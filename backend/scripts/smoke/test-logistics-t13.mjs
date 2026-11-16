@@ -83,8 +83,8 @@ function addDays(days) {
 
 await Promise.all([logisticsDb.connect(), identityDb.connect()]);
 try {
-  const manager = await registerAndLogin('manager', ['OPERATIONS_MANAGER', 'INTAKE_STAFF', 'CAMPAIGN_MANAGER']);
-  const counter = await registerAndLogin('counter', ['INTAKE_STAFF', 'REVIEWER']);
+  const manager = await registerAndLogin('manager', ['OPERATIONS_MANAGER', 'COORDINATOR']);
+  const counter = await registerAndLogin('counter', ['OPERATIONS_MANAGER', 'REVIEWER']);
   const reviewer = await registerAndLogin('reviewer', ['REVIEWER']);
   const donor = await registerAndLogin('donor', []);
   const suffix = randomBytes(5).toString('hex').toUpperCase();

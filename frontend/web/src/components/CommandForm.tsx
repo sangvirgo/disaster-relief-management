@@ -27,6 +27,10 @@ export type Field = {
   emptyLabel?: string;
   placeholder?: string;
   initialValue?: string;
+  /** Value used when the field is empty and this returns one (e.g. after a related field changes). */
+  defaultFor?: (values: Record<string, string>) => string | undefined;
+  /** Inline note shown under the field, derived from the current form values. */
+  hintFor?: (values: Record<string, string>) => string | undefined;
   visibleWhen?: { field: string; value: string };
   /** For `location` fields: area drawn on the map from the other form values. */
   overlayFor?: (values: Record<string, string>) => LocationOverlay | undefined;
@@ -54,6 +58,16 @@ function pointValue(value: string) {
   return Number.isFinite(longitude) && Number.isFinite(latitude) && value.includes(',')
     ? { longitude, latitude }
     : null;
+}
+/** Fills empty fields that declare a `defaultFor` value. */
+function withFieldDefaults(fields: Field[] | undefined, values: Record<string, string>): Record<string, string> {
+  let next = values;
+  for (const field of fields || []) {
+    if (!field.defaultFor || next[field.name]) continue;
+    const value = field.defaultFor(next);
+    if (value) next = { ...next, [field.name]: value };
+  }
+  return next;
 }
 function requestValuesFor(fields: Field[] | undefined, values: Record<string, string>): Record<string, string> {
   return Object.fromEntries(Object.entries(values).map(([name, value]) => {
@@ -110,10 +124,10 @@ export function CommandForm({
   onSuccess: (result?: unknown) => void;
   onStale?: () => void;
 }) {
-  const [values, setValues] = useState<Record<string, string>>(() =>
+  const [values, setValues] = useState<Record<string, string>>(() => withFieldDefaults(spec.fields,
     Object.fromEntries((spec.fields || []).filter((field) => field.initialValue)
       .map((field) => [field.name, field.initialValue!]))
-  );
+  ));
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -146,7 +160,7 @@ export function CommandForm({
   }
   function updateField(field: Field, value: string) {
     const resetNames = field.resetOnChange || [];
-    setValues((current) => ({
+    setValues((current) => withFieldDefaults(spec.fields, {
       ...current,
       ...Object.fromEntries(resetNames.map((name) => [name, ''])),
       [field.name]: value,
@@ -404,6 +418,7 @@ export function CommandForm({
               onChange={(event) => updateField(field, event.target.value)}
             />
           )}
+          {field.hintFor?.(values) && <small className="field-hint" role="note">{field.hintFor(values)}</small>}
           {inlineError && (
             <small className="field-error" id={errorId(field)} role="alert">{inlineError}</small>
           )}

@@ -1,5 +1,5 @@
 import type { EntityManager } from 'typeorm';
-import { updateCampaignAttribution } from '../operations/request-campaign-attribution';
+import { applyAutomaticCampaignMatch } from '../operations/request-campaign-attribution';
 
 // Request statuses that still need coordination (mirrors the open-status list used by campaign triage).
 export const OPEN_REQUEST_STATUSES = "'SUBMITTED','VERIFYING','VERIFIED','TRIAGED','DISPATCHED','IN_PROGRESS','RESOLVING'";
@@ -129,19 +129,19 @@ export function buildCommonQueueSuggestions(requests: OpenRequestPoint[], campai
 }
 
 /**
- * Attaches open, unmatched SOS inside an ACTIVE campaign's area. Used when a campaign is activated
- * and when its area is changed; only UNMATCHED requests are touched, never CONFLICT or MANUAL ones.
+ * Attaches open, unmatched SOS inside an ACTIVE campaign's area. Used when a campaign is activated,
+ * resumed, or its area is changed; only UNMATCHED requests are touched, never CONFLICT or MANUAL ones.
  */
 export async function attachUnmatchedInArea(
   manager: Pick<EntityManager, 'query'>,
   campaign: { id: string; status: string; center_latitude?: unknown; center_longitude?: unknown; radius_m?: number | null },
-  actorId: string,
-  reason: string,
+  _actorId: string,
+  _reason: string,
 ): Promise<number> {
   if (campaign.status !== 'ACTIVE' || campaign.radius_m == null ||
       campaign.center_latitude == null || campaign.center_longitude == null) return 0;
   const candidates = await manager.query(
-    `SELECT r.id,r.status,r.version,r.campaign_id,r.campaign_match_state,r.campaign_candidate_ids
+    `SELECT r.id,r.tracking_code,r.status,r.version
        FROM assistance_request r JOIN request_subject s ON s.request_id=r.id
       WHERE r.campaign_id IS NULL AND r.campaign_match_state='UNMATCHED' AND r.canonical_request_id IS NULL
         AND r.status IN (${OPEN_REQUEST_STATUSES})
@@ -149,12 +149,11 @@ export async function attachUnmatchedInArea(
       ORDER BY r.received_at,r.id
         FOR UPDATE OF r`,
     [Number(campaign.center_longitude), Number(campaign.center_latitude), Number(campaign.radius_m)],
-  ) as Array<{ id: string; status: string; version: number; campaign_id: string | null; campaign_match_state: string; campaign_candidate_ids: string[] | null }>;
+  ) as Array<{ id: string; tracking_code: string; status: string; version: number }>;
+  // Same rule as intake: one ACTIVE campaign in range => auto-attach; several => CONFLICT for manual choice.
   for (const row of candidates) {
-    await updateCampaignAttribution(manager, row, {
-      campaignId: campaign.id, matchState: 'AUTO_ATTACHED', actorId,
-      eventType: 'CAMPAIGN_ATTACHED', auditAction: 'CAMPAIGN_AUTO_ATTACHED', reason,
-      payload: { source: 'CAMPAIGN_AREA' },
+    await applyAutomaticCampaignMatch(manager, {
+      requestId: row.id, trackingCode: row.tracking_code, status: row.status, version: Number(row.version),
     });
   }
   return candidates.length;

@@ -5,11 +5,8 @@ export type UserRole =
   | 'VOLUNTEER'
   | 'COORDINATOR'
   | 'CAMPAIGN_COORDINATOR'
-  | 'CAMPAIGN_MANAGER'
   | 'OPERATIONS_MANAGER'
-  | 'INTAKE_STAFF'
   | 'REVIEWER'
-  | 'DISTRIBUTION_STAFF'
   | 'ADMIN';
 
 export interface User {

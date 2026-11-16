@@ -93,6 +93,10 @@ for service in identity response logistics; do
       role_constraint_count="$(query identity "SELECT count(*) FROM pg_constraint WHERE conrelid='public.role_grant'::regclass AND contype='c' AND pg_get_constraintdef(oid) LIKE '%CAMPAIGN_COORDINATOR%'")"
       [[ "$role_constraint_count" == "0" ]] || { echo 'FAIL campaign coordinator rollback left the role in an Identity check constraint' >&2; exit 1; }
     fi
+    if [[ "$service" == identity && "$latest" == RetireLegacyStaffRoles1795046400000 ]]; then
+      restored_legacy_roles="$(query identity "SELECT count(*) FROM pg_constraint WHERE conrelid='public.role_grant'::regclass AND contype='c' AND pg_get_constraintdef(oid) LIKE '%CAMPAIGN_MANAGER%' AND pg_get_constraintdef(oid) LIKE '%DISTRIBUTION_STAFF%'")"
+      [[ "$restored_legacy_roles" == "1" ]] || { echo 'FAIL retired staff role rollback did not restore the legacy role catalog' >&2; exit 1; }
+    fi
     if [[ "$service" == response && "$latest" == AddCampaignEngagementAndSpatialMatching1794960000000 ]]; then
       engagement_table="$(query response "SELECT to_regclass('public.campaign_engagement') IS NULL")"
       spatial_columns="$(query response "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND ((table_name='campaign' AND column_name IN ('center','radius_m')) OR (table_name='assistance_request' AND column_name IN ('campaign_match_state','campaign_candidate_ids')))")"
@@ -126,5 +130,9 @@ for service in identity response logistics; do
   applied="$(query "$service" 'SELECT count(*) FROM public.typeorm_migrations')"
   expected="${expected_counts[$service]}"
   [[ "$applied" == "$expected" ]] || { printf 'FAIL %s expected %s applied migrations, got %s\n' "$service" "$expected" "$applied" >&2; exit 1; }
+  if [[ "$service" == identity ]]; then
+    retired_roles="$(query identity "SELECT count(*) FROM pg_constraint WHERE conrelid='public.role_grant'::regclass AND contype='c' AND pg_get_constraintdef(oid) LIKE '%CAMPAIGN_MANAGER%'")"
+    [[ "$retired_roles" == "0" ]] || { echo 'FAIL identity up migration left retired staff roles in the role_grant check constraint' >&2; exit 1; }
+  fi
   printf 'PASS %s primary database migration down/up\n' "$service"
 done

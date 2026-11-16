@@ -222,7 +222,7 @@ export class CampaignsService {
         }
         await this.audit(manager, session.userId, `CAMPAIGN_${action.toUpperCase()}`, id, before, value, reason);
         // Activation adopts unmatched SOS already inside the campaign's area.
-        if (action === 'activate') await attachUnmatchedInArea(manager, next, session.userId, 'CAMPAIGN_ACTIVATED');
+        if (action === 'activate' || action === 'resume') await attachUnmatchedInArea(manager, next, session.userId, action === 'resume' ? 'CAMPAIGN_RESUMED' : 'CAMPAIGN_ACTIVATED');
         return { status: 200, value, resource: { type: 'campaign', id } };
       },
       replay: async (manager, resource) => campaignView(await this.replayCampaign(manager, resource, session, 'CAMPAIGN_MANAGE')),

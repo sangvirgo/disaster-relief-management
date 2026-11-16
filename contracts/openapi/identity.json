@@ -4481,11 +4481,8 @@
                          "VOLUNTEER",
                          "COORDINATOR",
                          "CAMPAIGN_COORDINATOR",
-                         "CAMPAIGN_MANAGER",
                          "OPERATIONS_MANAGER",
-                         "INTAKE_STAFF",
                          "REVIEWER",
-                         "DISTRIBUTION_STAFF",
                          "ADMIN"
                        ]
                      },
@@ -4712,11 +4709,8 @@
                        "VOLUNTEER",
                        "COORDINATOR",
                        "CAMPAIGN_COORDINATOR",
-                       "CAMPAIGN_MANAGER",
                        "OPERATIONS_MANAGER",
-                       "INTAKE_STAFF",
                        "REVIEWER",
-                       "DISTRIBUTION_STAFF",
                        "ADMIN"
                      ]
                    },
@@ -4784,11 +4778,8 @@
                                     "VOLUNTEER",
                                     "COORDINATOR",
                                     "CAMPAIGN_COORDINATOR",
-                                    "CAMPAIGN_MANAGER",
                                     "OPERATIONS_MANAGER",
-                                    "INTAKE_STAFF",
                                     "REVIEWER",
-                                    "DISTRIBUTION_STAFF",
                                     "ADMIN"
                                   ],
                                   "description": "CAMPAIGN_COORDINATOR grants require SYSTEM scope."

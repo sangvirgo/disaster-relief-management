@@ -71,28 +71,31 @@ export function DriveCreateForm({ warehouses, campaigns, items, itemScales, onSu
     } finally { setBusy(false); }
   }
   return <form className="form-stack command-form drive-create-form" onSubmit={submit}>
-    <h3>Tạo đợt quyên góp</h3>
     <label><span>Tên đợt quyên góp *</span><input required maxLength={201} aria-invalid={title.length > 200} value={title} onChange={event => { setTitle(event.target.value); pending.current = null; }} />{title.length > 200 && <small className="field-error" role="alert">Tên đợt quyên góp không được vượt quá 200 ký tự.</small>}</label>
     <label><span>Mô tả *</span><textarea required maxLength={5001} aria-invalid={description.length > 5000} value={description} onChange={event => { setDescription(event.target.value); pending.current = null; }} />{description.length > 5000 && <small className="field-error" role="alert">Mô tả không được vượt quá 5.000 ký tự.</small>}</label>
+    <div className="form-grid-2">
     <label><span>Kho tiếp nhận *</span><select required value={warehouseId} onChange={event => { setWarehouseId(event.target.value); pending.current = null; }}>
       <option value="">Chọn kho tiếp nhận</option>{warehouses.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
     </select></label>
     <label><span>Chiến dịch (nếu có)</span><select value={campaignId} onChange={event => { setCampaignId(event.target.value); pending.current = null; }}>
       <option value="">Không gắn chiến dịch</option>{campaigns.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
     </select></label>
+    </div>
     <fieldset className="drive-item-list"><legend>Vật phẩm cần tiếp nhận</legend>
       {lines.map((line, index) => <div className="drive-item-row" key={index}>
-        <strong>Vật phẩm {index + 1}</strong>
+        <div className="drive-item-head"><strong>Vật phẩm {index + 1}</strong>
+          {lines.length > 1 && <button className="button secondary small" type="button" onClick={() => { setLines(current => current.filter((_, i) => i !== index)); pending.current = null; }}>Xóa</button>}</div>
+        <div className="drive-item-fields">
         <label><span>Vật phẩm *</span><select required aria-invalid={Boolean(lineErrors[index].item)} value={line.item_id} onChange={event => updateLine(index, { item_id: event.target.value, target_quantity: '' })}>
           <option value="">Chọn vật phẩm</option>{items.filter(option => option.value === line.item_id || !lines.some(other => other.item_id === option.value)).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-        </select>{lineErrors[index].item && <small className="field-error" role="alert">{lineErrors[index].item}</small>}</label>
+        </select>{line.item_id && lineErrors[index].item && <small className="field-error" role="alert">{lineErrors[index].item}</small>}</label>
         <label><span>Số lượng mục tiêu *</span><input required type="number" min="0" step={10 ** -Number(itemScales.find(item => item.value === line.item_id)?.label ?? 0)} aria-invalid={Boolean(line.target_quantity && lineErrors[index].quantity)} value={line.target_quantity} onChange={event => updateLine(index, { target_quantity: event.target.value })} />{line.target_quantity && lineErrors[index].quantity && <small className="field-error" role="alert">{lineErrors[index].quantity}</small>}</label>
         <label><span>Ghi chú tiếp nhận (nếu có)</span><input maxLength={501} aria-invalid={Boolean(lineErrors[index].note)} value={line.acceptance_note} onChange={event => updateLine(index, { acceptance_note: event.target.value })} />{lineErrors[index].note && <small className="field-error" role="alert">{lineErrors[index].note}</small>}</label>
-        {lines.length > 1 && <button className="button secondary" type="button" onClick={() => { setLines(current => current.filter((_, i) => i !== index)); pending.current = null; }}>Xóa vật phẩm này</button>}
+        </div>
       </div>)}
       <button className="button secondary" type="button" disabled={lines.length >= Math.min(50, items.length)} onClick={() => { setLines(current => [...current, emptyItem()]); pending.current = null; }}>+ Thêm vật phẩm</button>
     </fieldset>
     {error && <p className="notice error" role="alert">{error}</p>}
-    <button className="button" disabled={busy || hasInvalidFields}>{busy ? 'Đang tạo…' : 'Tạo đợt quyên góp'}</button>
+    <div className="form-actions"><button className="button" disabled={busy || hasInvalidFields}>{busy ? 'Đang tạo…' : 'Tạo đợt quyên góp'}</button>{hasInvalidFields && !busy && <span className="muted">Điền đủ tên, mô tả, kho và vật phẩm để tạo.</span>}</div>
   </form>;
 }

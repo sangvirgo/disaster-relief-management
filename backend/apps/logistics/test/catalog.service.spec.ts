@@ -25,7 +25,7 @@ describe('Logistics catalog permissions', () => {
     const sessions = {
       require: jest.fn().mockResolvedValue({
         userId: '11111111-1111-4111-8111-111111111111',
-        grants: [{ role_code: 'INTAKE_STAFF', scope_type: 'SYSTEM',}],
+        grants: [{ role_code: 'REVIEWER', scope_type: 'SYSTEM',}],
         identityHeaders: { authorization: 'Bearer verified-token' },
       }),
     };
@@ -36,6 +36,24 @@ describe('Logistics catalog permissions', () => {
     } as never)).rejects.toMatchObject({ code: 'FORBIDDEN' });
     expect(idempotency.execute).not.toHaveBeenCalled();
     expect(dataSource.transaction).not.toHaveBeenCalled();
+  });
+
+  it('rejects catalog writes from a campaign-scoped operations manager (catalog is SYSTEM-only)', async () => {
+    const dataSource = { query: jest.fn(), transaction: jest.fn() };
+    const idempotency = { execute: jest.fn() };
+    const sessions = {
+      require: jest.fn().mockResolvedValue({
+        userId: '11111111-1111-4111-8111-111111111111',
+        grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'CAMPAIGN', campaign_id: '99999999-9999-4999-8999-999999999999' }],
+        identityHeaders: { authorization: 'Bearer verified-token' },
+      }),
+    };
+    const service = new CatalogService(dataSource as never, idempotency as never, sessions as never);
+
+    await expect(service.createItemType({ code: 'FOOD', display_name: 'Thực phẩm' }, {
+      method: 'POST', headers: {}, idempotencyKey: '33333333-3333-4333-8333-333333333333',
+    } as never)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(idempotency.execute).not.toHaveBeenCalled();
   });
 
   it('maps invalid Vietnamese catalog text to the existing validation error', async () => {

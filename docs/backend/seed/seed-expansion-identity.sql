@@ -2,6 +2,7 @@
 
 INSERT INTO app_user (id, username, display_name, email, email_verified_at, password_hash, status, must_change_password) VALUES
   ('00000000-0000-4000-8000-000000000112', 'ops_seed', 'Quản lý vận hành 2 (demo)', 'ops_seed+' || substr(md5('00000000-0000-4000-8000-000000000112'), 1, 10) || '@example.test', now(), :'seed_password_hash', 'ACTIVE', false),
+  ('00000000-0000-4000-8000-000000000126', 'ops_camp1', 'Quản lý vận hành chiến dịch TP. Hồ Chí Minh (demo)', 'ops_camp1+' || substr(md5('00000000-0000-4000-8000-000000000126'), 1, 10) || '@example.test', now(), :'seed_password_hash', 'ACTIVE', false),
   ('00000000-0000-4000-8000-000000000113', 'citizen3', 'Người dân 3 (demo)', 'citizen3+' || substr(md5('00000000-0000-4000-8000-000000000113'), 1, 10) || '@example.test', now(), :'seed_password_hash', 'ACTIVE', false),
   ('00000000-0000-4000-8000-000000000114', 'vol_leader3', 'Đội trưởng tình nguyện 3 (demo)', 'vol_leader3+' || substr(md5('00000000-0000-4000-8000-000000000114'), 1, 10) || '@example.test', now(), :'seed_password_hash', 'ACTIVE', false),
   ('00000000-0000-4000-8000-000000000115', 'vol_member3', 'Tình nguyện viên 3 (demo)', 'vol_member3+' || substr(md5('00000000-0000-4000-8000-000000000115'), 1, 10) || '@example.test', now(), :'seed_password_hash', 'ACTIVE', false),
@@ -20,6 +21,7 @@ INSERT INTO role_grant (user_id, role_code, scope_type, campaign_id)
 SELECT fixture.user_id, fixture.role_code, fixture.scope_type, fixture.campaign_id
   FROM (VALUES
     ('00000000-0000-4000-8000-000000000112'::uuid, 'ops_seed', 'OPERATIONS_MANAGER', 'SYSTEM', NULL::uuid),
+    ('00000000-0000-4000-8000-000000000126'::uuid, 'ops_camp1', 'OPERATIONS_MANAGER', 'CAMPAIGN', '00000000-0000-4000-8000-0000000000c3'::uuid),
     ('00000000-0000-4000-8000-000000000113'::uuid, 'citizen3', 'CITIZEN', 'SYSTEM', NULL::uuid),
     ('00000000-0000-4000-8000-000000000114'::uuid, 'vol_leader3', 'VOLUNTEER', 'SYSTEM', NULL::uuid),
     ('00000000-0000-4000-8000-000000000115'::uuid, 'vol_member3', 'VOLUNTEER', 'SYSTEM', NULL::uuid),

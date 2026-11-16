@@ -114,6 +114,7 @@ Every error the API can return has one row here. The implementation loads this t
 | `CYCLE_NOT_SETTLED` | 409 | Logistics | Còn nhu cầu hoặc hàng chưa hoàn tất nên chưa thể niêm phong. |
 | **Logistics — distribution** | | | |
 | `SELF_APPROVAL_FORBIDDEN` | 403 | Logistics | Người lập phiếu không được tự duyệt. |
+| `SELF_HANDOFF_FORBIDDEN` | 403 | Logistics | Người đã điều xuất phiếu này không được ghi nhận bàn giao cho phiếu đó. |
 | `APPROVAL_STALE` | 409 | Logistics | Phiếu đã thay đổi sau khi duyệt. Cần duyệt lại. |
 | `ALREADY_DISPATCHED` | 409 | Logistics | Phiếu đã xuất kho. |
 | `LINE_ITEM_MISMATCH` | 400 | Logistics | Mặt hàng không khớp với cam kết. |

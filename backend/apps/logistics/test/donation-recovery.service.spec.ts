@@ -35,7 +35,7 @@ function createIdempotency(manager: { query: jest.Mock }, replay = false, resour
 function makeService(manager: { query: jest.Mock }, idempotency = createIdempotency(manager)) {
   const sessions = { require: jest.fn(async () => ({
     userId,
-    grants: [{ role_code: 'INTAKE_STAFF', scope_type: 'SYSTEM',}],
+    grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM',}],
   })) };
   const service = new DonationsService(
     { query: jest.fn(async () => [{ id: deliveryId }]) } as never,

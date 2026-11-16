@@ -186,12 +186,12 @@ SELECT fixture.id, fixture.tracking_code, fixture.tracking_secret_hash, fixture.
                received_at, description, phone, reporter_user_id, reporter_name)
   JOIN campaign ON campaign.id = fixture.campaign_id
                AND campaign.name = CASE fixture.campaign_id
-                 WHEN '00000000-0000-4000-8000-0000000000c3'::uuid THEN 'Hỗ trợ khẩn cấp Nam'
-                 WHEN '00000000-0000-4000-8000-0000000000c4'::uuid THEN 'Tiếp tế vùng duyên hải Trung'
-                 WHEN '00000000-0000-4000-8000-0000000000c5'::uuid THEN 'Cứu trợ hộ dân Bắc'
-                 WHEN '00000000-0000-4000-8000-0000000000c6'::uuid THEN 'Nước sạch và nhu yếu phẩm Demo A'
-                 WHEN '00000000-0000-4000-8000-0000000000c7'::uuid THEN 'Hỗ trợ sơ tán và an sinh Demo B'
-                 WHEN '00000000-0000-4000-8000-0000000000c8'::uuid THEN 'Cứu trợ y tế Bắc'
+                 WHEN '00000000-0000-4000-8000-0000000000c3'::uuid THEN 'Hỗ trợ khẩn cấp TP. Hồ Chí Minh'
+                 WHEN '00000000-0000-4000-8000-0000000000c4'::uuid THEN 'Tiếp tế vùng duyên hải Đà Nẵng'
+                 WHEN '00000000-0000-4000-8000-0000000000c5'::uuid THEN 'Cứu trợ hộ dân Lào Cai'
+                 WHEN '00000000-0000-4000-8000-0000000000c6'::uuid THEN 'Nước sạch và nhu yếu phẩm Huế'
+                 WHEN '00000000-0000-4000-8000-0000000000c7'::uuid THEN 'Hỗ trợ sơ tán và an sinh Cần Thơ'
+                 WHEN '00000000-0000-4000-8000-0000000000c8'::uuid THEN 'Cứu trợ y tế Nghệ An'
                END
  WHERE true
 ON CONFLICT DO NOTHING;
@@ -201,17 +201,17 @@ SELECT fixture.id, fixture.people_affected, fixture.children_count, fixture.elde
        ST_SetSRID(ST_MakePoint(fixture.longitude, fixture.latitude), 4326)::geography, 'MANUAL_PIN'
   FROM (VALUES
     ('00000000-0000-4000-8000-00000000f101'::uuid, 'C48SEED0001', 3, 1, 1, 106.7000::float8, 10.7800::float8),
-    ('00000000-0000-4000-8000-00000000f102'::uuid, 'C48SEED0002', 2, 0, 1, 107.6000::float8, 16.0500::float8),
+    ('00000000-0000-4000-8000-00000000f102'::uuid, 'C48SEED0002', 2, 0, 1, 108.2000::float8, 16.0500::float8),
     ('00000000-0000-4000-8000-00000000f103'::uuid, 'C48SEED0003', 4, 2, 0, 105.8500::float8, 21.0500::float8),
-    ('00000000-0000-4000-8000-00000000f104'::uuid, 'C48SEED0004', 5, 1, 1, 106.7200::float8, 10.8000::float8),
-    ('00000000-0000-4000-8000-00000000f105'::uuid, 'C48SEED0005', 1, 0, 1, 107.6500::float8, 16.1000::float8),
-    ('00000000-0000-4000-8000-00000000f106'::uuid, 'C48SEED0006', 3, 1, 1, 105.9000::float8, 21.0200::float8),
+    ('00000000-0000-4000-8000-00000000f104'::uuid, 'C48SEED0004', 5, 1, 1, 107.5900::float8, 16.4700::float8),
+    ('00000000-0000-4000-8000-00000000f105'::uuid, 'C48SEED0005', 1, 0, 1, 105.7500::float8, 10.0500::float8),
+    ('00000000-0000-4000-8000-00000000f106'::uuid, 'C48SEED0006', 3, 1, 1, 105.6900::float8, 18.6800::float8),
     ('00000000-0000-4000-8000-00000000f107'::uuid, 'C48SEED0007', 4, 1, 0, 106.6800::float8, 10.7400::float8),
-    ('00000000-0000-4000-8000-00000000f108'::uuid, 'C48SEED0008', 2, 0, 1, 107.5500::float8, 16.1200::float8),
-    ('00000000-0000-4000-8000-00000000f109'::uuid, 'C48SEED0009', 6, 2, 1, 105.8200::float8, 21.0800::float8),
-    ('00000000-0000-4000-8000-00000000f10a'::uuid, 'C48SEED0010', 3, 0, 1, 106.7500::float8, 10.8200::float8),
-    ('00000000-0000-4000-8000-00000000f10b'::uuid, 'C48SEED0011', 4, 1, 1, 107.6200::float8, 16.0800::float8),
-    ('00000000-0000-4000-8000-00000000f10c'::uuid, 'C48SEED0012', 2, 0, 1, 105.8800::float8, 21.1000::float8)
+    ('00000000-0000-4000-8000-00000000f108'::uuid, 'C48SEED0008', 2, 0, 1, 108.2300::float8, 16.0700::float8),
+    ('00000000-0000-4000-8000-00000000f109'::uuid, 'C48SEED0009', 6, 2, 1, 103.9800::float8, 22.5000::float8),
+    ('00000000-0000-4000-8000-00000000f10a'::uuid, 'C48SEED0010', 3, 0, 1, 107.6100::float8, 16.4500::float8),
+    ('00000000-0000-4000-8000-00000000f10b'::uuid, 'C48SEED0011', 4, 1, 1, 105.7600::float8, 10.0600::float8),
+    ('00000000-0000-4000-8000-00000000f10c'::uuid, 'C48SEED0012', 2, 0, 1, 105.7000::float8, 18.6900::float8)
   ) AS fixture(id, tracking_code, people_affected, children_count, elderly_count, longitude, latitude)
   JOIN assistance_request request ON request.id = fixture.id AND request.tracking_code = fixture.tracking_code
  WHERE true
@@ -327,7 +327,7 @@ SELECT fixture.id, fixture.people_affected, fixture.children_count, fixture.elde
     ('00000000-0000-4000-8000-00000000f202'::uuid, 'C48CAM00A02', 3, 0, 1, 106.7500::float8, 10.7400::float8),
     ('00000000-0000-4000-8000-00000000f203'::uuid, 'C48CAM00A03', 2, 0, 0, 108.2100::float8, 16.0600::float8),
     ('00000000-0000-4000-8000-00000000f204'::uuid, 'C48CAM00A04', 1, 0, 1, 105.7500::float8, 10.0500::float8),
-    ('00000000-0000-4000-8000-00000000f205'::uuid, 'C48CAM00A05', 5, 2, 0, 103.4800::float8, 22.4000::float8),
+    ('00000000-0000-4000-8000-00000000f205'::uuid, 'C48CAM00A05', 5, 2, 0, 103.9800::float8, 22.4900::float8),
     ('00000000-0000-4000-8000-00000000f206'::uuid, 'C48CAM00B01', 6, 2, 1, 105.8700::float8, 21.0300::float8),
     ('00000000-0000-4000-8000-00000000f207'::uuid, 'C48CAM00B02', 3, 1, 0, 105.8900::float8, 21.0400::float8),
     ('00000000-0000-4000-8000-00000000f208'::uuid, 'C48CAM00B03', 2, 0, 1, 105.8800::float8, 21.0200::float8),
@@ -373,7 +373,9 @@ WITH hits AS (
     JOIN request_subject s ON s.request_id = r.id
     JOIN campaign c ON c.status = 'ACTIVE' AND c.center IS NOT NULL AND c.radius_m IS NOT NULL
                    AND ST_DWithin(c.center, s.location, c.radius_m)
-   WHERE r.tracking_code LIKE 'C48CAM%'
+   WHERE r.campaign_id IS NULL
+     AND (r.tracking_code LIKE 'C48CAM%'
+          OR (r.tracking_code LIKE 'C48DEM%' AND r.status IN ('SUBMITTED','VERIFYING','VERIFIED','TRIAGED','DISPATCHED','IN_PROGRESS','RESOLVING')))
    GROUP BY r.id
 )
 UPDATE assistance_request r
@@ -395,7 +397,8 @@ SELECT md5('c48-seed-cam-attribution:' || r.id::text)::uuid, r.id, NULL,
        END,
        r.received_at + interval '1 minute'
   FROM assistance_request r
- WHERE r.tracking_code LIKE 'C48CAM%' AND r.campaign_match_state IN ('AUTO_ATTACHED','CONFLICT')
+ WHERE (r.tracking_code LIKE 'C48CAM%' OR r.tracking_code LIKE 'C48DEM%') AND r.campaign_match_state IN ('AUTO_ATTACHED','CONFLICT')
+   AND r.campaign_match_state<>'MANUAL'
 ON CONFLICT (id) DO NOTHING;
 
 -- Campaign attribution fixtures mirror the deterministic PostGIS rule and retain audit history.
@@ -417,7 +420,7 @@ UPDATE assistance_request
    SET campaign_match_state='MANUAL',campaign_candidate_ids=NULL
  WHERE campaign_id IS NOT NULL AND id<>'00000000-0000-4000-8000-0000000000f1'
    AND tracking_code NOT LIKE 'C48CAM%'
-   AND campaign_match_state<>'MANUAL';
+   AND campaign_match_state NOT IN ('MANUAL','AUTO_ATTACHED');
 
 UPDATE assistance_request
    SET campaign_match_state='UNMATCHED',campaign_candidate_ids=NULL

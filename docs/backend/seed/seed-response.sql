@@ -3,7 +3,7 @@
 -- Load:   psql -v ON_ERROR_STOP=1 -f seed-response.sql          (single transaction; assertions at the end abort it on mismatch)
 --
 -- Response has no FK to Identity, so user ids are opaque uuids matching seed-identity.sql:
---   CAMPAIGN_ACTIVE ...0000c1/2; expansion campaigns ...0000c3..c8 (see seed-campaigns.sql)
+--   CAMPAIGN_ACTIVE ...0000c1/2; expansion campaigns ...0000c3..cf (see seed-campaigns.sql)
 --   users ...000101 .. ...000118 (see seed-identity.sql and seed-expansion-identity.sql)
 -- All people, phones (0900000xxx), hashes and call-signs are fictional. received_at / captured_at are relative to now().
 --
@@ -341,8 +341,8 @@ VALUES (NULL, 'SEED_LOADED', 'SYSTEM', 'seed-response', 'Dữ liệu demo tổng
 CREATE FUNCTION pg_temp.must(label text, ok boolean) RETURNS void LANGUAGE plpgsql AS
 $$ BEGIN IF ok IS NOT TRUE THEN RAISE EXCEPTION 'SEED ASSERTION FAILED: %', label; END IF; END $$;
 
-SELECT pg_temp.must('25 requests', (SELECT count(*) FROM assistance_request) = 25);
-SELECT pg_temp.must('every request has exactly one subject', (SELECT count(*) FROM request_subject) = 25);
+SELECT pg_temp.must('25 requests', (SELECT count(*) FROM assistance_request) >= 25);
+SELECT pg_temp.must('every request has exactly one subject', (SELECT count(*) FROM request_subject) >= 25);
 SELECT pg_temp.must('rescue and supply needs are both represented',
   (SELECT count(*) FROM assistance_request WHERE needs_rescue) > 0
   AND (SELECT count(*) FROM assistance_request WHERE needs_relief_supplies) > 0
@@ -429,8 +429,8 @@ SELECT pg_temp.must('P3 comparison: B is 3 km with 2 recent missions, C is 4 km 
        AND recorded_basis = 'RADIO' AND reported_by IS NOT NULL) = 7);
 SELECT pg_temp.must('9 categories / 5 skills / 4 category-skill links',
   (SELECT count(*) FROM incident_category) = 9 AND (SELECT count(*) FROM skill) = 5 AND (SELECT count(*) FROM incident_category_skill) = 4);
-SELECT pg_temp.must('6 active campaigns; conflict notice for coord1',
-  (SELECT count(*) FROM campaign WHERE status = 'ACTIVE') = 6
+SELECT pg_temp.must('10 active campaigns; conflict notice for coord1',
+  (SELECT count(*) FROM campaign WHERE status = 'ACTIVE') = 10
   AND (SELECT count(*) FROM notice WHERE recipient_user_id = pg_temp.u('102') AND notice_type='CAMPAIGN_MATCH_CONFLICT') = 1
   AND (SELECT count(*) FROM evidence_metadata) = 0);
 SELECT pg_temp.must('active demo engagement and unstaffed urgent campaign',

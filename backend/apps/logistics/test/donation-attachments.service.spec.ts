@@ -201,7 +201,7 @@ describe('donation attachment access and upload', () => {
     const sessions = {
       require: jest.fn(async () => ({
         userId: donorId,
-        grants: [{ role_code: 'DISTRIBUTION_STAFF', scope_type: 'SYSTEM',}],
+        grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM',}],
         identityHeaders: {},
       })),
     };
@@ -222,7 +222,7 @@ describe('donation attachment access and upload', () => {
     const sessions = {
       require: jest.fn(async () => ({
         userId: donorId,
-        grants: [{ role_code: 'DISTRIBUTION_STAFF', scope_type: 'SYSTEM',}],
+        grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM',}],
         identityHeaders: {},
       })),
     };
@@ -261,7 +261,7 @@ describe('donation attachment access and upload', () => {
     const sessions = {
       require: jest.fn(async () => ({
         userId: donorId,
-        grants: [{ role_code: 'DISTRIBUTION_STAFF', scope_type: 'SYSTEM',}],
+        grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM',}],
         identityHeaders: {},
       })),
     };

@@ -94,7 +94,7 @@ describe('RequestCampaignAssociationService', () => {
 
   it('requires permission for both the current and target campaign when moving attribution', async () => {
     const { service, managerQuery } = fixture([{
-      role_code: 'CAMPAIGN_MANAGER', scope_type: 'CAMPAIGN', campaign_id: campaignId,
+      role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: campaignId,
     }]);
     managerQuery.mockResolvedValueOnce([{ campaign_id: sourceCampaignId }])
       .mockResolvedValueOnce([activeCampaign()])
@@ -118,7 +118,7 @@ describe('RequestCampaignAssociationService', () => {
   });
 
   it('rejects a campaign-scoped user from changing campaign attribution', async () => {
-    const { service, managerQuery } = fixture([{ role_code: 'CAMPAIGN_MANAGER', scope_type: 'CAMPAIGN', campaign_id: campaignId }]);
+    const { service, managerQuery } = fixture([{ role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: campaignId }]);
     managerQuery.mockResolvedValueOnce([{ campaign_id: null }])
       .mockResolvedValueOnce([activeCampaign()])
       .mockResolvedValueOnce([unlockedRequest()])
@@ -131,7 +131,7 @@ describe('RequestCampaignAssociationService', () => {
   });
 
   it('does not allow a campaign grant to attach an unassigned request to another campaign', async () => {
-    const { service, managerQuery } = fixture([{ role_code: 'CAMPAIGN_MANAGER', scope_type: 'CAMPAIGN', campaign_id: campaignId }]);
+    const { service, managerQuery } = fixture([{ role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: campaignId }]);
     managerQuery.mockResolvedValueOnce([{ campaign_id: null }])
       .mockResolvedValueOnce([activeCampaign({ id: sourceCampaignId })])
       .mockResolvedValueOnce([unlockedRequest()]);
@@ -209,7 +209,7 @@ describe('RequestCampaignAssociationService', () => {
 
   it('does not expose a reassigned campaign when replaying an event scoped to the original campaign', async () => {
     const grants: ReporterSession['grants'] = [{
-      role_code: 'CAMPAIGN_MANAGER', scope_type: 'CAMPAIGN', campaign_id: campaignId,
+      role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: campaignId,
     }];
     const { service, managerQuery } = fixture(grants, { type: 'request_event', id: eventId });
     managerQuery.mockResolvedValueOnce([unlockedRequest({ campaign_id: currentCampaignId })])
@@ -235,7 +235,7 @@ describe('RequestCampaignAssociationService', () => {
 
   it('keeps the original event campaign permission check on replay', async () => {
     const grants: ReporterSession['grants'] = [{
-      role_code: 'CAMPAIGN_MANAGER', scope_type: 'CAMPAIGN', campaign_id: currentCampaignId,
+      role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: currentCampaignId,
     }];
     const { service, managerQuery } = fixture(grants, { type: 'request_event', id: eventId });
     managerQuery.mockResolvedValueOnce([unlockedRequest({ campaign_id: currentCampaignId })])
@@ -278,7 +278,7 @@ describe('RequestCampaignAssociationService', () => {
 
   it('rejects a campaign-scoped user from replaying a detach after the current association is null', async () => {
     const grants: ReporterSession['grants'] = [{
-      role_code: 'CAMPAIGN_MANAGER', scope_type: 'CAMPAIGN', campaign_id: campaignId,
+      role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: campaignId,
     }];
     const { service, managerQuery } = fixture(grants, { type: 'request_event', id: eventId });
     managerQuery.mockResolvedValueOnce([unlockedRequest()])

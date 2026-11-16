@@ -52,7 +52,7 @@ const services = [
 function prepareSql(
   service,
   filename = 'seed-' + service + '.sql',
-  campaignCreatorId = '00000000-0000-4000-8000-000000000104',
+  campaignCreatorId = '00000000-0000-4000-8000-000000000102',
 ) {
   let source = readFileSync(resolve('seed', filename), 'utf8');
   for (const [marker, include] of [
@@ -196,12 +196,12 @@ try {
     const creators = await clients.get('identity').query(
       "SELECT id FROM app_user WHERE status = 'ACTIVE' ORDER BY created_at, id LIMIT 1",
     );
-    const campaignCreatorId = creators.rows[0]?.id ?? '00000000-0000-4000-8000-000000000104';
+    const campaignCreatorId = creators.rows[0]?.id ?? '00000000-0000-4000-8000-000000000102';
     await runTransaction(clients.get('response'), prepareSql('response', 'seed-campaigns.sql', campaignCreatorId));
     const logisticsCampaign = await clients.get('response').query(
       `SELECT 1 FROM campaign
         WHERE id = '00000000-0000-4000-8000-0000000000c3'
-          AND name = 'Hỗ trợ khẩn cấp Nam'
+          AND name = 'Hỗ trợ khẩn cấp TP. Hồ Chí Minh'
           AND status = 'ACTIVE'`,
     );
     if (logisticsCampaign.rowCount !== 1) {

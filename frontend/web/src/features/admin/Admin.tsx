@@ -33,13 +33,11 @@ const roles = [
   'CITIZEN',
   'VOLUNTEER',
   'COORDINATOR',
-  'CAMPAIGN_MANAGER',
   'OPERATIONS_MANAGER',
-  'INTAKE_STAFF',
   'REVIEWER',
-  'DISTRIBUTION_STAFF',
   'ADMIN',
 ];
+const systemOperationsWarning = 'Phạm vi toàn hệ thống cho quản lý vận hành: người này sẽ điều khiển TẤT CẢ chiến dịch (tiếp nhận, phân phối, bàn giao và đối soát), cùng danh mục, điểm cứu trợ và nhu cầu vật tư. Chỉ chọn khi thật sự cần; nên chọn phạm vi chiến dịch.';
 const types: Record<string, string> = {
   app_user: 'Người dùng',
   role_grant: 'Quyền truy cập',
@@ -365,6 +363,8 @@ export function Admin({ page }: { page: string }) {
                         label: 'Phạm vi',
                         type: 'select',
                         required: true,
+                        defaultFor: (values) => (values.role_code === 'OPERATIONS_MANAGER' ? 'CAMPAIGN' : undefined),
+                        hintFor: (values) => (values.role_code === 'OPERATIONS_MANAGER' && values.scope_type === 'SYSTEM' ? systemOperationsWarning : undefined),
                         optionsFor: (values) => (
                           ['ADMIN', 'CITIZEN', 'VOLUNTEER'].includes(values.role_code)
                             ? ['SYSTEM']
@@ -372,7 +372,7 @@ export function Admin({ page }: { page: string }) {
                         ).map((value) => ({ value, label: label(value) })),
                         resetOnChange: ['campaign_id'],
                       },
-                      { name: 'campaign_id', label: 'Chiến dịch', type: 'reference', required: true, visibleWhen: { field: 'scope_type', value: 'CAMPAIGN' }, placeholder: 'Dán mã chiến dịch do quản lý chiến dịch cung cấp' },
+                      { name: 'campaign_id', label: 'Chiến dịch', type: 'reference', required: true, visibleWhen: { field: 'scope_type', value: 'CAMPAIGN' }, placeholder: 'Dán mã chiến dịch cần cấp quyền' },
                       { name: 'reason', label: 'Ghi chú (không bắt buộc)', type: 'textarea', maxLength: 500,
                         placeholder: 'Ghi thêm thông tin nếu cần' },
                     ],

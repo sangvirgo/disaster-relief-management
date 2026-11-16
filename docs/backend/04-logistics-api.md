@@ -1,3 +1,4 @@
+MISS-B
 # 04 — Logistics service: API contract
 
 Schema: [schema/logistics.sql](schema/logistics.sql). Conventions: [00](00-setup.md). Permissions: [05](05-permissions.md). Business rules: plan §6.4, §8.3, §22.3, §23.2/23.4, §25. Quantities are **decimal strings** validated against `unit.scale`; reject nonpositive command quantities, nonfinite/exponent/overflow and excess lexical scale before numeric(18,3) casting; count split fields may be zero; wrong scale (`QUANTITY_SCALE_INVALID`). Public routes live under `/public/…` so Nginx can rate-limit them separately; this refines the sketches in plan §25.9 (non-final). No cart, checkout, payment or money fields exist anywhere.
@@ -95,7 +96,7 @@ Every command above that is request-linked first locks `fulfillment_cycle` (SEAL
 | `POST /distributions/{id}/approve` (Idem · Ver) | `DISTRIBUTION_REVIEW` | approver ≠ preparer; stores `approved_version = version` (`SELF_APPROVAL_FORBIDDEN`) |
 | `POST /distributions/{id}/dispatch` (Idem · Ver) | `DISTRIBUTION_DISPATCH` | dispatcher ≠ approver; requires `approved_version = version` (`APPROVAL_STALE`); stock transaction per the stock rule: REQUEST_AID ⇒ `ISSUE` with `commitment_id` (reserved already held; `commitment.issued_quantity += q`); direct ⇒ `RESERVE` then `ISSUE` with `distribution_line_id` in the same transaction (insufficient ⇒ whole command rolls back, `INSUFFICIENT_STOCK`); status DISPATCHED. Concurrent dispatches against the same stock: exactly one wins (TC-16). |
 | `POST /distributions/{id}/cancel` (Idem · Ver) | preparer/approver | before dispatch only (`ALREADY_DISPATCHED`) |
-| `POST /distributions/{id}/handoffs` (Idem) | HANDOFF_RECORD for field records; RETURN requires DONATION_INTAKE or DISTRIBUTION_DISPATCH + receiving warehouse scope and recorder≠dispatcher; LOSS independent review below | `{ handoff_kind, source_stage?, receiver_user_id?, receiver_label?, confirmation_basis, occurred_at, lines:[{ distribution_line_id, quantity }] }`; rules below |
+| `POST /distributions/{id}/handoffs` (Idem) | HANDOFF_RECORD for field records; RETURN requires DONATION_INTAKE or DISTRIBUTION_DISPATCH + receiving warehouse scope and recorder≠dispatcher for every handoff kind (`SELF_HANDOFF_FORBIDDEN`); LOSS independent review below | `{ handoff_kind, source_stage?, receiver_user_id?, receiver_label?, confirmation_basis, occurred_at, lines:[{ distribution_line_id, quantity }] }`; rules below |
 | `GET /distributions/{id}/handoffs/{handoff_id}` | distribution warehouse scope plus `HANDOFF_RECORD` for DIRECT_HOUSEHOLD/POINT_RECEIPT/HOUSEHOLD_HANDOUT; RETURN allows `DONATION_INTAKE` or `DISTRIBUTION_DISPATCH`; LOSS allows `HANDOFF_RECORD` or `LOSS_APPROVE` | Outside scope returns NOT_FOUND; an in-scope user without the kind permission gets FORBIDDEN. Existing handoff projection plus `evidence:[{ id, state, size_bytes, detected_mime, created_at }]` for READY files only |
 | `POST /distributions/{id}/handoffs/{handoff_id}/evidence` (Idem · multipart) | Authenticated session and warehouse scope; `HANDOFF_RECORD` for DIRECT_HOUSEHOLD/POINT_RECEIPT/HOUSEHOLD_HANDOUT/LOSS, or `DONATION_INTAKE`/`DISTRIBUTION_DISPATCH` for RETURN | Missing session returns 401; missing permission returns 403; missing, mismatched, or out-of-scope records return 404. Exactly one multipart file named `file`; returns READY metadata from private Logistics storage |
 | `POST /distributions/{id}/reconcile` (Idem · Ver) | `DISTRIBUTION_REVIEW` | status RECONCILED only when every line has in_transit=0/at_point=0 and no pending loss |
@@ -106,7 +107,7 @@ Every command above that is request-linked first locks `fulfillment_cycle` (SEAL
 
 `vehicle_capacity_exceeded: true` is a warning in preparation and dispatch responses; stock and commitment checks still govern the dispatched quantity.
 
-Errors (messages in [07-error-catalog.md](07-error-catalog.md)): `SELF_APPROVAL_FORBIDDEN`, `APPROVAL_STALE`, `ALREADY_DISPATCHED`, `HANDOFF_EXCEEDS_BALANCE`, `HANDOFF_KIND_INVALID`, `SETTLEMENT_EXCEEDS_ISSUED`, `LINE_ITEM_MISMATCH`, `POINT_INACTIVE`, `VEHICLE_INACTIVE`.
+Errors (messages in [07-error-catalog.md](07-error-catalog.md)): `SELF_APPROVAL_FORBIDDEN`, `SELF_HANDOFF_FORBIDDEN`, `APPROVAL_STALE`, `ALREADY_DISPATCHED`, `HANDOFF_EXCEEDS_BALANCE`, `HANDOFF_KIND_INVALID`, `SETTLEMENT_EXCEEDS_ISSUED`, `LINE_ITEM_MISMATCH`, `POINT_INACTIVE`, `VEHICLE_INACTIVE`.
 
 ## 7. Attachments
 

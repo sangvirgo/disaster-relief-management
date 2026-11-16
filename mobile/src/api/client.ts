@@ -75,6 +75,7 @@ const codeMessages: Record<string, string> = {
   IDEMPOTENCY_KEY_REUSED: 'Yêu cầu đang chờ được xác nhận với nội dung khác. Hãy tải lại và thử lại.',
   VERSION_CONFLICT: 'Dữ liệu đã thay đổi. Vui lòng tải lại trước khi tiếp tục.',
   STATE_TRANSITION_INVALID: 'Trạng thái hiện tại không cho phép thực hiện thao tác này.',
+  SELF_HANDOFF_FORBIDDEN: 'Bạn không thể ghi nhận bàn giao cho phiếu phân phối do chính mình xuất kho. Hãy nhờ nhân viên vận hành khác thực hiện.',
   TRACKING_SECRET_INVALID: 'Mã tra cứu hoặc khóa bí mật không chính xác.',
   DONATION_SECRET_INVALID: 'Mã quyên góp hoặc khóa bí mật không chính xác.',
   DRIVE_NOT_OPEN: 'Đợt tiếp nhận này hiện không nhận bàn giao hàng hóa.',

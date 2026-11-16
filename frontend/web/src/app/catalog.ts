@@ -48,6 +48,7 @@ export const pages: Record<Workspace, Page[]> = {
   ],
   coordinator: [
     { id: 'campaigns', title: 'Chiến dịch và điều phối', icon: 'campaign', service: 'response', path: '/campaigns/overview' },
+    { id: 'drives', title: 'Đợt quyên góp', icon: 'drive', service: 'logistics', path: '/donation-drives' },
     { id: 'dashboard', title: 'Thống kê', icon: 'report' },
     {
       id: 'reports', title: 'Tổng quan và bản đồ', icon: 'report', service: 'response',
@@ -95,13 +96,6 @@ export const pages: Record<Workspace, Page[]> = {
     },
     { id: 'needs', title: 'Nhu cầu vật tư', icon: 'needs', service: 'logistics', path: '/needs' },
     {
-      id: 'distribution',
-      title: 'Phân phối vật tư',
-      icon: 'distribution',
-      service: 'logistics',
-      path: '/distributions',
-    },
-    {
       id: 'reports',
       title: 'Báo cáo',
       icon: 'report',
@@ -128,25 +122,16 @@ export const workspaceLabels: Record<Workspace, string> = {
   operations: 'Vận hành cứu trợ',
   admin: 'Quản trị',
 };
+const operationsRoles = ['OPERATIONS_MANAGER', 'REVIEWER'] as const;
 export function allowedWorkspaces(user: Me | null): Workspace[] {
   const r: ReadonlySet<string> = roles(user);
   const result: Workspace[] = ['citizen'];
   if (r.has('VOLUNTEER')) result.push('volunteer');
   if (r.has('COORDINATOR') || r.has('CAMPAIGN_COORDINATOR')) result.push('coordinator');
-  if (
-    [
-      'OPERATIONS_MANAGER',
-      'CAMPAIGN_MANAGER',
-      'INTAKE_STAFF',
-      'REVIEWER',
-      'DISTRIBUTION_STAFF',
-    ].some((role) => r.has(role))
-  )
-    result.push('operations');
+  if (operationsRoles.some((role) => r.has(role))) result.push('operations');
   if (r.has('ADMIN')) result.push('admin');
   return result;
 }
-const operationsRoles = ['OPERATIONS_MANAGER', 'CAMPAIGN_MANAGER', 'INTAKE_STAFF', 'REVIEWER', 'DISTRIBUTION_STAFF'];
 /** Role codes of the user that grant access to a workspace (for display only). */
 export function workspaceRoleCodes(workspace: Workspace, user: Me | null): string[] {
   const r: ReadonlySet<string> = roles(user);
@@ -161,36 +146,18 @@ export function allowedPages(workspace: Workspace, user: Me | null): Page[] {
   return pages[workspace].filter((page) => {
     if (workspace === 'citizen') return true;
     if (workspace === 'volunteer') return r.has('VOLUNTEER');
-    if (workspace === 'coordinator') return r.has('COORDINATOR') || r.has('CAMPAIGN_COORDINATOR');
+    if (workspace === 'coordinator') return page.id === 'drives' ? r.has('COORDINATOR') : r.has('COORDINATOR') || r.has('CAMPAIGN_COORDINATOR');
     if (workspace === 'admin') return r.has('ADMIN');
-    if (page.id === 'drives')
-      return (
-        r.has('OPERATIONS_MANAGER') ||
-        r.has('CAMPAIGN_MANAGER') ||
-        r.has('INTAKE_STAFF') ||
-        r.has('REVIEWER')
-      );
-    if (page.id === 'campaigns') return r.has('OPERATIONS_MANAGER') || r.has('CAMPAIGN_MANAGER');
-    if (page.id === 'intake') return r.has('INTAKE_STAFF') || r.has('REVIEWER');
-    if (page.id === 'distribution')
-      return (
-        r.has('OPERATIONS_MANAGER') ||
-        r.has('DISTRIBUTION_STAFF') ||
-        r.has('INTAKE_STAFF') ||
-        r.has('REVIEWER')
-      );
-    if (page.id === 'assets' || page.id === 'needs') return r.has('OPERATIONS_MANAGER');
-    if (page.id === 'stock')
-      return (
-        r.has('OPERATIONS_MANAGER') ||
-        r.has('CAMPAIGN_MANAGER') ||
-        r.has('INTAKE_STAFF') ||
-        r.has('REVIEWER') ||
-        r.has('DISTRIBUTION_STAFF')
-      );
-    if (page.id === 'overview') return ['OPERATIONS_MANAGER', 'CAMPAIGN_MANAGER', 'INTAKE_STAFF', 'REVIEWER', 'DISTRIBUTION_STAFF'].some((role) => r.has(role));
-    return r.has('OPERATIONS_MANAGER') || r.has('CAMPAIGN_MANAGER');
-  }).map((page) => workspace === 'operations' && page.id === 'intake' && r.has('REVIEWER')
-    ? { ...page, title: 'Tiếp nhận và duyệt' }
+    const manages = r.has('OPERATIONS_MANAGER');
+    const reviews = r.has('REVIEWER');
+    if (page.id === 'drives') return manages || reviews;
+    if (page.id === 'campaigns') return manages;
+    if (page.id === 'intake') return manages || reviews;
+    if (page.id === 'assets' || page.id === 'needs') return manages;
+    if (page.id === 'stock') return manages || reviews;
+    if (page.id === 'overview') return manages || reviews;
+    return manages;
+  }).map((page) => workspace === 'operations' && page.id === 'intake'
+    ? { ...page, title: r.has('REVIEWER') ? 'Tiếp nhận, duyệt và phân phối' : 'Tiếp nhận và phân phối' }
     : page);
 }

@@ -99,6 +99,7 @@ const messages: Record<string, string> = {
   IDEMPOTENCY_KEY_REUSED:
     'Yêu cầu gửi lại đã thay đổi nội dung. Vui lòng tải lại và thực hiện thao tác mới.',
   SELF_APPROVAL_FORBIDDEN: 'Bạn không thể tự duyệt bản ghi do mình lập hoặc kiểm đếm.',
+  SELF_HANDOFF_FORBIDDEN: 'Bạn không thể ghi nhận bàn giao cho phiếu phân phối do chính mình xuất kho. Hãy nhờ nhân viên vận hành khác thực hiện.',
   APPROVAL_STALE: 'Bản kiểm đếm đã thay đổi. Vui lòng tải lại trước khi duyệt.',
   STATE_TRANSITION_INVALID: 'Trạng thái hiện tại không cho phép thao tác này.',
   CYCLE_SEALED: 'Đợt xử lý SOS này đã kết thúc nên không thể thay đổi nhu cầu hoặc cam kết vật tư. Nếu phát sinh nhu cầu mới, cần điều phối viên mở lại hồ sơ SOS và ghi nhận nhu cầu cho đợt xử lý mới.',

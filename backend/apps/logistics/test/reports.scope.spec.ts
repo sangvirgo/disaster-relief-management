@@ -19,7 +19,7 @@ describe('reportScopeSql', () => {
 
   it('keeps campaign grants on campaign-owned report rows', () => {
     const grants: Grant[] = [
-      { role_code: 'CAMPAIGN_MANAGER', scope_type: 'CAMPAIGN', campaign_id: '33333333-3333-4333-8333-333333333333' },
+      { role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: '33333333-3333-4333-8333-333333333333' },
     ];
     const values: unknown[] = [];
 

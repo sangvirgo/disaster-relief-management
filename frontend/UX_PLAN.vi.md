@@ -4,7 +4,7 @@
 
 ## 1. Quy tắc phân vai
 
-Năm nhóm giao diện là **Người dân**, **Tình nguyện viên/Đội cứu hộ**, **Điều phối viên**, **Quản lý vận hành**, **Quản trị viên**. Backend có nhiều role code chi tiết hơn (`CITIZEN`, `VOLUNTEER`, `COORDINATOR`, `CAMPAIGN_COORDINATOR`, `CAMPAIGN_MANAGER`, `OPERATIONS_MANAGER`, `INTAKE_STAFF`, `REVIEWER`, `DISTRIBUTION_STAFF`, `ADMIN`). Điều phối chính (`COORDINATOR` + grant `SYSTEM`) xử lý hàng chờ chung và quản lý chiến dịch. Điều phối phụ (`CAMPAIGN_COORDINATOR` + grant `SYSTEM`) chọn chiến dịch qua phiên điều phối; chỉ xem SOS thuộc chiến dịch đang tham gia. Web gom các quyền kho, tiếp nhận, duyệt và phân phối vào không gian **Quản lý vận hành**, nhưng từng thao tác chỉ hiện và hoạt động theo grant thật của người đăng nhập. Một người có nhiều grant có thể chuyển không gian. Guest chỉ thấy các luồng công khai hoặc dùng mã theo dõi riêng tư.
+Năm nhóm giao diện là **Người dân**, **Tình nguyện viên/Đội cứu hộ**, **Điều phối viên**, **Quản lý vận hành**, **Quản trị viên**. Backend có bảy role code chi tiết hơn (`CITIZEN`, `VOLUNTEER`, `COORDINATOR`, `CAMPAIGN_COORDINATOR`, `OPERATIONS_MANAGER`, `REVIEWER`, `ADMIN`). Điều phối chính (`COORDINATOR` + grant `SYSTEM`) xử lý hàng chờ chung, quản lý chiến dịch và đợt quyên góp. Điều phối phụ (`CAMPAIGN_COORDINATOR` + grant `SYSTEM`) chọn chiến dịch qua phiên điều phối; chỉ xem SOS thuộc chiến dịch đang tham gia. Web gom các quyền kho, tiếp nhận, duyệt và phân phối vào không gian **Quản lý vận hành**, nhưng từng thao tác chỉ hiện và hoạt động theo grant thật của người đăng nhập. Một người có nhiều grant có thể chuyển không gian. Guest chỉ thấy các luồng công khai hoặc dùng mã theo dõi riêng tư.
 
 Quản trị viên không mặc nhiên được xem chi tiết SOS, nạn nhân hay người quyên góp. Ẩn nút theo quyền giúp giao diện rõ hơn; backend vẫn là nơi quyết định quyền truy cập.
 
@@ -15,7 +15,7 @@ Quản trị viên không mặc nhiên được xem chi tiết SOS, nạn nhân 
 | Người dân | Trang chủ trợ giúp; chọn cách gửi SOS; biểu mẫu SOS; tin nhắn nhanh và rà soát bản nháp; kết quả gửi; theo dõi SOS; chiến dịch; đợt quyên góp; khai báo vật phẩm; theo dõi đóng góp; thông báo của tôi | Gửi cho chính mình hoặc báo hộ, bổ sung tình hình/bằng chứng, xem tiến độ, khai báo và theo dõi vật phẩm | Response SELF/PROXY, tracking/supplements/evidence, public campaigns; Logistics public drives/deliveries/donation tracking |
 | Tình nguyện viên/Đội cứu hộ | Tổng quan nhiệm vụ; danh sách và chi tiết nhiệm vụ; nhận/từ chối; cập nhật hành trình/kết quả; bằng chứng; hồ sơ đội, thành viên, kỹ năng, trạng thái và vị trí | Nhận việc đúng quyền trưởng đội, cập nhật tiến độ, gửi bằng chứng | Response teams, missions, evidence, notices |
 | Điều phối viên | Hàng chờ chung và xung đột (điều phối chính); chọn chiến dịch gấp, hàng đợi theo phiên, lịch sử cứu trợ (điều phối phụ); chi tiết/xác minh; trùng lặp và liên hệ; quyết định ưu tiên; so sánh đội; giao nhiệm vụ; bản đồ; theo dõi nhiệm vụ; tổng quan chiến dịch; báo cáo | Điều phối chính gắn/gỡ chiến dịch và xử lý hàng chờ chung; điều phối phụ bắt đầu/dừng phiên và xử lý SOS trong chiến dịch đã chọn; cả hai xác minh, quyết định P1–P4 và giao đội theo quyền | Response operations, teams, missions, map, campaign triage/overview/engagement/history, reports, resolution |
-| Quản lý vận hành | Tổng quan nhu cầu/vật phẩm; đợt quyên góp; hàng chờ tiếp nhận; kiểm đếm; duyệt độc lập; kho/vật phẩm/điểm cứu trợ/xe; nhu cầu và cam kết; phiếu phân phối; bàn giao; đối soát; báo cáo | Mở đợt, đếm và duyệt theo quyền riêng, giữ sổ kho chính xác, xuất và bàn giao có chứng cứ | Logistics drives, receipts, catalog, assets, stock, needs, distributions, handoffs, reports; Response campaigns |
+| Quản lý vận hành | Tổng quan nhu cầu/vật phẩm; đợt quyên góp; hàng chờ tiếp nhận; kiểm đếm; duyệt độc lập; kho/vật phẩm/điểm cứu trợ/xe; nhu cầu và cam kết; phiếu phân phối; bàn giao; đối soát; báo cáo | Mở đợt, đếm và duyệt theo quyền riêng, giữ sổ kho chính xác, xuất và bàn giao có chứng cứ. Phạm vi mặc định là một chiến dịch; phạm vi hệ thống chỉ là ngoại lệ do quản trị viên cấp. Không ghi nhận bàn giao của phiếu do chính mình điều xuất. | Logistics drives, receipts, catalog, assets, stock, needs, distributions, handoffs, reports; Response campaigns |
 | Quản trị viên | Người dùng; grant; nhật ký kiểm toán | Cấp/thu hồi quyền và giám sát truy cập | Identity users, grants, audit; Logistics audit theo quyền ADMIN |
 
 ## 3. Luồng SOS của Người dân
@@ -58,7 +58,7 @@ Mọi màn có trạng thái tải, trống, lỗi, mất kết nối, quyền b
 
 | Quyết định | Hiện trạng | Đề xuất cho frontend |
 |---|---|
-| Năm actor | Backend có 9 role code và grant theo phạm vi | Dùng 5 không gian giao diện; menu và nút theo grant thực, không giả định manager có quyền reviewer |
+| Năm actor | Backend có 7 role code và grant theo phạm vi (chiến dịch hoặc hệ thống) | Dùng 5 không gian giao diện; menu và nút theo grant thực, không giả định manager có quyền reviewer |
 | SOS báo hộ | `POST /requests/proxy` yêu cầu phiên đang hoạt động | Buộc đăng nhập khi chọn báo hộ; nói rõ vị trí cần là nơi người gặp nạn |
 | Hai kiểu nhập SOS | API hiện nhận dữ liệu form SELF/PROXY | Cả hai kiểu UI hội tụ về một bản nháp form được kiểm tra trước khi gửi |
 | LLM trích xuất | Chưa có endpoint/provider/contract | Thiết kế UI và trạng thái; chưa nối model thật từ frontend |

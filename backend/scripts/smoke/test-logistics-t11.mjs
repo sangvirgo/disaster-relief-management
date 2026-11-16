@@ -89,7 +89,7 @@ function quantityMilli(value) {
 await Promise.all([logisticsDb.connect(), identityDb.connect()]);
 try {
   const operator = await registerAndLogin('ops', ['OPERATIONS_MANAGER']);
-  const requester = await registerAndLogin('requester', ['INTAKE_STAFF', 'REVIEWER']);
+  const requester = await registerAndLogin('requester', ['OPERATIONS_MANAGER', 'REVIEWER']);
   const reviewers = await Promise.all([
     registerAndLogin('reviewer_a', ['REVIEWER']),
     registerAndLogin('reviewer_b', ['REVIEWER']),

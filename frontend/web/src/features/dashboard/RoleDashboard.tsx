@@ -90,9 +90,7 @@ function Breakdown({ title, counts, requestStatuses = false }: { title: string; 
   </section>;
 }
 
-function ResponseDashboard({ onOpenRequest, showRecentOpenRequests = true }: {
-  onOpenRequest?: (id: string) => void; showRecentOpenRequests?: boolean;
-}) {
+function ResponseDashboard() {
   const snapshot = useSnapshot<ResponseOverview>('response', '/dashboard/overview');
   const { data } = snapshot;
   return <section className="card dashboard-section"><div className="section-header"><h2>Tình hình ứng cứu</h2><button type="button" className="button secondary" onClick={snapshot.refresh}>Cập nhật</button></div>
@@ -121,14 +119,6 @@ function ResponseDashboard({ onOpenRequest, showRecentOpenRequests = true }: {
         <Breakdown title="Loại sự cố" counts={data.requests.open_by_category} />
         <Breakdown title="Nhiệm vụ đang hoạt động" counts={data.missions.active_by_status} />
       </div>
-      {showRecentOpenRequests && <>
-        <h3>SOS mới đang mở</h3>
-        {data.recent_open_requests.length ? <div className="record-list">{data.recent_open_requests.map((item) =>
-          <div className="record" key={item.id}><div><strong>{requestStatusLabel(item.status)} · {label(item.category)}</strong>
-            <p>{label(item.priority)} · {timeLabel(item.received_at)}</p></div>
-            {onOpenRequest && <button type="button" className="button secondary" onClick={() => onOpenRequest(item.id)}>Xem SOS</button>}
-          </div>)}</div> : <p>Chưa có SOS đang mở.</p>}
-      </>}
     </>}
   </section>;
 }
@@ -182,11 +172,11 @@ function DriveSuggestions() {
   </section>;
 }
 
-export function RoleDashboard({ role, showReports = false, onOpenRequest }: { role: 'coordinator' | 'operations' | 'admin';
-  showReports?: boolean; onOpenRequest?: (id: string) => void }) {
+export function RoleDashboard({ role, showReports = false }: { role: 'coordinator' | 'operations' | 'admin';
+  showReports?: boolean }) {
   return <div className="dashboard-stack">
     {role === 'admin' && <AdminDashboard />}
-    {(role === 'admin' || role === 'coordinator') && <ResponseDashboard onOpenRequest={onOpenRequest} showRecentOpenRequests={role === 'coordinator'} />}
+    {(role === 'admin' || role === 'coordinator') && <ResponseDashboard />}
     {role === 'operations' && <OperationsSnapshot showReports={showReports} />}
   </div>;
 }

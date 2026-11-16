@@ -6,14 +6,14 @@ const grant = (role_code: Grant['role_code'], scope_type: Grant['scope_type']): 
 
 describe('operations dashboard scope', () => {
   it('returns SYSTEM scope only when a grant carries the requested permission', () => {
-    expect(scopeFor([grant('INTAKE_STAFF', 'SYSTEM')], ['DONATION_INTAKE'])).toBeNull();
-    expect(scopeFor([grant('DISTRIBUTION_STAFF', 'SYSTEM')], ['HANDOFF_RECORD'])).toBeNull();
-    expect(scopeFor([grant('DISTRIBUTION_STAFF', 'SYSTEM')], ['DISTRIBUTION_REVIEW'])).toEqual([]);
+    expect(scopeFor([grant('OPERATIONS_MANAGER', 'SYSTEM')], ['DONATION_INTAKE'])).toBeNull();
+    expect(scopeFor([grant('OPERATIONS_MANAGER', 'SYSTEM')], ['HANDOFF_RECORD'])).toBeNull();
+    expect(scopeFor([grant('COORDINATOR', 'SYSTEM')], ['DISTRIBUTION_REVIEW'])).toEqual([]);
   });
 
   it('grants no access without a matching permission', () => {
     expect(scopeFor([grant('CITIZEN', 'SYSTEM')], ['REPORT_READ'])).toEqual([]);
-    expect(scopeFor([grant('INTAKE_STAFF', 'SYSTEM')], ['NEED_MANAGE'])).toEqual([]);
+    expect(scopeFor([grant('REVIEWER', 'SYSTEM')], ['NEED_MANAGE'])).toEqual([]);
   });
 
   it('gives only a system administrator an unrestricted scope', () => {

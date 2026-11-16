@@ -41,7 +41,7 @@ describe('CampaignsService', () => {
   it('requires a system grant to create a campaign', async () => {
     for (const grants of [
       [],
-      [{ role_code: 'CAMPAIGN_MANAGER', scope_type: 'CAMPAIGN', campaign_id: campaignId }] as ReporterSession['grants'],
+      [{ role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: campaignId }] as ReporterSession['grants'],
       [{ role_code: 'CAMPAIGN_COORDINATOR', scope_type: 'SYSTEM' }] as ReporterSession['grants'],
     ]) {
       const { service, idempotency } = fixture(grants);
@@ -80,7 +80,7 @@ describe('CampaignsService', () => {
   it('keeps campaign-scoped list predicates bound to the granted campaign', () => {
     const values: unknown[] = [];
     const predicate = campaignScopePredicate([{
-      role_code: 'CAMPAIGN_MANAGER', scope_type: 'CAMPAIGN',
+      role_code: 'COORDINATOR', scope_type: 'CAMPAIGN',
       campaign_id: campaignId,
     }], 'CAMPAIGN_READ', values);
 

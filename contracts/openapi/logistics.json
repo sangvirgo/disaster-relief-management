@@ -2630,6 +2630,14 @@
                       "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
                       "correlation_id": "00000000-0000-4000-8000-000000000000"
                     }
+                  },
+                  "SELF_HANDOFF_FORBIDDEN": {
+                    "summary": "SELF_HANDOFF_FORBIDDEN",
+                    "value": {
+                      "code": "SELF_HANDOFF_FORBIDDEN",
+                      "message": "Người đã điều xuất phiếu này không được ghi nhận bàn giao cho phiếu đó.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
                   }
                 }
               }

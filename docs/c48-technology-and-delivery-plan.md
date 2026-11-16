@@ -36,7 +36,7 @@ Read the system overview and container architecture in Section 5, conceptual and
 | Deferred | Future pledges; inter-warehouse transfers; receipt-source allocation across pooled stock; FEFO automation; full stocktakes; multi-leg forwarding and source-level reconciliation; push/offline queues/AI remain conditional |
 | Excluded | Cash, bank transfers, payment gateways, checkout/order/payment flows, procurement, warehouse ERP, autonomous rescue triage/dispatch |
 
-The product emphasizes public donation opportunities and receipt/progress transparency. The ambiguous commerce note is not authority to introduce sales or money collection. Warehouse staff receive, count and issue supplies; campaign managers publish appeals and coordinators decide rescue priorities and allocations.
+The product emphasizes public donation opportunities and receipt/progress transparency. The ambiguous commerce note is not authority to introduce sales or money collection. Warehouse staff receive, count and issue supplies; operations managers and coordinators publish appeals, and coordinators decide rescue priorities and allocations.
 
 ## 2. Recommendation summary
 
@@ -100,7 +100,7 @@ These are problem hypotheses, not findings about a particular locality or author
 
 #### 3.2.1 Public in-kind donation flow
 
-Campaign/operations manager publishes a needed-item appeal → guest leaves name/phone and declares actual goods handed over without login → intake staff independently count/inspect → a different reviewer approves exact quantities → accepted stock posts once → approved dispatch and independent handoff → private donor receipt and sanitized campaign progress. This is the second core workflow, supporting rescue and relief; no cash or checkout is planned. Formal warehouse transfers, pooled receipt-source allocation and stocktakes are deferred.
+Operations manager (or coordinator) publishes a needed-item appeal → guest leaves name/phone and declares actual goods handed over without login → intake staff independently count/inspect → a different reviewer approves exact quantities → accepted stock posts once → approved dispatch and independent handoff → private donor receipt and sanitized campaign progress. This is the second core workflow, supporting rescue and relief; no cash or checkout is planned. Formal warehouse transfers, pooled receipt-source allocation and stocktakes are deferred.
 
 ### 3.3 Patterns adapted for Reliva
 
@@ -912,8 +912,8 @@ For FR priorities, **M** means required for the core demo, **S** means should ha
 | UR-06 | Admin/manager | Manage accounts/scoped permissions and view operational dashboards/reports. |
 | UR-07 | Operations team | See work queues, partially fulfilled needs, service health, dashboard timestamps, and recovery guidance. |
 | UR-08 | Signed-in or guest donor | Find donation drives, declare supplies handed over, inspect verified receipt and distribution progress, and dispute differences. |
-| UR-09 | Intake staff / independent operations reviewer | Receive and count supplies, independently approve receipts, preserve discrepancies and post accepted stock once; campaign managers publish drives. |
-| UR-10 | Distribution staff / receiving party | Authorize dispatch, record custody changes and beneficiary handouts, and reconcile shortages, returns and losses. |
+| UR-09 | Operations staff (intake) / independent reviewer | Receive and count supplies, independently approve receipts, preserve discrepancies and post accepted stock once; coordinators and operations managers publish drives. |
+| UR-10 | Operations staff (distribution) / receiving party | Authorize dispatch, record custody changes and beneficiary handouts, and reconcile shortages, returns and losses. |
 
 ### 7.2 Functional Requirements (FR)
 
@@ -939,7 +939,7 @@ For FR priorities, **M** means required for the core demo, **S** means should ha
 | FR-LOG-03 | M | Link Logistics needs and commitments to a request by opaque ID; record commit/release/issue/delivery locally | Multiple contributions are supported; no cross-service transaction or direct table access |
 | FR-LOG-04 | M | Distribution by campaign, point, item, quantity, and actor | Retries never duplicate a distribution |
 | FR-LOG-05 | M | Show requested, committed/reserved, issued, delivered, and outstanding quantities; allow partial fulfillment | Delivered + active committed/reserved + issued-but-not-delivered never exceeds requested; one partial contribution does not close the need |
-| FR-DON-01 | M | Campaign/operations managers publish drives with optional campaign link, intake location, items/types/units and acceptance criteria | Staff without drive-management grant cannot publish; drive and campaign remain distinct |
+| FR-DON-01 | M | Coordinators and operations managers publish drives with optional campaign link, intake location, items/types/units and acceptance criteria | Staff without drive-management grant cannot publish; drive and campaign remain distinct |
 | FR-DON-02 | M | Signed-in or guest donors leave name/phone and declare supplies handed over without mandatory registration; future pledges are deferred (S) | Guest capability is donation-scoped; retries do not duplicate records; declarations never credit stock |
 | FR-DON-03 | M | Preserve donor declarations, independent physical counts, condition and accepted/rejected/held quantities | Immutable submitted revisions and explicit missing confirmation; compare matching canonical units |
 | FR-DON-04 | M | Independent review and exactly-once posting of accepted receipts | Reviewer differs from intake actor; pending/held goods cannot be allocated; posting and ledger/audit are atomic |
@@ -1284,7 +1284,7 @@ Các sơ đồ riêng lẻ theo từng mã UC đã được gộp vào sơ đồ
 
 ### UC-10 — Publish and manage a donation drive
 
-**Actor:** Campaign/operations manager with `DONATION_DRIVE_MANAGE`.
+**Actor:** Coordinator or operations manager with `DONATION_DRIVE_MANAGE`.
 
 **Main flow:** Create draft with title, intake site, open/close time, optional campaign, needed items/types/units and acceptance criteria → open → pause/resume/close with reason and version check. Public pages show only sanitized fields (Section 25.4).
 
@@ -1376,10 +1376,11 @@ Public campaign summaries contain approved title/objective/broad time and saniti
 | Citizen | Create SELF/PROXY reports, view and supplement owned requests (including claimed guest requests); optional account-linked donations. No household identity or staff authority follows from reporting a relative. |
 | Volunteer | View assigned team missions and maintain own profile/availability. Only the active team leader accepts/declines, advances missions and submits results/evidence. |
 | Coordinator | Scoped queue/map; verify, duplicate-link, triage, assign, cancel/reopen, confirm outcomes; record mission progress and team position on a team's behalf with basis (audited). |
-| Campaign / Operations Manager | Scoped campaign/drive management, allocation/distribution approval and operational reports; independent receipt review only with an explicit grant. |
-| Warehouse / Intake Staff | Scoped receipt counts and approved stock issue; cannot publish campaigns, prioritize SOS or dispatch rescue teams. Cannot review own count. |
+| Operations Manager (`OPERATIONS_MANAGER`, campaign-scoped by default or system-scoped) | Campaign and drive management within scope, needs, allocation/distribution preparation and approval, receipt counts, approved stock issue and handoff recording, operational reports. Catalog and asset management require a system scope. Cannot review its own count or record a handoff for a distribution it dispatched; independent receipt and loss review stays with the reviewer. |
 | Government / military team | Same scoped team-member/leader permissions as volunteer teams; affiliation is verified staff-maintained organization metadata, not a privilege escalation. |
 | Admin | Accounts/roles/configuration; case-detail access is not automatically granted without need. |
+
+**Role consolidation (2026-11-16):** the role codes `CAMPAIGN_MANAGER`, `INTAKE_STAFF` and `DISTRIBUTION_STAFF` are removed. Campaign and drive rights merge into `COORDINATOR`; intake and distribution rights merge into `OPERATIONS_MANAGER`, which is granted per campaign by default and system-wide only as an audited exception. The independent reviewer remains `REVIEWER`. The matrix and scope rules are in [05-permissions](backend/05-permissions.md).
 
 **Proposed authentication:** Identity issues asymmetric JWTs containing issuer, audience, subject, expiry, and minimum role/scope data. Services validate signatures locally. Access tokens expire after 10 minutes for the demo; refresh sessions have a 7-day absolute expiry with rotation and reuse detection; rotation does not extend that expiry. These are capstone configuration defaults. Each protected HTTP request validates the JWT locally and obtains current account/session/grants from an authenticated Identity introspection API without a positive cache. Logout revokes that session; disabling, credential reset, or role changes revoke all affected sessions. Identity unavailability returns Vietnamese 503 and fails closed for authenticated routes. Guest SOS creation, guest evidence upload and tracking-code-based reporter access are deliberately independent of Identity: for SELF only, if a bearer token is present on SOS creation, Response validates its signature locally only (ownership link) and never calls introspection; PROXY always checks the current session, so an Identity outage cannot block an emergency report. A request already authorized may finish; this is request-boundary revocation, not cancellation of in-flight transactions. Section 22 defines the availability tradeoff.
 
@@ -1395,8 +1396,8 @@ Do not encode all policy in JWTs: Response checks its own team/request relations
 
 - **Public / citizen:** guest SOS form (SELF), signed-in PROXY form, private tracking page accessed with the tracking code, public drive list/detail, guest donation form and private donation tracking.
 - **Coordinator:** saved views for awaiting verification, verified-but-unassigned, active missions, and partially fulfilled needs; map and scoped filters; request details, team availability, mission board, and audit timeline.
-- **Campaign/operations manager:** campaigns, public collection appeals, item/type/unit needs, receipt review, basic allocations/deliveries and reports.
-- **Intake staff:** receiving/count queue and approved issue actions; separate from campaign ownership and SOS dispatch. Advanced warehouse screens are deferred.
+- **Operations manager:** campaigns, public collection appeals, item/type/unit needs, receipt review, basic allocations/deliveries and reports.
+- **Operations staff (intake and distribution):** receiving/count queue and approved issue actions; separate from campaign ownership and SOS dispatch. Advanced warehouse screens are deferred.
 - **Public donor:** browse sanitized campaigns/drives; leave name/phone and actual items/quantities; receive a private tracking capability without account registration.
 - **Admin:** accounts, organizations, role grants, service health; PII only with a relevant operational role.
 - **Operational metrics:** cases by organization/status/priority; time from receipt to verification/assignment/delivery; unfinished missions; requested/committed/issued/delivered/outstanding quantities per authorized request; source timestamps.
@@ -2212,7 +2213,7 @@ Response owns campaigns/SOS/teams/missions. Logistics owns public donation drive
 ### 25.2 Minimum workflow
 
 ```text
-Campaign/operations manager publishes needed items and intake place/time
+Coordinator or operations manager publishes needed items and intake place/time
 -> guest or signed-in donor leaves name/phone and actual handover quantities
 -> intake staff independently count/inspect and record discrepancies
 -> distinct reviewer approves exact receipt version
@@ -2228,7 +2229,7 @@ No mandatory donor registration, address, national ID or beneficiary photo. Name
 
 | Action | Grant and guard |
 |---|---|
-| Publish/open/pause/close appeal | Campaign/operations manager with `DONATION_DRIVE_MANAGE` and appropriate organization/campaign/intake scope |
+| Publish/open/pause/close appeal | Coordinator or operations manager with `DONATION_DRIVE_MANAGE` and appropriate organization/campaign/intake scope |
 | Declare, track, dispute | Owner account or donation-specific capability; no stock authority |
 | Count/inspect | Intake-site-scoped `DONATION_INTAKE` |
 | Review/post approved receipt | `DONATION_REVIEW`; reviewer differs from every count author |
@@ -2298,7 +2299,7 @@ These cases are specifications, **not executed tests**. IDs from the previous ex
 
 | Test | Status / links | Expected evidence |
 |---|---|---|
-| TC-DON-01 | Core / FR-DON-01 | Campaign/operations manager opens/closes; intake-only user denied publishing; pending review survives close |
+| TC-DON-01 | Core / FR-DON-01 | Coordinator or operations manager opens/closes; intake-only user denied publishing; pending review survives close |
 | TC-DON-02 | Core / FR-DON-02 | Guest name/phone and citizen handover work; no login dependency; lost-response retry stores once; future pledge path deferred |
 | TC-DON-03 | Core / FR-DON-03 | Declare 60, count 58, accept 55/reject 3; count difference -2 distinct from rejected 3; earlier pledge-100 subcase deferred |
 | TC-DON-04 | Core / FR-DON-04 | Count author cannot approve; accepted stock posts once; held stock unavailable |
@@ -2329,7 +2330,7 @@ Extend TC-L10N-01..03 across public guest forms, counts, conflicts, denied permi
 | State/military/volunteer rescue teams | User clarification: all are team affiliations under the same mission permissions. No official government integration or privileged role merely from affiliation. |
 | Nearby teams and unequal workload | User clarification: avoid overloading nearest team; compare similarly nearby eligible teams using recent mission burden, not distance alone. Section 26.3. |
 | Item type | Controlled item type and canonical unit, distinct from SOS incident category. |
-| Less warehouse responsibility | Campaign managers publish appeals/approve allocations; intake staff count/receive/issue; independent review remains. Advanced warehouse scope deferred. |
+| Less warehouse responsibility | Coordinators and operations managers publish appeals/approve allocations; operations staff count/receive/issue; independent review remains. Advanced warehouse scope deferred. |
 | Donation without login | User request: name/phone and goods suffice, private capability secures tracking. No mandatory donor account. |
 | Commerce / transfer notes | User explicitly answered in-kind only, no money. Do not implement payments or reinterpret this as sales. |
 | Grouping | Proposed time/category/status saved views and canonical duplicate links; not automatic household merging, not one mission spanning several SOS. Clarify if supervisor intended dispatch batching. |
@@ -2527,7 +2528,7 @@ Goal: a team that already works on the request can carry and hand over the aid, 
 
 - Response `mission.kind` becomes `RESCUE` or `DELIVERY`; `DELIVERY` missions carry `distribution_id` (opaque Logistics id, required for DELIVERY, null for RESCUE). The same state machine, view rules, evidence, record-on-behalf and DECLINE apply. The capacity-one index applies per kind (one active RESCUE and one active DELIVERY per team), because a team on scene must be able to deliver supplies.
 - **Self-claim:** an active leader of an eligible team (APP mode) may claim a request's approved, unclaimed `REQUEST_AID` distribution. Response validates the claim with Logistics (internal call outside any transaction), inserts the DELIVERY mission as ACCEPTED, and Logistics records `distribution.carrier_mission_id` (nullable, unique among non-cancelled) idempotently. Coordinators can still offer a DELIVERY mission normally; COORDINATOR-mode teams are offered by the coordinator and progress via record-on-behalf.
-- **Destination:** the delivery brief shows the request's approved location and the handover instructions to the carrier team only (same exposure as the mission view); relief-point targets read the point from Logistics at view time. Logistics stores no household location. DISTRIBUTION_STAFF who ship from the warehouse without a mission are unaffected.
+- **Destination:** the delivery brief shows the request's approved location and the handover instructions to the carrier team only (same exposure as the mission view); relief-point targets read the point from Logistics at view time. Logistics stores no household location. OPERATIONS_MANAGER users who ship from the warehouse without a mission are unaffected.
 - **Handoff recording by the carrier:** the carrier does not need a Logistics grant. Response authorizes the leader (or the coordinator on behalf, with basis and reporter), then calls Logistics `POST /internal/distributions/{id}/handoffs` with the service token, the signed actor, `carrier_mission_id` and the payload. Logistics keeps every rule: recorder differs from the dispatcher and from the account receiver, same arithmetic, same settlement guards.
 - Completing a DELIVERY mission never settles stock; only recorded handoffs do. Dispatch in Logistics stays a staff command.
 - Not in the core demo; build only after T15. If cut, the baseline remains: staff or the coordinator relay the destination.

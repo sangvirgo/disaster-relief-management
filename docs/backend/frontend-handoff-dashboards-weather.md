@@ -89,7 +89,7 @@ Sections appear **only if the caller's grants carry the matching permission**, a
   "generated_at": "ISO"
 }
 ```
-Observed visibility with demo accounts: `admin`, `coord1`, `ops_mgr`, `campaign_mgr` → intake, distribution, stock, needs; `intake1`, `reviewer1` → intake, distribution, stock; `dist1` → distribution, stock; `citizen1`, `vol_*` → 403.
+Visibility with demo accounts under the 2026-11-16 role consolidation (the expected matrix, to re-check in the browser): `admin`, `coord1`, `ops_mgr` → intake, distribution, stock, needs; `ops_seed` (`OPERATIONS_MANAGER`, SYSTEM) → same as `ops_mgr`; `reviewer1` → intake, distribution, stock; `citizen1`, `vol_*` → 403. The removed `campaign_mgr`, `dist1` and `dist2` accounts no longer exist.
 A "line" in `stock` is one item in one warehouse. `low_threshold_units` echoes the server setting (`STOCK_LOW_THRESHOLD`, default 50).
 
 ### 3.4 `GET /identity/dashboard/admin` – admin only (`USER_MANAGE`)
@@ -168,18 +168,18 @@ Needs `REPORT_READ` in scope (operations manager, coordinator, admin; others 403
 |---|---|
 | Citizen, volunteer | no statistics page; the citizen SOS page shows the weather banner (`GET /response/weather/alerts?active_only=true`) |
 | Coordinator | `GET /response/dashboard/overview`, plus the weather layer on the heatmap |
-| Operations manager, campaign manager | `GET /logistics/dashboard/operations` + existing report cards + `GET /logistics/reports/drive-suggestions` |
-| Intake staff, reviewer, distribution staff | `GET /logistics/dashboard/operations` only (they lack `REPORT_READ`: do not call `reports/summary`, `reports/stock-summary` or `drive-suggestions`, they return 403) |
+| Operations manager (report cards are limited to its campaign grant; see [05-permissions](05-permissions.md) section 7) | `GET /logistics/dashboard/operations` + existing report cards + `GET /logistics/reports/drive-suggestions` |
+| Reviewer | `GET /logistics/dashboard/operations` only (no `REPORT_READ`: do not call `reports/summary`, `reports/stock-summary` or `drive-suggestions`, they return 403) |
 | Admin | `GET /identity/dashboard/admin` + `GET /response/dashboard/overview` |
 
-Notes for the existing web navigation (`app/catalog.ts`): the operations `overview` page is currently hidden from intake/reviewer/distribution staff (it falls through to a manager-only rule), so those roles have no landing page; the existing `OperationsDashboard` would also 403 for them. This is implemented: the staff section is independent of the report cards. The dashboard pages are deliberately not the first entry of the coordinator and admin workspaces, so the default landing page is unchanged (`reports` and `users`; `allowedPages(...)[0]`).
+Notes for the existing web navigation (`app/catalog.ts`): the operations `overview` page is hidden from reviewers (it falls through to a manager-only rule), so reviewers have no landing page; the existing `OperationsDashboard` would also 403 for them. Intake and distribution work now sits under `OPERATIONS_MANAGER`, so those users reach the manager pages within their campaign grant. This is implemented: the staff section is independent of the report cards. The dashboard pages are deliberately not the first entry of the coordinator and admin workspaces, so the default landing page is unchanged (`reports` and `users`; `allowedPages(...)[0]`).
 
 ## 7. Vietnamese label tables to add (enum → text)
 
 - Delivery status: `DECLARED` Đã khai báo · `PENDING_REVIEW` Chờ duyệt kiểm đếm · `POSTED` Đã nhập kho.
 - Review decision: `APPROVE` Đã duyệt · `REJECT` Từ chối.
 - Drive/distribution/need: `OPEN` Đang mở · `CLOSED` Đã đóng · `DRAFT` Bản nháp · `APPROVED` Đã duyệt · `DISPATCHED` Đã xuất kho (distribution) · `RECONCILED` Đã đối soát · `PARTIALLY_FULFILLED` Đáp ứng một phần · `FULFILLED` Đã đáp ứng đủ · `CANCELLED` Đã hủy. (`DISPATCHED` on a *request* already has the label "Đã giao nhiệm vụ": keep context-specific labels.)
-- Roles: `ADMIN` Quản trị viên · `COORDINATOR` Điều phối viên · `CAMPAIGN_MANAGER` Quản lý chiến dịch · `OPERATIONS_MANAGER` Quản lý vận hành · `INTAKE_STAFF` Nhân viên tiếp nhận · `REVIEWER` Người xác minh · `DISTRIBUTION_STAFF` Nhân viên phân phát · `VOLUNTEER` Tình nguyện viên · `CITIZEN` Người dân.
+- Roles: `ADMIN` Quản trị viên · `COORDINATOR` Điều phối viên · `CAMPAIGN_COORDINATOR` Điều phối viên chiến dịch · `OPERATIONS_MANAGER` Quản lý vận hành · `REVIEWER` Người xác minh · `VOLUNTEER` Tình nguyện viên · `CITIZEN` Người dân.
 - Organization kind: `COORDINATION` Điều phối · `VOLUNTEER` Tình nguyện. User status: `PENDING_EMAIL` Chờ xác minh email · `DISABLED` Đã khóa.
 - Incident category: `FLOOD` Ngập lụt · `LANDSLIDE` Sạt lở đất · `STORM` Bão, gió lốc · `MEDICAL` Cấp cứu y tế · `TRAPPED` Người bị mắc kẹt · `FIRE` Hỏa hoạn · `SUPPLY_SHORTAGE` Thiếu nhu yếu phẩm · `OTHER` Khác · `UNKNOWN` Chưa rõ.
 - Mission: `OFFERED` Chờ đội nhận · `ACCEPTED` Đã nhận · `EN_ROUTE` Đang di chuyển · `ON_SCENE` Đang tại hiện trường · `COMPLETED` Hoàn thành.
@@ -192,7 +192,7 @@ Check the existing `i18n/labels.ts` first: `label()` returns "Có cập nhật m
 - Seed assertion bug fixed: the full seed now succeeds (it previously aborted on a hard-coded "15 teams" check).
 - Six expansion teams renamed to one style: `Đội xuồng cứu hộ Bắc (demo)`, `Đội sơ cứu lưu động Nam (demo)`, `Đội hỗ trợ cơ động Trung (demo)`, `Đội y tế cộng đồng Bắc (demo)`, `Đội xuồng cứu hộ Nam (demo)`, `Đội cứu hộ cơ động Bắc (demo)`. Team ids are unchanged.
 - Two volunteers without a team, in the coordination organization: `vol_free1`, `vol_free2` (ids `…0123`, `…0124`). Use them as leaders when demonstrating team creation by `coord1`/`coord2`. Password is the usual `SEED_PASSWORD`; all seeded users have `must_change_password=true`.
-- Demo accounts per role: `admin`, `coord1`, `ops_mgr`, `campaign_mgr`, `intake1`, `reviewer1`, `dist1`, `vol_leader1`, `vol_free1`, `citizen1`.
+- Demo accounts per role: `admin`, `coord1`, `ops_mgr`, `ops_seed`, `reviewer1`, `vol_leader1`, `vol_free1`, `citizen1`.
 - Login body needs `client_kind` (`WEB` or `NATIVE`).
 - With demo data the suggestions endpoint returns 4 items (hết hàng, tồn kho thấp) and weather returns real forecast data: alerts only appear when the forecast crosses a threshold, so the map may legitimately show none. To demo the UI offline, mock the response shape in section 4.
 

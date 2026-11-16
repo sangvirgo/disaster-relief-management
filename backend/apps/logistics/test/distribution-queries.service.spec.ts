@@ -105,7 +105,7 @@ describe('DistributionQueriesService handoff detail', () => {
     const sessions = {
       require: jest.fn(async () => ({
         userId: distribution.preparer_user_id,
-        grants: [{ role_code: 'DISTRIBUTION_STAFF', scope_type: 'SYSTEM',}],
+        grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM',}],
         identityHeaders: {},
       })),
     };
@@ -133,7 +133,7 @@ describe('DistributionQueriesService handoff detail', () => {
     const sessions = {
       require: jest.fn(async () => ({
         userId: '11111111-1111-4111-8111-111111111111',
-        grants: [{ role_code: 'DISTRIBUTION_STAFF', scope_type: 'CAMPAIGN', campaign_id: '99999999-9999-4999-8999-999999999999' }],
+        grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'CAMPAIGN', campaign_id: '99999999-9999-4999-8999-999999999999' }],
         identityHeaders: {},
       })),
     };
@@ -145,7 +145,7 @@ describe('DistributionQueriesService handoff detail', () => {
   });
 
   it('keeps missing handoffs indistinguishable from other not-found records', async () => {
-    const { query, service } = queriesForHandoff(null, [systemGrant('DISTRIBUTION_STAFF')]);
+    const { query, service } = queriesForHandoff(null, [systemGrant('OPERATIONS_MANAGER')]);
 
     await expect(service.handoffDetail(distributionId, handoffId, {} as Request))
       .rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
@@ -153,8 +153,8 @@ describe('DistributionQueriesService handoff detail', () => {
   });
 
   it.each([
-    ['DIRECT_HOUSEHOLD', 'OPERATIONS_MANAGER'],
-    ['RETURN', 'OPERATIONS_MANAGER'],
+    ['DIRECT_HOUSEHOLD', 'REVIEWER'],
+    ['RETURN', 'REVIEWER'],
     ['LOSS', 'COORDINATOR'],
   ] as const)('denies same-scope users without the handoff-kind permission (%s)', async (kind, role) => {
     const { query, service } = queriesForHandoff(kind, [systemGrant(role)]);
@@ -170,12 +170,10 @@ describe('DistributionQueriesService handoff detail', () => {
   });
 
   it.each([
-    ['DIRECT_HOUSEHOLD', 'DISTRIBUTION_STAFF'],
-    ['POINT_RECEIPT', 'DISTRIBUTION_STAFF'],
-    ['HOUSEHOLD_HANDOUT', 'DISTRIBUTION_STAFF'],
-    ['RETURN', 'INTAKE_STAFF'],
-    ['RETURN', 'DISTRIBUTION_STAFF'],
-    ['LOSS', 'DISTRIBUTION_STAFF'],
+    ['DIRECT_HOUSEHOLD', 'OPERATIONS_MANAGER'],
+    ['POINT_RECEIPT', 'OPERATIONS_MANAGER'],
+    ['HOUSEHOLD_HANDOUT', 'OPERATIONS_MANAGER'],
+    ['RETURN', 'OPERATIONS_MANAGER'],
     ['LOSS', 'OPERATIONS_MANAGER'],
   ] as const)('allows the authorized role for %s (%s)', async (kind, role) => {
     const { query, service } = queriesForHandoff(kind, [systemGrant(role)]);

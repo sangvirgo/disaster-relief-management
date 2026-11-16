@@ -121,7 +121,7 @@ describe('Engagement TTL has a single definition', () => {
 describe('Who may create or manage campaigns', () => {
   const system = (role_code: Grant['role_code']): Grant[] => [{ role_code, scope_type: 'SYSTEM' }];
   it('lets the primary coordinator and the existing managers create campaigns', () => {
-    for (const role of ['COORDINATOR', 'CAMPAIGN_MANAGER', 'OPERATIONS_MANAGER'] as const) {
+    for (const role of ['COORDINATOR', 'OPERATIONS_MANAGER'] as const) {
       expect(hasPermission(system(role), 'CAMPAIGN_MANAGE', { campaignId: null })).toBe(true);
     }
   });

@@ -82,25 +82,29 @@ const RoleDashboard = React.lazy(() => import('./features/dashboard/RoleDashboar
 
 function IntakeReview({ user }: { user: Me }) {
   const canReview = roles(user).has('REVIEWER');
-  const [step, setStep] = useUrlView('step', intakeSteps, canReview && !roles(user).has('INTAKE_STAFF') ? 'review' : 'intake');
-  function changeStep(next: 'intake' | 'review') {
+  const [step, setStep] = useUrlView('step', intakeSteps, canReview && !roles(user).has('OPERATIONS_MANAGER') ? 'review' : 'intake');
+  function changeStep(next: (typeof intakeSteps)[number]) {
     if (next === step) return;
     setStep(next);
     const url = new URL(window.location.href);
     url.searchParams.delete('view');
     window.history.replaceState(null, '', url);
   }
+  const current = step === 'review' && !canReview ? 'intake' : step;
+  const tabs: Array<[(typeof intakeSteps)[number], string]> = [
+    ['intake', 'Tiếp nhận'],
+    ...(canReview ? [['review', 'Duyệt và khiếu nại'] as [(typeof intakeSteps)[number], string]] : []),
+    ['distribution', 'Phân phối vật tư'],
+  ];
   return (
     <div>
-      {canReview && (
-        <div className="tabs" role="group" aria-label="Bước xử lý đóng góp">
-          <button type="button" className={step === 'intake' ? 'active' : ''}
-            aria-pressed={step === 'intake'} onClick={() => changeStep('intake')}>Tiếp nhận</button>
-          <button type="button" className={step === 'review' ? 'active' : ''}
-            aria-pressed={step === 'review'} onClick={() => changeStep('review')}>Duyệt và khiếu nại</button>
-        </div>
-      )}
-      <Operations key={step} page={canReview ? step : 'intake'} user={user} />
+      <div className="tabs" role="group" aria-label="Bước xử lý hàng cứu trợ">
+        {tabs.map(([id, label]) => (
+          <button key={id} type="button" className={current === id ? 'active' : ''}
+            aria-pressed={current === id} onClick={() => changeStep(id)}>{label}</button>
+        ))}
+      </div>
+      <Operations key={current} page={current} user={user} />
     </div>
   );
 }
@@ -1417,15 +1421,7 @@ function defaultWorkspaceForUser(user: Me | null): Workspace {
   if (r.has('ADMIN')) return 'admin';
   if (r.has('COORDINATOR') || r.has('CAMPAIGN_COORDINATOR')) return 'coordinator';
   if (r.has('VOLUNTEER')) return 'volunteer';
-  if (
-    [
-      'OPERATIONS_MANAGER',
-      'CAMPAIGN_MANAGER',
-      'INTAKE_STAFF',
-      'REVIEWER',
-      'DISTRIBUTION_STAFF',
-    ].some((role) => r.has(role))
-  ) {
+  if (['OPERATIONS_MANAGER', 'REVIEWER'].some((role) => r.has(role))) {
     return 'operations';
   }
   return 'citizen';
@@ -1457,10 +1453,11 @@ function normalizeSubview(url: URL, workspace: Workspace, page: string, user: Me
     : workspace === 'operations' && page === 'assets' ? assetViews
     : workspace === 'operations' && page === 'reports' ? reportViews
     : workspace === 'operations' && page === 'intake' && roles(user).has('REVIEWER')
-      && (url.searchParams.get('step') === 'review' || (!url.searchParams.has('step') && !roles(user).has('INTAKE_STAFF'))) ? reviewViews : [];
+      && (url.searchParams.get('step') === 'review' || (!url.searchParams.has('step') && !roles(user).has('OPERATIONS_MANAGER'))) ? reviewViews : [];
   if (!allowedViews.includes(url.searchParams.get('view') || '')) url.searchParams.delete('view');
   if (!(workspace === 'operations' && page === 'intake' && roles(user).has('REVIEWER')
-    && (intakeSteps as readonly string[]).includes(url.searchParams.get('step') || ''))) url.searchParams.delete('step');
+    && (intakeSteps as readonly string[]).includes(url.searchParams.get('step') || ''))
+    && !(workspace === 'operations' && page === 'intake' && url.searchParams.get('step') === 'distribution')) url.searchParams.delete('step');
   const sosId = url.searchParams.get('sos_id');
   if (!(workspace === 'coordinator' && ['queue', 'verify', 'triage', 'assign'].includes(page)
     && sosId && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(sosId))) {
@@ -1973,6 +1970,8 @@ function App() {
                   <Donations user={user} />
                 ) : workspace === 'coordinator' && selected.id === 'campaigns' ? (
                   <CampaignCoordination key={selectedRequestId} user={user!} initialRequestId={selectedRequestId} />
+                ) : workspace === 'coordinator' && selected.id === 'drives' && user ? (
+                  <Operations key="coordinator-drives" page="drives" user={user} />
                 ) : workspace === 'coordinator' &&
                   ['queue', 'verify', 'triage', 'assign'].includes(selected.id) ? (
                   <Coordinator key={`${selected.id}:${selectedRequestId}`} page={selected.id} currentUserId={user!.id}
@@ -1997,13 +1996,9 @@ function App() {
                     onClearInitialMission={() => setSelectedMissionId('')}
                     onToggleSharing={(teamId) => { setSharingTeamId((current) => current === teamId ? '' : teamId); setSharingMessage(''); }} />
                 ) : (workspace === 'coordinator' || workspace === 'admin') && selected.id === 'dashboard' ? (
-                  <RoleDashboard role={workspace} onOpenRequest={workspace === 'coordinator' ? (requestId) => {
-                    setSelectedRequestId(requestId);
-                    setPageId('campaigns');
-                    writeRoute('coordinator', 'campaigns', user);
-                  } : undefined} />
+                  <RoleDashboard role={workspace} />
                 ) : workspace === 'operations' && selected.id === 'overview' ? (
-                  <RoleDashboard role="operations" showReports={roles(user).has('OPERATIONS_MANAGER') || roles(user).has('CAMPAIGN_MANAGER')} />
+                  <RoleDashboard role="operations" showReports={roles(user).has('OPERATIONS_MANAGER')} />
                 ) : workspace === 'operations' && selected.id === 'intake' && user ? (
                   <IntakeReview user={user} />
                 ) : workspace === 'operations' && user ? (

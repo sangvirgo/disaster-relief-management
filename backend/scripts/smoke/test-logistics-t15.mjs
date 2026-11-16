@@ -228,10 +228,10 @@ await Promise.all([logisticsDb.connect(), responseDb.connect(), identityDb.conne
 try {
   const staff = await registerAndLogin('staff', ['COORDINATOR', 'OPERATIONS_MANAGER']);
   const approver = await cloneAndLogin('approver', ['COORDINATOR', 'REVIEWER'], staff);
-  const dispatcher = await cloneAndLogin('dispatcher', ['DISTRIBUTION_STAFF'], staff);
-  const fieldRecorder = await cloneAndLogin('field', ['COORDINATOR', 'DISTRIBUTION_STAFF'], staff);
-  const secondRecorder = await cloneAndLogin('field2', ['DISTRIBUTION_STAFF'], staff);
-  const returner = await cloneAndLogin('returner', ['INTAKE_STAFF'], staff);
+  const dispatcher = await cloneAndLogin('dispatcher', ['OPERATIONS_MANAGER'], staff);
+  const fieldRecorder = await cloneAndLogin('field', ['COORDINATOR', 'OPERATIONS_MANAGER'], staff);
+  const secondRecorder = await cloneAndLogin('field2', ['OPERATIONS_MANAGER'], staff);
+  const returner = await cloneAndLogin('returner', ['OPERATIONS_MANAGER'], staff);
   const secondReviewer = await cloneAndLogin('reviewer2', ['COORDINATOR', 'REVIEWER'], staff);
   const reporter = await cloneAndLogin('reporter', [], staff);
 
@@ -410,7 +410,7 @@ try {
 
   const revokedRecorderGrant = await identityDb.query(
     `UPDATE role_grant SET revoked_at=now()
-      WHERE user_id=$1 AND role_code='DISTRIBUTION_STAFF' AND revoked_at IS NULL RETURNING id`, [fieldRecorder.id],
+      WHERE user_id=$1 AND role_code='OPERATIONS_MANAGER' AND scope_type='SYSTEM' AND revoked_at IS NULL RETURNING id`, [fieldRecorder.id],
   );
   assert.equal(revokedRecorderGrant.rowCount, 1);
   await identityDb.query('UPDATE app_user SET authz_version=authz_version+1 WHERE id=$1', [fieldRecorder.id]);

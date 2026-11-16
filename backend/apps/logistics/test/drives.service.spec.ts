@@ -13,7 +13,7 @@ describe('Logistics donation drive commands', () => {
     }]) };
     const session = {
       userId,
-      grants: [{ role_code: 'CAMPAIGN_MANAGER', scope_type: 'SYSTEM', campaign_id: null }],
+      grants: [{ role_code: 'COORDINATOR', scope_type: 'SYSTEM', campaign_id: null }],
     };
     const sessions = { require: jest.fn(async () => session) };
     const idempotency = { execute: jest.fn() };
@@ -37,7 +37,7 @@ describe('Logistics donation drive commands', () => {
     }]) };
     const sessions = { require: jest.fn(async () => ({
       userId,
-      grants: [{ role_code: 'CAMPAIGN_MANAGER', scope_type: 'CAMPAIGN', campaign_id: '77777777-7777-4777-8777-777777777777' }],
+      grants: [{ role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: '77777777-7777-4777-8777-777777777777' }],
     })) };
     const idempotency = { execute: jest.fn() };
     const response = { getCampaign: jest.fn(async () => ({

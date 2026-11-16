@@ -5,10 +5,13 @@ describe('Identity grant scope shape', () => {
     expect(grantScopeIsValid({ role_code: 'ADMIN', scope_type: 'SYSTEM' })).toBe(true);
     expect(grantScopeIsValid({ role_code: 'VOLUNTEER', scope_type: 'SYSTEM' })).toBe(true);
     expect(grantScopeIsValid({ role_code: 'COORDINATOR', scope_type: 'SYSTEM' })).toBe(true);
-    expect(grantScopeIsValid({ role_code: 'CAMPAIGN_MANAGER', scope_type: 'CAMPAIGN', campaign_id: 'campaign' })).toBe(true);
+    expect(grantScopeIsValid({ role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: 'campaign' })).toBe(true);
     expect(grantScopeIsValid({ role_code: 'ADMIN', scope_type: 'CAMPAIGN', campaign_id: 'campaign' })).toBe(false);
     expect(grantScopeIsValid({ role_code: 'COORDINATOR', scope_type: 'SYSTEM', campaign_id: 'campaign' })).toBe(false);
     expect(grantScopeIsValid({ role_code: 'COORDINATOR', scope_type: 'CAMPAIGN' })).toBe(false);
+    expect(grantScopeIsValid({ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' })).toBe(true);
+    expect(grantScopeIsValid({ role_code: 'OPERATIONS_MANAGER', scope_type: 'CAMPAIGN', campaign_id: 'campaign' })).toBe(true);
+    expect(grantScopeIsValid({ role_code: 'OPERATIONS_MANAGER', scope_type: 'CAMPAIGN' })).toBe(false);
     expect(grantScopeIsValid({ role_code: 'CITIZEN', scope_type: 'CAMPAIGN', campaign_id: 'campaign' })).toBe(false);
   });
 

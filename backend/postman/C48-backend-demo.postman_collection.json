@@ -3894,7 +3894,7 @@
             "description": "Nhân viên tiếp nhận đăng nhập\n\nChạy theo thứ tự trong kịch bản. Lệnh ghi thay đổi dữ liệu demo chính; lỗi sẽ dừng Runner. Các lần đăng nhập, đọc chi tiết và chuyển trạng thái lặp có mục đích.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"intake1\",\n  \"password\": \"{{seedPassword}}\",\n  \"client_kind\": \"NATIVE\"\n}",
+              "raw": "{\n  \"username\": \"ops_seed\",\n  \"password\": \"{{seedPassword}}\",\n  \"client_kind\": \"NATIVE\"\n}",
               "options": {
                 "raw": {
                   "language": "json"

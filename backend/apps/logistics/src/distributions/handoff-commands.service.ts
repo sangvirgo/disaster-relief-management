@@ -71,9 +71,9 @@ export class HandoffCommandsService {
         const distribution = await loadDistribution(manager, distributionId, true);
         this.requireRecorderPermission(session.grants, distribution, dto.handoff_kind);
         if (distribution.status !== 'DISPATCHED') throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
-        if (!distribution.dispatch_actor_user_id || distribution.dispatch_actor_user_id === session.userId) {
-          throw new AppError('FORBIDDEN', { status: 403 });
-        }
+        if (!distribution.dispatch_actor_user_id) throw new AppError('FORBIDDEN', { status: 403 });
+        // Separation of duties: whoever released the stock may not also record its custody handoff.
+        if (distribution.dispatch_actor_user_id === session.userId) throw new AppError('SELF_HANDOFF_FORBIDDEN', { status: 403 });
         this.assertReceiver(dto, session.userId);
 
         const lineIds = dto.lines.map((line) => line.distribution_line_id);

@@ -24,7 +24,7 @@ describe('Logistics stock command scope', () => {
     const idempotency = { execute: jest.fn() };
     const sessions = { require: jest.fn().mockResolvedValue({
       userId: actorId,
-      grants: [{ role_code: 'INTAKE_STAFF', scope_type: 'CAMPAIGN', campaign_id: '99999999-9999-4999-8999-999999999999' }],
+      grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'CAMPAIGN', campaign_id: '99999999-9999-4999-8999-999999999999' }],
     }) };
     const service = new StockService(dataSource as never, idempotency as never, sessions as never);
 

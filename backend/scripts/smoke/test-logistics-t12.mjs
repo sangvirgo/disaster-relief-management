@@ -117,7 +117,8 @@ try {
   } else {
     const coordinator = await loginSeeded('coord1');
     const manager = await loginSeeded('ops_mgr');
-    const intakeOnly = await loginSeeded('intake1');
+    const intakeOnly = await loginSeeded('ops_seed');
+    const reviewerActor = await loginSeeded('reviewer1');
     const donor = await loginSeeded('citizen1');
     const suffix = randomBytes(5).toString('hex').toUpperCase();
     const itemType = await call(logisticsUrl, 'item-types', {
@@ -140,7 +141,7 @@ try {
     expectSuccess(warehouse, 201);
 
     const intakeOnlyPublish = await call(logisticsUrl, 'donation-drives', {
-      method: 'POST', actor: intakeOnly, idempotencyKey: key(),
+      method: 'POST', actor: reviewerActor, idempotencyKey: key(),
       body: { title: `Không được phép T12 ${suffix}`, intake_warehouse_id: warehouse.value.id,
         items: [{ item_id: item.value.id, target_quantity: '20.00' }] },
     });

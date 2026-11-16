@@ -60,7 +60,7 @@ describe('DistributionCommandsService vehicle capacity warning', () => {
     const lineId = '88888888-8888-4888-8888-888888888888';
     const preparerId = '99999999-9999-4999-8999-999999999999';
     const dispatcherId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-    const grants = [{ role_code: 'DISTRIBUTION_STAFF', scope_type: 'SYSTEM',}];
+    const grants = [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM',}];
     const distribution = {
       id: distributionId,
       warehouse_id: warehouseId,

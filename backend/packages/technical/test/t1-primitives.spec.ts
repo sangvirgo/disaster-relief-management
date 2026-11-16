@@ -145,7 +145,8 @@ describe('T1 technical package', () => {
 
   it('enforces role, permission, campaign, and named SYSTEM-scope rules', () => {
     expect(ROLE_PERMISSIONS.ADMIN).not.toContain('REQUEST_DETAIL_READ');
-    expect(ROLE_PERMISSIONS.INTAKE_STAFF).not.toContain('DONATION_REVIEW');
+    expect(ROLE_PERMISSIONS.OPERATIONS_MANAGER).not.toContain('DONATION_REVIEW');
+    expect(ROLE_PERMISSIONS.COORDINATOR).not.toContain('DONATION_REVIEW');
     const grant = { role_code: 'COORDINATOR' as const, scope_type: 'CAMPAIGN' as const, campaign_id: 'campaign-1' };
     expect(hasPermission([grant], 'REQUEST_VERIFY', { campaignId: 'campaign-1' })).toBe(true);
     expect(hasPermission([grant], 'REQUEST_VERIFY', { campaignId: 'campaign-2' })).toBe(false);

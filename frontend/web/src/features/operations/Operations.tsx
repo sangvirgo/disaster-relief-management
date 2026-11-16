@@ -377,7 +377,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
     )) ||
     (status === 'APPROVED' && (
       detail.approver_user_id === user.id ||
-      (detail.approver_user_id !== user.id && (rights.has('DISTRIBUTION_STAFF') || rights.has('INTAKE_STAFF'))) ||
+      (detail.approver_user_id !== user.id && rights.has('OPERATIONS_MANAGER')) ||
       detail.preparer_user_id === user.id
     )) ||
     (status === 'DISPATCHED' && (
@@ -385,14 +385,14 @@ export function Operations({ page, user }: { page: string; user: Me }) {
       (Array.isArray(detail.lines) && (detail.lines as Row[]).every((line) => Number(line.in_transit) === 0 && Number(line.at_point) === 0 && Number(line.pending_loss_count) === 0) &&
         (rights.has('REVIEWER') || rights.has('OPERATIONS_MANAGER'))) ||
       (page === 'distribution' && detail.dispatch_actor_user_id !== user.id && Array.isArray(detail.lines) &&
-        (rights.has('DISTRIBUTION_STAFF') || rights.has('INTAKE_STAFF')))
+        rights.has('OPERATIONS_MANAGER'))
     ))
   ));
   const showActionsTab = page === 'drives'
-    ? ['DRAFT', 'OPEN', 'PAUSED'].includes(status) && (rights.has('CAMPAIGN_MANAGER') || rights.has('OPERATIONS_MANAGER'))
+    ? ['DRAFT', 'OPEN', 'PAUSED'].includes(status) && (rights.has('COORDINATOR') || rights.has('OPERATIONS_MANAGER'))
     : page === 'needs' ? status !== 'CANCELLED' && (rights.has('OPERATIONS_MANAGER') || rights.has('COORDINATOR'))
       : distributionPages.has(page) ? distributionActionAvailable
-        : page === 'intake' ? rights.has('INTAKE_STAFF')
+        : page === 'intake' ? rights.has('OPERATIONS_MANAGER')
           : page === 'review' ? rights.has('REVIEWER') : false;
   const stockDetail = page === 'stock' || (page === 'reports' && report === 'stock-summary');
   const needScale = number((detail?.unit as Row | undefined)?.scale);
@@ -424,11 +424,11 @@ export function Operations({ page, user }: { page: string; user: Me }) {
     },
   };
   const canCreatePage =
-    (page === 'drives' && (rights.has('CAMPAIGN_MANAGER') || rights.has('OPERATIONS_MANAGER'))) ||
+    (page === 'drives' && (rights.has('COORDINATOR') || rights.has('OPERATIONS_MANAGER'))) ||
     (page === 'needs' && (rights.has('OPERATIONS_MANAGER') || rights.has('COORDINATOR'))) ||
     (page === 'assets' && rights.has('OPERATIONS_MANAGER')) ||
     (page === 'distribution' &&
-      (rights.has('DISTRIBUTION_STAFF') || rights.has('INTAKE_STAFF') || rights.has('OPERATIONS_MANAGER')));
+      rights.has('OPERATIONS_MANAGER'));
   const createTitle = page === 'drives' ? 'Tạo đợt quyên góp' : page === 'needs' ? 'Ghi nhận nhu cầu' :
     page === 'assets' ? asset === 'vehicles' ? 'Thêm phương tiện' : asset === 'warehouses' ? 'Thêm kho' : 'Thêm điểm cứu trợ' :
     'Tạo phiếu phân phối';
@@ -959,7 +959,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
               {page === 'drives' &&
                 id &&
                 version != null &&
-                (rights.has('CAMPAIGN_MANAGER') || rights.has('OPERATIONS_MANAGER')) &&
+                (rights.has('COORDINATOR') || rights.has('OPERATIONS_MANAGER')) &&
                 (status === 'DRAFT' ? (
                   command({
                     title: 'Mở đợt quyên góp',
@@ -999,7 +999,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
               {page === 'intake' &&
                 selected?.id &&
                 !selected.receipt_id &&
-                rights.has('INTAKE_STAFF') &&
+                rights.has('OPERATIONS_MANAGER') &&
                 command({
                   title: 'Lập biên nhận',
                   service: 'logistics',
@@ -1023,7 +1023,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
               {page === 'intake' &&
                 selected?.id &&
                 selected.version != null &&
-                rights.has('INTAKE_STAFF') && (
+                rights.has('OPERATIONS_MANAGER') && (
                   <RecoveryIssue
                     key={`recovery-${selected.id}-${selected.version}`}
                     service="logistics"
@@ -1035,7 +1035,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
               {page === 'intake' &&
                 receiptId &&
                 version != null &&
-                rights.has('INTAKE_STAFF') &&
+                rights.has('OPERATIONS_MANAGER') &&
                 !['REJECTED', 'CANCELLED'].includes(status) &&
                 (status !== 'POSTED' || (Array.isArray(count?.lines) && (count.lines as Row[]).some(line => Number(line.held_quantity) > 0))) && (
                   <ReceiptCountForm
@@ -1228,7 +1228,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                     })}
                   {status === 'APPROVED' &&
                     detail.approver_user_id !== user.id &&
-                    (rights.has('DISTRIBUTION_STAFF') || rights.has('INTAKE_STAFF')) &&
+                    rights.has('OPERATIONS_MANAGER') &&
                     command({
                       title: 'Xuất kho',
                       service: 'logistics',
@@ -1239,9 +1239,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                   {status === 'DRAFT' &&
                     detail.purpose === 'REQUEST_AID' &&
                     detail.preparer_user_id === user.id &&
-                    (rights.has('DISTRIBUTION_STAFF') ||
-                      rights.has('INTAKE_STAFF') ||
-                      rights.has('OPERATIONS_MANAGER')) &&
+                    rights.has('OPERATIONS_MANAGER') &&
                     <>
                       <p>
                         Thao tác này lấy mọi cam kết còn hiệu lực trong cùng kho, kể cả
@@ -1281,7 +1279,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 status === 'DISPATCHED' &&
                 detail.dispatch_actor_user_id !== user.id &&
                 Array.isArray(detail.lines) &&
-                (rights.has('DISTRIBUTION_STAFF') || rights.has('INTAKE_STAFF')) &&
+                rights.has('OPERATIONS_MANAGER') &&
                 command({
                   title: 'Ghi nhận bàn giao thực tế',
                   service: 'logistics',
@@ -1292,20 +1290,18 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                       label: 'Loại bàn giao',
                       type: 'select',
                       required: true,
-                      options: (rights.has('DISTRIBUTION_STAFF')
-                        ? detail.relief_point_id
-                          ? [
-                              ['POINT_RECEIPT', 'Điểm cứu trợ đã nhận'],
-                              ['HOUSEHOLD_HANDOUT', 'Đã giao cho hộ dân'],
-                              ['RETURN', 'Hoàn về kho'],
-                              ['LOSS', 'Ghi nhận thất thoát'],
-                            ]
-                          : [
-                              ['DIRECT_HOUSEHOLD', 'Giao trực tiếp cho hộ dân'],
-                              ['RETURN', 'Hoàn về kho'],
-                              ['LOSS', 'Ghi nhận thất thoát'],
-                            ]
-                        : [['RETURN', 'Hoàn về kho']]
+                      options: (detail.relief_point_id
+                        ? [
+                            ['POINT_RECEIPT', 'Điểm cứu trợ đã nhận'],
+                            ['HOUSEHOLD_HANDOUT', 'Đã giao cho hộ dân'],
+                            ['RETURN', 'Hoàn về kho'],
+                            ['LOSS', 'Ghi nhận thất thoát'],
+                          ]
+                        : [
+                            ['DIRECT_HOUSEHOLD', 'Giao trực tiếp cho hộ dân'],
+                            ['RETURN', 'Hoàn về kho'],
+                            ['LOSS', 'Ghi nhận thất thoát'],
+                          ]
                       ).map(([value, title]) => ({ value, label: title })),
                     },
                     {
@@ -1376,7 +1372,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
         </div>}
         {!selected &&
           page === 'drives' &&
-          (rights.has('CAMPAIGN_MANAGER') || rights.has('OPERATIONS_MANAGER')) &&
+          (rights.has('COORDINATOR') || rights.has('OPERATIONS_MANAGER')) &&
           <DriveCreateForm warehouses={warehouseOptions} campaigns={references.campaigns || []} items={references.items || []} itemScales={references.itemScales || []} onSuccess={done} />}
         {!selected &&
           page === 'needs' &&
@@ -1421,9 +1417,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           })}
         {!selected &&
           page === 'distribution' &&
-          (rights.has('DISTRIBUTION_STAFF') ||
-            rights.has('INTAKE_STAFF') ||
-            rights.has('OPERATIONS_MANAGER')) &&
+          rights.has('OPERATIONS_MANAGER') &&
           command({
             title: 'Tạo phiếu phân phối',
             service: 'logistics',
@@ -1443,7 +1437,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 ].map(([value, title]) => ({ value, label: title })),
               },
               { name: 'quantity', label: 'Số lượng', type: 'number', required: true, scaleFor: (values) => { const chosen = commitments.find((item) => item.id === values.commitment_id); const scale = references.itemScales?.find(item => item.value === values.item_id); return chosen ? Number(chosen.unit_scale) : scale ? Number(scale.label) : undefined; }, maxFor: (values) => values.purpose === 'REQUEST_AID' && values.commitment_id ? (commitments.some((item) => item.id === values.commitment_id) ? Number(commitments.find((item) => item.id === values.commitment_id)!.reserved_remaining) : undefined) : undefined },
-              { name: 'commitment_id', label: rights.has('OPERATIONS_MANAGER') ? 'Cam kết hỗ trợ SOS' : 'Mã cam kết do quản lý vận hành cung cấp', type: rights.has('OPERATIONS_MANAGER') ? 'select' : 'reference', required: true,
+              { name: 'commitment_id', label: 'Cam kết hỗ trợ SOS', type: 'select', required: true,
                 visibleWhen: { field: 'purpose', value: 'REQUEST_AID' },
                 emptyLabel: commitmentsLoading ? 'Đang tải cam kết…' : 'Chọn cam kết của kho và vật phẩm',
                 optionsFor: (values) => commitments.filter((item) => item.warehouse_id === values.warehouse_id && item.item_id === values.item_id)

@@ -21,7 +21,7 @@ const cases = [
   ['logistics', '/stock?limit=2'],
   ['logistics', '/reports/stock-summary?limit=2'],
 ];
-const users = ['citizen3', 'coord_seed', 'vol_leader_seed', 'ops_seed', 'intake2', 'reviewer2', 'admin'];
+const users = ['citizen3', 'coord_seed', 'vol_leader_seed', 'ops_seed', 'reviewer2', 'admin'];
 
 function shape(value) {
   if (Array.isArray(value)) return `array(${value.length})`;
