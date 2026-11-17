@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import { api, newCommandKey } from '../../api/client';
 import type { Me } from '../../auth/session';
+import { StatusBadge } from '../../components/StatusBadge';
+import { Pager } from '../../components/ui/Pager';
 import { Coordinator } from './Coordinator';
 import { Campaigns } from './Campaigns';
 import { CommonQueueSuggestions } from './CommonQueueSuggestions';
 import { HistorySummary, MyHistory, Timeline, type EngagementItem, type HistoryItem, type HistorySummaryData } from './CampaignHistory';
+import './campaign-coordination.css';
 
 type TriageCampaign = {
   id: string; name: string; urgency: {
@@ -21,6 +24,7 @@ type OverviewCampaign = {
 };
 type Summary = HistorySummaryData;
 type Overview = { items: OverviewCampaign[]; common_queue?: { unmatched: number; conflict: number } };
+const OVERVIEW_PAGE_SIZE = 10;
 
 const reasonLabel: Record<string, string> = {
   P1_UNHANDLED: 'Có SOS P1 chưa được xử lý', P2_UNHANDLED: 'Có SOS P2 chưa được xử lý',
@@ -47,8 +51,22 @@ export function CampaignCoordination({ user, initialRequestId = '' }: { user: Me
   const [loading, setLoading] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const [queueRevision, setQueueRevision] = useState(0);
+  const [managementOpen, setManagementOpen] = useState(false);
+  const [overviewPage, setOverviewPage] = useState(0);
   const selectedEngagement = engagements.find((item) => item.campaign_id === selectedId) ?? engagements[0];
   const overviewCampaigns = overview;
+  const activeCampaignCount = overviewCampaigns.filter((item) => item.status === 'ACTIVE').length;
+  const openRequestCount = overviewCampaigns.reduce((total, campaign) => total + Object.entries(campaign.request_counts ?? {})
+    .filter(([status]) => !['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(status))
+    .reduce((count, [, value]) => count + value, 0), 0);
+  const unassignedRequestCount = commonQueue.unmatched + commonQueue.conflict;
+  const overviewPageCount = Math.max(1, Math.ceil(overviewCampaigns.length / OVERVIEW_PAGE_SIZE));
+  const currentOverviewPage = Math.min(overviewPage, overviewPageCount - 1);
+  const visibleCampaigns = overviewCampaigns.slice(currentOverviewPage * OVERVIEW_PAGE_SIZE, (currentOverviewPage + 1) * OVERVIEW_PAGE_SIZE);
+
+  useEffect(() => {
+    setOverviewPage((page) => Math.min(page, Math.max(0, Math.ceil(overviewCampaigns.length / OVERVIEW_PAGE_SIZE) - 1)));
+  }, [overviewCampaigns.length]);
 
   useEffect(() => {
     let live = true;
@@ -115,7 +133,7 @@ export function CampaignCoordination({ user, initialRequestId = '' }: { user: Me
   }
 
   const tabs = primary
-    ? [['campaigns', 'Chiến dịch'], ['sos', 'Xử lý SOS'], ['workspace', 'Không gian điều phối'], ['history', 'Lịch sử']]
+    ? [['campaigns', 'Chiến dịch'], ['routing', 'Phân vùng SOS'], ['sos', 'Xử lý SOS'], ['workspace', 'Không gian điều phối'], ['history', 'Lịch sử']]
     : [['workspace', 'Không gian chiến dịch'], ['my-history', 'Lịch sử của tôi']];
   const activeTab = (id: string) => tab === id || (id === 'workspace' && tab === 'choose') || (id === 'history' && tab === 'my-history');
   return <section className="campaign-coordination">
@@ -126,31 +144,78 @@ export function CampaignCoordination({ user, initialRequestId = '' }: { user: Me
     {error && <p role="alert" className="notice error">{error}</p>}
     {loading && <p role="status">Đang cập nhật dữ liệu điều phối…</p>}
     {primary && tab === 'campaigns' && <>
-      {(commonQueue.conflict > 0 || commonQueue.unmatched > 0) && <p className="notice warning">
-        {commonQueue.unmatched} SOS ngoài mọi vùng · {commonQueue.conflict} SOS trùng nhiều vùng.{' '}
-        <button type="button" className="button secondary" onClick={() => setTab('sos')}>Xem trong Xử lý SOS</button>
-      </p>}
-      <CommonQueueSuggestions onChanged={() => { setQueueRevision((value) => value + 1); setRefresh((value) => value + 1); }} />
-      {overviewCampaigns.length > 0 && <div className="operations-table-scroll" role="region" aria-label="Tình hình các chiến dịch" tabIndex={0}>
-        <table className="operations-record-table">
-          <thead><tr><th scope="col">Chiến dịch</th><th scope="col">SOS đang mở</th><th scope="col">Điều phối viên</th><th scope="col">Cần chú ý</th><th scope="col"><span className="sr-only">Lịch sử</span></th></tr></thead>
-          <tbody>{overviewCampaigns.map((campaign) => {
-            const open = Object.entries(campaign.request_counts).filter(([status]) => !['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(status)).reduce((sum, [, count]) => sum + count, 0);
-            return <tr key={campaign.id}>
-              <th scope="row">{campaign.name}</th>
-              <td>{open}</td>
-              <td>{campaign.active_coordinators.length}</td>
-              <td>{!campaign.has_active_coordinator ? 'Chưa có ai điều phối' : campaign.overdue_count > 0 ? `${campaign.overdue_count} SOS quá hạn` : '—'}</td>
-              <td><button className="button secondary" type="button" onClick={() => void showHistory(campaign.id)}>Lịch sử</button></td>
-            </tr>;
-          })}</tbody>
-        </table>
-      </div>}
-      <details className="sos-fold" open>
-        <summary>Danh sách và vòng đời chiến dịch (kích hoạt, tạm dừng, kết thúc)</summary>
-        <Campaigns canManage />
-      </details>
+      <div className="campaign-overview">
+        <div className="campaign-overview__metrics" aria-label="Tóm tắt chiến dịch">
+          <article className="campaign-overview__metric">
+            <span className="campaign-overview__metric-label">Chiến dịch hoạt động</span>
+            <strong>{loading && overviewCampaigns.length === 0 ? '—' : activeCampaignCount}</strong>
+            <span className="campaign-overview__metric-note">đang tiếp nhận và điều phối</span>
+          </article>
+          <article className="campaign-overview__metric campaign-overview__metric--blue">
+            <span className="campaign-overview__metric-label">SOS đang mở</span>
+            <strong>{loading && overviewCampaigns.length === 0 ? '—' : openRequestCount}</strong>
+            <span className="campaign-overview__metric-note">trên các chiến dịch</span>
+          </article>
+          <button type="button" className="campaign-overview__metric campaign-overview__metric--attention"
+            aria-label={`Mở tab Phân vùng SOS, ${unassignedRequestCount} SOS cần phân vùng`} onClick={() => setTab('routing')}>
+            <span className="campaign-overview__metric-label">SOS cần phân vùng</span>
+            <strong>{loading && overviewCampaigns.length === 0 ? '—' : unassignedRequestCount}</strong>
+            <span className="campaign-overview__metric-note">
+              {loading && overviewCampaigns.length === 0 ? 'Đang tải dữ liệu…' : `${commonQueue.unmatched} ngoài vùng · ${commonQueue.conflict} trùng vùng`}
+              <span className="campaign-overview__metric-link">Mở tab Phân vùng SOS <span aria-hidden="true">→</span></span>
+            </span>
+          </button>
+        </div>
+
+        <section className="campaign-overview__list" aria-labelledby="campaign-overview-title">
+          <header className="campaign-overview__header">
+            <div>
+              <span className="eyebrow">Tổng quan vận hành</span>
+              <h2 id="campaign-overview-title">Chiến dịch đang theo dõi</h2>
+            </div>
+            <div className="campaign-overview__header-actions">
+              <span className="campaign-overview__count">{overviewCampaigns.length} chiến dịch</span>
+              <button type="button" className="button secondary" disabled={loading} onClick={() => setRefresh((value) => value + 1)}>Cập nhật</button>
+              <button type="button" className="button secondary" aria-expanded={managementOpen} aria-controls="campaign-management-panel"
+                onClick={() => setManagementOpen((value) => !value)}>{managementOpen ? 'Ẩn quản lý' : 'Quản lý chiến dịch'}</button>
+            </div>
+          </header>
+
+          {overviewCampaigns.length > 0 ? <div className="campaign-overview__table-scroll" role="region" aria-label="Tình hình các chiến dịch" tabIndex={0}>
+            <table className="campaign-overview__table">
+              <thead><tr><th scope="col">Chiến dịch</th><th scope="col">SOS mở</th><th scope="col">Cần lưu ý</th><th scope="col"><span className="sr-only">Lịch sử</span></th></tr></thead>
+              <tbody>{visibleCampaigns.map((campaign) => {
+                const open = Object.entries(campaign.request_counts ?? {}).filter(([status]) => !['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(status))
+                  .reduce((sum, [, count]) => sum + count, 0);
+                return <tr key={campaign.id}>
+                  <th scope="row" data-label="Chiến dịch">
+                    <span className="campaign-overview__campaign-name">{campaign.name}<StatusBadge status={campaign.status} /></span>
+                    <small>{campaign.active_coordinators.length} điều phối viên đang tham gia</small>
+                  </th>
+                  <td data-label="SOS mở"><strong>{open}</strong></td>
+                  <td data-label="Cần lưu ý">
+                    {!campaign.has_active_coordinator ? <span className="campaign-overview__attention">Chưa có điều phối viên</span>
+                      : campaign.overdue_count > 0 ? <span className="campaign-overview__attention">{campaign.overdue_count} SOS quá hạn</span>
+                        : <span className="campaign-overview__quiet">Đang theo dõi</span>}
+                  </td>
+                  <td data-label="Lịch sử"><button className="button secondary campaign-overview__history" type="button" onClick={() => void showHistory(campaign.id)}>Lịch sử</button></td>
+                </tr>;
+              })}</tbody>
+            </table>
+          </div> : !loading && <p className="empty campaign-overview__empty">Chưa có chiến dịch trong phạm vi được cấp quyền.</p>}
+
+          <Pager page={currentOverviewPage} hasNext={currentOverviewPage < overviewPageCount - 1} loading={loading}
+            onPrev={() => setOverviewPage((page) => Math.max(0, page - 1))}
+            onNext={() => setOverviewPage((page) => Math.min(overviewPageCount - 1, page + 1))}
+            count={visibleCampaigns.length} noun="chiến dịch" />
+
+          <div id="campaign-management-panel" className="campaign-overview__expanded" hidden={!managementOpen}>
+            {managementOpen && <Campaigns canManage />}
+          </div>
+        </section>
+      </div>
     </>}
+    {primary && tab === 'routing' && <CommonQueueSuggestions onChanged={() => { setQueueRevision((value) => value + 1); setRefresh((value) => value + 1); }} />}
     {primary && tab === 'sos' && <Coordinator key={`sos-${queueRevision}-${initialRequestId}`} page="queue" currentUserId={user.id} canSeeUnassigned initialRequestId={initialRequestId} />}
     {primary && tab === 'history' && <>
       <p><button className="button secondary" type="button" onClick={() => void showMyHistory()}>Xem lịch sử điều phối của tôi</button></p>

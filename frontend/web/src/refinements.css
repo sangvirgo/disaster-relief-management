@@ -1545,11 +1545,11 @@
 .common-queue-suggestions .suggestion-head { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(320px, 1.2fr); align-items: center; gap: 20px; }
 .common-queue-suggestions .suggestion-actions { display: grid; gap: 10px; min-width: 0; }
 .common-queue-suggestions .suggestion-actions__attach { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
-.common-queue-suggestions .suggestion-actions__alternatives { display: flex; flex-wrap: wrap; gap: 10px; }
-.common-queue-suggestions .suggestion-actions__alternatives .button { flex: 1 1 220px; }
+.common-queue-suggestions .suggestion-actions__alternatives { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.common-queue-suggestions .suggestion-actions__alternatives .button { width: 100%; min-width: 0; }
 .common-queue-suggestions .suggestion-actions select { min-width: 0; max-width: none; }
 .common-queue-suggestions .suggestion-actions .button { min-height: 44px; white-space: normal; }
-.common-queue-suggestions .suggestion-actions__create { color: #1d4ed8; background: #eff6ff; border-color: #bfdbfe; }
+.common-queue-suggestions .suggestion-actions__create { grid-column: 2; color: #1d4ed8; background: #eff6ff; border-color: #bfdbfe; }
 .common-queue-suggestions .suggestion-actions__create:hover { background: #dbeafe; }
 .common-queue-suggestions .suggestion-actions__expand { color: #92400e; background: #fffbeb; border-color: #fcd34d; }
 .common-queue-suggestions .suggestion-actions__expand:hover { background: #fef3c7; }

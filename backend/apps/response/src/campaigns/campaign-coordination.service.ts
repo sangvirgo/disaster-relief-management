@@ -388,7 +388,14 @@ export class CampaignCoordinationService {
          SELECT e.id,e.occurred_at,e.event_type,e.actor_user_id,r.id,NULL::uuid,e.payload
            FROM request_event e JOIN assistance_request r ON r.id=e.request_id
           WHERE COALESCE(NULLIF(e.payload->>'campaign_id','')::uuid,NULLIF(e.payload->>'previous_campaign_id','')::uuid,r.campaign_id)=$1
-             OR (e.payload ? 'campaign_candidate_ids' AND EXISTS (SELECT 1 FROM jsonb_array_elements_text(e.payload->'campaign_candidate_ids') v WHERE v.value=$1::text))
+             OR (e.payload ? 'campaign_candidate_ids' AND EXISTS (
+                  SELECT 1
+                    FROM jsonb_array_elements_text(
+                      CASE WHEN jsonb_typeof(e.payload->'campaign_candidate_ids') = 'array'
+                        THEN e.payload->'campaign_candidate_ids' ELSE '[]'::jsonb END
+                    ) v
+                   WHERE v.value=$1::text
+                ))
          UNION ALL
          SELECT me.id,me.occurred_at,'MISSION_'||me.to_status,me.actor_user_id,m.request_id,m.id,
                 jsonb_build_object('from_status',me.from_status,'to_status',me.to_status,'reason',me.reason,'outcome_note',me.outcome_note)
