@@ -14,6 +14,6 @@ import { HandoffAttachmentsService } from './handoff-attachments.service';
   imports: [LogisticsAuthModule, ResponseCampaignModule, AttachmentsModule],
   controllers: [DistributionsController],
   providers: [DistributionCommandsService, DistributionQueriesService, HandoffCommandsService, HandoffAttachmentsService, IdempotencyService, IdempotencyKeyInterceptor],
-  exports: [HandoffAttachmentsService],
+  exports: [HandoffAttachmentsService, DistributionCommandsService, HandoffCommandsService],
 })
 export class DistributionsModule {}

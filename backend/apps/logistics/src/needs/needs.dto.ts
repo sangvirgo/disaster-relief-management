@@ -1,5 +1,8 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateIf } from 'class-validator';
+import {
+  ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min,
+  ValidateIf, ValidateNested,
+} from 'class-validator';
 
 const decimalQuantity = /^(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/u;
 
@@ -89,4 +92,68 @@ export class ReleaseCommitmentDto {
 
   @IsString() @MaxLength(1_000) @Matches(/\S/u)
   reason!: string;
+}
+
+export class EstimateCategoryDto {
+  @IsString() @Matches(/^[A-Z0-9_]{2,40}$/u)
+  category!: string;
+
+  @IsUUID('all')
+  item_id!: string;
+}
+
+export class EstimateNeedsDto {
+  @IsUUID('all')
+  request_id!: string;
+
+  @IsInt() @Min(1)
+  work_cycle!: number;
+
+  @IsInt() @Min(1) @Max(10_000)
+  people_count!: number;
+
+  @ValidateIf((_object, value) => value !== undefined) @IsInt() @Min(1) @Max(30)
+  days?: number;
+
+  @ValidateIf((_object, value) => value !== undefined) @IsInt() @Min(0) @Max(10_000)
+  infants?: number;
+
+  @ValidateIf((_object, value) => value !== undefined) @IsInt() @Min(0) @Max(10_000)
+  elderly?: number;
+
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(4) @ValidateNested({ each: true }) @Type(() => EstimateCategoryDto)
+  categories!: EstimateCategoryDto[];
+}
+
+export class ConfirmNeedDto {
+  @Type(() => Number) @IsInt() @Min(1)
+  expected_version!: number;
+
+  @ValidateIf((_object, value) => value !== undefined) @IsString() @MaxLength(100) @Matches(decimalQuantity)
+  quantity?: string;
+
+  @ValidateIf((_object, value) => value !== undefined) @IsString() @MaxLength(1_000) @Matches(/\S/u)
+  reason?: string;
+}
+
+const decimalNorm = /^(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/u;
+
+export class NeedNormPatchDto {
+  @Type(() => Number) @IsInt() @Min(1)
+  expected_version!: number;
+
+  @ValidateIf((_object, value) => value !== undefined) @IsString() @MaxLength(20) @Matches(decimalNorm)
+  qty_per_person_per_day?: string;
+
+  @ValidateIf((_object, value) => value !== undefined) @IsString() @MaxLength(20) @Matches(decimalNorm)
+  modifier_infant?: string;
+
+  @ValidateIf((_object, value) => value !== undefined) @IsString() @MaxLength(20) @Matches(decimalNorm)
+  modifier_elderly?: string;
+
+  @ValidateIf((_object, value) => value !== undefined) @IsIn(['PER_PERSON_DAY', 'PER_PERSON'])
+  quantity_basis?: 'PER_PERSON_DAY' | 'PER_PERSON';
+
+  @ValidateIf((_object, value) => value !== undefined) @IsBoolean()
+  active?: boolean;
 }

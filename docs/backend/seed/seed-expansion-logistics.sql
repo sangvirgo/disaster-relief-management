@@ -6,22 +6,22 @@ INSERT INTO item_type (code, display_name) VALUES
   ('LUONG_THUC', 'Lương thực'), ('NUOC_UONG', 'Nước uống'), ('Y_TE', 'Vật tư y tế'), ('CHAN_MEN', 'Chăn màn, nơi trú ẩn')
 ON CONFLICT DO NOTHING;
 
-INSERT INTO item (id, item_type_code, unit_code, name)
-SELECT fixture.id, fixture.item_type_code, fixture.unit_code, fixture.name
+INSERT INTO item (id, item_type_code, unit_code, name, returnable)
+SELECT fixture.id, fixture.item_type_code, fixture.unit_code, fixture.name, fixture.returnable
   FROM (VALUES
-    ('00000000-0000-4000-8000-0000000a1010'::uuid, 'LUONG_THUC', 'KG', 'Gạo đóng túi TP. Hồ Chí Minh', 'Lương thực', 'kg', 3),
-    ('00000000-0000-4000-8000-0000000a1011'::uuid, 'NUOC_UONG', 'CAI', 'Nước uống đóng chai TP. Hồ Chí Minh', 'Nước uống', 'cái', 0),
-    ('00000000-0000-4000-8000-0000000a1012'::uuid, 'Y_TE', 'CAI', 'Bộ sơ cứu cộng đồng TP. Hồ Chí Minh', 'Vật tư y tế', 'cái', 0),
-    ('00000000-0000-4000-8000-0000000a1013'::uuid, 'CHAN_MEN', 'CAI', 'Chăn giữ nhiệt TP. Hồ Chí Minh', 'Chăn màn, nơi trú ẩn', 'cái', 0)
-  ) AS fixture(id, item_type_code, unit_code, name, item_type_name, unit_name, unit_scale)
+    ('00000000-0000-4000-8000-0000000a1010'::uuid, 'LUONG_THUC', 'KG', 'Gạo đóng túi TP. Hồ Chí Minh', 'Lương thực', 'kg', 3, false),
+    ('00000000-0000-4000-8000-0000000a1011'::uuid, 'NUOC_UONG', 'CAI', 'Nước uống đóng chai TP. Hồ Chí Minh', 'Nước uống', 'cái', 0, false),
+    ('00000000-0000-4000-8000-0000000a1012'::uuid, 'Y_TE', 'CAI', 'Bộ sơ cứu cộng đồng TP. Hồ Chí Minh', 'Vật tư y tế', 'cái', 0, false),
+    ('00000000-0000-4000-8000-0000000a1013'::uuid, 'CHAN_MEN', 'CAI', 'Chăn giữ nhiệt TP. Hồ Chí Minh', 'Chăn màn, nơi trú ẩn', 'cái', 0, true)
+  ) AS fixture(id, item_type_code, unit_code, name, item_type_name, unit_name, unit_scale, returnable)
   JOIN item_type item_type ON item_type.code = fixture.item_type_code AND item_type.display_name = fixture.item_type_name
   JOIN unit unit ON unit.code = fixture.unit_code AND unit.display_name = fixture.unit_name AND unit.scale = fixture.unit_scale
  WHERE true
 ON CONFLICT DO NOTHING;
 
-INSERT INTO warehouse (id, name, address_note, location, location_public) VALUES
+INSERT INTO warehouse (id, name, address_note, location, location_public, service_radius_m) VALUES
   ('00000000-0000-4000-8000-0000000a2010', 'Kho phân phối TP. Hồ Chí Minh',
-   'Địa điểm giả lập phục vụ trình diễn tại TP. Hồ Chí Minh', ST_GeogFromText('SRID=4326;POINT(106.6800 10.7700)'), false)
+   'Địa điểm giả lập phục vụ trình diễn tại TP. Hồ Chí Minh', ST_GeogFromText('SRID=4326;POINT(106.6800 10.7700)'), false, 15000)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO donation_drive (id, campaign_id, campaign_status, campaign_status_at, intake_warehouse_id,
@@ -169,3 +169,11 @@ SELECT fixture.id, distribution.id, warehouse.id, item.id, fixture.quantity
   JOIN item ON item.id = fixture.item_id AND item.name = fixture.item_name
  WHERE true
 ON CONFLICT DO NOTHING;
+
+-- Need norms for SOS estimates (same demo values as seed-logistics.sql; safe to apply more than once).
+INSERT INTO need_norm (category, item_type_code, quantity_basis, qty_per_person_per_day, modifier_infant, modifier_elderly) VALUES
+  ('WATER',    'NUOC_UONG',  'PER_PERSON_DAY', 3.000, 0.50, 0.20),
+  ('FOOD',     'LUONG_THUC', 'PER_PERSON_DAY', 0.600, 0.50, 0.20),
+  ('BLANKET',  'CHAN_MEN',   'PER_PERSON',     1.000, 0.00, 0.00),
+  ('MEDICINE', 'Y_TE',       'PER_PERSON',     0.010, 0.00, 0.00)
+ON CONFLICT (category, item_type_code) DO NOTHING;

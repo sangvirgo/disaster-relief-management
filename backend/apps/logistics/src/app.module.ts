@@ -11,6 +11,8 @@ import { NeedsModule } from './needs/needs.module';
 import { EvidenceModule } from './evidence/evidence.module';
 import { FulfillmentCyclesModule } from './fulfillment-cycles/fulfillment-cycles.module';
 import { ReportsModule } from './reports/reports.module';
+import { SupplyGapsModule } from './supply-gaps/supply-gaps.module';
+import { PickupTicketsModule } from './pickup-tickets/pickup-tickets.module';
 
 @Module({
   imports: [
@@ -25,6 +27,8 @@ import { ReportsModule } from './reports/reports.module';
     ReceiptsModule,
     ReportsModule,
     AuditModule,
+    SupplyGapsModule,
+    PickupTicketsModule,
   ],
 })
 export class AppModule {}

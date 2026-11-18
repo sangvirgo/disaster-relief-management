@@ -22,6 +22,7 @@ export interface AssetRow {
   contact_note?: string | null;
   operating_note?: string | null;
   location_public?: boolean;
+  service_radius_m?: number | string | null;
   longitude?: number | string | null;
   latitude?: number | string | null;
   status: 'ACTIVE' | 'INACTIVE';
@@ -55,7 +56,7 @@ export function assetSelect(kind: AssetKind, includePrivate: boolean): string {
     : 'ST_X(location::geometry)::float8 AS longitude, ST_Y(location::geometry)::float8 AS latitude';
   if (kind === 'warehouse') {
     return `SELECT id,name,${includePrivate ? 'address_note' : 'NULL::text AS address_note'},
-                   location_public,status,version,created_at,${location} FROM warehouse`;
+                   location_public,service_radius_m,status,version,created_at,${location} FROM warehouse`;
   }
   if (kind === 'relief_point') {
     return `SELECT id,name,${includePrivate ? 'contact_note,operating_note' : 'NULL::text AS contact_note,NULL::text AS operating_note'},
@@ -78,6 +79,7 @@ export function assetView(kind: AssetKind, row: AssetRow, includePrivate: boolea
       ? null
       : { type: 'Point', coordinates: [Number(row.longitude), Number(row.latitude)] };
     result.location_public = Boolean(row.location_public);
+    result.service_radius_m = row.service_radius_m === null || row.service_radius_m === undefined ? null : Number(row.service_radius_m);
     if (includePrivate) result.address_note = row.address_note ?? null;
   } else if (kind === 'relief_point') {
     result.name = row.name;
@@ -105,6 +107,7 @@ export function assetAuditState(kind: AssetKind, row: AssetRow): Record<string, 
     state.name = row.name;
     state.location_public = Boolean(row.location_public);
     state.has_location = row.longitude !== null && row.longitude !== undefined;
+    state.service_radius_m = row.service_radius_m === null || row.service_radius_m === undefined ? null : Number(row.service_radius_m);
   } else if (kind === 'relief_point') {
     state.name = row.name;
     state.has_location = row.longitude !== null && row.longitude !== undefined;

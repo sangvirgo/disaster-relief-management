@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, newCommandKey } from '../../api/client';
 import { useUrlView } from '../../app/useUrlView';
-import type { Me } from '../../auth/session';
+import { roles, type Me } from '../../auth/session';
 import { StatusBadge } from '../../components/StatusBadge';
 import { Pager } from '../../components/ui/Pager';
 import { Coordinator } from './Coordinator';
@@ -53,6 +53,7 @@ export function CampaignCoordination({ user, initialRequestId = '' }: { user: Me
   const [refresh, setRefresh] = useState(0);
   const [queueRevision, setQueueRevision] = useState(0);
   const [managementOpen, setManagementOpen] = useState(false);
+  const isOperationsManager = roles(user).has('OPERATIONS_MANAGER');
   const [overviewPage, setOverviewPage] = useState(0);
   const selectedEngagement = engagements.find((item) => item.campaign_id === selectedId) ?? engagements[0];
   const overviewCampaigns = overview;
@@ -206,13 +207,13 @@ export function CampaignCoordination({ user, initialRequestId = '' }: { user: Me
             count={visibleCampaigns.length} noun="chiến dịch" />
 
           <div id="campaign-management-panel" className="campaign-overview__expanded" hidden={!managementOpen}>
-            {managementOpen && <Campaigns canManage />}
+            {managementOpen && <Campaigns canManage canSetup={isOperationsManager} />}
           </div>
         </section>
       </div>
     </>}
     {tab === 'routing' && <CommonQueueSuggestions onChanged={() => { setQueueRevision((value) => value + 1); setRefresh((value) => value + 1); }} />}
-    {tab === 'sos' && <Coordinator key={`sos-${queueRevision}-${initialRequestId}`} page="queue" currentUserId={user.id} canSeeUnassigned initialRequestId={initialRequestId} />}
+    {tab === 'sos' && <Coordinator key={`sos-${queueRevision}-${initialRequestId}`} page="queue" currentUserId={user.id} user={user} canSeeUnassigned initialRequestId={initialRequestId} />}
     {tab === 'history' && <>
       <p><button className="button secondary" type="button" onClick={() => void showMyHistory()}>Xem lịch sử điều phối của tôi</button></p>
       <label className="campaign-history-select">Chiến dịch <select value={historyId} onChange={(event) => void showHistory(event.target.value)}>
@@ -245,7 +246,7 @@ export function CampaignCoordination({ user, initialRequestId = '' }: { user: Me
           {selectedEngagement && <button className="button secondary" type="button" disabled={loading} onClick={() => void disengage(selectedEngagement.campaign_id)}>Dừng điều phối</button>}
         </div>
       </div> : <div className="empty">Bạn chưa tham gia điều phối chiến dịch nào. Hãy chọn chiến dịch gấp.</div>}
-      {selectedEngagement && <Coordinator key={selectedEngagement.campaign_id} page="queue" currentUserId={user.id} campaignId={selectedEngagement.campaign_id} />}
+      {selectedEngagement && <Coordinator key={selectedEngagement.campaign_id} page="queue" currentUserId={user.id} user={user} campaignId={selectedEngagement.campaign_id} />}
     </>}
     {tab === 'my-history' && <>
       <p><button className="button secondary" type="button" onClick={() => setTab('history')}>← Lịch sử theo chiến dịch</button></p>

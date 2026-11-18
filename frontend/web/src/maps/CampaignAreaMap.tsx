@@ -49,11 +49,15 @@ export type AreaEditor = {
   radiusM: number;
   /** Campaign being adjusted: its saved circle is hidden while the editable one is shown. */
   hideCampaignId?: string;
+  /** Allowed radius for drag handles and drawing; defaults to the campaign range. */
+  radiusRange?: { min: number; max: number };
   onChange: (center: { lat: number; lng: number }, radiusM: number) => void;
 };
 
 const RADIUS_MIN_M = 500;
 const RADIUS_MAX_M = 300_000;
+const clampRadius = (radius: number, range?: { min: number; max: number }) =>
+  Math.min(range?.max ?? RADIUS_MAX_M, Math.max(range?.min ?? RADIUS_MIN_M, radius));
 const editHandleIcon = (kind: 'center' | 'radius') => L.divIcon({
   className: `campaign-edit-handle campaign-edit-handle--${kind}`,
   html: `<span aria-hidden="true">${kind === 'center' ? '✥' : '↔'}</span>`,
@@ -73,6 +77,7 @@ export function CampaignAreaMap({
   onCampaignSelect,
   onCampaignEdit,
   editActions,
+  ariaLabel = 'Bản đồ chiến dịch và SOS cần quyết định',
 }: {
   requests: AreaMapRequest[];
   campaigns: AreaMapCampaign[];
@@ -82,6 +87,7 @@ export function CampaignAreaMap({
   onCampaignSelect?: (id: string) => void;
   onCampaignEdit?: (id: string) => void;
   editActions?: { onConfirm: () => void; onCancel: () => void; busy: boolean; canConfirm: boolean } | null;
+  ariaLabel?: string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -148,7 +154,7 @@ export function CampaignAreaMap({
     const radiusMarker = L.marker(eastOf(center, editRadius), { icon: editHandleIcon('radius'), draggable: true, zIndexOffset: 2000 })
       .bindTooltip('Kéo để đổi bán kính').addTo(layer);
     const commit = (nextCenter: { lat: number; lng: number }, radius: number) =>
-      editorRef.current?.onChange(nextCenter, Math.min(RADIUS_MAX_M, Math.max(RADIUS_MIN_M, Math.round(radius / 100) * 100)));
+      editorRef.current?.onChange(nextCenter, clampRadius(Math.round(radius / 100) * 100, editorRef.current?.radiusRange));
     centerMarker.on('drag', () => {
       const at = centerMarker.getLatLng();
       circle.setLatLng(at);
@@ -156,7 +162,7 @@ export function CampaignAreaMap({
     });
     centerMarker.on('dragend', () => { const at = centerMarker.getLatLng(); commit({ lat: at.lat, lng: at.lng }, editRadius); });
     radiusMarker.on('drag', () => {
-      const radius = Math.min(RADIUS_MAX_M, Math.max(RADIUS_MIN_M, map.distance([center.lat, center.lng], radiusMarker.getLatLng())));
+      const radius = clampRadius(map.distance([center.lat, center.lng], radiusMarker.getLatLng()), editorRef.current?.radiusRange);
       circle.setRadius(radius);
     });
     radiusMarker.on('dragend', () => commit(center, map.distance([center.lat, center.lng], radiusMarker.getLatLng())));
@@ -241,7 +247,7 @@ export function CampaignAreaMap({
           ref={containerRef}
           className="campaign-area-map"
           role="region"
-          aria-label="Bản đồ chiến dịch và SOS cần quyết định"
+          aria-label={ariaLabel}
           style={{ height: 380, width: '100%', borderRadius: 8 }}
         />
         {editActions && <div className="campaign-area-map__confirm" role="group" aria-label="Xác nhận thay đổi vùng chiến dịch">

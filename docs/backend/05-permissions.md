@@ -22,6 +22,14 @@ Roles are a code catalog. The current role set has six codes: `ADMIN`, `COORDINA
 | `CAMPAIGN_READ` |  |  | ● | ● |  |  |
 | `CAMPAIGN_MANAGE` (create needs SYSTEM scope; update and pause need SYSTEM or a matching campaign grant) |  |  | ● | ● |  |  |
 | `DONATION_DRIVE_MANAGE` (donation drives) |  |  | ● | ● |  |  |
+| `CAMPAIGN_WAREHOUSE_VIEW` (campaign warehouse assignment read) |  |  | ● | ● |  |  |
+| `CAMPAIGN_WAREHOUSE_MANAGE` (manual primary warehouse, re-evaluation) |  |  |  | ● |  |  |
+| `SUPPLY_GAP_VIEW` (supply-gap warnings and suggestions, read-only; SYSTEM scope) |  |  | ● | ● |  |  |
+| `SUPPLY_GAP_MANAGE` (accept a suggested donation drive or dismiss a gap; SYSTEM scope) |  |  |  | ● |  |  |
+| `PICKUP_TICKET_VIEW` (pickup tickets and their read model; campaign or SYSTEM scope; REVIEWER reads so the independent close-out review can run) |  |  | ● | ● | ● |  |
+| `PICKUP_TICKET_MANAGE` (create, reserve, confirm and cancel a mission pickup ticket; the inner commitment, distribution and dispatch steps keep their own permissions) |  |  | ● | ● |  |  |
+| `PICKUP_CLOSEOUT_SUBMIT` (draft and submit a pickup close-out; the team lead acts through a coordinator in the demo) |  |  | ● | ● |  |  |
+| `PICKUP_CLOSEOUT_REVIEW` (approve or reject a submitted close-out; reviewer differs from submitter and from the handover user) |  |  |  | ● | ● |  |
 | `RESPONSE_REPORT_READ` (Response aggregates) |  |  | ● | ● |  | ● |
 | `REPORT_READ` (Logistics aggregates) |  |  | ● | ● |  | ● |
 | `CATALOG_MANAGE`, `ASSET_MANAGE` (items, warehouses, vehicles, relief points; SYSTEM scope only) |  |  |  | ● |  |  |
@@ -82,6 +90,8 @@ Only a primary system coordinator sees the shared intake queue. `unassigned=true
 | A handoff recorder differs from its receiver. | Service rule | — |
 | LOSS approver differs from the LOSS recorder. | Service rule | — |
 | Receipt reviewer differs from every count author. | Service rule and test | — |
+| Pickup ticket: the confirming user approves the draft; the reserving user is its preparer, so the existing self-approval rule applies. Handover dispatches the draft; the dispatcher differs from the approver (existing rule) and holds `DISTRIBUTION_DISPATCH`. A volunteer records no staff permission; the dispatcher may name the collector, who must be an active mission team member. | Existing distribution rules plus pickup-ticket facade (Step 6a). | `SELF_APPROVAL_FORBIDDEN`, `FORBIDDEN`, `PICKUP_COLLECTOR_NOT_MEMBER` |
+| Pickup close-out: the reviewer differs from the submitter (`SELF_REVIEW_FORBIDDEN`) and from the user who handed the goods over (`SELF_HANDOFF_FORBIDDEN`). Returns post a RETURN handoff with the reviewer as recorder, so the existing dispatch-actor rule applies as well. | Step 6b (pickup-goods service). | `SELF_REVIEW_FORBIDDEN`, `SELF_HANDOFF_FORBIDDEN` |
 
 A single `OPERATIONS_MANAGER` account can prepare, dispatch and record different distributions, but it cannot approve its own preparation and cannot record the handoff of a distribution it dispatched. Demo seeds keep the four actors of one distribution distinct (see [seed-logistics.sql](seed/seed-logistics.sql)).
 

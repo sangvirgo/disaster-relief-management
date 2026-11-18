@@ -5,6 +5,9 @@ import {
 
 const decimalQuantity = /^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/u;
 
+export const WAREHOUSE_SERVICE_RADIUS_MIN_M = 1;
+export const WAREHOUSE_SERVICE_RADIUS_MAX_M = 200_000;
+
 export class AssetPageQueryDto {
   @IsOptional() @IsString() @MaxLength(2_000)
   declare cursor?: string;
@@ -38,6 +41,9 @@ export class CreateWarehouseDto extends AssetCreateDto {
 
   @IsOptional() @IsBoolean()
   declare location_public?: boolean;
+
+  @IsOptional() @IsInt() @Min(WAREHOUSE_SERVICE_RADIUS_MIN_M) @Max(WAREHOUSE_SERVICE_RADIUS_MAX_M)
+  declare service_radius_m?: number | null;
 }
 
 export class PatchWarehouseDto {
@@ -55,6 +61,9 @@ export class PatchWarehouseDto {
 
   @IsOptional() @IsBoolean()
   declare location_public?: boolean;
+
+  @IsOptional() @IsInt() @Min(WAREHOUSE_SERVICE_RADIUS_MIN_M) @Max(WAREHOUSE_SERVICE_RADIUS_MAX_M)
+  declare service_radius_m?: number | null;
 }
 
 export class CreateReliefPointDto extends AssetCreateDto {

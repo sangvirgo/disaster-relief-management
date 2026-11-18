@@ -7,6 +7,8 @@ import { canonicalRequestHash, IdempotencyService, IdempotentResult } from '@c48
 import { validateQuantity } from '../common/quantity';
 import { cleanText } from '../common/text';
 import { AuthenticatedLogisticsSession, LogisticsSessionService } from '../auth/logistics-session.service';
+import { CampaignWarehouseService } from '../campaign-warehouses/campaign-warehouses.service';
+import { warehouseServiceArea, warehouseServiceAreaFromView, WarehouseServiceArea } from '../campaign-warehouses/campaign-warehouses.helpers';
 import {
   assetAuditState, assetTables, assetView, findAsset, pointCoordinates, requireAssetManage,
   writeAssetAudit, AssetKind, AssetRow,
@@ -77,6 +79,17 @@ function validatePatchText(kind: AssetKind, dto: AssetPatchDto): void {
   }
 }
 
+/** A warehouse service area needs its location and radius together: both absent, or both present. */
+function assertWarehouseServiceArea(hasLocation: boolean, radius: number | null | undefined): void {
+  if (hasLocation === (radius == null)) {
+    throw new AppError('VALIDATION_FAILED', {
+      status: 400,
+      userMessage: 'Vui lòng nhập đồng thời vị trí và bán kính phục vụ của kho, hoặc để trống cả hai.',
+      fieldErrors: { location: ['WAREHOUSE_SERVICE_AREA_PAIR_REQUIRED'], service_radius_m: ['WAREHOUSE_SERVICE_AREA_PAIR_REQUIRED'] },
+    });
+  }
+}
+
 function validateCapacityPair(capacity: string | null | undefined, unit: string | null | undefined): void {
   if ((capacity == null) !== (unit == null)) throw new AppError('VALIDATION_FAILED', { status: 400 });
 }
@@ -106,10 +119,13 @@ export class AssetsService {
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly idempotency: IdempotencyService,
     private readonly sessions: LogisticsSessionService,
+    private readonly campaignWarehouses: CampaignWarehouseService,
   ) {}
 
-  createWarehouse(dto: CreateWarehouseDto, request: AssetRequest): Promise<IdempotentResult<Record<string, unknown>>> {
-    return this.create('warehouse', dto, request);
+  async createWarehouse(dto: CreateWarehouseDto, request: AssetRequest): Promise<IdempotentResult<Record<string, unknown>>> {
+    const result = await this.create('warehouse', dto, request);
+    await this.notifyWarehouseChange(null, result);
+    return result;
   }
 
   createReliefPoint(dto: CreateReliefPointDto, request: AssetRequest): Promise<IdempotentResult<Record<string, unknown>>> {
@@ -120,8 +136,11 @@ export class AssetsService {
     return this.create('vehicle', dto, request);
   }
 
-  patchWarehouse(id: string, dto: PatchWarehouseDto, request: AssetRequest): Promise<IdempotentResult<Record<string, unknown>>> {
-    return this.patch('warehouse', id, dto, request);
+  async patchWarehouse(id: string, dto: PatchWarehouseDto, request: AssetRequest): Promise<IdempotentResult<Record<string, unknown>>> {
+    const before = await findAsset(this.dataSource, 'warehouse', id);
+    const result = await this.patch('warehouse', id, dto, request);
+    await this.notifyWarehouseChange(before ? warehouseServiceArea(before) : null, result);
+    return result;
   }
 
   patchReliefPoint(id: string, dto: PatchReliefPointDto, request: AssetRequest): Promise<IdempotentResult<Record<string, unknown>>> {
@@ -132,8 +151,20 @@ export class AssetsService {
     return this.patch('vehicle', id, dto, request);
   }
 
-  deactivate(kind: AssetKind, id: string, dto: DeactivateAssetDto, request: AssetRequest): Promise<IdempotentResult<Record<string, unknown>>> {
-    return this.deactivateAsset(kind, id, dto, request);
+  async deactivate(kind: AssetKind, id: string, dto: DeactivateAssetDto, request: AssetRequest): Promise<IdempotentResult<Record<string, unknown>>> {
+    const before = kind === 'warehouse' ? await findAsset(this.dataSource, kind, id) : null;
+    const result = await this.deactivateAsset(kind, id, dto, request);
+    if (before) await this.notifyWarehouseChange(warehouseServiceArea(before), result);
+    return result;
+  }
+
+  /**
+   * Re-evaluates campaign warehouse assignments after a real service-area change. Runs after the warehouse command has
+   * committed; the trigger never throws, so a failure here cannot fail the warehouse command.
+   */
+  private async notifyWarehouseChange(before: WarehouseServiceArea | null, result: IdempotentResult<Record<string, unknown>>): Promise<void> {
+    if (result.replay) return;
+    await this.campaignWarehouses.onWarehouseChanged({ before, after: warehouseServiceAreaFromView(result.value) });
   }
 
   private async create(kind: AssetKind, dto: AssetCreateDto, request: AssetRequest): Promise<IdempotentResult<Record<string, unknown>>> {
@@ -145,6 +176,10 @@ export class AssetsService {
       await assertCapacityScale(this.dataSource, vehicle.capacity, vehicle.capacity_unit);
     }
     const coordinates = kind === 'vehicle' ? null : pointCoordinates((dto as CreateWarehouseDto | CreateReliefPointDto).location);
+    if (kind === 'warehouse') {
+      const warehouse = dto as CreateWarehouseDto;
+      assertWarehouseServiceArea(coordinates !== null, warehouse.service_radius_m);
+    }
 
     return this.idempotency.execute(this.dataSource, {
       scopeKey: `user:${session.userId}`,
@@ -180,9 +215,9 @@ export class AssetsService {
     if (kind === 'warehouse') {
       const warehouse = dto as CreateWarehouseDto;
       values = [warehouse.name, warehouse.address_note ?? null,
-        coordinates?.[0] ?? null, coordinates?.[1] ?? null, warehouse.location_public ?? false];
-      sql = `INSERT INTO warehouse (name,address_note,location,location_public)
-             VALUES ($1,$2,CASE WHEN $3::float8 IS NULL THEN NULL ELSE ST_SetSRID(ST_MakePoint($3,$4),4326)::geography END,$5)
+        coordinates?.[0] ?? null, coordinates?.[1] ?? null, warehouse.location_public ?? false, warehouse.service_radius_m ?? null];
+      sql = `INSERT INTO warehouse (name,address_note,location,location_public,service_radius_m)
+             VALUES ($1,$2,CASE WHEN $3::float8 IS NULL THEN NULL ELSE ST_SetSRID(ST_MakePoint($3,$4),4326)::geography END,$5,$6::integer)
              RETURNING id`;
     } else if (kind === 'relief_point') {
       const point = dto as CreateReliefPointDto;
@@ -222,6 +257,11 @@ export class AssetsService {
         if (!row) throw new AppError('NOT_FOUND', { status: 404 });
         assertCanManageRow(session, row);
         assertExpectedVersion(row.version, dto.expected_version);
+        if (kind === 'warehouse') {
+          const patch = dto as PatchWarehouseDto;
+          const hasLocation = patch.location === undefined ? row.longitude !== null && row.longitude !== undefined : patch.location !== null;
+          assertWarehouseServiceArea(hasLocation, patch.service_radius_m === undefined ? (row.service_radius_m == null ? null : Number(row.service_radius_m)) : patch.service_radius_m);
+        }
         if (kind === 'vehicle') await this.validateEffectiveVehicle(manager, row, dto as PatchVehicleDto);
         const before = assetAuditState(kind, row);
         const { sets, values } = this.patchAssignments(kind, dto);
@@ -263,6 +303,7 @@ export class AssetsService {
         if (typeof patch.location_public !== 'boolean') throw new AppError('VALIDATION_FAILED', { status: 400 });
         add('location_public', patch.location_public);
       }
+      if (patch.service_radius_m !== undefined) add('service_radius_m', patch.service_radius_m);
     } else if (kind === 'relief_point') {
       const patch = dto as PatchReliefPointDto;
       if (patch.name !== undefined) add('name', patch.name);

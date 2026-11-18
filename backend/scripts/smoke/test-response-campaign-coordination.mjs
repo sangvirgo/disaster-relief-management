@@ -93,8 +93,8 @@ async function createRequest(reporter, coordinates, suffix, idempotencyKey = key
 
 await Promise.all([responseDb.connect(), identityDb.connect()]);
 try {
-  const [primary, secondary, citizen] = await Promise.all([
-    login('coord1'), login('coord2'), login('citizen1'),
+  const [primary, secondary, citizen, campaignManager] = await Promise.all([
+    login('coord1'), login('coord2'), login('citizen1'), login('ops_mgr'),
   ]);
   const grants = await identityDb.query(
     `SELECT role_code,scope_type FROM role_grant WHERE user_id=$1 AND revoked_at IS NULL ORDER BY role_code,scope_type`,
@@ -195,22 +195,32 @@ try {
     name: 'Không được phép tạo chiến dịch', center: { lat: 18, lng: 110 }, radius_m: 5000,
   });
   expectVietnameseError(volunteerCreate, 403, 'FORBIDDEN');
-  const invalidRadius = await command(primary, 'campaigns', {
+  const primaryCreate = await command(primary, 'campaigns', {
+    name: 'Điều phối viên không được tạo chiến dịch', center: { lat: 18, lng: 110 }, radius_m: 5000,
+  });
+  expectVietnameseError(primaryCreate, 403, 'FORBIDDEN');
+  const invalidRadius = await command(campaignManager, 'campaigns', {
     name: 'Chiến dịch bán kính không hợp lệ', center: { lat: 18, lng: 110 }, radius_m: 499,
   });
   expectVietnameseError(invalidRadius, 400, 'VALIDATION_FAILED');
-  const createdCampaign = await command(primary, 'campaigns', {
+  const createdCampaign = await command(campaignManager, 'campaigns', {
     name: `Chiến dịch kiểm tra điều phối ${randomUUID().slice(0, 8)}`,
     objective: 'Kiểm tra quyền quản lý và vùng hoạt động.',
     center: { lat: 18, lng: 110 }, radius_m: 5000,
   });
   expectSuccess(createdCampaign, 201);
   assert.deepEqual(createdCampaign.value.center, { lat: 18, lng: 110 });
-  const patchedCampaign = await command(primary, `campaigns/${createdCampaign.value.id}`, {
+  const primaryAreaPatch = await command(primary, `campaigns/${createdCampaign.value.id}`, {
+    expected_version: 1, center: { lat: 18.01, lng: 110.01 }, radius_m: 6000,
+  }, key(), 'PATCH');
+  expectVietnameseError(primaryAreaPatch, 403, 'FORBIDDEN');
+  const patchedCampaign = await command(campaignManager, `campaigns/${createdCampaign.value.id}`, {
     expected_version: 1, center: { lat: 18.01, lng: 110.01 }, radius_m: 6000,
   }, key(), 'PATCH');
   expectSuccess(patchedCampaign);
-  const activatedCampaign = await command(primary, `campaigns/${createdCampaign.value.id}/activate`, { expected_version: 2 });
+  const primaryActivate = await command(primary, `campaigns/${createdCampaign.value.id}/activate`, { expected_version: 2 });
+  expectVietnameseError(primaryActivate, 403, 'FORBIDDEN');
+  const activatedCampaign = await command(campaignManager, `campaigns/${createdCampaign.value.id}/activate`, { expected_version: 2 });
   expectSuccess(activatedCampaign);
   const campaignEngagement = await command(primary, `campaigns/${createdCampaign.value.id}/engage`, undefined);
   expectSuccess(campaignEngagement, 201);
@@ -225,11 +235,11 @@ try {
   const pausedReengage = await command(primary, `campaigns/${createdCampaign.value.id}/engage`, undefined);
   expectVietnameseError(pausedReengage, 409, 'CAMPAIGN_NOT_ACTIVE');
 
-  const noCenterCampaign = await command(primary, 'campaigns', {
+  const noCenterCampaign = await command(campaignManager, 'campaigns', {
     name: `Chiến dịch chưa có vùng ${randomUUID().slice(0, 8)}`,
   });
   expectSuccess(noCenterCampaign, 201);
-  const noCenterActive = await command(primary, `campaigns/${noCenterCampaign.value.id}/activate`, { expected_version: 1 });
+  const noCenterActive = await command(campaignManager, `campaigns/${noCenterCampaign.value.id}/activate`, { expected_version: 1 });
   expectSuccess(noCenterActive);
 
   const single = await createRequest(citizen, [106.7001, 10.7801], 'một vùng');

@@ -11,10 +11,35 @@ export interface ResponseCampaignConfig {
   timeoutMs: number;
 }
 
+export interface ResponseCampaignCenter {
+  lat: number;
+  lng: number;
+}
+
 export interface ResponseCampaign {
   id: string;
   status: 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'CLOSED';
   version: number;
+  /** Campaign area, present when Response publishes it. Both fields are null when the campaign has no area yet. */
+  center?: ResponseCampaignCenter | null;
+  radius_m?: number | null;
+}
+
+const maxCampaignRadiusM = 300_000;
+
+function parseArea(value: Record<string, unknown>): Pick<ResponseCampaign, 'center' | 'radius_m'> {
+  const hasCenter = Object.hasOwn(value, 'center');
+  const hasRadius = Object.hasOwn(value, 'radius_m');
+  if (!hasCenter && !hasRadius) return {};
+  const center = value.center;
+  const radius = value.radius_m;
+  if (!hasCenter || !hasRadius || (center === null) !== (radius === null)) throw unavailable();
+  if (center === null) return { center: null, radius_m: null };
+  const point = center as Record<string, unknown>;
+  if (typeof point !== 'object' || !Number.isFinite(point.lat) || !Number.isFinite(point.lng) ||
+      (point.lat as number) < -90 || (point.lat as number) > 90 || (point.lng as number) < -180 || (point.lng as number) > 180 ||
+      !Number.isInteger(radius) || (radius as number) < 1 || (radius as number) > maxCampaignRadiusM) throw unavailable();
+  return { center: { lat: point.lat as number, lng: point.lng as number }, radius_m: radius as number };
 }
 
 export function loadResponseCampaignConfig(env: Record<string, string | undefined> = process.env): ResponseCampaignConfig {
@@ -58,7 +83,12 @@ export class LogisticsResponseCampaignClient implements OnModuleDestroy {
     const value = result.body as Record<string, unknown>;
     if (value.id !== id || !['DRAFT', 'ACTIVE', 'PAUSED', 'CLOSED'].includes(String(value.status)) ||
         !Number.isInteger(value.version)) throw unavailable();
-    return value as unknown as ResponseCampaign;
+    return {
+      id: value.id as string,
+      status: value.status as ResponseCampaign['status'],
+      version: value.version as number,
+      ...parseArea(value),
+    };
   }
 
   onModuleDestroy(): void {

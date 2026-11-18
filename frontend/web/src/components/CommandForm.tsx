@@ -3,12 +3,13 @@ import { api, ApiError, newCommandKey, upload, type Service, type HttpMethod } f
 import { evidenceFileError } from '../i18n/evidence';
 import { SelectedFiles } from './ui/SelectedFiles';
 import { LocationPicker, type LocationOverlay } from '../maps/LocationPicker';
+import { CampaignAreaMap } from '../maps/CampaignAreaMap';
 import { confirmAction } from './confirmAction';
 
 export type Field = {
   name: string;
   label: string;
-  type?: 'text' | 'number' | 'password' | 'textarea' | 'select' | 'choice-cards' | 'datetime-local' | 'location' | 'reference';
+  type?: 'text' | 'number' | 'password' | 'textarea' | 'select' | 'choice-cards' | 'datetime-local' | 'location' | 'service-area' | 'reference';
   required?: boolean;
   requiredWhen?: { field: string; values: string[] };
   min?: number;
@@ -35,6 +36,10 @@ export type Field = {
   visibleWhen?: { field: string; value: string };
   /** For `location` fields: area drawn on the map from the other form values. */
   overlayFor?: (values: Record<string, string>) => LocationOverlay | undefined;
+  /** For `service-area` fields: the paired radius field (metres) that the map circle edits together with the centre. */
+  radiusFieldName?: string;
+  /** For `service-area` fields: allowed radius for the map handles (metres). */
+  radiusRange?: { min: number; max: number };
 };
 export interface CommandSpec {
   title: string;
@@ -87,6 +92,12 @@ function fieldValidationError(field: Field, value: string, values: Record<string
     return isRequired(field, values) && !pointValue(value)
       ? `${field.label} là bắt buộc.`
       : undefined;
+  }
+  if (field.type === 'service-area') {
+    const radius = field.radiusFieldName ? (values[field.radiusFieldName] || '').trim() : '';
+    if (pointValue(value) && !radius) return 'Vui lòng nhập bán kính phục vụ.';
+    if (!pointValue(value) && radius) return 'Vui lòng chọn tâm vùng trên bản đồ, hoặc xóa bán kính.';
+    return undefined;
   }
   if (isRequired(field, values) && !trimmed)
     return `${field.label} là bắt buộc.`;
@@ -181,6 +192,19 @@ export function CommandForm({
     setMessage('');
     pending.current = null;
   }
+  /** Writes a service-area centre and its paired radius in one update, so the two never disagree. */
+  function updateServiceArea(field: Field, center: { longitude: number; latitude: number } | null, radiusM: number | null) {
+    const radiusName = field.radiusFieldName;
+    setValues((current) => ({
+      ...current,
+      [field.name]: center ? `${center.longitude},${center.latitude}` : '',
+      ...(radiusName ? { [radiusName]: center && radiusM ? String(Math.round(radiusM)) : '' } : {}),
+    }));
+    setTouched((current) => ({ ...current, [field.name]: true, ...(radiusName ? { [radiusName]: true } : {}) }));
+    setFieldErrors((current) => ({ ...current, [field.name]: '', ...(radiusName ? { [radiusName]: '' } : {}) }));
+    setMessage('');
+    pending.current = null;
+  }
   async function submit(event: FormEvent) {
     event.preventDefault();
     setAttempted(true);
@@ -245,7 +269,7 @@ export function CommandForm({
       }
       if (
         cause instanceof ApiError &&
-        ['VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'].includes(cause.code)
+        ['VERSION_CONFLICT', 'STATE_TRANSITION_INVALID', 'SUPPLY_GAP_NOT_OPEN'].includes(cause.code)
       ) {
         pending.current = null;
         onStale?.();
@@ -361,7 +385,38 @@ export function CommandForm({
               <small className="field-error" id={errorId(field)} role="alert">{inlineError}</small>
             )}
           </div>
-        ) : field.type === 'location' ? (
+        ) : field.type === 'service-area' ? (() => {
+          const centre = pointValue(values[field.name] || '');
+          const radiusValue = Number(field.radiusFieldName ? values[field.radiusFieldName] : '');
+          const radiusRange = field.radiusRange ?? { min: 500, max: 300_000 };
+          return (
+          <div key={field.name} className="form-stack service-area-field" role="group" aria-invalid={Boolean(inlineError)} aria-describedby={describedBy}>
+            <strong>{field.label}</strong>
+            <small className="muted">Nhấn lên bản đồ để đặt tâm vùng. Kéo tâm để di chuyển, kéo tay cầm ↔ để đổi bán kính.</small>
+            <CampaignAreaMap
+              requests={[]}
+              campaigns={[]}
+              ariaLabel={`${field.label}: chọn tâm và bán kính trên bản đồ`}
+              editor={{
+                center: centre ? { lat: centre.latitude, lng: centre.longitude } : null,
+                radiusM: Number.isFinite(radiusValue) && radiusValue > 0 ? radiusValue : radiusRange.min,
+                radiusRange,
+                onChange: (nextCenter, nextRadius) => updateServiceArea(field, { longitude: nextCenter.lng, latitude: nextCenter.lat }, nextRadius),
+              }}
+            />
+            <div>
+              <button type="button" className="button secondary" disabled={!centre && !values[field.radiusFieldName || '']}
+                onClick={() => updateServiceArea(field, null, null)}>Xóa vùng phục vụ</button>
+            </div>
+            {centre && (
+              <small>Tâm vùng: {centre.latitude.toFixed(6)}, {centre.longitude.toFixed(6)}</small>
+            )}
+            {inlineError && (
+              <small className="field-error" id={errorId(field)} role="alert">{inlineError}</small>
+            )}
+          </div>
+          );
+        })() : field.type === 'location' ? (
           <div key={field.name} className="form-stack" role="group" aria-invalid={Boolean(inlineError)} aria-describedby={describedBy}>
             <strong>{field.label}{isRequired(field, values) && <> <span className="required-mark" aria-hidden="true">*</span></>}</strong>
             <LocationPicker

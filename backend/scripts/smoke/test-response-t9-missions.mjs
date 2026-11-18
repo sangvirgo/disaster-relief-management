@@ -5,7 +5,7 @@ const require = createRequire(import.meta.url);
 const { Client } = require('pg');
 
 export async function runMissionSmoke({
-  responseDb, responseUrl, reporter, coordinator, otherCoordinator, overdueReader, appTeam, coordinatorTeam, call, key, assertVietnameseError,
+  responseDb, responseUrl, reporter, coordinator, otherCoordinator, overdueReader, campaignManager, appTeam, coordinatorTeam, call, key, assertVietnameseError,
 }) {
   await responseDb.query(
     "INSERT INTO incident_category (code,display_name) VALUES ('T9_MISSION','Yêu cầu kiểm thử nhiệm vụ') ON CONFLICT (code) DO NOTHING",
@@ -322,12 +322,12 @@ export async function runMissionSmoke({
 
   const campaign = await call(responseUrl, 'campaigns', {
     method: 'POST', body: { name: `T9 lock campaign ${key()}` },
-    headers: { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': key() },
+    headers: { Authorization: `Bearer ${campaignManager.token}`, 'Idempotency-Key': key() },
   });
   assert.equal(campaign.status, 201, JSON.stringify(campaign.value));
   const activatedCampaign = await call(responseUrl, `campaigns/${campaign.value.id}/activate`, {
     method: 'POST', body: { expected_version: campaign.value.version },
-    headers: { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': key() },
+    headers: { Authorization: `Bearer ${campaignManager.token}`, 'Idempotency-Key': key() },
   });
   assert.equal(activatedCampaign.status, 200, JSON.stringify(activatedCampaign.value));
 

@@ -14,7 +14,10 @@ import { CoordinatorTeamPositionForm } from './CoordinatorTeamPositionForm';
 import { operationIdFromTimeline, ResolutionOperationPanel } from './ResolutionOperationPanel';
 import { RequestTimeline } from './RequestTimeline';
 import { RequestEvidencePanel } from './RequestEvidencePanel';
+import { SosNeedEstimatePanel } from './SosNeedEstimatePanel';
 import { TeamReadinessQueue } from './TeamReadinessQueue';
+import { PickupTicketPanel } from '../pickup/PickupTicketPanel';
+import type { Me } from '../../auth/session';
 import './coordinator-detail.css';
 
 type QueueItem = {
@@ -540,9 +543,10 @@ function claimBlockedBy(detail: Pick<Detail, 'handled_by' | 'handled_at'>, curre
 }
 
 export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnassigned = false,
-  campaignId, campaignMatchState, initialUnassignedOnly = false }: {
+  campaignId, campaignMatchState, initialUnassignedOnly = false, user }: {
   page: string; initialRequestId?: string; currentUserId: string; canSeeUnassigned?: boolean;
   campaignId?: string; campaignMatchState?: 'UNMATCHED' | 'CONFLICT'; initialUnassignedOnly?: boolean;
+  user?: Me;
 }) {
   const restoredView = useRef<QueueView | null>(null);
   if (!restoredView.current) restoredView.current = readQueueView(currentUserId, page);
@@ -1192,6 +1196,15 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
             </div>
             <div id="sos-detail-content" role="tabpanel" aria-labelledby={`sos-tab-${activeTab}`} className="sos-detail-content" data-tab={activeTab} tabIndex={0}>
             <div className="sos-tab-group" hidden={activeTab !== 'overview'}>
+            <SosNeedEstimatePanel
+              requestId={detail.id}
+              workCycle={detail.work_cycle ?? 1}
+              status={detail.status}
+              peopleAffected={detail.subject.people_affected}
+              elderlyCount={detail.subject.elderly_count}
+              needsReliefSupplies={detail.needs_relief_supplies}
+              onChanged={() => setDetailRevision((value) => value + 1)}
+            />
             {(detail.declared_danger || detail.proxy_activity_flags.length > 0 || detail.tracking_code.startsWith('C48HM')) && (
               <div className="sos-alerts">
                 {detail.declared_danger && <p className="sos-alert sos-alert--danger" role="alert">Người báo cho biết có nguy hiểm tính mạng — kiểm tra ngay.</p>}
@@ -2164,6 +2177,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                       </p>
                       <CoordinatorMissionControl missionId={m.id} teamId={m.team_id}
                         revision={revision} onSuccess={done} onStale={refreshAfterConflict} />
+                      {user && <PickupTicketPanel user={user} missionId={m.id} missionStatus={m.status} />}
                     </div>
                   ))}
                 </div>

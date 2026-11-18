@@ -1,9 +1,10 @@
 import {
-  Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, Req, Res, UseInterceptors,
+  Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, Req, Res, UseGuards, UseInterceptors,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotency.interceptor';
 import { FailureReviewDto } from '../resolution/request-resolution.dto';
+import { ResponseServiceTokenGuard } from '../campaigns/service-token.guard';
 import { RequestFailureReviewService } from '../resolution/request-failure-review.service';
 import {
   CreateMissionDto, MissionPageQueryDto, MissionReasonDto, MissionTransitionDto, MissionVersionDto,
@@ -36,6 +37,13 @@ export class MissionsController {
     const result = await this.commands.offer(requestId, dto, key(request), request);
     replay(response, result.replay);
     return result.value;
+  }
+
+  @Get('internal/missions/:id')
+  @UseGuards(ResponseServiceTokenGuard)
+  async internal(@Param('id', new ParseUUIDPipe({ version: 'all' })) missionId: string, @Res({ passthrough: true }) response: Response) {
+    noStore(response);
+    return this.queries.internal(missionId);
   }
 
   @Get('missions/mine')

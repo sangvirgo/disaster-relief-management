@@ -19,6 +19,12 @@ export interface CampaignCommandRequest extends Request {
 }
 
 type CampaignPage = { items: Record<string, unknown>[]; more: boolean; cursor?: string };
+type CampaignPermission = 'CAMPAIGN_READ' | 'CAMPAIGN_MANAGE' | 'CAMPAIGN_SETUP_MANAGE';
+
+/** Activation is part of campaign setup (OPERATIONS_MANAGER only); pause, resume and close stay with coordination. */
+function transitionPermission(action: CampaignAction): CampaignPermission {
+  return action === 'activate' ? 'CAMPAIGN_SETUP_MANAGE' : 'CAMPAIGN_MANAGE';
+}
 
 const campaignColumns = `id,name,objective,status,starts_at,ends_at,version,created_at,
   CASE WHEN center IS NULL THEN NULL ELSE ST_Y(center::geometry) END AS center_latitude,
@@ -60,7 +66,7 @@ export class CampaignsService {
         return { status: 201, value, resource: { type: 'campaign', id: row.id } };
       },
       replay: async (manager, resource) => {
-        const row = await this.replayCampaign(manager, resource, session, 'CAMPAIGN_MANAGE');
+        const row = await this.replayCampaign(manager, resource, session, 'CAMPAIGN_SETUP_MANAGE');
         return campaignView(row);
       },
     });
@@ -106,6 +112,7 @@ export class CampaignsService {
       execute: async (manager) => {
         const row = await this.findCampaign(manager, id, true);
         this.assertCampaignPermission(session, row, 'CAMPAIGN_MANAGE');
+        if (dto.center !== undefined || dto.radius_m !== undefined) this.assertCampaignPermission(session, row, 'CAMPAIGN_SETUP_MANAGE');
         this.assertVersion(row, dto.expected_version);
         if (row.status !== 'DRAFT') throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
         validateCampaignDates(
@@ -151,7 +158,7 @@ export class CampaignsService {
       requestHash: canonicalRequestHash({ actor_user_id: session.userId, campaign_id: id, dto }),
       execute: async (manager) => {
         const row = await this.findCampaign(manager, id, true);
-        this.assertCampaignPermission(session, row, 'CAMPAIGN_MANAGE');
+        this.assertCampaignPermission(session, row, 'CAMPAIGN_SETUP_MANAGE');
         this.assertVersion(row, dto.expected_version);
         if (row.status === 'CLOSED') throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
         validateCampaignSpatial(dto.center, dto.radius_m);
@@ -169,7 +176,7 @@ export class CampaignsService {
         const attached = await attachUnmatchedInArea(manager, next, session.userId, 'CAMPAIGN_AREA_CHANGED');
         return { status: 200, value: { ...value, attached_request_count: attached }, resource: { type: 'campaign', id } };
       },
-      replay: async (manager, resource) => campaignView(await this.replayCampaign(manager, resource, session, 'CAMPAIGN_MANAGE')),
+      replay: async (manager, resource) => campaignView(await this.replayCampaign(manager, resource, session, 'CAMPAIGN_SETUP_MANAGE')),
     });
   }
 
@@ -188,7 +195,7 @@ export class CampaignsService {
       requestHash: canonicalRequestHash({ actor_user_id: session.userId, campaign_id: id, action, dto }),
       execute: async (manager) => {
         const row = await this.findCampaign(manager, id, true);
-        this.assertCampaignPermission(session, row, 'CAMPAIGN_MANAGE');
+        this.assertCampaignPermission(session, row, transitionPermission(action));
         this.assertVersion(row, dto.expected_version);
         const status = campaignNextStatus(row.status, action);
         const reason = 'reason' in dto ? dto.reason : null;
@@ -225,7 +232,7 @@ export class CampaignsService {
         if (action === 'activate' || action === 'resume') await attachUnmatchedInArea(manager, next, session.userId, action === 'resume' ? 'CAMPAIGN_RESUMED' : 'CAMPAIGN_ACTIVATED');
         return { status: 200, value, resource: { type: 'campaign', id } };
       },
-      replay: async (manager, resource) => campaignView(await this.replayCampaign(manager, resource, session, 'CAMPAIGN_MANAGE')),
+      replay: async (manager, resource) => campaignView(await this.replayCampaign(manager, resource, session, transitionPermission(action))),
     });
   }
 
@@ -258,6 +265,10 @@ export class CampaignsService {
       id: row.id,
       status: row.status,
       version: Number(row.version),
+      center: row.center_latitude == null || row.center_longitude == null
+        ? null
+        : { lat: Number(row.center_latitude), lng: Number(row.center_longitude) },
+      radius_m: row.radius_m == null ? null : Number(row.radius_m),
     };
   }
 
@@ -282,7 +293,7 @@ export class CampaignsService {
     return rows[0];
   }
 
-  private async replayCampaign(manager: EntityManager, resource: ResourceRef | null, session: ReporterSession, permission: 'CAMPAIGN_READ' | 'CAMPAIGN_MANAGE'): Promise<CampaignRow> {
+  private async replayCampaign(manager: EntityManager, resource: ResourceRef | null, session: ReporterSession, permission: CampaignPermission): Promise<CampaignRow> {
     if (!resource || resource.type !== 'campaign') throw new AppError('INTERNAL_ERROR', { status: 500 });
     const row = await this.findCampaign(manager, resource.id);
     this.assertCampaignPermission(session, row, permission);
@@ -290,10 +301,10 @@ export class CampaignsService {
   }
 
   private assertCreatePermission(grants: readonly Grant[]): void {
-    if (!hasPermission(grants, 'CAMPAIGN_MANAGE', { campaignId: null })) throw new AppError('FORBIDDEN', { status: 403 });
+    if (!hasPermission(grants, 'CAMPAIGN_SETUP_MANAGE', { campaignId: null })) throw new AppError('FORBIDDEN', { status: 403 });
   }
 
-  private assertCampaignPermission(session: ReporterSession, row: CampaignRow, permission: 'CAMPAIGN_READ' | 'CAMPAIGN_MANAGE'): void {
+  private assertCampaignPermission(session: ReporterSession, row: CampaignRow, permission: CampaignPermission): void {
     if (!hasPermission(session.grants, permission, { campaignId: row.id })) throw new AppError('FORBIDDEN', { status: 403 });
   }
 

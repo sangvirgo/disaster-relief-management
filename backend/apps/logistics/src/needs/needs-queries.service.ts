@@ -10,6 +10,7 @@ import type { Grant, Permission } from '@c48/identity-contracts/permissions';
 import { LogisticsSessionService } from '../auth/logistics-session.service';
 import { decimalFromUnits, quantityUnits } from '../common/quantity';
 import { FulfillmentQueryDto, NeedContributionsQueryDto, NeedsListQueryDto } from './needs.dto';
+import { NeedEstimateBasis, needSourceView, referenceEstimateSql } from './needs.helpers';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const readPermissions: readonly Permission[] = ['NEED_MANAGE', 'REPORT_READ'];
@@ -34,6 +35,9 @@ interface NeedQueryRow extends Record<string, unknown> {
   lost: string;
   cancelled_remaining: string | null;
   status: string;
+  source: 'DECLARED' | 'ESTIMATED' | 'CONFIRMED';
+  estimate_basis: NeedEstimateBasis | null;
+  reference_estimate_quantity: string | null;
   version: number | string;
   created_at: Date | string;
   cursor_created_at: string;
@@ -109,7 +113,9 @@ function needTotalsQuery(includeContributions = false): string {
          COALESCE(sum(cm.delivered_quantity),0)::text AS delivered,
          COALESCE(sum(cm.returned_quantity),0)::text AS returned,
          COALESCE(sum(cm.lost_quantity),0)::text AS lost,
-         n.cancelled_remaining::text AS cancelled_remaining,n.status,n.version,n.created_at,
+         n.cancelled_remaining::text AS cancelled_remaining,n.status,n.source,n.estimate_basis,
+         ${referenceEstimateSql} AS reference_estimate_quantity,
+         n.version,n.created_at,
          to_char(n.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at
          ${includeContributions ? ',contribution.contributions,contribution.contributions_more' : ''}
     FROM relief_need n JOIN fulfillment_cycle c ON c.id=n.cycle_id
@@ -173,6 +179,14 @@ function needTotals(row: NeedQueryRow): Record<string, unknown> {
   const delivered = quantityUnits(row.delivered, scale);
   const outstanding = row.status === 'CANCELLED' ? 0n : requested - delivered;
   return {
+    ...needSourceView({
+      source: row.source,
+      estimate_basis: row.estimate_basis,
+      reference_estimate_quantity: row.reference_estimate_quantity,
+      requested_quantity: row.requested,
+      unit_scale: scale,
+      status: row.status,
+    }),
     id: row.id,
     item: { id: row.item_id, name: row.item_name },
     unit: { code: row.unit_code, display_name: row.unit_name, scale },

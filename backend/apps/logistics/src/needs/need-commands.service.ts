@@ -7,9 +7,10 @@ import {
 } from '@c48/technical/idempotency/idempotency';
 import { LogisticsSessionService } from '../auth/logistics-session.service';
 import { decimalFromUnits, quantityUnits, validateQuantity } from '../common/quantity';
-import { AdjustNeedQuantityDto, CancelNeedDto } from './needs.dto';
+import { AdjustNeedQuantityDto, CancelNeedDto, ConfirmNeedDto } from './needs.dto';
 import {
-  NeedCommandRequest, NeedRow, needCommandKey, needValue, readNeed, requireNeedManage, writeNeedAudit,
+  NeedCommandRequest, NeedRow, needCommandKey, needValue, readNeed, requireNeedEstimateConfirm, requireNeedManage,
+  writeNeedAudit,
 } from './needs.helpers';
 
 type NeedChange = 'increase' | 'reduce' | 'cancel';
@@ -91,7 +92,7 @@ async function lockNeed(manager: Pick<EntityManager, 'query'>, needId: string, c
     `SELECT n.id,n.cycle_id,c.request_id,c.work_cycle,c.campaign_id,
             n.item_id,i.name AS item_name,u.code AS unit_code,u.display_name AS unit_name,u.scale AS unit_scale,
             n.original_quantity::text,n.requested_quantity::text,n.cancelled_remaining::text,
-            n.designated_point_id,n.status,n.version,n.created_at
+            n.designated_point_id,n.status,n.source,n.estimate_basis,n.version,n.created_at
        FROM relief_need n JOIN fulfillment_cycle c ON c.id=n.cycle_id
        JOIN item i ON i.id=n.item_id JOIN unit u ON u.code=i.unit_code
       WHERE n.id=$1 AND n.cycle_id=$2 FOR UPDATE OF n`,
@@ -186,6 +187,67 @@ export class NeedCommandsService {
     return this.change('cancel', id, dto, request);
   }
 
+  /** Turns an ESTIMATED need into CONFIRMED, optionally changing its quantity. Only the estimate-confirm permission applies. */
+  async confirm(id: string, dto: ConfirmNeedDto, request: NeedCommandRequest): Promise<IdempotentResult<Record<string, unknown>>> {
+    const session = await this.sessions.require(request);
+    const idempotencyKey = needCommandKey(request);
+    const scopeRows = await this.dataSource.query(
+      `SELECT c.campaign_id
+         FROM relief_need n JOIN fulfillment_cycle c ON c.id=n.cycle_id WHERE n.id=$1`,
+      [id],
+    ) as Array<Pick<CycleRow, 'campaign_id'>>;
+    if (!scopeRows[0]) throw new AppError('NOT_FOUND', { status: 404 });
+    requireNeedEstimateConfirm(session.grants, scopeRows[0]);
+
+    return this.idempotency.execute(this.dataSource, {
+      scopeKey: `user:${session.userId}`,
+      command: 'logistics.needs.confirm',
+      key: idempotencyKey,
+      requestHash: canonicalRequestHash({ relief_need_id: id, dto }),
+      execute: async (manager) => {
+        const cycleId = await needCycleId(manager, id);
+        const cycle = await lockCycle(manager, cycleId);
+        requireNeedEstimateConfirm(session.grants, cycle);
+        // Confirmation is a review step, so it uses the same OPEN-only rule as increase (not the reduce direction rule).
+        assertCycleAllows(cycle, 'increase');
+        const need = await lockNeed(manager, id, cycleId);
+        requireNeedEstimateConfirm(session.grants, need);
+        if (need.source !== 'ESTIMATED') throw new AppError('NEED_NOT_ESTIMATED', { status: 409 });
+        if (need.status === 'CANCELLED') throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
+        if (Number(need.version) !== dto.expected_version) {
+          throw new AppError('VERSION_CONFLICT', { status: 409, details: { current_version: Number(need.version) } });
+        }
+
+        const scale = Number(need.unit_scale);
+        const changed = dto.quantity !== undefined && quantityUnits(dto.quantity, scale) !== quantityUnits(need.requested_quantity, scale);
+        if (changed && !dto.reason?.trim()) throw new AppError('VALIDATION_FAILED', { status: 400 });
+        const quantity = dto.quantity === undefined ? need.requested_quantity : validateQuantity(dto.quantity, scale);
+        const next = quantityUnits(quantity, scale);
+        const before = needValue(need);
+        const commitments = await lockCommitments(manager, id);
+        const current = totals(commitments, scale);
+        if (next < current.delivered + current.reserved + current.unsettledIssued) {
+          throw new AppError('BELOW_PROTECTED_QUANTITY', { status: 409 });
+        }
+        const updated = await manager.query(
+          `UPDATE relief_need SET requested_quantity=$3::numeric,source='CONFIRMED',status=$4,version=version+1
+            WHERE id=$1 AND version=$2 RETURNING id`,
+          [need.id, dto.expected_version, decimalFromUnits(next, scale), needStatus(current.delivered, next)],
+        ) as Array<{ id: string }>;
+        if (!updated[0]) throw new AppError('VERSION_CONFLICT', { status: 409 });
+        const value = await readNeed(manager, need.id);
+        await writeNeedAudit(manager, session.userId, 'NEED_CONFIRMED', need.id, before, value, dto.reason?.trim() || null);
+        return { status: 200, value, resource: { type: 'relief_need', id: need.id } };
+      },
+      replay: async (manager, resource: ResourceRef | null) => {
+        if (resource?.type !== 'relief_need') throw new AppError('INTERNAL_ERROR', { status: 500 });
+        const value = await readNeed(manager, resource.id);
+        requireNeedEstimateConfirm(session.grants, value as Pick<NeedRow, 'campaign_id'>);
+        return value;
+      },
+    });
+  }
+
   private async change(
     action: NeedChange,
     id: string,
@@ -215,6 +277,8 @@ export class NeedCommandsService {
         const need = await lockNeed(manager, id, cycleId);
         requireNeedManage(session.grants, need);
         if (need.status === 'CANCELLED') throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
+        // An estimate must be confirmed (quantity edits go through confirm), but it can still be cancelled.
+        if (action !== 'cancel' && need.source === 'ESTIMATED') throw new AppError('NEED_ESTIMATE_NOT_CONFIRMED', { status: 409 });
         if (Number(need.version) !== dto.expected_version) {
           throw new AppError('VERSION_CONFLICT', { status: 409, details: { current_version: Number(need.version) } });
         }

@@ -28,6 +28,6 @@ import { ResponseCampaignModule } from '../integrations/response/response-campai
     DonationsQueriesService,
     DriveCampaignSyncService,
   ],
-  exports: [DonationAttachmentsService],
+  exports: [DonationAttachmentsService, DrivesService],
 })
 export class DrivesModule {}

@@ -1628,6 +1628,434 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/campaigns/{id}/primary-warehouse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * CampaignWarehousesController.setPrimary
+         * @description Route exported from backend/apps/logistics/src/campaign-warehouses/campaign-warehouses.controller.ts#CampaignWarehousesController.setPrimary. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
+         */
+        put: operations["logisticsCampaignWarehousesSetPrimary"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/warehouses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * CampaignWarehousesController.list
+         * @description Route exported from backend/apps/logistics/src/campaign-warehouses/campaign-warehouses.controller.ts#CampaignWarehousesController.list. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
+         */
+        get: operations["logisticsCampaignWarehousesList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/warehouses/reevaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * CampaignWarehousesController.reevaluate
+         * @description Route exported from backend/apps/logistics/src/campaign-warehouses/campaign-warehouses.controller.ts#CampaignWarehousesController.reevaluate. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
+         */
+        post: operations["logisticsCampaignWarehousesReevaluate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/need-norms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * NeedsController.listNorms
+         * @description Requires NEED_NORM_MANAGE (OPERATIONS_MANAGER at system scope). Lists the per-person norm table used by need estimates.
+         */
+        get: operations["logisticsNeedsListNorms"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/need-norms/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * NeedsController.updateNorm
+         * @description Requires NEED_NORM_MANAGE (OPERATIONS_MANAGER at system scope). Changes are version-checked and audited.
+         */
+        patch: operations["logisticsNeedsUpdateNorm"];
+        trace?: never;
+    };
+    "/needs/{id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * NeedsController.confirm
+         * @description Requires NEED_ESTIMATE_CONFIRM. Turns an ESTIMATED need into CONFIRMED. Changing the quantity requires a reason. Only OPEN cycles accept confirmation.
+         */
+        post: operations["logisticsNeedsConfirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/needs/estimate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * NeedsController.estimate
+         * @description Requires NEED_ESTIMATE_CONFIRM on the work cycle campaign. Generates ESTIMATED needs from active norms; the norm quantity is multiplied by the people count (and days for per-person-per-day norms) with infant and elderly modifiers, then rounded up to the item unit scale. Refused when the request already has a DECLARED or CONFIRMED need for the item. Estimated lines cannot be committed until confirmed.
+         */
+        post: operations["logisticsNeedsEstimate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/supply-gaps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * SupplyGapsController.list
+         * @description Route exported from backend/apps/logistics/src/supply-gaps/supply-gaps.controller.ts#SupplyGapsController.list. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
+         */
+        get: operations["logisticsSupplyGapsList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/supply-gaps/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * SupplyGapsController.detail
+         * @description Route exported from backend/apps/logistics/src/supply-gaps/supply-gaps.controller.ts#SupplyGapsController.detail. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
+         */
+        get: operations["logisticsSupplyGapsDetail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/supply-gaps/{id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SupplyGapsController.accept
+         * @description Route exported from backend/apps/logistics/src/supply-gaps/supply-gaps.controller.ts#SupplyGapsController.accept. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
+         */
+        post: operations["logisticsSupplyGapsAccept"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/supply-gaps/{id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SupplyGapsController.dismiss
+         * @description Route exported from backend/apps/logistics/src/supply-gaps/supply-gaps.controller.ts#SupplyGapsController.dismiss. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
+         */
+        post: operations["logisticsSupplyGapsDismiss"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pickup-tickets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * PickupTicketsController.list
+         * @description Route exported from backend/apps/logistics/src/pickup-tickets/pickup-tickets.controller.ts#PickupTicketsController.list. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
+         */
+        get: operations["logisticsPickupTicketsList"];
+        put?: never;
+        /**
+         * PickupTicketsController.create
+         * @description Route exported from backend/apps/logistics/src/pickup-tickets/pickup-tickets.controller.ts#PickupTicketsController.create. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
+         */
+        post: operations["logisticsPickupTicketsCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pickup-tickets/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * PickupTicketsController.detail
+         * @description Route exported from backend/apps/logistics/src/pickup-tickets/pickup-tickets.controller.ts#PickupTicketsController.detail. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
+         */
+        get: operations["logisticsPickupTicketsDetail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pickup-tickets/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * PickupTicketsController.cancel
+         * @description Route exported from backend/apps/logistics/src/pickup-tickets/pickup-tickets.controller.ts#PickupTicketsController.cancel. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
+         */
+        post: operations["logisticsPickupTicketsCancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pickup-tickets/{id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * PickupTicketsController.confirm
+         * @description Route exported from backend/apps/logistics/src/pickup-tickets/pickup-tickets.controller.ts#PickupTicketsController.confirm. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
+         */
+        post: operations["logisticsPickupTicketsConfirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pickup-tickets/{id}/handover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * PickupTicketsController.handover
+         * @description Route exported from backend/apps/logistics/src/pickup-tickets/pickup-tickets.controller.ts#PickupTicketsController.handover. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
+         */
+        post: operations["logisticsPickupTicketsHandover"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pickup-tickets/{id}/reserve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * PickupTicketsController.reserve
+         * @description Route exported from backend/apps/logistics/src/pickup-tickets/pickup-tickets.controller.ts#PickupTicketsController.reserve. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
+         */
+        post: operations["logisticsPickupTicketsReserve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pickup-tickets/{id}/closeout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * PickupTicketsController.closeout
+         * @description Route exported from backend/apps/logistics/src/pickup-tickets/pickup-tickets.controller.ts#PickupTicketsController.closeout. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
+         */
+        get: operations["logisticsPickupTicketsCloseout"];
+        /**
+         * PickupTicketsController.saveCloseout
+         * @description Route exported from backend/apps/logistics/src/pickup-tickets/pickup-tickets.controller.ts#PickupTicketsController.saveCloseout. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
+         */
+        put: operations["logisticsPickupTicketsSaveCloseout"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pickup-tickets/{id}/closeout/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * PickupTicketsController.reviewCloseout
+         * @description Route exported from backend/apps/logistics/src/pickup-tickets/pickup-tickets.controller.ts#PickupTicketsController.reviewCloseout. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
+         */
+        post: operations["logisticsPickupTicketsReviewCloseout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pickup-tickets/{id}/closeout/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * PickupTicketsController.submitCloseout
+         * @description Route exported from backend/apps/logistics/src/pickup-tickets/pickup-tickets.controller.ts#PickupTicketsController.submitCloseout. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
+         */
+        post: operations["logisticsPickupTicketsSubmitCloseout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pickup-tickets/{id}/deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * PickupTicketsController.deliveries
+         * @description Route exported from backend/apps/logistics/src/pickup-tickets/pickup-tickets.controller.ts#PickupTicketsController.deliveries. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
+         */
+        post: operations["logisticsPickupTicketsDeliveries"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -6295,9 +6723,16 @@ export interface operations {
                         progress?: {
                             status?: string;
                         };
-                        /** @description Whether the caller has the owner session or guest capability required for write actions. */
-                        can_manage?: boolean;
                     };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
             /** @description Documented error response; clients branch on the stable code. */
@@ -8135,6 +8570,7 @@ export interface operations {
                         coordinates?: number[];
                     };
                     location_public?: boolean;
+                    service_radius_m?: number;
                 };
             };
         };
@@ -8160,6 +8596,7 @@ export interface operations {
                             coordinates: number[];
                         } | null;
                         location_public?: boolean;
+                        service_radius_m?: number | null;
                         address_note?: string | null;
                     };
                 };
@@ -8205,6 +8642,7 @@ export interface operations {
                         coordinates?: number[];
                     } | null;
                     location_public?: boolean;
+                    service_radius_m?: number | null;
                 };
             };
         };
@@ -8230,6 +8668,7 @@ export interface operations {
                             coordinates: number[];
                         } | null;
                         location_public?: boolean;
+                        service_radius_m?: number | null;
                         address_note?: string | null;
                     };
                 };
@@ -8301,6 +8740,7 @@ export interface operations {
                             coordinates: number[];
                         } | null;
                         location_public?: boolean;
+                        service_radius_m?: number | null;
                         address_note?: string | null;
                     };
                 };
@@ -9109,6 +9549,15 @@ export interface operations {
                 content?: never;
             };
             /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
             401: {
                 headers: {
                     [name: string]: unknown;
@@ -9191,6 +9640,2581 @@ export interface operations {
             };
             /** @description Documented error response; clients branch on the stable code. */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsCampaignWarehousesSetPrimary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    warehouse_id: string;
+                    expected_version: number;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        campaign_id: string;
+                        /** @enum {string} */
+                        campaign_status: "DRAFT" | "ACTIVE" | "PAUSED" | "CLOSED";
+                        assignment_version: number;
+                        area: {
+                            center: {
+                                lat: number;
+                                lng: number;
+                            };
+                            radius_m: number;
+                        } | null;
+                        primary: {
+                            /** Format: uuid */
+                            warehouse_id: string;
+                            /** @enum {string} */
+                            source: "AUTO" | "MANUAL";
+                            eligible: boolean;
+                        } | null;
+                        warehouses: {
+                            /** Format: uuid */
+                            warehouse_id: string;
+                            name: string;
+                            role: ("PRIMARY" | "BACKUP") | null;
+                            source: ("AUTO" | "MANUAL") | null;
+                            distance_m: number;
+                            eligible: boolean;
+                            stock: {
+                                open_needed_items: number;
+                                needed_items_in_stock: number;
+                            };
+                            open_distributions: number;
+                        }[];
+                        flags: ("NO_SERVING_WAREHOUSE" | "MANUAL_PRIMARY_INELIGIBLE" | "CAMPAIGN_AREA_MISSING")[];
+                        /** @description Non-persisted proposal; present only when no PRIMARY is stored. */
+                        proposed_primary_warehouse_id?: string | null;
+                        /** Format: date-time */
+                        generated_at: string;
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsCampaignWarehousesList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        campaign_id: string;
+                        /** @enum {string} */
+                        campaign_status: "DRAFT" | "ACTIVE" | "PAUSED" | "CLOSED";
+                        assignment_version: number;
+                        area: {
+                            center: {
+                                lat: number;
+                                lng: number;
+                            };
+                            radius_m: number;
+                        } | null;
+                        primary: {
+                            /** Format: uuid */
+                            warehouse_id: string;
+                            /** @enum {string} */
+                            source: "AUTO" | "MANUAL";
+                            eligible: boolean;
+                        } | null;
+                        warehouses: {
+                            /** Format: uuid */
+                            warehouse_id: string;
+                            name: string;
+                            role: ("PRIMARY" | "BACKUP") | null;
+                            source: ("AUTO" | "MANUAL") | null;
+                            distance_m: number;
+                            eligible: boolean;
+                            stock: {
+                                open_needed_items: number;
+                                needed_items_in_stock: number;
+                            };
+                            open_distributions: number;
+                        }[];
+                        flags: ("NO_SERVING_WAREHOUSE" | "MANUAL_PRIMARY_INELIGIBLE" | "CAMPAIGN_AREA_MISSING")[];
+                        /** @description Non-persisted proposal; present only when no PRIMARY is stored. */
+                        proposed_primary_warehouse_id?: string | null;
+                        /** Format: date-time */
+                        generated_at: string;
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsCampaignWarehousesReevaluate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    clear_manual?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        campaign_id: string;
+                        /** @enum {string} */
+                        campaign_status: "DRAFT" | "ACTIVE" | "PAUSED" | "CLOSED";
+                        assignment_version: number;
+                        area: {
+                            center: {
+                                lat: number;
+                                lng: number;
+                            };
+                            radius_m: number;
+                        } | null;
+                        primary: {
+                            /** Format: uuid */
+                            warehouse_id: string;
+                            /** @enum {string} */
+                            source: "AUTO" | "MANUAL";
+                            eligible: boolean;
+                        } | null;
+                        warehouses: {
+                            /** Format: uuid */
+                            warehouse_id: string;
+                            name: string;
+                            role: ("PRIMARY" | "BACKUP") | null;
+                            source: ("AUTO" | "MANUAL") | null;
+                            distance_m: number;
+                            eligible: boolean;
+                            stock: {
+                                open_needed_items: number;
+                                needed_items_in_stock: number;
+                            };
+                            open_distributions: number;
+                        }[];
+                        flags: ("NO_SERVING_WAREHOUSE" | "MANUAL_PRIMARY_INELIGIBLE" | "CAMPAIGN_AREA_MISSING")[];
+                        /** @description Non-persisted proposal; present only when no PRIMARY is stored. */
+                        proposed_primary_warehouse_id?: string | null;
+                        /** Format: date-time */
+                        generated_at: string;
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsNeedsListNorms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success response; see docs/backend/04-logistics-api.md for the documented response shape. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsNeedsUpdateNorm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expected_version: number;
+                    /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                    qty_per_person_per_day?: string;
+                    /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                    modifier_infant?: string;
+                    /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                    modifier_elderly?: string;
+                    /** @enum {string} */
+                    quantity_basis?: "PER_PERSON_DAY" | "PER_PERSON";
+                    active?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Success response; see docs/backend/04-logistics-api.md for the documented response shape. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsNeedsConfirm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expected_version: number;
+                    /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                    quantity?: string;
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success response; see docs/backend/04-logistics-api.md for the documented response shape. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsNeedsEstimate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    request_id: string;
+                    work_cycle: number;
+                    people_count: number;
+                    days?: number;
+                    infants?: number;
+                    elderly?: number;
+                    categories: {
+                        category: string;
+                        /** Format: uuid */
+                        item_id: string;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description Documented response shape. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            /** Format: uuid */
+                            id: string;
+                            /** Format: uuid */
+                            cycle_id: string;
+                            /** Format: uuid */
+                            request_id: string;
+                            work_cycle: number;
+                            /** Format: uuid */
+                            item_id: string;
+                            /** @enum {string} */
+                            source: "ESTIMATED";
+                            /** @enum {string} */
+                            status: "OPEN" | "PARTIALLY_FULFILLED" | "FULFILLED" | "CANCELLED";
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            original_quantity?: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            requested_quantity: string;
+                            estimate?: {
+                                [key: string]: unknown;
+                            };
+                            reason_codes?: string[];
+                        }[];
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsSupplyGapsList: {
+        parameters: {
+            query?: {
+                status?: string;
+                warehouse_id?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            /** Format: uuid */
+                            id: string;
+                            /** @enum {string} */
+                            status: "OPEN" | "ACCEPTED" | "DISMISSED" | "EXPIRED";
+                            /** @enum {string} */
+                            severity: "YELLOW" | "RED";
+                            /** Format: uuid */
+                            warehouse_id: string;
+                            warehouse_name: string;
+                            /** Format: uuid */
+                            item_id: string;
+                            item_name: string;
+                            unit_code: string;
+                            scale: number;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            demand: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            supply: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            pledged: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            gap_qty: string;
+                            /** @description ESTIMATED demand, shown for information only. Never part of demand or gap_qty. */
+                            forecast_demand: string;
+                            campaign_ids: string[];
+                            backup_warehouse_ids: string[];
+                            reason_codes: string[];
+                            reasons: {
+                                code: string;
+                                message: string;
+                            }[];
+                            /** @description Suggested donation drive for RED gaps; empty object for YELLOW warnings. */
+                            draft: Record<string, never>;
+                            drive_id: string | null;
+                            dismissed_reason: string | null;
+                            dismissed_until: string | null;
+                            /** Format: date-time */
+                            computed_at: string;
+                            version: number;
+                            /** Format: date-time */
+                            created_at: string;
+                            /** Format: date-time */
+                            updated_at: string;
+                        }[];
+                        more: boolean;
+                        cursor?: string;
+                        /** Format: date-time */
+                        generated_at: string;
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsSupplyGapsDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        /** @enum {string} */
+                        status: "OPEN" | "ACCEPTED" | "DISMISSED" | "EXPIRED";
+                        /** @enum {string} */
+                        severity: "YELLOW" | "RED";
+                        /** Format: uuid */
+                        warehouse_id: string;
+                        warehouse_name: string;
+                        /** Format: uuid */
+                        item_id: string;
+                        item_name: string;
+                        unit_code: string;
+                        scale: number;
+                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                        demand: string;
+                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                        supply: string;
+                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                        pledged: string;
+                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                        gap_qty: string;
+                        /** @description ESTIMATED demand, shown for information only. Never part of demand or gap_qty. */
+                        forecast_demand: string;
+                        campaign_ids: string[];
+                        backup_warehouse_ids: string[];
+                        reason_codes: string[];
+                        reasons: {
+                            code: string;
+                            message: string;
+                        }[];
+                        /** @description Suggested donation drive for RED gaps; empty object for YELLOW warnings. */
+                        draft: Record<string, never>;
+                        drive_id: string | null;
+                        dismissed_reason: string | null;
+                        dismissed_until: string | null;
+                        /** Format: date-time */
+                        computed_at: string;
+                        version: number;
+                        /** Format: date-time */
+                        created_at: string;
+                        /** Format: date-time */
+                        updated_at: string;
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsSupplyGapsAccept: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expected_version: number;
+                    overrides?: {
+                        title?: string;
+                        description?: string | null;
+                        items?: {
+                            /** Format: uuid */
+                            item_id: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            target_quantity: string;
+                            acceptance_note?: string;
+                        }[];
+                        /** Format: date-time */
+                        opens_at?: string;
+                        /** Format: date-time */
+                        closes_at?: string;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        /** @enum {string} */
+                        status: "OPEN" | "ACCEPTED" | "DISMISSED" | "EXPIRED";
+                        /** @enum {string} */
+                        severity: "YELLOW" | "RED";
+                        /** Format: uuid */
+                        warehouse_id: string;
+                        warehouse_name: string;
+                        /** Format: uuid */
+                        item_id: string;
+                        item_name: string;
+                        unit_code: string;
+                        scale: number;
+                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                        demand: string;
+                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                        supply: string;
+                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                        pledged: string;
+                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                        gap_qty: string;
+                        /** @description ESTIMATED demand, shown for information only. Never part of demand or gap_qty. */
+                        forecast_demand: string;
+                        campaign_ids: string[];
+                        backup_warehouse_ids: string[];
+                        reason_codes: string[];
+                        reasons: {
+                            code: string;
+                            message: string;
+                        }[];
+                        /** @description Suggested donation drive for RED gaps; empty object for YELLOW warnings. */
+                        draft: Record<string, never>;
+                        drive_id: string | null;
+                        dismissed_reason: string | null;
+                        dismissed_until: string | null;
+                        /** Format: date-time */
+                        computed_at: string;
+                        version: number;
+                        /** Format: date-time */
+                        created_at: string;
+                        /** Format: date-time */
+                        updated_at: string;
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsSupplyGapsDismiss: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expected_version: number;
+                    reason: string;
+                    dismissed_days?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        /** @enum {string} */
+                        status: "OPEN" | "ACCEPTED" | "DISMISSED" | "EXPIRED";
+                        /** @enum {string} */
+                        severity: "YELLOW" | "RED";
+                        /** Format: uuid */
+                        warehouse_id: string;
+                        warehouse_name: string;
+                        /** Format: uuid */
+                        item_id: string;
+                        item_name: string;
+                        unit_code: string;
+                        scale: number;
+                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                        demand: string;
+                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                        supply: string;
+                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                        pledged: string;
+                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                        gap_qty: string;
+                        /** @description ESTIMATED demand, shown for information only. Never part of demand or gap_qty. */
+                        forecast_demand: string;
+                        campaign_ids: string[];
+                        backup_warehouse_ids: string[];
+                        reason_codes: string[];
+                        reasons: {
+                            code: string;
+                            message: string;
+                        }[];
+                        /** @description Suggested donation drive for RED gaps; empty object for YELLOW warnings. */
+                        draft: Record<string, never>;
+                        drive_id: string | null;
+                        dismissed_reason: string | null;
+                        dismissed_until: string | null;
+                        /** Format: date-time */
+                        computed_at: string;
+                        version: number;
+                        /** Format: date-time */
+                        created_at: string;
+                        /** Format: date-time */
+                        updated_at: string;
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsPickupTicketsList: {
+        parameters: {
+            query?: {
+                mission_id?: string;
+                status?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            /** Format: uuid */
+                            id: string;
+                            /** Format: uuid */
+                            mission_id: string;
+                            request_id?: string | null;
+                            campaign_id?: string | null;
+                            team_id?: string | null;
+                            /** Format: uuid */
+                            warehouse_id: string;
+                            /** @enum {string} */
+                            status: "OPEN" | "READY" | "HANDED_OVER" | "CLOSED" | "CANCELLED";
+                            distribution_id?: string | null;
+                            version: number;
+                            ready_at?: string | null;
+                            reserved_by?: string | null;
+                            confirmed_by?: string | null;
+                            confirmed_at?: string | null;
+                            handed_over_by?: string | null;
+                            handed_over_at?: string | null;
+                            collected_by_user_id?: string | null;
+                            cancelled_at?: string | null;
+                            cancel_reason?: string | null;
+                            /** Format: date-time */
+                            created_at?: string;
+                            /** Format: date-time */
+                            updated_at?: string;
+                            lines: {
+                                /** Format: uuid */
+                                relief_need_id: string;
+                                commitment_id: string | null;
+                                /** Format: uuid */
+                                item_id: string;
+                                item_name: string;
+                                unit_code: string;
+                                /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                                requested_quantity: string;
+                                /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                                reserved_quantity: string;
+                                /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                                shortfall_quantity: string;
+                            }[];
+                            shortfalls: {
+                                /** Format: uuid */
+                                relief_need_id: string;
+                                /** Format: uuid */
+                                item_id: string;
+                                item_name: string;
+                                /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                                shortfall_quantity: string;
+                            }[];
+                            backup_warehouses?: {
+                                /** Format: uuid */
+                                warehouse_id: string;
+                                /** Format: uuid */
+                                item_id: string;
+                                /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                                available_quantity: string;
+                            }[];
+                            closed_by?: string | null;
+                            closed_at?: string | null;
+                            unaccounted_goods?: boolean;
+                            handover_overdue?: boolean;
+                        }[];
+                        more: boolean;
+                        cursor?: string;
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsPickupTicketsCreate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    mission_id: string;
+                    /** Format: uuid */
+                    warehouse_id?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        /** Format: uuid */
+                        mission_id: string;
+                        request_id?: string | null;
+                        campaign_id?: string | null;
+                        team_id?: string | null;
+                        /** Format: uuid */
+                        warehouse_id: string;
+                        /** @enum {string} */
+                        status: "OPEN" | "READY" | "HANDED_OVER" | "CLOSED" | "CANCELLED";
+                        distribution_id?: string | null;
+                        version: number;
+                        ready_at?: string | null;
+                        reserved_by?: string | null;
+                        confirmed_by?: string | null;
+                        confirmed_at?: string | null;
+                        handed_over_by?: string | null;
+                        handed_over_at?: string | null;
+                        collected_by_user_id?: string | null;
+                        cancelled_at?: string | null;
+                        cancel_reason?: string | null;
+                        /** Format: date-time */
+                        created_at?: string;
+                        /** Format: date-time */
+                        updated_at?: string;
+                        lines: {
+                            /** Format: uuid */
+                            relief_need_id: string;
+                            commitment_id: string | null;
+                            /** Format: uuid */
+                            item_id: string;
+                            item_name: string;
+                            unit_code: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            requested_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            reserved_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            shortfall_quantity: string;
+                        }[];
+                        shortfalls: {
+                            /** Format: uuid */
+                            relief_need_id: string;
+                            /** Format: uuid */
+                            item_id: string;
+                            item_name: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            shortfall_quantity: string;
+                        }[];
+                        backup_warehouses?: {
+                            /** Format: uuid */
+                            warehouse_id: string;
+                            /** Format: uuid */
+                            item_id: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            available_quantity: string;
+                        }[];
+                        closed_by?: string | null;
+                        closed_at?: string | null;
+                        unaccounted_goods?: boolean;
+                        handover_overdue?: boolean;
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsPickupTicketsDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        /** Format: uuid */
+                        mission_id: string;
+                        request_id?: string | null;
+                        campaign_id?: string | null;
+                        team_id?: string | null;
+                        /** Format: uuid */
+                        warehouse_id: string;
+                        /** @enum {string} */
+                        status: "OPEN" | "READY" | "HANDED_OVER" | "CLOSED" | "CANCELLED";
+                        distribution_id?: string | null;
+                        version: number;
+                        ready_at?: string | null;
+                        reserved_by?: string | null;
+                        confirmed_by?: string | null;
+                        confirmed_at?: string | null;
+                        handed_over_by?: string | null;
+                        handed_over_at?: string | null;
+                        collected_by_user_id?: string | null;
+                        cancelled_at?: string | null;
+                        cancel_reason?: string | null;
+                        /** Format: date-time */
+                        created_at?: string;
+                        /** Format: date-time */
+                        updated_at?: string;
+                        lines: {
+                            /** Format: uuid */
+                            relief_need_id: string;
+                            commitment_id: string | null;
+                            /** Format: uuid */
+                            item_id: string;
+                            item_name: string;
+                            unit_code: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            requested_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            reserved_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            shortfall_quantity: string;
+                        }[];
+                        shortfalls: {
+                            /** Format: uuid */
+                            relief_need_id: string;
+                            /** Format: uuid */
+                            item_id: string;
+                            item_name: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            shortfall_quantity: string;
+                        }[];
+                        backup_warehouses?: {
+                            /** Format: uuid */
+                            warehouse_id: string;
+                            /** Format: uuid */
+                            item_id: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            available_quantity: string;
+                        }[];
+                        closed_by?: string | null;
+                        closed_at?: string | null;
+                        unaccounted_goods?: boolean;
+                        handover_overdue?: boolean;
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsPickupTicketsCancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expected_version: number;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        /** Format: uuid */
+                        mission_id: string;
+                        request_id?: string | null;
+                        campaign_id?: string | null;
+                        team_id?: string | null;
+                        /** Format: uuid */
+                        warehouse_id: string;
+                        /** @enum {string} */
+                        status: "OPEN" | "READY" | "HANDED_OVER" | "CLOSED" | "CANCELLED";
+                        distribution_id?: string | null;
+                        version: number;
+                        ready_at?: string | null;
+                        reserved_by?: string | null;
+                        confirmed_by?: string | null;
+                        confirmed_at?: string | null;
+                        handed_over_by?: string | null;
+                        handed_over_at?: string | null;
+                        collected_by_user_id?: string | null;
+                        cancelled_at?: string | null;
+                        cancel_reason?: string | null;
+                        /** Format: date-time */
+                        created_at?: string;
+                        /** Format: date-time */
+                        updated_at?: string;
+                        lines: {
+                            /** Format: uuid */
+                            relief_need_id: string;
+                            commitment_id: string | null;
+                            /** Format: uuid */
+                            item_id: string;
+                            item_name: string;
+                            unit_code: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            requested_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            reserved_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            shortfall_quantity: string;
+                        }[];
+                        shortfalls: {
+                            /** Format: uuid */
+                            relief_need_id: string;
+                            /** Format: uuid */
+                            item_id: string;
+                            item_name: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            shortfall_quantity: string;
+                        }[];
+                        backup_warehouses?: {
+                            /** Format: uuid */
+                            warehouse_id: string;
+                            /** Format: uuid */
+                            item_id: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            available_quantity: string;
+                        }[];
+                        closed_by?: string | null;
+                        closed_at?: string | null;
+                        unaccounted_goods?: boolean;
+                        handover_overdue?: boolean;
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsPickupTicketsConfirm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expected_version: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        /** Format: uuid */
+                        mission_id: string;
+                        request_id?: string | null;
+                        campaign_id?: string | null;
+                        team_id?: string | null;
+                        /** Format: uuid */
+                        warehouse_id: string;
+                        /** @enum {string} */
+                        status: "OPEN" | "READY" | "HANDED_OVER" | "CLOSED" | "CANCELLED";
+                        distribution_id?: string | null;
+                        version: number;
+                        ready_at?: string | null;
+                        reserved_by?: string | null;
+                        confirmed_by?: string | null;
+                        confirmed_at?: string | null;
+                        handed_over_by?: string | null;
+                        handed_over_at?: string | null;
+                        collected_by_user_id?: string | null;
+                        cancelled_at?: string | null;
+                        cancel_reason?: string | null;
+                        /** Format: date-time */
+                        created_at?: string;
+                        /** Format: date-time */
+                        updated_at?: string;
+                        lines: {
+                            /** Format: uuid */
+                            relief_need_id: string;
+                            commitment_id: string | null;
+                            /** Format: uuid */
+                            item_id: string;
+                            item_name: string;
+                            unit_code: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            requested_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            reserved_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            shortfall_quantity: string;
+                        }[];
+                        shortfalls: {
+                            /** Format: uuid */
+                            relief_need_id: string;
+                            /** Format: uuid */
+                            item_id: string;
+                            item_name: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            shortfall_quantity: string;
+                        }[];
+                        backup_warehouses?: {
+                            /** Format: uuid */
+                            warehouse_id: string;
+                            /** Format: uuid */
+                            item_id: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            available_quantity: string;
+                        }[];
+                        closed_by?: string | null;
+                        closed_at?: string | null;
+                        unaccounted_goods?: boolean;
+                        handover_overdue?: boolean;
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsPickupTicketsHandover: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expected_version: number;
+                    /** Format: uuid */
+                    collected_by_user_id?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        /** Format: uuid */
+                        mission_id: string;
+                        request_id?: string | null;
+                        campaign_id?: string | null;
+                        team_id?: string | null;
+                        /** Format: uuid */
+                        warehouse_id: string;
+                        /** @enum {string} */
+                        status: "OPEN" | "READY" | "HANDED_OVER" | "CLOSED" | "CANCELLED";
+                        distribution_id?: string | null;
+                        version: number;
+                        ready_at?: string | null;
+                        reserved_by?: string | null;
+                        confirmed_by?: string | null;
+                        confirmed_at?: string | null;
+                        handed_over_by?: string | null;
+                        handed_over_at?: string | null;
+                        collected_by_user_id?: string | null;
+                        cancelled_at?: string | null;
+                        cancel_reason?: string | null;
+                        /** Format: date-time */
+                        created_at?: string;
+                        /** Format: date-time */
+                        updated_at?: string;
+                        lines: {
+                            /** Format: uuid */
+                            relief_need_id: string;
+                            commitment_id: string | null;
+                            /** Format: uuid */
+                            item_id: string;
+                            item_name: string;
+                            unit_code: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            requested_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            reserved_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            shortfall_quantity: string;
+                        }[];
+                        shortfalls: {
+                            /** Format: uuid */
+                            relief_need_id: string;
+                            /** Format: uuid */
+                            item_id: string;
+                            item_name: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            shortfall_quantity: string;
+                        }[];
+                        backup_warehouses?: {
+                            /** Format: uuid */
+                            warehouse_id: string;
+                            /** Format: uuid */
+                            item_id: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            available_quantity: string;
+                        }[];
+                        closed_by?: string | null;
+                        closed_at?: string | null;
+                        unaccounted_goods?: boolean;
+                        handover_overdue?: boolean;
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsPickupTicketsReserve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expected_version: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        /** Format: uuid */
+                        mission_id: string;
+                        request_id?: string | null;
+                        campaign_id?: string | null;
+                        team_id?: string | null;
+                        /** Format: uuid */
+                        warehouse_id: string;
+                        /** @enum {string} */
+                        status: "OPEN" | "READY" | "HANDED_OVER" | "CLOSED" | "CANCELLED";
+                        distribution_id?: string | null;
+                        version: number;
+                        ready_at?: string | null;
+                        reserved_by?: string | null;
+                        confirmed_by?: string | null;
+                        confirmed_at?: string | null;
+                        handed_over_by?: string | null;
+                        handed_over_at?: string | null;
+                        collected_by_user_id?: string | null;
+                        cancelled_at?: string | null;
+                        cancel_reason?: string | null;
+                        /** Format: date-time */
+                        created_at?: string;
+                        /** Format: date-time */
+                        updated_at?: string;
+                        lines: {
+                            /** Format: uuid */
+                            relief_need_id: string;
+                            commitment_id: string | null;
+                            /** Format: uuid */
+                            item_id: string;
+                            item_name: string;
+                            unit_code: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            requested_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            reserved_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            shortfall_quantity: string;
+                        }[];
+                        shortfalls: {
+                            /** Format: uuid */
+                            relief_need_id: string;
+                            /** Format: uuid */
+                            item_id: string;
+                            item_name: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            shortfall_quantity: string;
+                        }[];
+                        backup_warehouses?: {
+                            /** Format: uuid */
+                            warehouse_id: string;
+                            /** Format: uuid */
+                            item_id: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            available_quantity: string;
+                        }[];
+                        closed_by?: string | null;
+                        closed_at?: string | null;
+                        unaccounted_goods?: boolean;
+                        handover_overdue?: boolean;
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsPickupTicketsCloseout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        ticket_id: string;
+                        /** @enum {string} */
+                        ticket_status: "OPEN" | "READY" | "HANDED_OVER" | "CLOSED" | "CANCELLED";
+                        closeout_id?: string | null;
+                        closeout_status?: ("DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED") | null;
+                        version: number;
+                        editable: boolean;
+                        can_submit: boolean;
+                        review_note?: string | null;
+                        submitted_at?: string | null;
+                        reviewed_at?: string | null;
+                        lines: {
+                            /** Format: uuid */
+                            item_id: string;
+                            item_name: string;
+                            unit_code: string;
+                            returnable?: boolean;
+                            perishable?: boolean;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            held_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            delivered_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            remaining_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            returned_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            retired_quantity: string;
+                            retire_reason?: ("CONSUMED" | "EXPIRED" | "DAMAGED" | "LOST" | "NOT_RETURNABLE") | null;
+                            retire_reason_label?: string | null;
+                            note?: string | null;
+                            balanced: boolean;
+                        }[];
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsPickupTicketsSaveCloseout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expected_version: number;
+                    lines: {
+                        /** Format: uuid */
+                        item_id: string;
+                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                        returned_quantity: string;
+                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                        retired_quantity: string;
+                        /** @enum {string} */
+                        retire_reason?: "CONSUMED" | "EXPIRED" | "DAMAGED" | "LOST" | "NOT_RETURNABLE";
+                        note?: string;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        ticket_id: string;
+                        /** @enum {string} */
+                        ticket_status: "OPEN" | "READY" | "HANDED_OVER" | "CLOSED" | "CANCELLED";
+                        closeout_id?: string | null;
+                        closeout_status?: ("DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED") | null;
+                        version: number;
+                        editable: boolean;
+                        can_submit: boolean;
+                        review_note?: string | null;
+                        submitted_at?: string | null;
+                        reviewed_at?: string | null;
+                        lines: {
+                            /** Format: uuid */
+                            item_id: string;
+                            item_name: string;
+                            unit_code: string;
+                            returnable?: boolean;
+                            perishable?: boolean;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            held_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            delivered_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            remaining_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            returned_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            retired_quantity: string;
+                            retire_reason?: ("CONSUMED" | "EXPIRED" | "DAMAGED" | "LOST" | "NOT_RETURNABLE") | null;
+                            retire_reason_label?: string | null;
+                            note?: string | null;
+                            balanced: boolean;
+                        }[];
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsPickupTicketsReviewCloseout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expected_version: number;
+                    /** @enum {string} */
+                    decision: "APPROVE" | "REJECT";
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        ticket_id: string;
+                        /** @enum {string} */
+                        ticket_status: "OPEN" | "READY" | "HANDED_OVER" | "CLOSED" | "CANCELLED";
+                        closeout_id?: string | null;
+                        closeout_status?: ("DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED") | null;
+                        version: number;
+                        editable: boolean;
+                        can_submit: boolean;
+                        review_note?: string | null;
+                        submitted_at?: string | null;
+                        reviewed_at?: string | null;
+                        lines: {
+                            /** Format: uuid */
+                            item_id: string;
+                            item_name: string;
+                            unit_code: string;
+                            returnable?: boolean;
+                            perishable?: boolean;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            held_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            delivered_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            remaining_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            returned_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            retired_quantity: string;
+                            retire_reason?: ("CONSUMED" | "EXPIRED" | "DAMAGED" | "LOST" | "NOT_RETURNABLE") | null;
+                            retire_reason_label?: string | null;
+                            note?: string | null;
+                            balanced: boolean;
+                        }[];
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsPickupTicketsSubmitCloseout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expected_version: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        ticket_id: string;
+                        /** @enum {string} */
+                        ticket_status: "OPEN" | "READY" | "HANDED_OVER" | "CLOSED" | "CANCELLED";
+                        closeout_id?: string | null;
+                        closeout_status?: ("DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED") | null;
+                        version: number;
+                        editable: boolean;
+                        can_submit: boolean;
+                        review_note?: string | null;
+                        submitted_at?: string | null;
+                        reviewed_at?: string | null;
+                        lines: {
+                            /** Format: uuid */
+                            item_id: string;
+                            item_name: string;
+                            unit_code: string;
+                            returnable?: boolean;
+                            perishable?: boolean;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            held_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            delivered_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            remaining_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            returned_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            retired_quantity: string;
+                            retire_reason?: ("CONSUMED" | "EXPIRED" | "DAMAGED" | "LOST" | "NOT_RETURNABLE") | null;
+                            retire_reason_label?: string | null;
+                            note?: string | null;
+                            balanced: boolean;
+                        }[];
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsPickupTicketsDeliveries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expected_version: number;
+                    /** Format: date-time */
+                    occurred_at: string;
+                    receiver_label?: string;
+                    lines: {
+                        /** Format: uuid */
+                        item_id: string;
+                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                        quantity: string;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        /** Format: uuid */
+                        mission_id: string;
+                        request_id?: string | null;
+                        campaign_id?: string | null;
+                        team_id?: string | null;
+                        /** Format: uuid */
+                        warehouse_id: string;
+                        /** @enum {string} */
+                        status: "OPEN" | "READY" | "HANDED_OVER" | "CLOSED" | "CANCELLED";
+                        distribution_id?: string | null;
+                        version: number;
+                        ready_at?: string | null;
+                        reserved_by?: string | null;
+                        confirmed_by?: string | null;
+                        confirmed_at?: string | null;
+                        handed_over_by?: string | null;
+                        handed_over_at?: string | null;
+                        collected_by_user_id?: string | null;
+                        cancelled_at?: string | null;
+                        cancel_reason?: string | null;
+                        /** Format: date-time */
+                        created_at?: string;
+                        /** Format: date-time */
+                        updated_at?: string;
+                        lines: {
+                            /** Format: uuid */
+                            relief_need_id: string;
+                            commitment_id: string | null;
+                            /** Format: uuid */
+                            item_id: string;
+                            item_name: string;
+                            unit_code: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            requested_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            reserved_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            shortfall_quantity: string;
+                        }[];
+                        shortfalls: {
+                            /** Format: uuid */
+                            relief_need_id: string;
+                            /** Format: uuid */
+                            item_id: string;
+                            item_name: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            shortfall_quantity: string;
+                        }[];
+                        backup_warehouses?: {
+                            /** Format: uuid */
+                            warehouse_id: string;
+                            /** Format: uuid */
+                            item_id: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            available_quantity: string;
+                        }[];
+                        closed_by?: string | null;
+                        closed_at?: string | null;
+                        unaccounted_goods?: boolean;
+                        handover_overdue?: boolean;
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

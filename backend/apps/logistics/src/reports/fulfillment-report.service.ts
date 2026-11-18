@@ -56,6 +56,8 @@ export class FulfillmentReportService {
     values.push(window.from, window.to);
     conditions.push(`n.created_at >= $${values.length - 1}::timestamptz`);
     conditions.push(`n.created_at < $${values.length}::timestamptz`);
+    // ESTIMATED lines are a forecast, not demand, so the fulfillment report leaves them out.
+    conditions.push(`n.source<>'ESTIMATED'`);
     if (cursor) {
       values.push(cursor.id, cursor.id);
       conditions.push(`(n.id,n.id)>($${values.length - 1}::uuid,$${values.length}::uuid)`);

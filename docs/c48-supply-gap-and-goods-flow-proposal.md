@@ -16,14 +16,14 @@ Status: proposal, dated 2026-11-18. Nothing here is implemented. The warehouse a
 - Demand model: `relief_need` (per `fulfillment_cycle`, linked to a campaign).
 - Reservations: `commitment` (with `issued`, `delivered`, `returned`, `lost` quantities).
 - Stock balances (on_hand, reserved) with adjustments that need independent review.
-- Warehouses appear to have only a name, so there is probably no location yet (to be confirmed).
+- Warehouses already have a nullable `location geography(Point,4326)` (baseline schema, exposed as a GeoJSON Point `{type, coordinates:[lng,lat]}`), but it was unindexed and there was no service radius. Step 2 adds `service_radius_m`, a pair CHECK and a GIST index.
 - `CAMPAIGN_COORDINATOR` and `CAMPAIGN_MANAGER` were retired in earlier migrations. "Campaign manager" is taken to mean OPERATIONS_MANAGER.
 
 ## 3. Design
 
 ### 3.1 Warehouse location
 
-Add `location` (PostGIS point) and `service_radius_m` to warehouses. Radii may overlap.
+Reuse the existing `warehouse.location` and add `service_radius_m` (pair rule: both null or both set; 1..200000 m). Radii may overlap.
 
 ### 3.2 Campaign-warehouse assignment
 
@@ -132,7 +132,8 @@ Keep strict: the reconciliation invariant, independent retire approval, the audi
 - Should warehouse capacity be a single total, per item type, or just current stock? Recommendation: per item type.
 - Overlap rule: nearest warehouse only, or split by stock? Current default is one sticky PRIMARY by the ranking above.
 - Confirm "campaign manager" means OPERATIONS_MANAGER.
-- Confirm the warehouse schema has no location column, and check how SOS requests currently store need data.
+- Check how SOS requests currently store need data.
+- Step 2 backfilled `service_radius_m = 10000` for existing located warehouses. Confirm this default, or null the location instead.
 
 ## 6. Next concrete step
 

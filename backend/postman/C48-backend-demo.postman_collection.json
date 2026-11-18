@@ -4917,6 +4917,51 @@
           "response": []
         },
         {
+          "name": "Đăng nhập quản lý vận hành ops_mgr",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('_c48', \"{\\\"service\\\":\\\"response\\\",\\\"operationId\\\":\\\"login\\\",\\\"expectedStatus\\\":200}\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Phản hồi đúng trạng thái\", function () { pm.response.to.have.status(JSON.parse(pm.variables.get(\"_c48\")).expectedStatus); });",
+                  "pm.collectionVariables.set('opsMgrAccessToken', pm.response.json().access_token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"ops_mgr\",\n  \"password\": \"{{seedPassword}}\",\n  \"client_kind\": \"NATIVE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{identityBaseUrl}}/auth/login",
+            "description": "Dùng tài khoản seed demo; lệnh ghi gửi Idempotency-Key."
+          },
+          "response": []
+        },
+        {
           "name": "Tạo chiến dịch có tâm và bán kính",
           "event": [
             {
@@ -4944,7 +4989,7 @@
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{coord1AccessToken}}"
+                "value": "Bearer {{opsMgrAccessToken}}"
               },
               {
                 "key": "Idempotency-Key",
@@ -4965,7 +5010,7 @@
               }
             },
             "url": "{{responseBaseUrl}}/campaigns",
-            "description": "Dùng tài khoản seed demo; lệnh ghi gửi Idempotency-Key."
+            "description": "Quản lý vận hành (ops_mgr) tạo chiến dịch; điều phối viên không có quyền tạo chiến dịch."
           },
           "response": []
         },

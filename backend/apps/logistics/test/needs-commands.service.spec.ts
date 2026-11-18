@@ -33,6 +33,8 @@ const baseNeed = {
   cancelled_remaining: null,
   designated_point_id: null,
   status: 'OPEN',
+  source: 'DECLARED',
+  estimate_basis: null,
   version: 1,
   created_at: new Date('2026-10-12T12:00:00.000Z'),
 };
@@ -241,5 +243,88 @@ describe('NeedCommandsService', () => {
 
     await expect(service.increase(needId, { expected_version: 1, quantity: '4', reason: 'Tăng.' }, request))
       .rejects.toMatchObject({ code: 'VERSION_CONFLICT', status: 409 });
+  });
+});
+
+describe('NeedCommandsService estimate confirmation', () => {
+  const estimated = { source: 'ESTIMATED', estimate_basis: { batch_id: 'batch-1', estimated_quantity: '3' } };
+
+  it('confirms an estimate with an edited quantity, records the reason, and keeps the estimate basis', async () => {
+    const { service, calls, request, idempotency } = setup({ need: { ...estimated, requested_quantity: '3', version: 1 } });
+
+    const result = await service.confirm(needId, { expected_version: 1, quantity: '4', reason: 'Điều chỉnh theo khảo sát.' }, request);
+
+    expect(result.status).toBe(200);
+    expect(calls.find((call) => call.sql.includes('UPDATE relief_need'))?.sql).toContain("source='CONFIRMED'");
+    expect(calls.find((call) => call.sql.includes('UPDATE relief_need'))?.values).toEqual([needId, 1, '4', 'OPEN']);
+    expect(calls.some((call) => call.sql.includes('INSERT INTO audit_log') && call.values?.[1] === 'NEED_CONFIRMED')).toBe(true);
+    expect(idempotency.execute).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ command: 'logistics.needs.confirm' }));
+  });
+
+  it('confirms an estimate without changing its quantity', async () => {
+    const { service, calls, request } = setup({ need: { ...estimated, requested_quantity: '3', version: 2 } });
+
+    await service.confirm(needId, { expected_version: 2 }, request);
+
+    expect(calls.find((call) => call.sql.includes('UPDATE relief_need'))?.values).toEqual([needId, 2, '3', 'OPEN']);
+  });
+
+  it('requires a reason when the confirmed quantity differs from the estimate', async () => {
+    const { service, request, manager } = setup({ need: { ...estimated, requested_quantity: '3', version: 1 } });
+
+    await expect(service.confirm(needId, { expected_version: 1, quantity: '4' }, request))
+      .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 });
+    expect(manager.query).not.toHaveBeenCalledWith(expect.stringContaining('UPDATE relief_need'), expect.anything());
+  });
+
+  it('rejects confirming a need that was not an estimate', async () => {
+    const { service, request } = setup({ need: { source: 'DECLARED', requested_quantity: '3', version: 1 } });
+
+    await expect(service.confirm(needId, { expected_version: 1 }, request))
+      .rejects.toMatchObject({ code: 'NEED_NOT_ESTIMATED', status: 409 });
+  });
+
+  it('rejects a stale version when confirming', async () => {
+    const { service, request } = setup({ need: { ...estimated, requested_quantity: '3', version: 3 } });
+
+    await expect(service.confirm(needId, { expected_version: 1 }, request))
+      .rejects.toMatchObject({ code: 'VERSION_CONFLICT', status: 409 });
+  });
+
+  it('rejects confirming a quantity below stock already protected for the need', async () => {
+    const { service, request } = setup({
+      need: { ...estimated, requested_quantity: '3', version: 1 },
+      commitments: [{
+        id: 'commitment-1', warehouse_id: warehouseId, quantity: '2', released_quantity: '0',
+        issued_quantity: '0', delivered_quantity: '0', returned_quantity: '0', lost_quantity: '0', version: 1,
+      }],
+    });
+
+    await expect(service.confirm(needId, { expected_version: 1, quantity: '1', reason: 'Giảm.' }, request))
+      .rejects.toMatchObject({ code: 'BELOW_PROTECTED_QUANTITY', status: 409 });
+  });
+
+  it('rejects confirming in a frozen cycle', async () => {
+    const { service, request } = setup({ cycleState: 'FROZEN', need: { ...estimated, requested_quantity: '3', version: 1 } });
+
+    await expect(service.confirm(needId, { expected_version: 1 }, request))
+      .rejects.toMatchObject({ code: 'CYCLE_FROZEN', status: 409 });
+  });
+
+  it.each(['increase', 'reduce'] as const)('rejects %s on an unconfirmed estimate', async (action) => {
+    const { service, request } = setup({ need: { ...estimated, requested_quantity: '3', version: 1 } });
+    const call = action === 'increase'
+      ? () => service.increase(needId, { expected_version: 1, quantity: '5', reason: 'Tăng.' }, request)
+      : () => service.reduce(needId, { expected_version: 1, quantity: '2', reason: 'Giảm.' }, request);
+
+    await expect(call()).rejects.toMatchObject({ code: 'NEED_ESTIMATE_NOT_CONFIRMED', status: 409 });
+  });
+
+  it('still allows cancelling an unconfirmed estimate', async () => {
+    const { service, request } = setup({ need: { ...estimated, requested_quantity: '3', version: 1 } });
+
+    const result = await service.cancel(needId, { expected_version: 1, reason: 'Ước tính không phù hợp.' }, request);
+
+    expect(result.status).toBe(200);
   });
 });

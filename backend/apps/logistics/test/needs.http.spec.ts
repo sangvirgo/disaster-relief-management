@@ -8,13 +8,15 @@ import { LOGISTICS_IDENTITY_CLIENT, LOGISTICS_IDENTITY_CONFIG, LogisticsIdentity
 import { LOGISTICS_AUTH_CONFIG, LogisticsSessionService } from '../src/auth/logistics-session.service';
 import { NeedCommandsService } from '../src/needs/need-commands.service';
 import { NeedCommitmentsService } from '../src/needs/need-commitments.service';
+import { NeedNormsService } from '../src/needs/need-norms.service';
 import { NeedsQueriesService } from '../src/needs/needs-queries.service';
 import { NeedsModule } from '../src/needs/needs.module';
 import { NeedsService } from '../src/needs/needs.service';
+import { UnaccountedGoodsGuard } from '../src/pickup-tickets/unaccounted-goods.service';
 import { ResponseAdmissionClient, RESPONSE_ADMISSION_CLIENT, RESPONSE_ADMISSION_CONFIG } from '../src/needs/response-admission.client';
 import { LOGISTICS_RESPONSE_CLIENT, LogisticsResponseCampaignClient, RESPONSE_CAMPAIGN_CONFIG } from '../src/integrations/response/response-campaign.client';
 import { LogisticsServiceTokenGuard } from '../src/auth/logistics-service-token.guard';
-import type { AdjustNeedQuantityDto, CancelNeedDto, CreateNeedCommitmentDto, CreateNeedDto, FulfillmentQueryDto, NeedContributionsQueryDto, NeedsListQueryDto, ReleaseCommitmentDto } from '../src/needs/needs.dto';
+import type { AdjustNeedQuantityDto, CancelNeedDto, CreateNeedCommitmentDto, CreateNeedDto, FulfillmentQueryDto, NeedContributionsQueryDto, NeedNormPatchDto, NeedsListQueryDto, ReleaseCommitmentDto } from '../src/needs/needs.dto';
 
 const needId = '55555555-5555-4555-8555-555555555555';
 const requestId = '11111111-1111-4111-8111-111111111111';
@@ -35,6 +37,10 @@ describe('POST /needs HTTP', () => {
     reduce: jest.fn(async (_id: string, _dto: AdjustNeedQuantityDto, _request: Request) => ({ status: 200, value: { id: needId, requested_quantity: '2' }, replay: false })),
     cancel: jest.fn(async (_id: string, _dto: CancelNeedDto, _request: Request) => ({ status: 200, value: { id: needId, status: 'CANCELLED' }, replay: false })),
   };
+  const norms = {
+    list: jest.fn(async (_request: Request) => ({ items: [], generated_at: '2026-10-13T00:00:00.000Z' })),
+    update: jest.fn(async (_id: string, _dto: NeedNormPatchDto, _request: Request) => ({ id: needId, version: 2 })),
+  };
   const commitments = {
     create: jest.fn(async (_id: string, _dto: CreateNeedCommitmentDto, _request: Request) => ({ status: 201, value: { id: '99999999-9999-4999-8999-999999999999', quantity: '1.25' }, replay: false })),
     release: jest.fn(async (_id: string, _dto: ReleaseCommitmentDto, _request: Request) => ({ status: 200, value: { id: '99999999-9999-4999-8999-999999999999', released_quantity: '0.5' }, replay: true })),
@@ -50,7 +56,9 @@ describe('POST /needs HTTP', () => {
       .overrideProvider(NeedsService).useValue(needs)
       .overrideProvider(NeedCommandsService).useValue(commands)
       .overrideProvider(NeedCommitmentsService).useValue(commitments)
+      .overrideProvider(NeedNormsService).useValue(norms)
       .overrideProvider(NeedsQueriesService).useValue(queries)
+      .overrideProvider(UnaccountedGoodsGuard).useValue({ assertRequestResolvable: async () => undefined })
       .overrideGuard(LogisticsServiceTokenGuard).useValue({ canActivate: () => true })
       .overrideProvider(ResponseAdmissionClient).useValue({})
       .overrideProvider(RESPONSE_ADMISSION_CONFIG).useValue({ baseUrl: 'http://127.0.0.1:1', timeoutMs: 2_000 })

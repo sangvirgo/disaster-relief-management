@@ -62,6 +62,33 @@ export class MissionsQueriesService {
     @Inject(MISSIONS_CONFIG) private readonly config: MissionsConfig,
   ) {}
 
+  /**
+   * Internal projection for Logistics (service token only, never exposed through Nginx). Allowlisted fields only:
+   * no contact data, notes, coordinates or reporter identity.
+   */
+  async internal(missionId: string): Promise<Record<string, unknown>> {
+    const rows = await this.dataSource.query(
+      `SELECT m.id,m.status,m.request_id,r.campaign_id,m.team_id,m.work_cycle
+         FROM mission m JOIN assistance_request r ON r.id=m.request_id WHERE m.id=$1`,
+      [missionId],
+    ) as Array<{ id: string; status: string; request_id: string; campaign_id: string | null; team_id: string; work_cycle: number | string }>;
+    const row = rows[0];
+    if (!row) throw new AppError('NOT_FOUND', { status: 404 });
+    const members = await this.dataSource.query(
+      'SELECT user_id FROM team_member WHERE team_id=$1 AND left_at IS NULL ORDER BY user_id',
+      [row.team_id],
+    ) as Array<{ user_id: string }>;
+    return {
+      id: row.id,
+      status: row.status,
+      request_id: row.request_id,
+      campaign_id: row.campaign_id ?? null,
+      team_id: row.team_id,
+      work_cycle: Number(row.work_cycle),
+      member_user_ids: members.map((member) => member.user_id),
+    };
+  }
+
   async mine(query: MissionPageQueryDto, request: Request): Promise<Record<string, unknown>> {
     const session = await this.sessions.require(request);
     const teams = await this.dataSource.query(

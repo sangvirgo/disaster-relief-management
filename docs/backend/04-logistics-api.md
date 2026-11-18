@@ -14,7 +14,7 @@ Schema: [schema/logistics.sql](schema/logistics.sql). Conventions: [00](00-setup
 | `GET /item-types` · `GET /units` · `GET /items?type=&status=&query=&cursor=` | Vietnamese display names; `unit.scale` included |
 | `POST /item-types` · `POST /units` · `POST /items` (Idem) | `{ item_type_code, unit_code, name }`; `ITEM_NAME_TAKEN` 409 (per unit). Unit/type/code immutable after use |
 | `POST /items/{id}/deactivate` | blocked only for new use; history kept |
-| `POST /warehouses` · `PATCH /warehouses/{id}` · `POST …/deactivate` | `{ name, address_note?, location?, location_public? }`; shared warehouse operations require SYSTEM scope |
+| `POST /warehouses` · `PATCH /warehouses/{id}` · `POST …/deactivate` | `{ name, address_note?, location?, location_public?, service_radius_m? }`; `location` (GeoJSON Point, lng/lat) and `service_radius_m` (1–200000 m) are set or cleared together (`VALIDATION_FAILED` with `WAREHOUSE_SERVICE_AREA_PAIR_REQUIRED` otherwise); shared warehouse operations require SYSTEM scope |
 | `POST /relief-points` · `PATCH` · `deactivate` | location required; inactive point cannot be chosen for a new need/distribution (`POINT_INACTIVE`) |
 | `POST /vehicles` · `PATCH` · `deactivate` | `{ identifier, vehicle_type, capacity?, capacity_unit? }`; shared vehicle operations require SYSTEM scope; `VEHICLE_IDENTIFIER_TAKEN` |
 | `POST /stock/opening` (Idem) | `OPERATIONS_MANAGER`: `{ warehouse_id, lines:[{item_id, quantity}], note }` → `OPENING` movements (no fabricated donor receipt) |
@@ -153,3 +153,175 @@ TC-15..19, TC-31, TC-DON-01..07/09, TC-DIST-01..04, TC-REC-01, TC-BE-05/09/15/17
 
 - `GET /audit-logs?entity_type=&entity_id=&limit=&cursor=` (`AUDIT_READ`, system-scope ADMIN only) returns `{ items, next_cursor }` ordered by `(created_at DESC, id DESC)`; `entity_type` is required, `entity_id` is optional, and cursors are bound to both filters. Rows include actor, action, entity, before/after state, reason, correlation ID, and timestamp. Producers store structured lifecycle/version fields and staff-entered reason text; never put credentials, one-time codes, or signed URLs in a reason. Treat those notes as privileged data.
 - Round-2 cleanup (plan §28.7, 01 §9): lists for warehouses, relief points and vehicles; `GET /stock/adjustments?status=`; relief-point `contact_note`/`operating_note` in POST/PATCH and detail; guest donors have no notice rows (tracking view carries their updates); dispute evidence is owned by the dispute.
+
+## 12. Campaign warehouse assignment (`CAMPAIGN_WAREHOUSE_VIEW` / `CAMPAIGN_WAREHOUSE_MANAGE`)
+
+Campaign geometry (`center`, `radius_m`) is owned by Response and is read through its internal projection. Logistics keeps a local cache in `campaign_area_snapshot` and never joins across databases. A warehouse is eligible when it is `ACTIVE`, has a `location` and a `service_radius_m`, and `ST_DWithin(warehouse.location, campaign.center, warehouse.service_radius_m + campaign.radius_m)` holds in geography metres. Overlap is allowed. Each campaign has at most one `PRIMARY` (partial unique index); other eligible warehouses are `BACKUP` and informational only. The rules follow [the supply-gap proposal §3.2](../c48-supply-gap-and-goods-flow-proposal.md).
+
+| Method & path | Auth | Behaviour |
+|---|---|---|
+| `GET /campaigns/{id}/warehouses` | `CAMPAIGN_WAREHOUSE_VIEW` (COORDINATOR and OPERATIONS_MANAGER; a campaign grant covers only its campaign) | Returns `{ campaign_id, campaign_status, assignment_version, area, primary, warehouses[], flags[], generated_at }`, plus `proposed_primary_warehouse_id` only when no `PRIMARY` is stored. Each eligible warehouse carries `role`, `source`, `distance_m`, `stock` (`open_needed_items`, `needed_items_in_stock`: counts of distinct items, never summed across units) and `open_distributions` (load). The read is strictly read-only: it fetches the latest Response area for eligibility, runs only SELECTs (no transaction, advisory lock, snapshot write, assignment change or audit row) and returns the stored `assignment_version` unchanged. `proposed_primary_warehouse_id` is the warehouse the next sync would assign (null when nothing is eligible); it is never persisted. Assignment happens only in the write paths below. |
+| `PUT /campaigns/{id}/primary-warehouse` (Idem) | `CAMPAIGN_WAREHOUSE_MANAGE` (OPERATIONS_MANAGER only) | `{ warehouse_id, expected_version, reason }`. `expected_version` is the `assignment_version` from GET; a stale value returns `VERSION_CONFLICT` 409. The warehouse must be eligible (`WAREHOUSE_NOT_ELIGIBLE` 409) and the campaign must have an area (`CAMPAIGN_AREA_MISSING` 409). The row becomes `PRIMARY` with `source = MANUAL`, the previous primary becomes `BACKUP`, `assignment_version` increments, and an `audit_log` row (`CAMPAIGN_PRIMARY_WAREHOUSE_SET`, with the reason) is written. Returns the same view as GET. |
+| `POST /campaigns/{id}/warehouses/reevaluate` (Idem) | `CAMPAIGN_WAREHOUSE_MANAGE` | `{ clear_manual? }`. Re-ranks the AUTO primary. A MANUAL primary is kept unless `clear_manual` is `true`. Returns the same view. |
+
+Rules:
+
+- **Ranking:** (a) stock for the campaign's open needs (`relief_need` in `OPEN` or `PARTIALLY_FULFILLED` through `fulfillment_cycle.campaign_id`, with `stock_balance.on_hand - reserved > 0` for that item), (b) fewer open distributions (`DRAFT`, `APPROVED`, `DISPATCHED`) from the warehouse, (c) shorter distance, (d) smaller warehouse id as the stable tie-break.
+- **Sticky:** re-ranking happens only when there is no primary, the primary is ineligible, a warehouse's status, location or radius changed, the campaign area changed, or a manager asked. A warehouse change re-evaluates the campaigns whose cached circle is within reach of the old or new circle, plus campaigns currently assigned to it. A MANUAL primary is never replaced automatically. If it becomes ineligible, the row is kept and flagged.
+- **Flags** (derived from state, never stored): `NO_SERVING_WAREHOUSE`, `MANUAL_PRIMARY_INELIGIBLE`, `CAMPAIGN_AREA_MISSING`. A campaign with no eligible warehouse has no `campaign_warehouse` row.
+- **Concurrency:** each write evaluation (PUT, POST reevaluate, the sweep, the warehouse trigger) runs in one transaction holding `pg_advisory_xact_lock(hashtext('campaign-warehouse:' || campaign_id))`, and the partial unique index guarantees one PRIMARY. GET takes neither the lock nor a transaction.
+- **Triggers** run after the warehouse command commits. A trigger failure is logged with a stable code and never fails the warehouse command.
+- **Scheduled sweep:** `CampaignWarehouseService.reevaluateCampaign(campaignId)` is the entry point for the later gap job. It refreshes the snapshot from Response, stores it, and assigns a primary when none exists, so a new campaign gets its primary from the sweep, not from a GET. It throws `RESPONSE_UNAVAILABLE` during an outage. No scheduler is wired in this step.
+- **Dependency:** the Response internal projection `GET /internal/campaigns/{id}` must include `center` and `radius_m`. Without them, these endpoints fail closed with `RESPONSE_UNAVAILABLE`.
+
+## 13. SOS need estimates, confirmation and norms (Step 4)
+
+Demand lines stay in `relief_need`; no separate line table exists. Each line has `source`:
+
+- `DECLARED`: entered through `POST /needs` (the existing path).
+- `ESTIMATED`: generated by `POST /needs/estimate` from the active norm table. Visible in every read, but **never committable**: `POST /needs/{id}/commitments` rejects it with `NEED_ESTIMATE_NOT_CONFIRMED`, and `increase` / `reduce` reject it the same way. `cancel` is allowed.
+- `CONFIRMED`: an estimate confirmed by a coordinator. It keeps `estimate` as history.
+
+Only `DECLARED` and `CONFIRMED` count as demand. The fulfillment report, drive suggestions, operations-dashboard need counts and the cycle `has_open_needs` settlement guard exclude `ESTIMATED` lines.
+
+| Route | Permission | Contract |
+|---|---|---|
+| `POST /needs/estimate` (Idem) | `NEED_ESTIMATE_CONFIRM` in cycle scope (`COORDINATOR`, `OPERATIONS_MANAGER`) | Body `{ request_id, work_cycle, people_count (1..10000), days? (1..30, default 3), infants? (0..), elderly? (0..), categories: [{ category, item_id }] (1..4, unique categories) }`. `infants + elderly <= people_count`. Each category needs an active norm (`NEED_NORM_NOT_FOUND` 400) whose item type matches the chosen item (`NEED_ITEM_TYPE_MISMATCH` 400). Refused with `NEED_ALREADY_DECLARED` 409 when the same request already has a live `DECLARED` or `CONFIRMED` need for the item (checked across its cycles). A live estimate for the same item in the cycle returns `NEED_EXISTS`. Response: `201 { items: [need…] }`; all lines share one `estimate_basis.batch_id`. Admission goes through the existing Response admission call. |
+| `POST /needs/{id}/confirm` (Idem · Ver) | `NEED_ESTIMATE_CONFIRM` in cycle scope | Body `{ expected_version, quantity?, reason? }`. Only `ESTIMATED` lines (`NEED_NOT_ESTIMATED` 409 otherwise). Changing the quantity requires `reason`. The quantity must be positive at the item scale and cannot go below protected stock (`BELOW_PROTECTED_QUANTITY`). Confirmation is allowed only in an OPEN cycle; it has no increase/reduce direction rule. |
+| `GET /need-norms` | `NEED_NORM_MANAGE` (`OPERATIONS_MANAGER`, system scope) | `{ items: [{ id, category, item_type_code, quantity_basis, qty_per_person_per_day, modifier_infant, modifier_elderly, active, version, updated_at }], generated_at }`. |
+| `PATCH /need-norms/{id}` (Ver) | `NEED_NORM_MANAGE` | Body `{ expected_version, qty_per_person_per_day?, modifier_infant?, modifier_elderly?, quantity_basis?, active? }`; at least one change is required. Audited as `NEED_NORM_UPDATED`. |
+
+**Estimate rule** (pure function `need-estimate.ts`, no AI):
+
+```
+effective_persons = people_count + infants * modifier_infant + elderly * modifier_elderly
+raw               = qty_per_person_per_day * days * effective_persons   (PER_PERSON basis: days factor 1)
+quantity          = raw rounded UP to the item's unit scale
+```
+
+`people_count` includes infants and elderly. Each modifier is the extra share of one norm added per person in that group. `quantity_basis` says whether a norm is multiplied by days (`PER_PERSON_DAY`, for example water and food) or is a one-off per-person amount (`PER_PERSON`, for example a blanket or first-aid kit). Arithmetic uses integer units, so there is no float drift.
+
+**Norm table** (`need_norm`, unique `(category, item_type_code)`): seeded with four demo categories, `WATER` (`NUOC_UONG`, 3 per person per day), `FOOD` (`LUONG_THUC`, 0.6 per person per day), `BLANKET` (`CHAN_MEN`, 1 per person) and `MEDICINE` (`Y_TE`, 0.01 per person). A norm's quantity is in the unit of the item the coordinator chooses, so these demo values assume the litre water item, the kg rice item and the piece items. Modifiers are demo placeholders.
+
+**Reason codes** (stable English codes, Vietnamese copy in one place): `NORM_PER_PERSON_DAY`, `NORM_PER_PERSON`, `DAYS_DEFAULT`, `INFANT_MODIFIER_APPLIED`, `ELDERLY_MODIFIER_APPLIED`, `ROUNDED_UP_TO_UNIT_SCALE`, `NORM_NOT_FOUND` (skipped categories), and `QUANTITY_FAR_ABOVE_ESTIMATE`.
+
+**`QUANTITY_FAR_ABOVE_ESTIMATE`** is computed on read, never stored. It applies to a live `DECLARED` line whose requested quantity is strictly greater than 3 times the estimated quantity of the latest estimate for the same item in the same cycle, including cancelled or confirmed estimates. A declared line with no earlier estimate is not flagged.
+
+**Read model:** every need row now includes `source`, `estimate` (the `estimate_basis` snapshot for ESTIMATED and CONFIRMED lines, otherwise `null`), `estimate_reference_quantity` (DECLARED lines only) and `reason_codes` (the computed flags). The fields are additive.
+
+**Request contract:** the SOS intake contract is unchanged. The SOS already carries `people_affected`, `children_count` and `elderly_count`, but it has no infant count or need categories. The coordinator therefore enters categories and infants on the estimate form, and the web prefills people and elderly from the SOS.
+
+## 14. Supply gaps and manager suggestions (Step 5)
+
+Proposal: [supply-gap proposal §3.4–§3.5](../c48-supply-gap-and-goods-flow-proposal.md). The system only **suggests**. A RED gap becomes a donation drive only when an OPERATIONS_MANAGER accepts it. Nothing here creates a drive by itself. Table: `supply_gap` (migration `AddSupplyGaps1795564800000`; the baseline `schema/logistics.sql` is a frozen historical baseline and is not edited).
+
+**Calculation** (pure function `supply-gap.calculator.ts`, integer units at the item scale, no floats). For each warehouse W and item I:
+
+```
+demand     = SUM over relief_need in campaigns whose PRIMARY warehouse is W, source IN (DECLARED, CONFIRMED),
+             status IN (OPEN, PARTIALLY_FULFILLED), of max(0, requested - committed)
+             committed = SUM(commitment.quantity - commitment.released_quantity) for the need
+available  = max(0, on_hand - reserved) at W
+pledged    = SUM over drive_item at W of max(0, target - received)
+supply     = available + pledged
+gap        = demand - supply
+```
+
+- `received` is the posted receipt ledger for that drive and item at its intake warehouse (`RECEIPT` and `RECEIPT_HELD_RELEASE` movements). Received stock is already in `on_hand`, so only the unreceived remainder is pledged.
+- Drives count as pledges when they are `OPEN`, or when a gap accepted them and they are still `DRAFT` or `PAUSED`. This stops the same gap being suggested again while the accepted draft waits to open.
+- `ESTIMATED` lines never count as demand. They are returned as `forecast_demand` on the gap row (computed on read) and never stored.
+- Campaigns in `ACTIVE` or `PAUSED` snapshots count. `DRAFT` and `CLOSED` campaigns are ignored.
+- Severity: `gap > 0` gives `RED`. Otherwise `supply > 0` and `demand / supply >= 0.8` gives `YELLOW`, a warning with no draft. Demand exactly equal to supply is YELLOW.
+- One gap per (warehouse, item). When several campaigns contend, the row lists all of them in `campaign_ids`, largest share first. The draft targets the largest share.
+- `backup_warehouse_ids`: BACKUP warehouses of the contending campaigns (other than W) whose `on_hand - reserved` is at least the gap. Nothing is transferred automatically.
+- Items are compared only at their own unit scale. Each item has a single unit, so units are never summed.
+- Stock is not reassigned and commitments at other warehouses still reduce W's demand. Their reserved stock is excluded from W's supply, so it is not double-counted there.
+
+**Recompute** (`SupplyGapsService.recompute`): first calls `CampaignWarehouseService.reevaluateCampaign` for at most 50 campaigns that have no PRIMARY (ACTIVE snapshots, plus campaigns with live needs). Then each warehouse is recomputed in its own transaction under `pg_advisory_xact_lock(hashtext('supply-gap:' || warehouse_id))`. The `OPEN` row is refreshed by `INSERT … ON CONFLICT (warehouse_id,item_id) WHERE status='OPEN' DO UPDATE`, and its version increases only when the content changes. A gap that disappears moves to `EXPIRED`. Failures are logged with a stable code and never thrown to callers. Audit rows: `SUPPLY_GAP_OPENED` and `SUPPLY_GAP_EXPIRED` (actor null, reason `SUPPLY_GAP_RECOMPUTED`).
+
+**Draft** (RED only): `{ title: 'Quyên góp bổ sung {item}', description, intake_warehouse_id, campaign_id (largest share), opens_at, closes_at, items: [{ item_id, target_quantity: ceil(gap × 1.10) at the item scale, acceptance_note }] }`. The window is `now` to `now + 7 days`, kept while it is still open and refreshed after it closes.
+
+**Cooldown after dismissal:** a dismissed RED gap reopens only when the current RED gap is at least 1.25 × the dismissed gap. A dismissed YELLOW warning reopens only when it becomes RED. The cooldown ends at `dismissed_until`, after which the gap may reopen normally.
+
+**Scheduler:** `SupplyGapScheduler` runs the recompute every 15 minutes through the shared `JobRunner` (advisory lock per job name). Environment `C48_SUPPLY_GAP_JOB_ENABLED`: unset or `true` enables it, `false` disables it, and any other value fails startup. Recompute is not hooked into need or stock commands in this step. The scheduler covers the 15-minute cadence.
+
+**Permissions:** `SUPPLY_GAP_VIEW` (COORDINATOR and OPERATIONS_MANAGER, read-only) for the GET routes. `SUPPLY_GAP_MANAGE` (OPERATIONS_MANAGER, SYSTEM scope) for accept and dismiss. Both need a SYSTEM grant, because a warehouse gap is not scoped to one campaign.
+
+| Method & path | Auth | Behaviour |
+|---|---|---|
+| `GET /supply-gaps?status=&warehouse_id=&cursor=&limit=` | `SUPPLY_GAP_VIEW` | Keyset page (default 50, maximum 100), newest first. Each row carries demand, supply, pledged, gap_qty, forecast_demand, campaign_ids, backup_warehouse_ids, reason_codes, `reasons` (`{code, message}` with Vietnamese copy), draft, drive_id, dismissal data, version. Quantities are decimal strings at the item scale. `no-store`. |
+| `GET /supply-gaps/{id}` | `SUPPLY_GAP_VIEW` | One row, same shape. |
+| `POST /supply-gaps/{id}/accept` (Idem) | `SUPPLY_GAP_MANAGE` | `{ expected_version, overrides?: { title?, description?, items?, opens_at?, closes_at? } }`. Only a RED `OPEN` gap. Builds the drive request from the draft and overrides, then calls the existing `DrivesService.create`, so `DONATION_DRIVE_MANAGE`, drive validation, the drive's own idempotency and its audit still apply. The drive is created as `DRAFT`. The gap then becomes `ACCEPTED` with `drive_id` and `version + 1`. Audit `SUPPLY_GAP_ACCEPTED`. Retrying with the same `Idempotency-Key` after a partial failure replays the drive and links the gap. |
+| `POST /supply-gaps/{id}/dismiss` (Idem) | `SUPPLY_GAP_MANAGE` | `{ expected_version, reason, dismissed_days? (1..90, default 7) }`. Sets `DISMISSED`, `dismissed_reason` and `dismissed_until`. Audit `SUPPLY_GAP_DISMISSED`. |
+
+Both POST routes check `expected_version` (`VERSION_CONFLICT`). A gap that is not `OPEN` returns `SUPPLY_GAP_NOT_OPEN`. A YELLOW warning returns `SUPPLY_GAP_WARNING_ONLY` on accept. A coordinator gets `FORBIDDEN` (403) on both POST routes and never creates a drive. The drive rules still apply to accept: an inactive campaign returns `CAMPAIGN_NOT_ACTIVE`, and the gap stays `OPEN`.
+
+**Known limits:** the accept transaction holds the gap row lock while `DrivesService.create` runs in its own transaction. A failure after the drive commits leaves the gap `OPEN` until the same key is retried, which replays the drive. Estimate-only items produce a forecast but no gap row. Only campaigns in the snapshot or with live needs are reevaluated. A campaign with no eligible warehouse is retried each run.
+
+## Pickup tickets (Step 6a)
+
+One pickup ticket per Response mission. It hides the need, commitment and distribution steps from the user. It is a **thin facade**: it never computes stock. Each step calls the existing `NeedCommitmentsService` or `DistributionCommandsService` with the caller's session, so their permission, scope, version and stock rules apply unchanged. Tables: `pickup_ticket`, `pickup_ticket_line`, `team_custody` (migration `AddPickupTickets1795651200000`). Mission data comes from Response `GET /internal/missions/{id}` (service token, allowlist projection, see [03](03-response-api.md)); Logistics never joins Response tables.
+
+| Route | Permission (gate) | Behaviour |
+|---|---|---|
+| `GET /pickup-tickets?mission_id=&status=&cursor=&limit=` | `PICKUP_TICKET_VIEW` (campaign-scoped rows) | Keyset list of read models with `lines`, `shortfalls`, status and who/when. |
+| `GET /pickup-tickets/{id}` | `PICKUP_TICKET_VIEW` | One read model. Out-of-scope rows return `NOT_FOUND`. |
+| `POST /pickup-tickets` (Idem) | `PICKUP_TICKET_MANAGE` | `{ mission_id, warehouse_id? }`. The mission must be `ACCEPTED`, `EN_ROUTE` or `ON_SCENE`. Warehouse defaults to the campaign PRIMARY (`campaign_warehouse`); an explicit warehouse must be assigned to the campaign. One line per live need (`source` DECLARED or CONFIRMED, status OPEN or PARTIALLY_FULFILLED, same work cycle as the mission), quantity = unmet. Status `OPEN`. |
+| `POST /pickup-tickets/{id}/reserve` (Idem) | `PICKUP_TICKET_MANAGE` | `{ expected_version }`. For each line, creates a commitment for `min(line requested, unmet, free stock at the warehouse)` through `NeedCommitmentsService.create`. Then creates a `REQUEST_AID` DRAFT distribution with **explicit commitment lines** for the reserved lines. Status `READY` only if at least one line was reserved. Response lists `shortfalls` and `backup_warehouses` (BACKUP warehouses of the campaign with free stock for a short item). Hints are informational; nothing moves. |
+| `POST /pickup-tickets/{id}/confirm` (Idem) | `PICKUP_TICKET_MANAGE` (and `DISTRIBUTION_REVIEW` inside the approve) | `{ expected_version }`. Approves the draft through `DistributionCommandsService.approve` with the confirming user as approver. Sets `confirmed_by` and `confirmed_at`. The existing rule rejects the preparer (`SELF_APPROVAL_FORBIDDEN`). |
+| `POST /pickup-tickets/{id}/handover` (Idem) | `DISTRIBUTION_DISPATCH` (gate) | `{ expected_version, collected_by_user_id? }`. Requires a confirmed READY ticket. Dispatches through `DistributionCommandsService.dispatch` (existing rule: dispatcher differs from approver). Then, in one transaction with the `READY -> HANDED_OVER` transition, credits `team_custody` per item. `collected_by_user_id` must be an active member of the mission team (`PICKUP_COLLECTOR_NOT_MEMBER`). |
+| `POST /pickup-tickets/{id}/cancel` (Idem) | `PICKUP_TICKET_MANAGE` | `{ expected_version, reason }`. Allowed from `OPEN` or `READY` only; `HANDED_OVER` returns `STATE_TRANSITION_INVALID`. READY cancellation cancels the draft through the existing cancel (only its preparer or approver may do so) and releases each unissued commitment through `NeedCommitmentsService.release`. A dispatched draft returns `ALREADY_DISPATCHED`. |
+
+**State machine:** `OPEN -> READY -> HANDED_OVER -> CLOSED` (Step 6b close-out approval). `CLOSED` is terminal. `CANCELLED` is reachable from `OPEN` or `READY` (manually, or by the expiry sweep). Every command takes `expected_version` (`VERSION_CONFLICT`) and writes `audit_log` (`PICKUP_TICKET_CREATED`, `_RESERVED`, `_CONFIRMED`, `_HANDED_OVER`, `_CANCELLED`, `_EXPIRED`).
+
+**Separation of duties (why the steps are split).** The existing distribution rules make the preparer unable to approve, so one user cannot create, prepare and approve the same distribution. The facade therefore creates the DRAFT during `reserve` (the reserving user is the preparer), approves it in `confirm` (a different user), and dispatches it in `handover` (a third user who holds `DISTRIBUTION_DISPATCH`). A volunteer never needs a staff permission. The dispatcher may record the volunteer who collected the goods in `collected_by_user_id`. A coordinator without `DISTRIBUTION_DISPATCH` gets `FORBIDDEN` (403) on handover before any stock step runs.
+
+**Idempotency and retries.** Each command uses the `Idempotency-Key` (outer command, scope `user:{id}`). Each underlying step uses a key derived from it (SHA-256 to a version-5 UUID layout), so a retry replays the stored step result instead of executing it again. Handover credits custody inside the same transaction as the `READY -> HANDED_OVER` transition, which matches only from `READY`, so a retry cannot credit twice. Dispatch uses `approved_version` as its expected version, which stays stable, so a retried dispatch sends the same request hash.
+
+**Expiry sweep.** `PickupTicketScheduler` runs every 10 minutes through `JobRunner` (advisory lock). It cancels READY tickets older than 24 hours that were never confirmed, cancels their DRAFT distribution, and releases the unissued reservation. Environment `C48_PICKUP_TICKET_JOB_ENABLED`: unset or `true` enables it, `false` disables it, and any other value fails startup. A system job has no session, so the sweep writes the same `RELEASE` movement as `NeedCommitmentsService.release` directly (same `operation_ref` format, same lock order: cycle, then commitment), attributed to the user who reserved the stock (`pickup_ticket.reserved_by`). A ticket whose cycle is SEALED is skipped and left for a coordinator.
+
+**Errors:** new codes `PICKUP_MISSION_NOT_FOUND`, `PICKUP_MISSION_NOT_ASSIGNABLE`, `PICKUP_TICKET_EXISTS`, `PICKUP_NO_PRIMARY_WAREHOUSE`, `PICKUP_NO_NEEDS`, `PICKUP_NOTHING_RESERVABLE`, `PICKUP_NOT_CONFIRMED`, `PICKUP_COLLECTOR_NOT_MEMBER` ([07](07-error-catalog.md)). Reused codes: `STATE_TRANSITION_INVALID`, `VERSION_CONFLICT`, `WAREHOUSE_NOT_ELIGIBLE`, `SELF_APPROVAL_FORBIDDEN`, `APPROVAL_STALE`, `ALREADY_DISPATCHED`, `INSUFFICIENT_STOCK`, `RESPONSE_UNAVAILABLE`, `FORBIDDEN`.
+
+**Catalog flags:** `item.returnable` (default true) and `item.perishable` (default false) are added for Step 6b. Seeded consumables (food, water, first-aid and dressings, and the community first-aid kit) are `returnable=false`. Existing databases keep the default until the seed is re-applied or the catalog changes.
+
+**Known limits (6a):**
+- A coordinator holds `PICKUP_TICKET_MANAGE`, but `reserve` also needs `COMMITMENT_MANAGE` and `DISTRIBUTION_PREPARE`, and `confirm` needs `DISTRIBUTION_REVIEW`. Those are held by `OPERATIONS_MANAGER` (and `REVIEWER` for review) only, so the coordinator gets a 403 from the inner step. The Step 6a demo therefore needs two operations managers: one to reserve, and a different one to confirm and hand over. A coordinator can view and create tickets, and can cancel an OPEN ticket.
+- Cancelling a READY ticket is limited to its preparer or approver by the existing distribution rule. Unattended READY tickets are handled by the expiry sweep.
+- The facade is several transactions, not one. A crash between steps is repaired by retrying with the same `Idempotency-Key`. A retry by a different user, or with a new key, after dispatch has already happened returns `APPROVAL_STALE` (409). An operator must reconcile that case.
+- Stock and commitment locks are taken by the inner services. The facade locks only the ticket row, and never locks a commitment or distribution in its own transaction before calling an inner step, to avoid self-deadlock.
+- The SQL has not been run against PostgreSQL in this step (no Compose run was allowed). The sub-service and sweep behaviour is covered by fake-DB unit tests only.
+
+## Pickup close-out and deliveries (Step 6b)
+
+Completes the lifecycle `HANDED_OVER -> CLOSED`. Goods are accounted per ticket item: **delivered** on scene, **returned** to the warehouse, or **retired** with a reason. Invariant per item: `delivered + returned + retired = held`, where `held` is the quantity issued to the ticket at handover (sum of its distribution lines) and `delivered` is the sum of DIRECT_HOUSEHOLD handoffs. Migration `AddPickupCloseout1795737600000` adds `pickup_ticket_closeout`, `pickup_closeout_line` and `pickup_ticket.closed_by/closed_at`; the stock ledger does not change.
+
+| Route | Permission (gate) | Behaviour |
+|---|---|---|
+| `POST /pickup-tickets/{id}/deliveries` (Idem) | `PICKUP_TICKET_MANAGE`; the inner handoff needs `HANDOFF_RECORD` (OPERATIONS_MANAGER) | `{ expected_version, occurred_at, receiver_label?, lines:[{ item_id, quantity }] }`. HANDED_OVER only, and refused while a close-out is SUBMITTED. Each item is allocated across its distribution lines by in-transit capacity and posted as one `DIRECT_HOUSEHOLD` handoff through `HandoffCommandsService.create` (in-transit counter and DELIVERED settlement by the existing rule). Team custody falls by the delivered quantity. Above custody: `PICKUP_DELIVERY_EXCEEDS_CUSTODY`. Ticket version +1. `occurred_at` is client-supplied so a retry sends the same hash. |
+| `GET /pickup-tickets/{id}/closeout` | `PICKUP_TICKET_VIEW` | Close-out view. With no saved close-out: proposed lines. Lines carry `held`, `delivered`, `remaining`, `returned`, `retired`, `retire_reason`, `retire_reason_label` and `balanced`. `editable`, `can_submit`, `version` (0 when nothing is saved). |
+| `PUT /pickup-tickets/{id}/closeout` (Idem) | `PICKUP_CLOSEOUT_SUBMIT` | `{ expected_version (0 for the first save), lines:[{ item_id, returned_quantity, retired_quantity, retire_reason?, note? }] }`. Saves the DRAFT (creates it at version 1). Exactly one line per ticket item (`CLOSEOUT_LINES_INVALID`). Returns of non-returnable or perishable items: `ITEM_NOT_RETURNABLE`. Invariant: `CLOSEOUT_INVARIANT_VIOLATED`. Retired quantity needs a reason: `CLOSEOUT_RETIRE_REASON_REQUIRED`. |
+| `POST /pickup-tickets/{id}/closeout/submit` (Idem) | `PICKUP_CLOSEOUT_SUBMIT` | `{ expected_version }`. DRAFT -> SUBMITTED. Re-validates against live figures. Deliveries are locked until the review. |
+| `POST /pickup-tickets/{id}/closeout/review` (Idem) | `PICKUP_CLOSEOUT_REVIEW` (OPERATIONS_MANAGER, REVIEWER) | `{ expected_version, decision: APPROVE\|REJECT, note }`. Reviewer differs from the submitter (`SELF_REVIEW_FORBIDDEN`) and from `handed_over_by` (`SELF_HANDOFF_FORBIDDEN`). REJECT requires a note and returns the close-out to DRAFT. APPROVE applies everything in one command (see below). |
+
+**Defaults (proposal).** Returnable and not perishable: returned = remaining. Non-returnable: retired with `NOT_RETURNABLE`. Perishable: retired with `EXPIRED`. The close-out has no expiry date, so a perishable item counts as expired and is never restocked. Reason codes and their Vietnamese labels live in one file, `pickup-closeout.rules.ts` (`RETIRE_REASON_LABELS`).
+
+**Approval (`review`, APPROVE).** Checks run first: closeout SUBMITTED, version, independence, the ledger (`held - delivered` must equal the live in-transit plus at-point counters, and no LOSS handoff may be pending; otherwise `PICKUP_LEDGER_MISMATCH`), and stored lines still matching live figures (otherwise `CLOSEOUT_STALE`). Then:
+1. Returns go through `HandoffCommandsService.create` as a `RETURN` handoff (`source_stage IN_TRANSIT`). The existing writer posts the `RETURN` stock movement (`handoff_line_id`) and the RETURNED settlement. The recorder is the reviewer, so the existing rule `SELF_HANDOFF_FORBIDDEN` also rejects a reviewer who dispatched the distribution. The inner step needs `DISTRIBUTION_DISPATCH` or `DONATION_INTAKE`.
+2. Retired quantities reduce the distribution line in-transit counter with the LOSS arithmetic (`nextCustodyBalance`). They write **no stock movement and no LOSS handoff**: the dispatch ISSUE already removed those goods from on-hand, and the independent close-out approval replaces the LOSS review. Commitment `lost_quantity` is not raised for retired goods (see limits).
+3. Team custody falls by returned plus retired for each item of this ticket (`PICKUP_LEDGER_MISMATCH` if it would go below zero). The custody of other tickets of the same team is not touched.
+4. Close-out APPROVED, ticket `CLOSED` with `closed_by` and `closed_at`, audit rows `PICKUP_CLOSEOUT_APPROVED` and `PICKUP_TICKET_CLOSED`.
+
+**Read-model warning (computed on read, never stored).** `unaccounted_goods` is true when the ticket still holds goods. `handover_overdue` is true when a HANDED_OVER ticket has held goods for more than 48 hours (`PICKUP_OVERDUE_HOURS`). It triggers no automatic action.
+
+**Resolution guard (Response).** Response calls `GET /internal/requests/{requestId}/fulfillment` before it creates a resolution intent. That route now also refuses with `PICKUP_UNACCOUNTED_GOODS` (409, `details.ticket_ids`) while any pickup ticket of the request is HANDED_OVER with unaccounted goods. The helper `unaccountedGoods({ ticketIds } | { requestId })` (`unaccounted-goods.service.ts`) returns the per-item balances behind it.
+
+**Errors (new):** `PICKUP_ITEM_NOT_ON_TICKET`, `PICKUP_DELIVERY_EXCEEDS_CUSTODY`, `PICKUP_LEDGER_MISMATCH`, `PICKUP_UNACCOUNTED_GOODS`, `CLOSEOUT_LINES_INVALID`, `CLOSEOUT_INVARIANT_VIOLATED`, `CLOSEOUT_RETIRE_REASON_REQUIRED`, `ITEM_NOT_RETURNABLE`, `CLOSEOUT_STALE`. Reused: `STATE_TRANSITION_INVALID`, `VERSION_CONFLICT`, `SELF_REVIEW_FORBIDDEN`, `SELF_HANDOFF_FORBIDDEN`, `HANDOFF_EXCEEDS_BALANCE`, `FORBIDDEN`, `VALIDATION_FAILED` ([07](07-error-catalog.md)).
+
+**Known limits (6b):**
+- **Not one database transaction.** Deliveries and the approval's returns are written by the distribution handoff service in its own transaction, before the pickup command commits (the 6a pattern). If the command fails after the RETURN step has committed, the retry derives a different RETURN body from the changed counters, so the inner idempotency check refuses it. Stock is still applied once, but an operator must reconcile that case.
+- **REVIEWER cannot approve a close-out that returns goods**: the inner RETURN step requires `DISTRIBUTION_DISPATCH` or `DONATION_INTAKE`, which REVIEWER does not hold, and that permission is not widened. A REVIEWER can approve a retire-only close-out.
+- **Coordinators cannot record deliveries**: the inner DIRECT_HOUSEHOLD handoff needs `HANDOFF_RECORD`, held by OPERATIONS_MANAGER only. The demo records deliveries as an operations manager.
+- **Commitment counters for retired goods.** Retirement does not raise `commitment.lost_quantity`, so a request's commitment shows issued goods that are neither delivered nor returned. Reporting that needs a follow-up decision.
+- **Retire-only distributions** keep their status until the existing reconcile command runs (it needs `DISTRIBUTION_REVIEW`); the approval does not reconcile automatically.
+- The SQL has not run against PostgreSQL in this step (no Compose run was allowed). Behaviour is covered by fake-DB unit tests only.
+

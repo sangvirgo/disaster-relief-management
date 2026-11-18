@@ -38,6 +38,7 @@ type SetupOptions = {
   campaign?: string | null;
   campaignStatus?: 'ACTIVE' | 'PAUSED' | 'DRAFT' | 'CLOSED';
   needStatus?: 'OPEN' | 'FULFILLED' | 'CANCELLED';
+  needSource?: 'DECLARED' | 'ESTIMATED' | 'CONFIRMED';
   requested?: string;
   commitments?: Commitment[];
   balance?: { on_hand: string; reserved: string } | null;
@@ -51,7 +52,7 @@ function setup(options: SetupOptions = {}) {
     id: cycleId,
     campaign_id: options.campaign ?? null, state: options.cycleState ?? 'OPEN',
   };
-  const lockedNeed = { ...need, campaign_id: cycle.campaign_id, status: options.needStatus ?? 'OPEN', requested_quantity: options.requested ?? '3.00' };
+  const lockedNeed = { ...need, campaign_id: cycle.campaign_id, status: options.needStatus ?? 'OPEN', source: options.needSource ?? 'DECLARED', requested_quantity: options.requested ?? '3.00' };
   const commitments = options.commitments ?? [];
   const warehouse = { id: warehouseId,  status: 'ACTIVE' };
   const balance = options.balance === null ? [] : [{ id: balanceId, warehouse_id: warehouseId, item_id: itemId, ...options.balance ?? { on_hand: '5.00', reserved: '2.00' } }];
@@ -147,6 +148,14 @@ describe('NeedCommitmentsService', () => {
       databaseErrorMappings: { check: { stock_balance_check: 'INSUFFICIENT_STOCK' } },
     }));
     expect(manager.query).toHaveBeenCalled();
+  });
+
+  it('rejects a commitment on an estimated need until the coordinator confirms it', async () => {
+    const { service, calls } = setup({ needSource: 'ESTIMATED' });
+
+    await expect(service.create(needId, { warehouse_id: warehouseId, quantity: '1.00' }, request))
+      .rejects.toMatchObject({ code: 'NEED_ESTIMATE_NOT_CONFIRMED', status: 409 });
+    expect(calls.some((call) => call.sql.includes('INSERT INTO commitment'))).toBe(false);
   });
 
   it('rejects a commitment that would exceed the requested need', async () => {

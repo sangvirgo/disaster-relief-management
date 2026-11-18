@@ -38,10 +38,12 @@ function fixture(grants: ReporterSession['grants'] = []) {
 
 describe('CampaignsService', () => {
 
-  it('requires a system grant to create a campaign', async () => {
+  it('requires an operations manager system grant to create a campaign', async () => {
     for (const grants of [
       [],
       [{ role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: campaignId }] as ReporterSession['grants'],
+      [{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }] as ReporterSession['grants'],
+      [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'CAMPAIGN', campaign_id: campaignId }] as ReporterSession['grants'],
       [{ role_code: 'VOLUNTEER', scope_type: 'SYSTEM' }] as ReporterSession['grants'],
     ]) {
       const { service, idempotency } = fixture(grants);
@@ -61,6 +63,41 @@ describe('CampaignsService', () => {
       .rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
     expect(idempotency.execute).toHaveBeenCalledTimes(1);
     expect(managerQuery).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a coordinator from activating a campaign and lets it keep pausing one', async () => {
+    const campaign = {
+      id: campaignId, name: 'Cứu trợ', objective: null, status: 'DRAFT', starts_at: null, ends_at: null,
+      version: 1, created_at: new Date('2026-01-01T00:00:00.000Z'),
+    };
+    const denied = fixture([{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }]);
+    denied.managerQuery.mockResolvedValueOnce([campaign]);
+    await expect(denied.service.transition(campaignId, 'activate', { expected_version: 1 }, idemKey, request))
+      .rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
+    expect(denied.managerQuery).toHaveBeenCalledTimes(1);
+
+    const active = { ...campaign, status: 'ACTIVE', version: 2 };
+    const allowed = fixture([{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }]);
+    allowed.managerQuery.mockResolvedValueOnce([{ ...campaign, status: 'ACTIVE' }]).mockResolvedValueOnce([[active], 1]).mockResolvedValueOnce([]);
+    await expect(allowed.service.transition(campaignId, 'pause', { expected_version: 1, reason: 'Tạm dừng' }, idemKey, request))
+      .resolves.toMatchObject({ value: { id: campaignId } });
+  });
+
+  it('rejects a coordinator from changing the campaign area through the area endpoint or PATCH', async () => {
+    const campaign = {
+      id: campaignId, name: 'Cứu trợ', objective: null, status: 'DRAFT', starts_at: null, ends_at: null,
+      version: 1, created_at: new Date('2026-01-01T00:00:00.000Z'),
+    };
+    const area = fixture([{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }]);
+    area.managerQuery.mockResolvedValueOnce([campaign]);
+    await expect(area.service.changeArea(campaignId, { expected_version: 1, center: { lat: 10, lng: 106 }, radius_m: 1000 }, idemKey, request))
+      .rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
+
+    const patch = fixture([{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }]);
+    patch.managerQuery.mockResolvedValueOnce([campaign]);
+    await expect(patch.service.patch(campaignId, { expected_version: 1, radius_m: 1000 }, idemKey, request))
+      .rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
+    expect(patch.managerQuery).toHaveBeenCalledTimes(1);
   });
 
   it('allows only the documented lifecycle edges and keeps CLOSED terminal', () => {
@@ -142,7 +179,7 @@ describe('CampaignsService', () => {
 
   it('reads the returned campaign row from TypeORM UPDATE results when transitioning status', async () => {
     const { service, managerQuery } = fixture([{
-      role_code: 'COORDINATOR', scope_type: 'SYSTEM',
+      role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM',
     }]);
     const campaign = {
       id: campaignId, name: 'Cứu trợ', objective: null,
@@ -182,7 +219,20 @@ describe('CampaignsService', () => {
     }]);
 
     expect(await service.internal(campaignId)).toEqual({
-      id: campaignId, status: 'ACTIVE', version: 7,
+      id: campaignId, status: 'ACTIVE', version: 7, center: null, radius_m: null,
+    });
+  });
+
+  it('exposes the campaign area to internal callers when it is set', async () => {
+    const { service, dataSourceQuery } = fixture();
+    dataSourceQuery.mockResolvedValueOnce([{
+      id: campaignId, name: 'Cứu trợ', objective: null, status: 'ACTIVE', starts_at: null, ends_at: null,
+      version: '3', created_at: new Date('2026-01-01T00:00:00.000Z'),
+      center_latitude: 10.7, center_longitude: 106.6, radius_m: 5000,
+    }]);
+
+    expect(await service.internal(campaignId)).toEqual({
+      id: campaignId, status: 'ACTIVE', version: 3, center: { lat: 10.7, lng: 106.6 }, radius_m: 5000,
     });
   });
 });

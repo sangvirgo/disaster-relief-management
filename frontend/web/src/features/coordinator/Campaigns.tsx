@@ -8,6 +8,7 @@ import { Tabs } from '../../components/ui/Tabs';
 import { StatusBadge } from '../../components/StatusBadge';
 import { SuccessBanner } from '../../components/SuccessBanner';
 import { label, timeLabel } from '../../i18n/labels';
+import { CampaignWarehousePanel } from '../campaign-warehouses/CampaignWarehousePanel';
 
 type Campaign = {
   id: string;
@@ -28,7 +29,9 @@ function centerFromValue(value: string | undefined): { lat: number; lng: number 
   return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
 }
 
-export function Campaigns({ canManage = false }: { canManage?: boolean }) {
+// canSetup: create, activate, edit a draft and change the area (OPERATIONS_MANAGER only).
+// canManage: pause, resume and close a live campaign (coordinators and operations managers).
+export function Campaigns({ canManage = false, canSetup = false }: { canManage?: boolean; canSetup?: boolean }) {
   const [items, setItems] = useState<Campaign[]>([]);
   const [cursor, setCursor, prevPage, pageIndex] = useCursorNav<string>('');
   const [next, setNext] = useState('');
@@ -115,6 +118,9 @@ export function Campaigns({ canManage = false }: { canManage?: boolean }) {
       };
     },
   };
+  // Coordinators see the management tab only for actions they may perform in the campaign's current status.
+  const canActOn = (status: string) =>
+    (canSetup && ['DRAFT', 'ACTIVE', 'PAUSED'].includes(status)) || (canManage && ['ACTIVE', 'PAUSED'].includes(status));
   const id = selected?.id;
   const version = selected?.version;
   const visibleItems =
@@ -192,7 +198,7 @@ export function Campaigns({ canManage = false }: { canManage?: boolean }) {
           <div className="list-header-actions">
             <span className="chip">Đã tải {items.length} chiến dịch</span>
             <button type="button" className="button secondary" disabled={loading} onClick={done}>Cập nhật</button>
-            {canManage && <button type="button" className="button primary" onClick={() => setShowCreate(true)}>Tạo chiến dịch</button>}
+            {canSetup && <button type="button" className="button primary" onClick={() => setShowCreate(true)}>Tạo chiến dịch</button>}
           </div>
         </div>
         <p>Chọn chiến dịch để xem mục tiêu, thời gian và thao tác được cấp quyền.</p>
@@ -244,7 +250,7 @@ export function Campaigns({ canManage = false }: { canManage?: boolean }) {
         <ListNav page={pageIndex} hasNext={Boolean(next)} loading={loading} onPrev={prevPage} onNext={() => next && setCursor(next)} count={items.length} noun="chiến dịch" />
       </section>
       {selected && <DetailSurface key={selected.id} modal open onClose={() => setSelected(null)} label={`Chi tiết chiến dịch ${selected.name}`} heading={selected.name} className="campaign-management-dialog">
-        <Tabs items={[{ id: 'overview', label: 'Thông tin' }, ...(canManage && ['DRAFT', 'ACTIVE', 'PAUSED'].includes(selected.status) ? [{ id: 'actions', label: 'Quản lý' }] : [])]} value={detailTab} onChange={setDetailTab} ariaLabel="Nội dung chiến dịch" idBase="campaign-detail" />
+        <Tabs items={[{ id: 'overview', label: 'Thông tin' }, ...(canActOn(selected.status) ? [{ id: 'actions', label: 'Quản lý' }] : [])]} value={detailTab} onChange={setDetailTab} ariaLabel="Nội dung chiến dịch" idBase="campaign-detail" />
         <div role="tabpanel" id="campaign-detail-tabpanel" aria-labelledby={`campaign-detail-tab-${detailTab}`}>
           <div hidden={detailTab !== 'overview'}>
             <p className="campaign-objective">{selected.objective || 'Chưa ghi mục tiêu cho chiến dịch.'}</p>
@@ -266,13 +272,14 @@ export function Campaigns({ canManage = false }: { canManage?: boolean }) {
               <div><dt>Tâm vùng</dt><dd>{selected.center ? `${selected.center.lat}, ${selected.center.lng}` : 'Chưa cấu hình vùng tự động gắn'}</dd></div>
               <div><dt>Bán kính tự động gắn</dt><dd>{selected.radius_m ? `${selected.radius_m.toLocaleString('vi-VN')} m` : 'Chưa cấu hình'}</dd></div>
             </dl>
+            <CampaignWarehousePanel campaignId={selected.id} canManage={canSetup} />
           </div>
           <div hidden={detailTab !== 'actions'}>
             <p>Chọn thao tác phù hợp với trạng thái hiện tại của chiến dịch.</p>
             <div className="action-grid">
-              {canManage && selected.status === 'DRAFT' && editSpatialAndDetails}
-              {canManage && changeArea}
-              {canManage && selected.status === 'DRAFT' && action('Kích hoạt chiến dịch', 'activate')}
+              {canSetup && selected.status === 'DRAFT' && editSpatialAndDetails}
+              {canSetup && changeArea}
+              {canSetup && selected.status === 'DRAFT' && action('Kích hoạt chiến dịch', 'activate')}
               {canManage && selected.status === 'ACTIVE' && (
                 <>
                   {action('Tạm dừng chiến dịch', 'pause', true)}
@@ -285,13 +292,14 @@ export function Campaigns({ canManage = false }: { canManage?: boolean }) {
                   {action('Kết thúc chiến dịch', 'close', true)}
                 </>
               )}
-              {!canManage && <p className="muted">Bạn có quyền xem chiến dịch nhưng không có quyền quản lý chiến dịch.</p>}
-              {canManage && !['DRAFT', 'ACTIVE', 'PAUSED'].includes(selected.status) && <p className="muted">Chiến dịch đã kết thúc, không còn thao tác quản lý.</p>}
+              {!canManage && !canSetup && <p className="muted">Bạn có quyền xem chiến dịch nhưng không có quyền quản lý chiến dịch.</p>}
+              {selected.status === 'DRAFT' && !canSetup && <p className="muted">Chiến dịch đang ở trạng thái nháp. Quản lý vận hành sẽ kích hoạt chiến dịch.</p>}
+              {!['DRAFT', 'ACTIVE', 'PAUSED'].includes(selected.status) && (canManage || canSetup) && <p className="muted">Chiến dịch đã kết thúc, không còn thao tác quản lý.</p>}
             </div>
           </div>
         </div>
       </DetailSurface>}
-      {canManage && <DetailSurface modal open={showCreate} onClose={() => setShowCreate(false)} label="Tạo chiến dịch" heading="Tạo chiến dịch" className="campaign-management-dialog">
+      {canSetup && <DetailSurface modal open={showCreate} onClose={() => setShowCreate(false)} label="Tạo chiến dịch" heading="Tạo chiến dịch" className="campaign-management-dialog">
         {showCreate && <CommandForm key={revision} spec={create} onSuccess={(result) => { setCreatedName((result as Campaign | undefined)?.name || 'mới'); setShowCreate(false); done(); }} />}
       </DetailSurface>}
     </div>

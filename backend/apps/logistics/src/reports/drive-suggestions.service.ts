@@ -67,7 +67,7 @@ export class DriveSuggestionsService {
         ), needs AS (
           SELECT n.item_id, SUM(n.requested_quantity - n.cancelled_remaining) AS open_need
             FROM relief_need n JOIN fulfillment_cycle c ON c.id = n.cycle_id
-           WHERE n.status IN ('OPEN','PARTIALLY_FULFILLED') AND ${needScope.replace(/\$(\d+)/g, (_m, i: string) => `$${Number(i) + warehouseValues.length}`)}
+           WHERE n.status IN ('OPEN','PARTIALLY_FULFILLED') AND n.source <> 'ESTIMATED' AND ${needScope.replace(/\$(\d+)/g, (_m, i: string) => `$${Number(i) + warehouseValues.length}`)}
            GROUP BY n.item_id
         )
         SELECT s.item_id, i.name AS item_name, u.display_name AS unit_name,

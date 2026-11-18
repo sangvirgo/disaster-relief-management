@@ -69,11 +69,12 @@ async function registerAndLogin(label) {
   const userId = registered.value.user.id;
   users.push(userId);
 
-  if (label === 'coordinator') {
+  const systemRole = { coordinator: 'COORDINATOR', manager: 'OPERATIONS_MANAGER' }[label];
+  if (systemRole) {
     await identityDb.query(
       `INSERT INTO role_grant (user_id,role_code,scope_type)
-       VALUES ($1,'COORDINATOR','SYSTEM')`,
-      [userId],
+       VALUES ($1,$2,'SYSTEM')`,
+      [userId, systemRole],
     );
   }
 
@@ -99,6 +100,8 @@ function bearer(token) { return { Authorization: `Bearer ${token}` }; }
 await Promise.all([responseDb.connect(), identityDb.connect()]);
 try {
   const coordinator = await registerAndLogin('coordinator');
+  const manager = await registerAndLogin('manager');
+  const managerAuth = bearer(manager.token);
   const otherRecipient = await registerAndLogin('recipient');
   const coordinatorAuth = bearer(coordinator.token);
 
@@ -144,16 +147,23 @@ try {
   const createCampaign = await call(responseUrl, 'campaigns', {
     method: 'POST',
     body: campaignCreateBody,
-    headers: { ...coordinatorAuth, 'Idempotency-Key': campaignCreateKey },
+    headers: { ...managerAuth, 'Idempotency-Key': campaignCreateKey },
   });
   campaignId = createCampaign.value?.id;
   expectSuccess(createCampaign, 201);
   assert.equal(createCampaign.value.status, 'DRAFT');
   assert.equal(createCampaign.value.version, 1);
 
+  const coordinatorCreateCampaign = await call(responseUrl, 'campaigns', {
+    method: 'POST',
+    body: campaignCreateBody,
+    headers: { ...coordinatorAuth, 'Idempotency-Key': key() },
+  });
+  expectVietnameseError(coordinatorCreateCampaign, 403, 'FORBIDDEN');
+
   const campaignReplay = await call(responseUrl, 'campaigns', {
     method: 'POST', body: campaignCreateBody,
-    headers: { ...coordinatorAuth, 'Idempotency-Key': campaignCreateKey },
+    headers: { ...managerAuth, 'Idempotency-Key': campaignCreateKey },
   });
   expectSuccess(campaignReplay, 201);
   assert.equal(campaignReplay.headers.get('idempotent-replay'), 'true');
@@ -161,7 +171,7 @@ try {
 
   const campaignKeyConflict = await call(responseUrl, 'campaigns', {
     method: 'POST', body: { ...campaignCreateBody, name: 'Tên chiến dịch khác' },
-    headers: { ...coordinatorAuth, 'Idempotency-Key': campaignCreateKey },
+    headers: { ...managerAuth, 'Idempotency-Key': campaignCreateKey },
   });
   expectVietnameseError(campaignKeyConflict, 409, 'IDEMPOTENCY_KEY_REUSED');
 
@@ -184,7 +194,7 @@ try {
   const secondCampaign = await call(responseUrl, 'campaigns', {
     method: 'POST',
     body: { ...campaignCreateBody, name: 'Chiến dịch kiểm thử phân trang T10' },
-    headers: { ...coordinatorAuth, 'Idempotency-Key': key() },
+    headers: { ...managerAuth, 'Idempotency-Key': key() },
   });
   secondCampaignId = secondCampaign.value?.id;
   expectSuccess(secondCampaign, 201);
@@ -214,7 +224,7 @@ try {
 
   const activated = await call(responseUrl, `campaigns/${campaignId}/activate`, {
     method: 'POST', body: { expected_version: 2 },
-    headers: { ...coordinatorAuth, 'Idempotency-Key': key() },
+    headers: { ...managerAuth, 'Idempotency-Key': key() },
   });
   expectSuccess(activated);
   assert.equal(activated.value.status, 'ACTIVE');
@@ -222,7 +232,7 @@ try {
 
   const secondActivated = await call(responseUrl, `campaigns/${secondCampaignId}/activate`, {
     method: 'POST', body: { expected_version: 1 },
-    headers: { ...coordinatorAuth, 'Idempotency-Key': key() },
+    headers: { ...managerAuth, 'Idempotency-Key': key() },
   });
   expectSuccess(secondActivated);
   assert.equal(secondActivated.value.status, 'ACTIVE');
@@ -252,7 +262,7 @@ try {
 
   const draftToClose = await call(responseUrl, 'campaigns', {
     method: 'POST', body: { ...campaignCreateBody, name: 'Chiến dịch đóng từ bản nháp T10' },
-    headers: { ...coordinatorAuth, 'Idempotency-Key': key() },
+    headers: { ...managerAuth, 'Idempotency-Key': key() },
   });
   expectSuccess(draftToClose, 201);
   const draftCloseReason = 'Đóng chiến dịch bản nháp theo kế hoạch.';

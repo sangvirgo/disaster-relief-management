@@ -170,6 +170,62 @@ try {
   assert.equal(updatedWarehouse.value.version, 2);
   assert.equal(updatedWarehouse.value.location_public, true);
 
+  // Warehouse service area: location and service_radius_m are set and cleared together. A separate warehouse keeps the
+  // version sequence of the main warehouse above unchanged for the deactivation step.
+  const areaLocation = { type: 'Point', coordinates: [105.85, 21.03] };
+  const areaWarehouse = await call(logisticsUrl, 'warehouses', {
+    method: 'POST', actor: operator, idempotencyKey: key(),
+    body: { name: `Kho vùng phục vụ T11 ${suffix}`, location: areaLocation, service_radius_m: 5000 },
+  });
+  expectSuccess(areaWarehouse, 201);
+  assert.deepEqual(areaWarehouse.value.location, areaLocation);
+  assert.equal(areaWarehouse.value.service_radius_m, 5000);
+
+  const radiusWithoutLocation = await call(logisticsUrl, 'warehouses', {
+    method: 'POST', actor: operator, idempotencyKey: key(),
+    body: { name: `Kho T11 thiếu vị trí ${suffix}`, service_radius_m: 5000 },
+  });
+  expectVietnameseError(radiusWithoutLocation, 400, 'VALIDATION_FAILED');
+  assert.ok(radiusWithoutLocation.value.field_errors?.service_radius_m, JSON.stringify(radiusWithoutLocation.value));
+
+  for (const radius of [0, 200001]) {
+    const invalidRadius = await call(logisticsUrl, 'warehouses', {
+      method: 'POST', actor: operator, idempotencyKey: key(),
+      body: { name: `Kho T11 bán kính sai ${suffix}`, location: areaLocation, service_radius_m: radius },
+    });
+    expectVietnameseError(invalidRadius, 400, 'VALIDATION_FAILED');
+    assert.ok(invalidRadius.value.field_errors?.service_radius_m, JSON.stringify(invalidRadius.value));
+  }
+
+  const clearLocationOnly = await call(logisticsUrl, `warehouses/${areaWarehouse.value.id}`, {
+    method: 'PATCH', actor: operator, idempotencyKey: key(),
+    body: { expected_version: 1, location: null },
+  });
+  expectVietnameseError(clearLocationOnly, 400, 'VALIDATION_FAILED');
+
+  const radiusPatched = await call(logisticsUrl, `warehouses/${areaWarehouse.value.id}`, {
+    method: 'PATCH', actor: operator, idempotencyKey: key(),
+    body: { expected_version: 1, service_radius_m: 8000 },
+  });
+  expectSuccess(radiusPatched);
+  assert.equal(radiusPatched.value.version, 2);
+  assert.equal(radiusPatched.value.service_radius_m, 8000);
+  assert.deepEqual(radiusPatched.value.location, areaLocation);
+
+  const areaListed = await call(logisticsUrl, 'warehouses?limit=100', { actor: operator });
+  expectSuccess(areaListed);
+  const areaRow = areaListed.value.items.find((row) => row.id === areaWarehouse.value.id);
+  assert.equal(areaRow?.service_radius_m, 8000);
+  assert.deepEqual(areaRow?.location, areaLocation);
+
+  const areaCleared = await call(logisticsUrl, `warehouses/${areaWarehouse.value.id}`, {
+    method: 'PATCH', actor: operator, idempotencyKey: key(),
+    body: { expected_version: 2, location: null, service_radius_m: null },
+  });
+  expectSuccess(areaCleared);
+  assert.equal(areaCleared.value.service_radius_m, null);
+  assert.equal(areaCleared.value.location, null);
+
   const updatedPoint = await call(logisticsUrl, `relief-points/${point.value.id}`, {
     method: 'PATCH', actor: operator, idempotencyKey: key(),
     body: { expected_version: 1, operating_note: `T11 cập nhật ${suffix}` },

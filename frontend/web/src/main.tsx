@@ -35,6 +35,7 @@ import { StatusBadge } from './components/StatusBadge';
 import { DetailSurface } from './components/DetailSurface';
 import { useModalScrollLock } from './components/modalScrollLock';
 import { PageHeader } from './components/ui/PageHeader';
+import { SupplyGapWarningBadge } from './features/supply-gaps/SupplyBadges';
 
 declare global {
   interface Window {
@@ -78,7 +79,9 @@ const Volunteer = React.lazy(() => import('./features/volunteer/Volunteer').then
 const Admin = React.lazy(() => import('./features/admin/Admin').then((module) => ({ default: module.Admin })));
 const CoordinatorTeams = React.lazy(() => import('./features/coordinator/CoordinatorTeams').then((module) => ({ default: module.CoordinatorTeams })));
 const Operations = React.lazy(() => import('./features/operations/Operations').then((module) => ({ default: module.Operations })));
+const SupplyGapsPage = React.lazy(() => import('./features/supply-gaps/SupplyGapsPage').then((module) => ({ default: module.SupplyGapsPage })));
 const RoleDashboard = React.lazy(() => import('./features/dashboard/RoleDashboard').then((module) => ({ default: module.RoleDashboard })));
+const PickupTicketsPage = React.lazy(() => import('./features/pickup/PickupTicketsPage').then((module) => ({ default: module.PickupTicketsPage })));
 
 function IntakeReview({ user }: { user: Me }) {
   const canReview = roles(user).has('REVIEWER');
@@ -1973,13 +1976,16 @@ function App() {
                 ) : workspace === 'citizen' && selected.id === 'drives' ? (
                   <Donations user={user} />
                 ) : workspace === 'coordinator' && selected.id === 'campaigns' ? (
-                  <CampaignCoordination key={selectedRequestId} user={user!} initialRequestId={selectedRequestId} />
+                  <>
+                    <SupplyGapWarningBadge user={user!} />
+                    <CampaignCoordination key={selectedRequestId} user={user!} initialRequestId={selectedRequestId} />
+                  </>
                 ) : workspace === 'coordinator' && selected.id === 'drives' && user ? (
                   <Operations key="coordinator-drives" page="drives" user={user} />
                 ) : workspace === 'coordinator' &&
                   ['queue', 'verify', 'triage', 'assign'].includes(selected.id) ? (
                   <Coordinator key={`${selected.id}:${selectedRequestId}`} page={selected.id} currentUserId={user!.id}
-                    initialRequestId={selectedRequestId}
+                    user={user!} initialRequestId={selectedRequestId}
                     canSeeUnassigned={user!.grants.some((grant) => grant.role_code === 'COORDINATOR' && grant.scope_type === 'SYSTEM' && !grant.campaign_id)} />
                 ) : ['volunteer', 'coordinator'].includes(workspace) &&
                   selected.id === 'notices' ? (
@@ -1993,7 +1999,9 @@ function App() {
                     writeRoute('volunteer', 'missions', user);
                   } : undefined} />
                 ) : workspace === 'operations' && selected.id === 'campaigns' ? (
-                  <Campaigns key={workspace} />
+                  <Campaigns key={workspace} canManage={roles(user).has('OPERATIONS_MANAGER')} canSetup={roles(user).has('OPERATIONS_MANAGER')} />
+                ) : workspace === 'operations' && selected.id === 'supply' && user ? (
+                  <SupplyGapsPage key={`supply:${user.id}`} user={user} />
                 ) : workspace === 'volunteer' ? (
                   <Volunteer key={`${selected.id}:${selectedMissionId}`} page={selected.id} currentUserId={user!.id} initialMissionId={selectedMissionId}
                     sharingTeamId={sharingTeamId} sharingMessage={sharingMessage}
@@ -2005,6 +2013,8 @@ function App() {
                   <RoleDashboard role="operations" showReports={roles(user).has('OPERATIONS_MANAGER')} />
                 ) : workspace === 'operations' && selected.id === 'intake' && user ? (
                   <IntakeReview user={user} />
+                ) : workspace === 'operations' && selected.id === 'pickup' && user ? (
+                  <PickupTicketsPage user={user} />
                 ) : workspace === 'operations' && user ? (
                   <Operations key={selected.id} page={selected.id} user={user} />
                 ) : workspace === 'coordinator' && selected.id === 'teams' ? (

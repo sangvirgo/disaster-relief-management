@@ -66,7 +66,7 @@ async function waitForTeamRowLockWaits(database, blockerPid, minimum, pendingCom
   assert.fail(`Team command completed before ${minimum} lock waiters appeared: HTTP ${outcome.result.status} ${JSON.stringify(outcome.result.value)}`);
 }
 
-async function registerAndLogin(label, grantCoordinator = label === 'coordinator' || label === 'overdue-reader') {
+async function registerAndLogin(label, grantCoordinator = label === 'coordinator' || label === 'overdue-reader', systemRole = null) {
   const suffix = randomBytes(5).toString('hex');
   const credentials = {
     username: `t8${label}${suffix}`,
@@ -80,11 +80,11 @@ async function registerAndLogin(label, grantCoordinator = label === 'coordinator
   assert.equal(registered.status, 201, JSON.stringify(registered.value));
   await activateEmailRegistration(identityDb, registered);
   const userId = registered.value.user.id;
-  if (grantCoordinator) {
+  for (const roleCode of [grantCoordinator ? 'COORDINATOR' : null, systemRole].filter(Boolean)) {
     await identityDb.query(
       `INSERT INTO role_grant (user_id,role_code,scope_type)
-       VALUES ($1,'COORDINATOR','SYSTEM')`,
-      [userId],
+       VALUES ($1,$2,'SYSTEM')`,
+      [userId, roleCode],
     );
   }
   const login = await call(identityUrl, 'auth/login', {
@@ -122,6 +122,7 @@ try {
   const coordinator = await registerAndLogin('coordinator');
   const otherCoordinator = await registerAndLogin('other');
   const overdueReader = await registerAndLogin('overdue-reader');
+  const campaignManager = await registerAndLogin('campaign-manager', false, 'OPERATIONS_MANAGER');
   await identityDb.query(
     `INSERT INTO role_grant (user_id,role_code,scope_type)
      VALUES ($1,'VOLUNTEER','SYSTEM')`,
@@ -405,7 +406,7 @@ try {
     responseDb, responseUrl, reporter, coordinator, otherCoordinator, appTeam, call, key,
   });
   await runMissionSmoke({
-    responseDb, responseUrl, reporter, coordinator, otherCoordinator, overdueReader, appTeam,
+    responseDb, responseUrl, reporter, coordinator, otherCoordinator, overdueReader, campaignManager, appTeam,
     coordinatorTeam: created, call, key, assertVietnameseError,
   });
 

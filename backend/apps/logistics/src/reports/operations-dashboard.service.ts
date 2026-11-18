@@ -118,7 +118,7 @@ export class OperationsDashboardService {
     }
     if (visible(needs)) {
       const rows = await this.q<{ key: string; total: number }>(
-        `SELECT n.status AS key, COUNT(*)::int AS total FROM relief_need n JOIN fulfillment_cycle c ON c.id = n.cycle_id WHERE ${inCampaign('c.campaign_id')} GROUP BY n.status`, needs);
+        `SELECT n.status AS key, COUNT(*)::int AS total FROM relief_need n JOIN fulfillment_cycle c ON c.id = n.cycle_id WHERE ${inCampaign('c.campaign_id')} AND n.source <> 'ESTIMATED' GROUP BY n.status`, needs);
       const byStatus = counts(rows);
       out.needs = { by_status: byStatus, outstanding: n(byStatus.OPEN) + n(byStatus.PARTIALLY_FULFILLED) };
     }

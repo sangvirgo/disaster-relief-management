@@ -221,7 +221,7 @@ export class FulfillmentCyclesService {
   private async assertSettled(manager: EntityManager, cycleId: string, basis: ResolutionOutcomeBasis): Promise<void> {
     const rows = await manager.query(
       `SELECT
-         EXISTS (SELECT 1 FROM relief_need n WHERE n.cycle_id=$1 AND n.status IN ('OPEN','PARTIALLY_FULFILLED')) AS has_open_needs,
+         EXISTS (SELECT 1 FROM relief_need n WHERE n.cycle_id=$1 AND n.source<>'ESTIMATED' AND n.status IN ('OPEN','PARTIALLY_FULFILLED')) AS has_open_needs,
          EXISTS (SELECT 1 FROM commitment cm JOIN relief_need n ON n.id=cm.relief_need_id
                   WHERE n.cycle_id=$1 AND cm.quantity-cm.released_quantity-cm.issued_quantity>0) AS has_reserved,
          EXISTS (SELECT 1 FROM commitment cm JOIN relief_need n ON n.id=cm.relief_need_id

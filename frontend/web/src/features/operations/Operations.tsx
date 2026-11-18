@@ -7,6 +7,7 @@ import { roles, type Me } from '../../auth/session';
 import { CommandForm, type CommandSpec, type Field } from '../../components/CommandForm';
 import { dateLabel, label, requestStatusLabel, timeLabel } from '../../i18n/labels';
 import { formatQuantity } from '../../i18n/quantity';
+import { NeedReasonChips, NeedSourceBadge } from '../supply-gaps/SupplyBadges';
 import { HandoffDetail } from './HandoffDetail';
 import { ReceiptCountForm } from './ReceiptCountForm';
 import { DriveCreateForm } from './DriveCreateForm';
@@ -640,7 +641,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             <table className="operations-record-table">
               <thead><tr><th scope="col">{page === 'assets' ? asset === 'vehicles' ? 'Phương tiện' : asset === 'warehouses' ? 'Kho' : 'Điểm cứu trợ' : 'Tên bản ghi'}</th>{page !== 'assets' && <th scope="col">Thông tin chính</th>}<th scope="col">Thời gian</th><th scope="col">Trạng thái</th></tr></thead>
               <tbody>{items.map((item) => <tr key={operationRecordKey(item)}>
-                <th scope="row"><button type="button" className="table-row-link" onClick={() => { setDetailTab('overview'); setSelected(item); }}>{recordTitle(page, item)}</button></th>
+                <th scope="row"><button type="button" className="table-row-link" onClick={() => { setDetailTab('overview'); setSelected(item); }}>{recordTitle(page, item)}</button>{page === 'needs' && <span className="supply-table-cell-stack"><NeedSourceBadge source={item.source} /><NeedReasonChips codes={item.reason_codes} /></span>}</th>
                 {page !== 'assets' && <td>{distributionPages.has(page) ? distributionItems(item, references.itemUnits)
                   : item.requested != null ? `Cần ${quantityWithUnit(item, item.requested)} · Đã giao ${quantityWithUnit(item, item.delivered)}`
                   : item.active_requested != null ? `Cần ${quantityWithUnit(item, item.active_requested)} · Đã giao ${quantityWithUnit(item, item.delivered)}`
@@ -682,6 +683,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
               </>}
               {page === 'assets' && <>
                 {asset !== 'vehicles' && <p><strong>{asset === 'warehouses' ? 'Tên kho' : 'Tên điểm cứu trợ'}</strong><span className="detail-value">{string(detail.name) || 'Chưa có tên'}</span></p>}
+                {asset === 'warehouses' && <p><strong>Bán kính phục vụ</strong><span className="detail-value">{detail.service_radius_m == null ? 'Chưa khai báo' : `${Number(detail.service_radius_m).toLocaleString('vi-VN')} m`}</span></p>}
                 {asset === 'vehicles' && <>
                   <p><strong>Loại phương tiện</strong><span className="detail-value">{string(detail.vehicle_type) || 'Chưa có thông tin'}</span></p>
                   <p><strong>Sức chứa</strong><span className="detail-value">{detail.capacity == null ? 'Chưa khai báo' : `${quantity(detail.capacity)} ${label(detail.capacity_unit)}`}</span></p>
@@ -741,7 +743,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 </p>
               )}
               {distributionPages.has(page) && status === 'DISPATCHED' && <p className="notice">Phiếu tự đối soát khi hết hàng đang vận chuyển, hàng tại điểm và không còn thất thoát chờ duyệt.</p>}
-              {page === 'needs' && <><p><strong>Yêu cầu SOS</strong><span className="detail-value">{references.requests?.find((item) => item.value === detail.request_id)?.label || string(detail.request_id)}</span></p><p><strong>Nhu cầu</strong><span className="detail-value">{quantityWithUnit(detail, detail.requested)} · Đã giao {quantityWithUnit(detail, detail.delivered)}</span></p></>}
+              {page === 'needs' && <><p><strong>Yêu cầu SOS</strong><span className="detail-value">{references.requests?.find((item) => item.value === detail.request_id)?.label || string(detail.request_id)}</span></p><p><strong>Nhu cầu</strong><span className="detail-value">{quantityWithUnit(detail, detail.requested)} · Đã giao {quantityWithUnit(detail, detail.delivered)}</span></p><p><strong>Nguồn nhu cầu</strong><span className="detail-value"><NeedSourceBadge source={detail.source} /></span></p><NeedReasonChips codes={detail.reason_codes} all /></>}
               {distributionPages.has(page) && Boolean(detail.purpose) && (
                 <p>
                   <strong>Mục đích phân phối</strong>
@@ -1399,6 +1401,8 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 : asset === 'warehouses'
                   ? [
                       { name: 'name', label: 'Tên kho', required: true, maxLength: 200 },
+                      { name: 'location', label: 'Vùng phục vụ của kho', type: 'service-area', radiusFieldName: 'service_radius_m', radiusRange: { min: 500, max: 200_000 } },
+                      { name: 'service_radius_m', label: 'Bán kính phục vụ (mét)', type: 'number', integer: true, min: 500, max: 200_000 },
                     ]
                   : [
                       { name: 'name', label: 'Tên điểm cứu trợ', required: true, maxLength: 200 },
@@ -1413,7 +1417,18 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                       coordinates: values.location.split(',').map(Number),
                     },
                   })
-                : undefined,
+                : asset === 'warehouses'
+                  ? (values) => ({
+                      name: values.name,
+                      // Location and radius are sent together or not at all (the form enforces the pair).
+                      ...(values.location
+                        ? {
+                            location: { type: 'Point', coordinates: values.location.split(',').map(Number) },
+                            service_radius_m: Number(values.service_radius_m),
+                          }
+                        : {}),
+                    })
+                  : undefined,
           })}
         {!selected &&
           page === 'distribution' &&

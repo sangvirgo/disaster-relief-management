@@ -95,6 +95,8 @@ export const pages: Record<Workspace, Page[]> = {
       path: '/relief-points',
     },
     { id: 'needs', title: 'Nhu cầu vật tư', icon: 'needs', service: 'logistics', path: '/needs' },
+    { id: 'pickup', title: 'Phiếu lấy hàng', icon: 'handoff', service: 'logistics', path: '/pickup-tickets' },
+    { id: 'supply', title: 'Đề xuất quyên góp', icon: 'drive', service: 'logistics', path: '/supply-gaps' },
     {
       id: 'reports',
       title: 'Báo cáo',

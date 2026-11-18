@@ -106,6 +106,11 @@ Every error the API can return has one row here. The implementation loads this t
 | `ALREADY_POSTED` | 409 | Logistics | Phiếu nhận đã được ghi vào kho. |
 | **Logistics — needs / fulfillment** | | | |
 | `NEED_EXISTS` | 409 | Logistics | Nhu cầu cho mặt hàng này đã tồn tại. |
+| `NEED_ESTIMATE_NOT_CONFIRMED` | 409 | Logistics | Nhu cầu ước tính cần được xác nhận trước khi giữ hàng, điều chỉnh số lượng hoặc phân bổ. |
+| `NEED_NOT_ESTIMATED` | 409 | Logistics | Nhu cầu này không phải nhu cầu ước tính nên không thể xác nhận. |
+| `NEED_ALREADY_DECLARED` | 409 | Logistics | Yêu cầu SOS này đã có nhu cầu khai báo hoặc đã xác nhận cho vật phẩm này, không thể tạo ước tính trùng. |
+| `NEED_NORM_NOT_FOUND` | 400 | Logistics | Chưa có định mức đang hoạt động cho nhóm hàng đã chọn. |
+| `NEED_ITEM_TYPE_MISMATCH` | 400 | Logistics | Vật phẩm đã chọn không thuộc nhóm hàng của định mức. |
 | `NEED_OVER_COMMITTED` | 409 | Logistics | Tổng số lượng cam kết vượt quá nhu cầu. |
 | `BELOW_PROTECTED_QUANTITY` | 409 | Logistics | Không thể giảm nhu cầu xuống thấp hơn lượng đã giữ chỗ hoặc đã giao. |
 | `UNSETTLED_ISSUED_GOODS` | 409 | Logistics | Còn hàng đã xuất chưa được xác nhận giao, trả hoặc ghi mất. |
@@ -121,6 +126,31 @@ Every error the API can return has one row here. The implementation loads this t
 | `HANDOFF_KIND_INVALID` | 409 | Logistics | Hình thức bàn giao không phù hợp với phiếu phân phối. |
 | `HANDOFF_EXCEEDS_BALANCE` | 409 | Logistics | Số lượng bàn giao vượt quá số lượng đang có ở giai đoạn này. |
 | `SETTLEMENT_EXCEEDS_ISSUED` | 409 | Logistics | Số lượng xác nhận vượt quá số lượng đã xuất. |
+| **Logistics — campaign warehouse assignment** | | | |
+| `WAREHOUSE_NOT_ELIGIBLE` | 409 | Logistics | Kho này không nằm trong vùng phục vụ đang hoạt động của chiến dịch. Vui lòng chọn kho khác. |
+| `CAMPAIGN_AREA_MISSING` | 409 | Logistics | Chiến dịch chưa có vị trí và bán kính nên chưa thể phân công kho. |
+| **Logistics — supply gap suggestions** | | | |
+| `SUPPLY_GAP_NOT_OPEN` | 409 | Logistics | Đề xuất này không còn ở trạng thái chờ xử lý. Vui lòng tải lại danh sách. |
+| `SUPPLY_GAP_WARNING_ONLY` | 409 | Logistics | Đây chỉ là cảnh báo sắp thiếu hàng, chưa có đề xuất quyên góp để chấp nhận. |
+| **Logistics — pickup tickets** | | | |
+| `PICKUP_MISSION_NOT_FOUND` | 404 | Logistics | Không tìm thấy nhiệm vụ cứu trợ này. Vui lòng kiểm tra lại. |
+| `PICKUP_MISSION_NOT_ASSIGNABLE` | 409 | Logistics | Nhiệm vụ chưa được đội nhận hoặc đã kết thúc nên chưa thể lập phiếu lấy hàng. |
+| `PICKUP_TICKET_EXISTS` | 409 | Logistics | Nhiệm vụ này đã có phiếu lấy hàng. |
+| `PICKUP_NO_PRIMARY_WAREHOUSE` | 409 | Logistics | Chiến dịch chưa có kho chính. Vui lòng phân công kho trước khi lập phiếu lấy hàng. |
+| `PICKUP_NO_NEEDS` | 409 | Logistics | Yêu cầu cứu trợ chưa có nhu cầu hàng hóa đã xác nhận hoặc khai báo để lập phiếu. |
+| `PICKUP_NOTHING_RESERVABLE` | 409 | Logistics | Không có mặt hàng nào đủ tồn kho tại kho đã chọn để giữ chỗ. |
+| `PICKUP_NOT_CONFIRMED` | 409 | Logistics | Phiếu lấy hàng cần được xác nhận trước khi bàn giao. |
+| `PICKUP_COLLECTOR_NOT_MEMBER` | 409 | Logistics | Người nhận hàng không phải thành viên đang hoạt động của đội thực hiện nhiệm vụ. |
+| **Logistics — pickup close-out (Step 6b)** | | | |
+| `PICKUP_ITEM_NOT_ON_TICKET` | 400 | Logistics | Mặt hàng này không nằm trong phiếu lấy hàng. |
+| `PICKUP_DELIVERY_EXCEEDS_CUSTODY` | 409 | Logistics | Số lượng giao vượt quá số lượng đội đang giữ cho mặt hàng này. |
+| `PICKUP_LEDGER_MISMATCH` | 409 | Logistics | Số liệu bàn giao của phiếu không khớp với sổ kho. Cần đối soát trước khi tiếp tục. |
+| `PICKUP_UNACCOUNTED_GOODS` | 409 | Logistics | Chưa thể kết thúc SOS vì phiếu lấy hàng vẫn còn hàng chưa đối soát. |
+| `CLOSEOUT_LINES_INVALID` | 400 | Logistics | Phiếu đối soát cần đúng một dòng cho mỗi mặt hàng của phiếu lấy hàng. |
+| `CLOSEOUT_INVARIANT_VIOLATED` | 409 | Logistics | Số lượng đã giao, trả lại và hủy phải bằng đúng số lượng đã giữ của mặt hàng. |
+| `CLOSEOUT_RETIRE_REASON_REQUIRED` | 400 | Logistics | Cần chọn lý do khi hủy hàng. |
+| `ITEM_NOT_RETURNABLE` | 409 | Logistics | Mặt hàng này không được nhập lại kho. Vui lòng ghi nhận là hủy kèm lý do. |
+| `CLOSEOUT_STALE` | 409 | Logistics | Số liệu đã thay đổi sau khi gửi duyệt. Vui lòng lập lại phiếu đối soát. |
 
 Notes: `REQUEST_STATE_INVALID` and `IDEMPOTENCY_IN_PROGRESS` from earlier drafts are **removed** (use `STATE_TRANSITION_INVALID`; in-flight duplicates simply wait for the first command, see 00 §3). A revoked or expired session is always `SESSION_EXPIRED`; a missing credential is `UNAUTHENTICATED`.
 

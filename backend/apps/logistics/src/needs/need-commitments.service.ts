@@ -17,6 +17,7 @@ interface NeedContext {
   cycle_id: string;
   item_id: string;
   status: 'OPEN' | 'PARTIALLY_FULFILLED' | 'FULFILLED' | 'CANCELLED';
+  source?: 'DECLARED' | 'ESTIMATED' | 'CONFIRMED';
   requested_quantity: string;
   campaign_id: string | null;
   unit_scale: number | string;
@@ -57,7 +58,7 @@ interface BalanceRow {
 
 async function loadNeedContext(source: Pick<DataSource | EntityManager, 'query'>, id: string): Promise<NeedContext> {
   const rows = await source.query(
-    `SELECT n.id,n.cycle_id,n.item_id,n.status,n.requested_quantity::text,
+    `SELECT n.id,n.cycle_id,n.item_id,n.status,n.source,n.requested_quantity::text,
             c.campaign_id,u.scale AS unit_scale
        FROM relief_need n JOIN fulfillment_cycle c ON c.id=n.cycle_id
        JOIN item i ON i.id=n.item_id JOIN unit u ON u.code=i.unit_code WHERE n.id=$1`,
@@ -88,7 +89,7 @@ async function lockCycle(manager: Pick<EntityManager, 'query'>, cycleId: string)
 
 async function lockNeed(manager: Pick<EntityManager, 'query'>, needId: string, cycleId: string): Promise<NeedContext> {
   const rows = await manager.query(
-    `SELECT n.id,n.cycle_id,n.item_id,n.status,n.requested_quantity::text,
+    `SELECT n.id,n.cycle_id,n.item_id,n.status,n.source,n.requested_quantity::text,
             c.campaign_id,u.scale AS unit_scale
        FROM relief_need n JOIN fulfillment_cycle c ON c.id=n.cycle_id
        JOIN item i ON i.id=n.item_id JOIN unit u ON u.code=i.unit_code
@@ -222,6 +223,8 @@ export class NeedCommitmentsService {
         assertCreateCycle(cycle);
         const lockedNeed = await lockNeed(manager, needId, cycle.id);
         if (lockedNeed.status === 'CANCELLED') throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
+        // Estimated lines are a forecast only; they cannot reserve stock until the coordinator confirms them.
+        if (lockedNeed.source === 'ESTIMATED') throw new AppError('NEED_ESTIMATE_NOT_CONFIRMED', { status: 409 });
         await loadWarehouse(manager, dto.warehouse_id);
         assertWarehouseScope(session.grants, cycle.campaign_id);
         if (cycle.campaign_id !== need.campaign_id || lockedNeed.campaign_id !== cycle.campaign_id) {

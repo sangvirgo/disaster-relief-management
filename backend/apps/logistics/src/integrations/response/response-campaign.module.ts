@@ -5,11 +5,13 @@ import {
   LOGISTICS_RESPONSE_CLIENT, LogisticsResponseCampaignClient, loadResponseCampaignConfig,
   RESPONSE_CAMPAIGN_CONFIG,
 } from './response-campaign.client';
+import { LogisticsResponseMissionClient } from './response-mission.client';
 
 @Module({
   imports: [LogisticsAuthModule],
   providers: [
     LogisticsResponseCampaignClient,
+    LogisticsResponseMissionClient,
     { provide: RESPONSE_CAMPAIGN_CONFIG, useFactory: () => loadResponseCampaignConfig() },
     {
       provide: LOGISTICS_RESPONSE_CLIENT,
@@ -18,6 +20,6 @@ import {
         new CircuitBreakerClient(config.baseUrl, 'RESPONSE_UNAVAILABLE', { timeoutMs: config.timeoutMs, maxSockets: 10 }),
     },
   ],
-  exports: [LogisticsResponseCampaignClient],
+  exports: [LogisticsResponseCampaignClient, LogisticsResponseMissionClient],
 })
 export class ResponseCampaignModule {}

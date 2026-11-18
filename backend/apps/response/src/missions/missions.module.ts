@@ -7,6 +7,7 @@ import { MissionsCommandsService } from './missions-commands.service';
 import { MissionsController } from './missions.controller';
 import { MissionsOverdueService } from './missions-overdue.service';
 import { MissionsQueriesService } from './missions-queries.service';
+import { ResponseServiceTokenGuard } from '../campaigns/service-token.guard';
 
 @Module({
   imports: [RequestIntakeModule, RequestOperationsModule, RequestResolutionModule],
@@ -16,6 +17,7 @@ import { MissionsQueriesService } from './missions-queries.service';
     MissionsCommandsService,
     MissionsQueriesService,
     MissionsOverdueService,
+    ResponseServiceTokenGuard,
   ],
   exports: [MISSIONS_CONFIG],
 })
