@@ -1447,6 +1447,9 @@ function permittedRoute(user: Me | null, requested: ReturnType<typeof routeFromU
 }
 
 function normalizeSubview(url: URL, workspace: Workspace, page: string, user: Me | null) {
+  if (!(workspace === 'coordinator' && page === 'campaigns'
+    && ['campaigns', 'routing', 'sos', 'workspace', 'history', 'choose', 'my-history'].includes(url.searchParams.get('campaign_tab') || '')))
+    url.searchParams.delete('campaign_tab');
   const allowedViews: readonly string[] = workspace === 'citizen' && page === 'drives' ? donationViews
     : (workspace === 'volunteer' || workspace === 'coordinator') && page === 'notices' ? noticeViews
     : workspace === 'volunteer' && page === 'missions' ? missionViews
@@ -1479,6 +1482,7 @@ function writeRoute(workspace: Workspace, page: string, user: Me | null, mode: '
     url.searchParams.delete('step');
     url.searchParams.delete('sos_id');
     url.searchParams.delete('sos_tab');
+    url.searchParams.delete('campaign_tab');
   } else {
     normalizeSubview(url, workspace, page, user);
   }
@@ -1566,7 +1570,7 @@ function App() {
     } catch { setSelectedTrackingCode(''); }
     if (pendingUrl && requested?.workspace === route.workspace && requested.page === route.page) {
       const url = new URL(window.location.href);
-      for (const key of ['step', 'view', 'sos_id', 'sos_tab']) {
+      for (const key of ['step', 'view', 'sos_id', 'sos_tab', 'campaign_tab']) {
         const parameter = pendingUrl.searchParams.get(key);
         if (parameter) url.searchParams.set(key, parameter);
       }

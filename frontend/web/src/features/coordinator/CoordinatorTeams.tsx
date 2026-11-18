@@ -98,8 +98,8 @@ export function CoordinatorTeams({ user }: { user: Me }) {
         </div>}
       </div>
       <details className="team-member-section"><summary>Thành viên đội ({members.length})</summary>
-        <Button type="button" variant="secondary" onClick={() => setAddMemberOpen(true)}>Thêm thành viên vào đội</Button>
-        <TeamMembers key={`${selected.id}-${revision}`} teamId={selected.id} onManageChange={() => {}} addOpen={addMemberOpen} onCloseAdd={() => { setAddMemberOpen(false); refresh(); }} />
+        <TeamMembers key={`${selected.id}-${revision}`} teamId={selected.id} onManageChange={() => {}} addOpen={addMemberOpen}
+          onOpenAdd={() => setAddMemberOpen(true)} onCloseAdd={() => { setAddMemberOpen(false); refresh(); }} />
       </details>
     </DetailSurface>}
   </div>;

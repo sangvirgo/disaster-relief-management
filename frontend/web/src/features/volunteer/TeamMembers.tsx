@@ -11,14 +11,15 @@ type MemberPage = { items: Member[]; can_manage_members: boolean; cursor?: strin
 type Candidate = { user_id: string; username: string; display_name: string };
 type CandidatePage = { items: Candidate[]; cursor?: string; more: boolean };
 
-export function TeamMembers({ teamId, onManageChange, addOpen, onCloseAdd }: { teamId: string; onManageChange: (allowed: boolean) => void; addOpen: boolean; onCloseAdd: () => void }) {
+export function TeamMembers({ teamId, onManageChange, addOpen, onOpenAdd, onCloseAdd }: { teamId: string; onManageChange: (allowed: boolean) => void; addOpen: boolean; onOpenAdd: () => void; onCloseAdd: () => void }) {
   const [members, setMembers] = useState<Member[]>([]);
   const [canManage, setCanManage] = useState(false);
   const [memberCursor, setMemberCursor, prevMembers, memberPage] = useCursorNav<string>('');
   const [memberNext, setMemberNext] = useState('');
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState('vol');
   const [searched, setSearched] = useState(false);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
   const [candidateNext, setCandidateNext] = useState('');
   const [busyId, setBusyId] = useState('');
   const [loading, setLoading] = useState(true);
@@ -55,9 +56,10 @@ export function TeamMembers({ teamId, onManageChange, addOpen, onCloseAdd }: { t
     setMemberCursor('');
     setMemberNext('');
     setCanManage(false);
-    setQuery('');
+    setQuery('vol');
     setSearched(false);
     setCandidates([]);
+    setSelectedCandidate(null);
     setCandidateNext('');
     setMessage('');
     setSearchError('');
@@ -73,6 +75,7 @@ export function TeamMembers({ teamId, onManageChange, addOpen, onCloseAdd }: { t
       const page = await api<CandidatePage>('response', `/teams/${teamId}/member-candidates?${params}`);
       if (generation !== searchGeneration.current) return;
       setCandidates((current) => nextCursor ? [...current, ...page.items.filter((item) => !current.some((existing) => existing.user_id === item.user_id))] : page.items);
+      if (!nextCursor) setSelectedCandidate(null);
       setCandidateNext(page.cursor || '');
       setSearched(true);
     } catch (cause) {
@@ -104,6 +107,7 @@ export function TeamMembers({ teamId, onManageChange, addOpen, onCloseAdd }: { t
       setSearching(false);
       if (searchTerm.length < 2 || searchTerm.length > 64) {
         setCandidates([]);
+        setSelectedCandidate(null);
         setCandidateNext('');
         setSearched(false);
         setSearchError('');
@@ -131,9 +135,10 @@ export function TeamMembers({ teamId, onManageChange, addOpen, onCloseAdd }: { t
       searchDebounce.current = null;
     }
     searchGeneration.current += 1;
-    setQuery('');
+    setQuery('vol');
     setSearched(false);
     setCandidates([]);
+    setSelectedCandidate(null);
     setCandidateNext('');
     setSearchError('');
     setSearching(false);
@@ -142,7 +147,7 @@ export function TeamMembers({ teamId, onManageChange, addOpen, onCloseAdd }: { t
 
   async function add(candidate: Candidate) {
     setBusyId(candidate.user_id);
-    setError('');
+    setSearchError('');
     setMessage('');
     if (pendingAdd.current?.userId !== candidate.user_id)
       pendingAdd.current = { userId: candidate.user_id, key: newCommandKey() };
@@ -155,8 +160,9 @@ export function TeamMembers({ teamId, onManageChange, addOpen, onCloseAdd }: { t
       setMessage(`Đã thêm ${candidate.display_name} vào đội.`);
       setMemberCursor('');
       setRevision((value) => value + 1);
+      closeAddDialog();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Chưa thể thêm thành viên.');
+      setSearchError(cause instanceof Error ? cause.message : 'Chưa thể thêm thành viên.');
     } finally {
       setBusyId('');
     }
@@ -184,7 +190,10 @@ export function TeamMembers({ teamId, onManageChange, addOpen, onCloseAdd }: { t
   return <section className="team-members" aria-label="Thành viên đội">
     <div className="team-members-heading">
       <div><h3>Thành viên đội</h3><p className="muted">{canManage ? 'Bạn có thể thêm hoặc đưa thành viên ra khỏi đội.' : 'Danh sách người đang tham gia đội.'}</p></div>
-      {members.length > 0 && <span className="chip">{members.length}{memberNext ? '+' : ''} người</span>}
+      <div className="team-members-heading-actions">
+        {members.length > 0 && <span className="chip">{members.length}{memberNext ? '+' : ''} người</span>}
+        {canManage && <button type="button" className="button team-member-open-add" onClick={onOpenAdd}>Thêm thành viên</button>}
+      </div>
     </div>
     {loading && <p role="status">Đang tải thành viên…</p>}
     {error && <p className="notice error" role="alert">{error}</p>}
@@ -201,7 +210,7 @@ export function TeamMembers({ teamId, onManageChange, addOpen, onCloseAdd }: { t
     {addOpen && <DetailSurface modal open onClose={closeAddDialog} label="Thêm thành viên vào đội" heading="Thêm thành viên" className="team-member-dialog"><div className="team-member-add">
       {!loading && !canManage && <p className="notice error" role="alert">Bạn không có quyền thêm thành viên vào đội này.</p>}
       {canManage && <>
-      <p className="muted team-member-add__intro">Tìm theo tên hoặc tài khoản. Tài khoản phải đang hoạt động và chưa thuộc đội khác. Để làm đội trưởng, người đó còn cần quyền Tình nguyện viên toàn hệ thống.</p>
+      <p className="muted team-member-add__intro">Đang gợi ý tài khoản chưa thuộc đội theo từ khóa “vol”. Bạn có thể đổi từ khóa để tìm thêm tình nguyện viên; chỉ thêm người đã được cấp vai trò tình nguyện viên.</p>
       <form className="team-member-search" noValidate onSubmit={(event) => void search(event)}>
         <label htmlFor="team-member-query">Tìm người tham gia</label>
         <div className="team-member-search-row">
@@ -212,7 +221,7 @@ export function TeamMembers({ teamId, onManageChange, addOpen, onCloseAdd }: { t
                 searchDebounce.current = null;
               }
               searchGeneration.current += 1;
-              setQuery(event.target.value); setCandidates([]); setSearched(false); setCandidateNext(''); setSearchError(''); pendingAdd.current = null;
+              setQuery(event.target.value); setCandidates([]); setSelectedCandidate(null); setSearched(false); setCandidateNext(''); setSearchError(''); pendingAdd.current = null;
               setSearching(false);
             }} />
           <button type="submit" className="button" disabled={searching || queryInvalid}>
@@ -226,16 +235,20 @@ export function TeamMembers({ teamId, onManageChange, addOpen, onCloseAdd }: { t
       {searchTerm.length >= 2 && searchTerm.length <= 64 && <div className="team-member-search-results" aria-busy={searching}>
       {searchError && <p className="notice error" role="alert">{searchError}</p>}
       {searching && <p className="team-member-search-status" role="status">Đang tìm người phù hợp…</p>}
-      {searched && !searching && candidates.length === 0 && !candidateNext && <p className="empty">Không tìm thấy người phù hợp chưa tham gia đội.</p>}
+      {searched && !searching && candidates.length === 0 && !candidateNext && <p className="empty">Không tìm thấy tài khoản phù hợp chưa tham gia đội.</p>}
       {candidates.length > 0 && <div className="team-member-results-heading"><strong>Kết quả phù hợp</strong><span>{candidates.length}{candidateNext ? '+' : ''} người</span></div>}
       <div className="team-member-candidates">
-        {candidates.map((candidate) => <article className="team-member-row" key={candidate.user_id}>
-          <div className="team-member-avatar" aria-hidden="true">{candidate.display_name.trim().charAt(0).toLocaleUpperCase('vi')}</div>
-          <div className="team-member-identity"><strong>{candidate.display_name}</strong><span>@{candidate.username}</span></div>
-          <button type="button" className="button team-member-add-button" aria-label={`Thêm ${candidate.display_name} vào đội`} disabled={Boolean(busyId)} onClick={() => void add(candidate)}>{busyId === candidate.user_id ? 'Đang thêm…' : 'Thêm vào đội'}</button>
-        </article>)}
+        {candidates.map((candidate) => <button type="button" className={`team-member-row team-member-candidate-choice${selectedCandidate?.user_id === candidate.user_id ? ' is-selected' : ''}`}
+          key={candidate.user_id} aria-pressed={selectedCandidate?.user_id === candidate.user_id} disabled={Boolean(busyId)}
+          onClick={() => setSelectedCandidate((current) => current?.user_id === candidate.user_id ? null : candidate)}>
+          <span className="team-member-avatar" aria-hidden="true">{candidate.display_name.trim().charAt(0).toLocaleUpperCase('vi')}</span>
+          <span className="team-member-identity"><strong>{candidate.display_name}</strong><span>@{candidate.username}</span></span>
+          <span className="team-member-candidate-check" aria-hidden="true">{selectedCandidate?.user_id === candidate.user_id ? '✓' : ''}</span>
+        </button>)}
       </div>
       {candidates.length > 0 && <LoadMore hasMore={Boolean(candidateNext)} loading={searching} onClick={() => void search(undefined, candidateNext)} shown={candidates.length} noun="kết quả" />}
+      {selectedCandidate && <button type="button" className="button team-member-confirm-add" disabled={Boolean(busyId)}
+        onClick={() => void add(selectedCandidate)}>{busyId ? 'Đang thêm…' : `Thêm ${selectedCandidate.display_name} vào đội`}</button>}
       </div>}
       </>}
     </div></DetailSurface>}

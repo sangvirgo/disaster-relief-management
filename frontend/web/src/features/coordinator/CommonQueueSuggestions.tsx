@@ -78,6 +78,7 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
   const [filter, setFilter] = useState<MatchFilter>('');
   const [cursor, setCursor, prevPage, pageIndex] = useCursorNav<string>('');
   const [choice, setChoice] = useState<Record<string, string>>({});
+  const [campaignSearch, setCampaignSearch] = useState<Record<string, string>>({});
   // Map editor: draw a new campaign area, or adjust an existing one (kind 'adjust' carries the campaign id).
   const [editMode, setEditMode] = useState<{ kind: 'create' } | { kind: 'adjust'; id: string } | null>(null);
   const [draftCenter, setDraftCenter] = useState<{ lat: number; lng: number } | null>(null);
@@ -317,8 +318,18 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
           const canExpand = Boolean(nearest && nearestCampaign && !nearest.inside_area
             && nearest.suggested_radius_m <= Math.min(MAX_RADIUS_M, nearest.radius_m * 3));
           const candidates = new Set(item.candidate_campaign_ids);
-          const options = [...attachTargets].sort((a, b) => Number(candidates.has(b.id)) - Number(candidates.has(a.id)));
-          const selectedTarget = choice[item.id] ?? (candidates.size ? options[0]?.id : '') ?? '';
+          const campaignCenters = new Map(data?.campaigns.map((campaign) => [campaign.id, campaign.center]));
+          const distance = (id: string) => {
+            const center = campaignCenters.get(id);
+            return center ? haversineM(center, { lat: item.location.latitude, lng: item.location.longitude }) : Number.POSITIVE_INFINITY;
+          };
+          const options = [...attachTargets].sort((a, b) =>
+            Number(candidates.has(b.id)) - Number(candidates.has(a.id)) || distance(a.id) - distance(b.id));
+          const savedTarget = choice[item.id] ?? (candidates.size ? options[0]?.id : '') ?? '';
+          const query = (campaignSearch[item.id] ?? '').trim().toLocaleLowerCase('vi-VN');
+          const visibleOptions = options.filter((target, index) =>
+            query ? target.name.toLocaleLowerCase('vi-VN').includes(query) : index < 5 || target.id === savedTarget);
+          const selectedTarget = visibleOptions.some((target) => target.id === savedTarget) ? savedTarget : '';
           return (
             <article className={`suggestion-item${highlight === item.id ? ' is-highlighted' : ''}`} key={item.id} id={`sos-suggestion-${item.id}`}>
               <div className="suggestion-head">
@@ -333,14 +344,21 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
                   </p>
                 </div>
                 <div className="suggestion-actions">
+                  <input type="search" aria-label={`Tìm chiến dịch cho ${item.tracking_code}`}
+                    placeholder="Tìm chiến dịch theo tên…" value={campaignSearch[item.id] ?? ''}
+                    onChange={(event) => setCampaignSearch((current) => ({ ...current, [item.id]: event.target.value }))} />
                   <div className="suggestion-actions__attach">
                     <select aria-label={`Chiến dịch để gắn ${item.tracking_code}`} value={selectedTarget} disabled={busy}
                       onChange={(event) => setChoice((current) => ({ ...current, [item.id]: event.target.value }))}>
                       <option value="">Gắn vào chiến dịch…</option>
-                      {options.map((target) => <option key={target.id} value={target.id}>{candidates.has(target.id) ? '★ ' : ''}{target.name}</option>)}
+                      {visibleOptions.map((target) => <option key={target.id} value={target.id}>
+                        {candidates.has(target.id) ? 'Trong vùng · ' : ''}{target.name}{Number.isFinite(distance(target.id)) ? ` · ${km(distance(target.id))} km` : ''}
+                      </option>)}
                     </select>
                     <button type="button" className="button primary" disabled={busy || !selectedTarget} onClick={() => void attach(item, selectedTarget)}>Gắn</button>
                   </div>
+                  {!query && options.length > 5 && <small className="muted">5 chiến dịch gần nhất; tìm theo tên để xem lựa chọn khác.</small>}
+                  {query && !visibleOptions.length && <small className="muted">Không tìm thấy chiến dịch theo tên này.</small>}
                   <div className="suggestion-actions__alternatives">
                     {canExpand && nearestCampaign && nearest && (
                       <button type="button" className="button secondary suggestion-actions__expand" disabled={busy} onClick={() => void expandArea(nearestCampaign, nearest.suggested_radius_m)}>

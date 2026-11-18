@@ -301,7 +301,7 @@ function MissionOutcome({ id }: { id: string }) {
 
 function SosCommandPopup({ spec, onSuccess, onStale }: { spec: CommandSpec; onSuccess: () => void; onStale: () => void }) {
   const [open, setOpen] = useState(false);
-  if (!spec.fields?.length) return <CommandForm spec={spec} onSuccess={onSuccess} onStale={onStale} />;
+  if (!spec.fields) return <CommandForm spec={spec} onSuccess={onSuccess} onStale={onStale} />;
   return <div className="sos-action-entry">
     <button type="button" className="button" onClick={() => setOpen(true)}>{spec.title}</button>
     <DetailSurface modal open={open} label={spec.title} className="sos-command-dialog" onClose={() => setOpen(false)}>
@@ -493,6 +493,20 @@ const advisoryStatusLabels: Record<string, string> = {
   FAILED: 'Chưa có kết quả AI dùng được',
   UNKNOWN: 'Chưa rõ trạng thái đánh giá AI',
 };
+const advisoryFailureLabels: Record<string, string> = {
+  AI_PROVIDER_ERROR: 'Dịch vụ AI tạm thời không phản hồi. Lượt đánh giá này đã thất bại; không còn chờ kết quả.',
+  AI_DAILY_LIMIT: 'Đã hết lượt gọi AI trong ngày. Hãy tiếp tục xác minh thủ công.',
+  AI_INVALID_OUTPUT: 'AI đã trả dữ liệu không hợp lệ nên hệ thống không sử dụng kết quả.',
+  AI_DISABLED: 'Chức năng AI hiện chưa được bật.',
+};
+function campaignDistanceMeters(point: [number, number], center: { lat: number; lng: number } | null): number {
+  if (!center) return Number.POSITIVE_INFINITY;
+  const [lng, lat] = point;
+  const latRadians = (center.lat - lat) * Math.PI / 180;
+  const lngRadians = (center.lng - lng) * Math.PI / 180;
+  const meanLatitude = (center.lat + lat) * Math.PI / 360;
+  return Math.hypot(latRadians, lngRadians * Math.cos(meanLatitude)) * 6_371_000;
+}
 
 function advisoryScoreLabel(score: number | null, level: string | null): string {
   if (score === null || !level || !advisoryLevelLabels[level]) return 'Chưa đủ thông tin để đánh giá';
@@ -545,13 +559,13 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
   } | null>(null);
   const [showAdditionalDispatch, setShowAdditionalDispatch] = useState(false);
   const [campaignOptions, setCampaignOptions] = useState<{
-    value: string; label: string
+    value: string; label: string; center: { lat: number; lng: number } | null
   }[]>([]);
   useEffect(() => {
     let live = true;
     async function loadCampaigns() {
       try {
-        const campaigns: { id: string; name: string; status: string }[] = [];
+        const campaigns: { id: string; name: string; status: string; center: { lat: number; lng: number } | null }[] = [];
         let cursor = '';
         do {
           const query = new URLSearchParams({ limit: '100' });
@@ -562,7 +576,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
         } while (cursor);
         if (live) setCampaignOptions(campaigns
           .filter((campaign) => campaign.status === 'ACTIVE')
-          .map((campaign) => ({ value: campaign.id, label: campaign.name })));
+          .map((campaign) => ({ value: campaign.id, label: campaign.name, center: campaign.center })));
       } catch {
         if (live) setCampaignOptions([]);
       }
@@ -621,12 +635,14 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
     return () => window.clearInterval(timer);
   }, []);
   const hasActiveMissions = Boolean(detail?.active_missions?.items.length);
+  const hasPendingAi = [detail?.ai_advisory?.status, detail?.ai_priority_advisory?.status]
+    .some((status) => status === 'QUEUED' || status === 'PROCESSING');
   useEffect(() => {
     if (!selected) return;
     const refreshActiveMissionDetail = () => {
       if (document.visibilityState === 'visible') setDetailRevision((value) => value + 1);
     };
-    const timer = hasActiveMissions ? window.setInterval(refreshActiveMissionDetail, 5000) : null;
+    const timer = hasActiveMissions || hasPendingAi ? window.setInterval(refreshActiveMissionDetail, 5000) : null;
     window.addEventListener('focus', refreshActiveMissionDetail);
     document.addEventListener('visibilitychange', refreshActiveMissionDetail);
     return () => {
@@ -634,7 +650,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
       window.removeEventListener('focus', refreshActiveMissionDetail);
       document.removeEventListener('visibilitychange', refreshActiveMissionDetail);
     };
-  }, [selected, hasActiveMissions]);
+  }, [selected, hasActiveMissions, hasPendingAi]);
   const latestCompletedMissionId = detail?.id === selected && ['TRIAGED', 'DISPATCHED', 'IN_PROGRESS'].includes(detail.status)
     ? detail.mission_history?.items.find((mission) => mission.status === 'COMPLETED')?.id
     : undefined;
@@ -1193,39 +1209,6 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 </>
               ) : <p>Không có thông tin hồ sơ gốc trong phạm vi truy cập hiện tại.</p>)}
             </section>
-            {!(detail.fast_track && ['SUBMITTED', 'VERIFYING'].includes(detail.status)) && (() => {
-              const ai = detail.ai_priority_advisory;
-              const extracted = detail.ai_advisory?.extracted_json;
-              const done = ai?.status === 'COMPLETED' && ai.review_status !== 'REJECTED';
-              const status = ai?.status ?? detail.ai_advisory?.status;
-              return (
-                <section className="sos-ai-card" data-state={done ? 'done' : 'pending'} aria-label="Gợi ý của AI">
-                  <div className="sos-ai-card__head">
-                    <strong>Gợi ý của AI</strong>
-                    <span className="sos-ai-card__status">{done ? 'Đã đánh giá' : (advisoryStatusLabels[status ?? ''] ?? 'Chưa có đánh giá')}</span>
-                  </div>
-                  {done ? (
-                    <>
-                      <p className="sos-ai-card__verdict">
-                        {ai.suggested_priority ? <PriorityBadge priority={ai.suggested_priority} /> : <span>Chưa xác định mức</span>}
-                        {ai.score != null && <span>Điểm nguy cơ <b>{ai.score}</b>/100</span>}
-                        {ai.confidence != null && <span title="Mức chắc chắn do AI tự ước tính, chưa phải xác suất đúng đã kiểm định">Độ tin cậy ~{Math.round(ai.confidence * 100)}%</span>}
-                      </p>
-                      {extracted?.summary && <p>{extracted.summary}</p>}
-                      {ai.reasons.length > 0 && <p className="muted">Căn cứ: {ai.reasons.join(' · ')}</p>}
-                      {extracted?.weather_impact && <p className="muted">Thời tiết: {extracted.weather_impact}</p>}
-                    </>
-                  ) : (
-                    <p className="muted">
-                      {status === 'QUEUED' || status === 'PROCESSING'
-                        ? 'AI đang đánh giá, kết quả tự cập nhật sau ít phút.'
-                        : 'Chưa có đánh giá AI dùng được cho SOS này. Hãy xác minh thủ công.'}
-                    </p>
-                  )}
-                  <p className="sos-ai-card__note">Chỉ để tham khảo — điều phối viên quyết định mức ưu tiên và giao đội.</p>
-                </section>
-              );
-            })()}
             {detail.status === 'SUBMITTED' && <div className="sos-start-verification">
               {command({
                 title: 'Bắt đầu xác minh',
@@ -1321,6 +1304,41 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
               </section>
               );
             })()}
+            {!(detail.fast_track && ['SUBMITTED', 'VERIFYING'].includes(detail.status)) && (() => {
+              const ai = detail.ai_priority_advisory;
+              const extracted = detail.ai_advisory?.extracted_json;
+              const done = ai?.status === 'COMPLETED' && ai.review_status !== 'REJECTED';
+              const status = ai?.status ?? detail.ai_advisory?.status;
+              return (
+                <section className="sos-ai-card" data-state={done ? 'done' : 'pending'} aria-label="Gợi ý của AI">
+                  <div className="sos-ai-card__head">
+                    <strong>Gợi ý của AI</strong>
+                    <span className="sos-ai-card__status">{done ? 'Đã đánh giá' : (advisoryStatusLabels[status ?? ''] ?? 'Chưa có đánh giá')}</span>
+                  </div>
+                  {done ? (
+                    <>
+                      <p className="sos-ai-card__verdict">
+                        {ai.suggested_priority ? <PriorityBadge priority={ai.suggested_priority} /> : <span>Chưa xác định mức</span>}
+                        {ai.score != null && <span>Điểm nguy cơ <b>{ai.score}</b>/100</span>}
+                        {ai.confidence != null && <span title="Mức chắc chắn do AI tự ước tính, chưa phải xác suất đúng đã kiểm định">Độ tin cậy ~{Math.round(ai.confidence * 100)}%</span>}
+                      </p>
+                      {extracted?.summary && <p>{extracted.summary}</p>}
+                      {ai.reasons.length > 0 && <p className="muted">Căn cứ: {ai.reasons.join(' · ')}</p>}
+                      {extracted?.weather_impact && <p className="muted">Thời tiết: {extracted.weather_impact}</p>}
+                    </>
+                  ) : (
+                    <p className="muted">
+                      {status === 'QUEUED' || status === 'PROCESSING'
+                        ? 'AI đang đánh giá, kết quả tự cập nhật sau ít phút.'
+                        : status === 'FAILED' || status === 'SKIPPED'
+                          ? `${advisoryFailureLabels[detail.ai_advisory?.error_code ?? ''] ?? 'Lượt đánh giá AI không có kết quả dùng được.'} Hãy xác minh thủ công.`
+                          : 'Chưa có đánh giá AI dùng được cho SOS này. Hãy xác minh thủ công.'}
+                    </p>
+                  )}
+                  <p className="sos-ai-card__note">Chỉ để tham khảo — điều phối viên quyết định mức ưu tiên và giao đội.</p>
+                </section>
+              );
+            })()}
             </div>
             <div className="sos-tab-group" hidden={activeTab !== 'overview'}>
             {pendingSupplements.map((event) => {
@@ -1393,17 +1411,27 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                   path: `/requests/${detail.id}/attach-campaign`,
                   version: detail.version,
                   fields: [
-                    { name: 'campaign_id', label: 'Chiến dịch', type: 'choice-cards', required: true,
-                      options: campaignOptions.map(({ value, label: name }) => ({ value, label: name })) },
+                    { name: 'campaign_id', label: 'Chiến dịch', type: 'choice-cards', required: true, searchable: true,
+                      options: [...campaignOptions].sort((a, b) =>
+                        Number(Boolean(detail.campaign_candidate_ids?.includes(b.value))) - Number(Boolean(detail.campaign_candidate_ids?.includes(a.value))) ||
+                        campaignDistanceMeters(detail.subject.location?.coordinates ?? [0, 0], a.center) -
+                        campaignDistanceMeters(detail.subject.location?.coordinates ?? [0, 0], b.center))
+                        .map(({ value, label: name, center }) => {
+                          const distance = detail.subject.location && center
+                            ? campaignDistanceMeters(detail.subject.location.coordinates, center) : null;
+                          return { value, label: `${detail.campaign_candidate_ids?.includes(value) ? 'Trong vùng · ' : ''}${name}${distance === null ? '' : ` · cách khoảng ${Math.round(distance / 1000)} km`}` };
+                        }) },
                   ],
                   warning: 'Xác nhận gắn yêu cầu này vào chiến dịch đã chọn?',
                 })}
               {canSeeUnassigned && detail.campaign_id &&
                 secondaryCommand({
                   title: 'Gỡ khỏi chiến dịch',
+                  hideTitle: true,
                   service: 'response',
                   path: `/requests/${detail.id}/detach-campaign`,
                   version: detail.version,
+                  fields: [],
                   warning: 'Xác nhận gỡ yêu cầu này khỏi chiến dịch?',
                 })}
               {detail.timeline.items.some((event) => event.event_type === 'AUTHORITY_REFERRED') && (
@@ -1986,7 +2014,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                   </p>
                 )}
                 {['FAILED', 'SKIPPED'].includes(detail.ai_priority_advisory.status) && (
-                  <p>AI chưa đánh giá được yêu cầu này. Hãy kiểm tra thông tin SOS và xử lý theo quy trình thủ công.</p>
+                  <p>{advisoryFailureLabels[detail.ai_advisory?.error_code ?? ''] ?? 'AI chưa đánh giá được yêu cầu này.'} Hãy kiểm tra thông tin SOS và xử lý theo quy trình thủ công.</p>
                 )}
                 {detail.ai_priority_advisory.status === 'COMPLETED' &&
                   detail.ai_priority_advisory.review_status !== 'REJECTED' &&

@@ -4,6 +4,44 @@
   align-items: start;
 }
 
+.volunteer-position-success-dialog {
+  width: min(440px, calc(100vw - 32px));
+}
+
+.volunteer-position-success-content {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  text-align: center;
+}
+
+.volunteer-position-success-content p {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.volunteer-position-success-content p:first-of-type {
+  color: var(--color-text-primary);
+  font: 600 var(--text-subtitle) var(--font-family);
+}
+
+.volunteer-position-success-icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--color-success-bg);
+  color: var(--color-success-dark);
+  font-size: 30px;
+  font-weight: 700;
+}
+
+.volunteer-position-success-content .button {
+  width: 100%;
+  margin-top: var(--space-2);
+}
+
 .volunteer-team-list-card,
 .volunteer-team-detail-card {
   min-width: 0;

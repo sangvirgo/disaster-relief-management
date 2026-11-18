@@ -22,6 +22,7 @@ export type Field = {
   maxLength?: number;
   integer?: boolean;
   options?: { value: string; label: string }[];
+  searchable?: boolean;
   optionsFor?: (values: Record<string, string>) => { value: string; label: string }[];
   resetOnChange?: string[];
   emptyLabel?: string;
@@ -134,6 +135,8 @@ export function CommandForm({
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [attempted, setAttempted] = useState(false);
   const [manualFields, setManualFields] = useState<Record<string, boolean>>({});
+  const [choiceSearch, setChoiceSearch] = useState<Record<string, string>>({});
+  const [expandedChoices, setExpandedChoices] = useState<Record<string, boolean>>({});
   const [files, setFiles] = useState<File[]>([]);
   const [fileError, setFileError] = useState('');
   const uploaded = useRef<{ file: File; key: string; id?: string }[]>([]);
@@ -258,11 +261,22 @@ export function CommandForm({
         const inlineError = errorFor(field);
         const describedBy = inlineError ? errorId(field) : undefined;
         const scale = field.scaleFor?.(values);
+        const search = (choiceSearch[field.name] ?? '').trim().toLocaleLowerCase('vi-VN');
+        const matchingChoices = field.options?.filter((option) => option.label.toLocaleLowerCase('vi-VN').includes(search)) ?? [];
+        const shownChoices = field.searchable && !search && !expandedChoices[field.name]
+          ? matchingChoices.filter((option, index) => index < 5 || option.value === values[field.name]) : matchingChoices;
         return (
         field.type === 'choice-cards' ? (
           <fieldset key={field.name} className="command-choice-list" aria-invalid={Boolean(inlineError)} aria-describedby={describedBy}>
             <legend>{field.label}{isRequired(field, values) && <> <span className="required-mark" aria-hidden="true">*</span></>}</legend>
-            {field.options?.length ? field.options.map((option) => (
+            {field.searchable && (field.options?.length ?? 0) > 5 && <>
+              <label className="command-choice-search" htmlFor={`${formId}-${field.name}-search`}>Tìm chiến dịch</label>
+              <input id={`${formId}-${field.name}-search`} type="search" value={choiceSearch[field.name] ?? ''}
+                placeholder="Nhập tên chiến dịch cần gắn…"
+                onChange={(event) => setChoiceSearch((current) => ({ ...current, [field.name]: event.target.value }))} />
+              {!search && <small className="muted">Hiển thị 5 chiến dịch đầu. Tìm theo tên để chọn chiến dịch khác.</small>}
+            </>}
+            {field.options?.length ? shownChoices.map((option) => (
               <button
                 type="button"
                 key={option.value}
@@ -276,6 +290,12 @@ export function CommandForm({
                 <span className="command-choice-indicator" aria-hidden="true">{values[field.name] === option.value ? '✓' : ''}</span>
               </button>
             )) : <p className="empty">Chưa có chiến dịch đang hoạt động phù hợp.</p>}
+            {field.options?.length && !shownChoices.length && <p className="empty">Không tìm thấy chiến dịch theo tên này.</p>}
+            {field.searchable && !search && matchingChoices.length > shownChoices.length &&
+              <button type="button" className="button secondary command-choice-more"
+                onClick={() => setExpandedChoices((current) => ({ ...current, [field.name]: true }))}>
+                Xem tất cả {matchingChoices.length} chiến dịch
+              </button>}
             {inlineError && <small className="field-error" id={errorId(field)} role="alert">{inlineError}</small>}
           </fieldset>
         ) : field.type === 'reference' ? (

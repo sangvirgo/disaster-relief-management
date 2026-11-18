@@ -188,6 +188,18 @@
   white-space: normal;
   text-align: center;
 }
+.coordinator-detail-surface .sos-actions .sos-action-row .secondary-command .sos-action-entry > .button {
+  border: 1px solid var(--color-surface-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-card);
+  color: var(--color-text-primary);
+  font-size: var(--text-body);
+}
+.coordinator-detail-surface .sos-actions .sos-action-row .secondary-command .sos-action-entry > .button:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-bg);
+  color: var(--color-primary-dark);
+}
 .coordinator-detail-surface .sos-actions .sos-action-row .secondary-command--danger .sos-action-entry > .button {
   border: 1px solid var(--color-emergency);
   background: var(--color-emergency);

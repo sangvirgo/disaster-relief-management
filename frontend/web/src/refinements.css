@@ -527,6 +527,9 @@
   margin-bottom: 9px;
   font-weight: 700;
 }
+.command-choice-search { font-weight: 600; }
+.command-choice-list input[type='search'] { width: 100%; min-width: 0; }
+.command-choice-more { justify-self: start; }
 .command-choice-card {
   display: flex;
   align-items: center;
@@ -1530,6 +1533,7 @@
 .campaign-area-editor__row label { min-width: min(100%, 230px); gap: 7px; font-weight: 600; }
 .campaign-area-editor__row label:has(select) { flex: 1 1 270px; max-width: 420px; }
 .campaign-area-editor__row input, .campaign-area-editor__row select,
+.common-queue-suggestions .suggestion-actions input[type='search'],
 .common-queue-suggestions .suggestion-actions select, .campaign-history-select select {
   appearance: none; width: 100%; min-height: 44px; padding: 9px 38px 9px 13px;
   border: 1px solid #cbd9ed; border-radius: 10px; background: #fff; color: var(--color-text-primary);
@@ -1539,15 +1543,15 @@
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' fill='none' stroke='%232563eb' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat; background-position: right 13px center; cursor: pointer;
 }
-.campaign-area-editor__row :is(input, select):hover, .common-queue-suggestions .suggestion-actions select:hover, .campaign-history-select select:hover { border-color: var(--color-primary-light); }
-.campaign-area-editor__row :is(input, select):focus-visible, .common-queue-suggestions .suggestion-actions select:focus-visible, .campaign-history-select select:focus-visible { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 4px #2563eb24; }
+.campaign-area-editor__row :is(input, select):hover, .common-queue-suggestions .suggestion-actions :is(input, select):hover, .campaign-history-select select:hover { border-color: var(--color-primary-light); }
+.campaign-area-editor__row :is(input, select):focus-visible, .common-queue-suggestions .suggestion-actions :is(input, select):focus-visible, .campaign-history-select select:focus-visible { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 4px #2563eb24; }
 .campaign-history-select { display: grid; gap: 7px; max-width: 420px; font-weight: 600; margin-bottom: 14px; }
 .common-queue-suggestions .suggestion-head { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(320px, 1.2fr); align-items: center; gap: 20px; }
 .common-queue-suggestions .suggestion-actions { display: grid; gap: 10px; min-width: 0; }
 .common-queue-suggestions .suggestion-actions__attach { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
 .common-queue-suggestions .suggestion-actions__alternatives { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .common-queue-suggestions .suggestion-actions__alternatives .button { width: 100%; min-width: 0; }
-.common-queue-suggestions .suggestion-actions select { min-width: 0; max-width: none; }
+.common-queue-suggestions .suggestion-actions :is(input, select) { min-width: 0; max-width: none; }
 .common-queue-suggestions .suggestion-actions .button { min-height: 44px; white-space: normal; }
 .common-queue-suggestions .suggestion-actions__create { grid-column: 2; color: #1d4ed8; background: #eff6ff; border-color: #bfdbfe; }
 .common-queue-suggestions .suggestion-actions__create:hover { background: #dbeafe; }

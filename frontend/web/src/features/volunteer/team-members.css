@@ -1,3 +1,58 @@
+.team-members-heading-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.team-member-open-add {
+  min-height: var(--control-h);
+}
+
+.team-member-candidate-choice {
+  width: 100%;
+  color: var(--color-text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.team-member-candidate-choice:hover,
+.team-member-candidate-choice.is-selected {
+  border-color: var(--color-primary);
+  background: var(--color-primary-bg);
+}
+
+.team-member-candidate-choice:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.team-member-candidate-check {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border: 1px solid var(--color-surface-divider);
+  border-radius: 50%;
+  color: var(--color-surface-card);
+  font-weight: 700;
+}
+
+.team-member-candidate-choice.is-selected .team-member-candidate-check {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+}
+
+.team-member-confirm-add { width: 100%; }
+
+@media (max-width: 620px) {
+  .team-members-heading { flex-wrap: wrap; }
+  .team-members-heading-actions { width: 100%; justify-content: space-between; }
+}
+
 .team-member-dialog.record-detail-dialog {
   box-sizing: border-box;
   width: min(640px, calc(100vw - var(--space-6)));

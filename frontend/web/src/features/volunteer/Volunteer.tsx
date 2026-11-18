@@ -15,6 +15,7 @@ import { useUrlView } from '../../app/useUrlView';
 import { missionViews, noticeViews } from '../../app/routeViews';
 import { TeamMembers } from './TeamMembers';
 import { TeamReadinessForm } from './TeamReadinessForm';
+import { DetailSurface } from '../../components/DetailSurface';
 import './volunteer-missions.css';
 import './volunteer-team.css';
 
@@ -45,10 +46,9 @@ const teamDetailTabs: { id: TeamDetailTab; label: string }[] = [
   { id: 'readiness', label: 'Sẵn sàng' },
   { id: 'location', label: 'Vị trí' },
 ];
-type MissionDetailTab = 'overview' | 'progress' | 'history';
+type MissionDetailTab = 'overview' | 'history';
 const missionDetailTabs: { id: MissionDetailTab; label: string }[] = [
-  { id: 'overview', label: 'Tình huống' },
-  { id: 'progress', label: 'Tiến độ & thao tác' },
+  { id: 'overview', label: 'Tình huống & thao tác' },
   { id: 'history', label: 'Minh chứng & lịch sử' },
 ];
 type Notice = ResponseComponents['schemas']['Notice'];
@@ -243,7 +243,7 @@ export function Notices({ onOpenMission, onOpenRequest }: {
   );
 }
 
-export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId = '', sharingMessage = '', onToggleSharing, onClearInitialMission }: {
+export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingMessage = '', onToggleSharing, onClearInitialMission }: {
   page: string; currentUserId: string; initialMissionId?: string; sharingTeamId?: string; sharingMessage?: string;
   onToggleSharing?: (teamId: string) => void; onClearInitialMission?: () => void;
 }) {
@@ -258,7 +258,6 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
   // Selected mission and detailed state
   const [selectedMission, setSelectedMission] = useState<Mission | null>(null);
   const [missionDetailTab, setMissionDetailTab] = useState<MissionDetailTab>('overview');
-  const selectionKey = `reliva:mission-selection:${currentUserId}`;
   const [missionSelectionRevision, setMissionSelectionRevision] = useState(0);
   const [missionDetail, setMissionDetail] = useState<MissionDetail | null>(null);
   const missionCardRef = useRef<HTMLElement | null>(null);
@@ -320,6 +319,7 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
   const [teamPoint, setTeamPoint] = useState<Point | null>(null);
   const [teamAccuracy, setTeamAccuracy] = useState<number | null>(null);
   const [teamMessage, setTeamMessage] = useState('');
+  const [savedPositionTeam, setSavedPositionTeam] = useState<string | null>(null);
   const [teamDetailTab, setTeamDetailTab] = useState<TeamDetailTab>('overview');
 
   useEffect(() => {
@@ -345,25 +345,18 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
 
   useEffect(() => {
     if (isTeam) return;
-    let missionId = initialMissionId;
-    try { missionId ||= window.sessionStorage.getItem(selectionKey) || undefined; } catch { /* Storage may be unavailable. */ }
+    const missionId = initialMissionId;
     if (!missionId) return;
     let live = true;
     api<MissionDetail>('response', `/missions/${encodeURIComponent(missionId)}`)
       .then((mission) => { if (live) setSelectedMission(mission); })
       .catch((cause) => {
         if (live) {
-          try { window.sessionStorage.removeItem(selectionKey); } catch { /* Storage may be unavailable. */ }
           setError(cause instanceof Error ? cause.message : 'Không thể mở nhiệm vụ đã chọn.');
         }
       });
     return () => { live = false; };
-  }, [initialMissionId, isTeam, selectionKey]);
-
-  useEffect(() => {
-    if (!selectedMission) return;
-    try { window.sessionStorage.setItem(selectionKey, selectedMission.id); } catch { /* Selection still works without storage. */ }
-  }, [selectedMission?.id, selectionKey]);
+  }, [initialMissionId, isTeam]);
 
   useEffect(() => {
     if (!completionFile || !completionFile.type.startsWith('image/')) return;
@@ -385,7 +378,13 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
     )
       .then((value) => {
         if (live) {
-          if (isTeam) setItems(value.items as Team[]);
+          if (isTeam) {
+            const teams = value.items as Team[];
+            setItems(teams);
+            if (!cursor && teams.length === 1 && !value.cursor) {
+              setSelectedTeam(current => current?.id === teams[0].id ? current : teams[0]);
+            }
+          }
           else setItems((value.items as Mission[]).sort((a, b) =>
             Date.parse(b.created_at) - Date.parse(a.created_at)
           ));
@@ -501,7 +500,6 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
   }
 
   function returnToMissionList() {
-    try { window.sessionStorage.removeItem(selectionKey); } catch { /* Storage may be unavailable. */ }
     onClearInitialMission?.();
     setSelectedMission(null);
     setMissionDetail(null);
@@ -726,7 +724,7 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
           accuracy_m: teamAccuracy,
         },
       });
-      setTeamMessage(`Đã cập nhật vị trí mới cho ${team.name}.`);
+      setSavedPositionTeam(team.name);
       setTeamPoint(null);
       setTeamAccuracy(null);
       refreshAll();
@@ -749,7 +747,6 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
     previousMissionFilter.current = missionFilter;
     const current = missionDetail || selectedMission;
     if (current && !matchesMissionFilter(current, missionFilter)) {
-      try { window.sessionStorage.removeItem(selectionKey); } catch { /* Storage may be unavailable. */ }
       setSelectedMission(null);
       setMissionDetail(null);
       setActionMessage('');
@@ -765,6 +762,7 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
   const directionsUrl = activeMission && googleMapsDirectionsUrl(activeMission.location);
   const selectedTeamCanBeManaged = Boolean(selectedTeam &&
     (canManageTeam || manageableTeamIds.has(selectedTeam.id)));
+  const hasSingleTeam = isTeam && items.length === 1 && !next;
 
   function selectTeam(team: Team, tab: TeamDetailTab = 'overview', openAdd = false) {
     setCanManageTeam(false);
@@ -797,8 +795,19 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
 
   return (
     <div className={`grid-two ${isTeam ? 'volunteer-teams-layout volunteer-team-workspace' : 'volunteer-missions-layout'}`}>
+      {savedPositionTeam && <DetailSurface modal open label="Đã lưu vị trí đội cứu hộ"
+        heading="Đã cập nhật vị trí" className="volunteer-position-success-dialog"
+        onClose={() => setSavedPositionTeam(null)}>
+        <div className="volunteer-position-success-content">
+          <span className="volunteer-position-success-icon" aria-hidden="true">✓</span>
+          <p>Vị trí mới của <strong>{savedPositionTeam}</strong> đã được lưu thành công.</p>
+          <p>Điều phối viên có thể dùng vị trí này khi chọn đội phù hợp cho tín hiệu SOS.</p>
+          <button type="button" className="button" onClick={() => setSavedPositionTeam(null)}>Đã hiểu</button>
+        </div>
+      </DetailSurface>}
       {/* Danh sách nhiệm vụ hoặc đội */}
-      {(isTeam ? !selectedTeam : !activeMission) && <section className={`card ${isTeam ? 'volunteer-team-list-card' : 'mission-list-panel'}`} ref={missionListRef}>
+      {isTeam && loading && !selectedTeam && <section className="card volunteer-team-detail-card" role="status">Đang tải thông tin đội cứu hộ…</section>}
+      {(isTeam ? !selectedTeam && !loading : !activeMission) && <section className={`card ${isTeam ? 'volunteer-team-list-card' : 'mission-list-panel'}`} ref={missionListRef}>
         <div className="section-header"><h2>{isTeam ? 'Đội của tôi' : 'Nhiệm vụ và tiến độ'}</h2><button type="button" className="button secondary" disabled={loading || busy} onClick={() => { setCursor(''); refreshAll(); }}>Cập nhật</button></div>
         <p className="mission-list-intro">{isTeam ? 'Chọn một đội để xem hồ sơ và các thao tác quản lý.' : 'Chọn một nhiệm vụ trong bảng để xem tình huống, tiến độ và minh chứng.'}</p>
         {error && (
@@ -907,7 +916,7 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
               <h2 ref={teamHeadingRef} tabIndex={-1}>Chi tiết đội cứu hộ</h2>
               {selectedTeam && <div className="mission-detail-heading__actions">
                 <button type="button" className="button secondary" disabled={loading || teamLoading || busy} onClick={() => { setCursor(''); setRevision(value => value + 1); }}>Cập nhật</button>
-                <button type="button" className="button secondary" onClick={returnToTeamList}>← Danh sách đội</button>
+                {!hasSingleTeam && <button type="button" className="button secondary" onClick={returnToTeamList}>← Danh sách đội</button>}
               </div>}
             </div>
             {!selectedTeam && (
@@ -967,6 +976,7 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
                       teamId={selectedTeam.id}
                       onManageChange={setCanManageTeam}
                       addOpen={addMemberOpen}
+                      onOpenAdd={() => setAddMemberOpen(true)}
                       onCloseAdd={() => setAddMemberOpen(false)}
                     />
                   )}
@@ -1159,7 +1169,7 @@ export function Volunteer({ page, currentUserId, initialMissionId, sharingTeamId
                 )}
                 </div>}
 
-                {missionDetailTab === 'progress' && <div className="volunteer-mission-tab-content volunteer-mission-progress">
+                {missionDetailTab === 'overview' && <div className="volunteer-mission-tab-content volunteer-mission-progress">
                 {['OFFERED', 'ACCEPTED', 'EN_ROUTE', 'ON_SCENE'].includes(activeMission.status) ? (
                   <h3>{canManageMission ? 'Thao tác điều hành nhiệm vụ' : 'Theo dõi nhiệm vụ'}</h3>
                 ) : (

@@ -316,6 +316,10 @@
   margin: 0;
 }
 
+.volunteer-mission-progress {
+  order: -1;
+}
+
 .volunteer-mission-progress .action-grid {
   margin: 0;
 }

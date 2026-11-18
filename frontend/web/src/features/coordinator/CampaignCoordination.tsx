@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, newCommandKey } from '../../api/client';
+import { useUrlView } from '../../app/useUrlView';
 import type { Me } from '../../auth/session';
 import { StatusBadge } from '../../components/StatusBadge';
 import { Pager } from '../../components/ui/Pager';
@@ -25,6 +26,7 @@ type OverviewCampaign = {
 type Summary = HistorySummaryData;
 type Overview = { items: OverviewCampaign[]; common_queue?: { unmatched: number; conflict: number } };
 const OVERVIEW_PAGE_SIZE = 10;
+const campaignTabs = ['campaigns', 'routing', 'sos', 'workspace', 'history', 'choose', 'my-history'] as const;
 
 const reasonLabel: Record<string, string> = {
   P1_UNHANDLED: 'Có SOS P1 chưa được xử lý', P2_UNHANDLED: 'Có SOS P2 chưa được xử lý',
@@ -36,7 +38,7 @@ export function CampaignCoordination({ user, initialRequestId = '' }: { user: Me
   const primary = user.grants.some((grant) => grant.role_code === 'COORDINATOR' && grant.scope_type === 'SYSTEM');
   const opensSos = Boolean(initialRequestId) || Boolean(new URL(window.location.href).searchParams.get('sos_id'));
   // Primary: campaigns (map + list) · SOS queue · coordination workspace · history. Others: workspace · history.
-  const [tab, setTab] = useState(primary ? (opensSos ? 'sos' : 'campaigns') : 'workspace');
+  const [tab, setTab] = useUrlView('campaign_tab', campaignTabs, primary ? (opensSos ? 'sos' : 'campaigns') : 'workspace');
   const [triage, setTriage] = useState<TriageCampaign[]>([]);
   const [overview, setOverview] = useState<OverviewCampaign[]>([]);
   const [commonQueue, setCommonQueue] = useState({ unmatched: 0, conflict: 0 });
@@ -82,8 +84,9 @@ export function CampaignCoordination({ user, initialRequestId = '' }: { user: Me
       setEngagements(mine.items); setTriage(ranked.items);
       setSelectedId((current) => mine.items.some((item) => item.campaign_id === current) ? current : mine.items[0]?.campaign_id ?? '');
       if (primary) return;
-      if (mine.items.length) setTab((current) => current === 'choose' || current === 'my-history' ? current : 'workspace');
-      if (!mine.items.length) setTab((current) => current === 'workspace' ? 'choose' : current);
+      const routeTab = new URL(window.location.href).searchParams.get('campaign_tab');
+      if (mine.items.length && !['choose', 'my-history'].includes(routeTab ?? '')) setTab('workspace');
+      if (!mine.items.length && (routeTab === 'workspace' || !routeTab)) setTab('choose');
     });
     void load.catch((cause: unknown) => { if (live) setError(cause instanceof Error ? cause.message : 'Không thể tải dữ liệu điều phối.'); })
       .finally(() => { if (live) setLoading(false); });
@@ -139,7 +142,7 @@ export function CampaignCoordination({ user, initialRequestId = '' }: { user: Me
   return <section className="campaign-coordination">
     <div className="tabs" role="tablist" aria-label="Điều phối chiến dịch">
       {tabs.map(([id, title]) => <button key={id} type="button" role="tab" aria-selected={activeTab(id)} className={activeTab(id) ? 'active' : ''}
-        onClick={() => id === 'my-history' ? void showMyHistory() : setTab(id)}>{title}</button>)}
+        onClick={() => id === 'my-history' ? void showMyHistory() : setTab(id as typeof campaignTabs[number])}>{title}</button>)}
     </div>
     {error && <p role="alert" className="notice error">{error}</p>}
     {loading && <p role="status">Đang cập nhật dữ liệu điều phối…</p>}
@@ -241,11 +244,13 @@ export function CampaignCoordination({ user, initialRequestId = '' }: { user: Me
     </section>}
     {tab === 'workspace' && <>
       {engagements.length > 0 ? <div className="card campaign-engagement-toolbar">
-        <label>Chiến dịch đang điều phối <select value={selectedEngagement?.campaign_id ?? ''} onChange={(event) => setSelectedId(event.target.value)}>
+        <label className="campaign-engagement-toolbar__select">Chiến dịch đang điều phối <select value={selectedEngagement?.campaign_id ?? ''} onChange={(event) => setSelectedId(event.target.value)}>
           {engagements.map((item) => <option key={item.id} value={item.campaign_id}>{item.campaign_name ?? item.campaign_id}</option>)}
         </select></label>
-        <button className="button secondary" type="button" onClick={() => setTab('choose')}>Chọn thêm chiến dịch gấp</button>
-        {selectedEngagement && <button className="button secondary" type="button" disabled={loading} onClick={() => void disengage(selectedEngagement.campaign_id)}>Dừng điều phối</button>}
+        <div className="campaign-engagement-toolbar__actions">
+          <button className="button secondary" type="button" onClick={() => setTab('choose')}>Chọn thêm chiến dịch gấp</button>
+          {selectedEngagement && <button className="button secondary" type="button" disabled={loading} onClick={() => void disengage(selectedEngagement.campaign_id)}>Dừng điều phối</button>}
+        </div>
       </div> : <div className="empty">Bạn chưa tham gia điều phối chiến dịch nào. Hãy chọn chiến dịch gấp.</div>}
       {selectedEngagement && <Coordinator key={selectedEngagement.campaign_id} page="queue" currentUserId={user.id} campaignId={selectedEngagement.campaign_id} />}
     </>}
