@@ -10389,300 +10389,502 @@
     },
     "/teams": {
       "get": {
-        "operationId": "responseTeamsList",
-        "summary": "TeamsController.list",
-        "description": "Route exported from backend/apps/response/src/teams/teams.controller.ts#TeamsController.list. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.",
-        "responses": {
-          "200": {
-            "description": "Documented response shape.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "items": {
-                      "type": "array",
+          "operationId": "responseTeamsList",
+          "summary": "TeamsController.list",
+          "description": "Route exported from backend/apps/response/src/teams/teams.controller.ts#TeamsController.list. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.",
+          "responses": {
+            "200": {
+              "description": "Documented response shape.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
                       "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "name": {
-                            "type": "string"
-                          },
-                          "kind": {
-                            "type": "string",
-                            "enum": [
-                              "VOLUNTEER",
-                              "MILITARY",
-                              "GOVERNMENT",
-                              "OTHER"
-                            ]
-                          },
-                          "reporting_mode": {
-                            "type": "string",
-                            "enum": [
-                              "APP",
-                              "COORDINATOR"
-                            ]
-                          },
-                          "availability": {
-                            "type": "string",
-                            "enum": [
-                              "AVAILABLE",
-                              "UNAVAILABLE"
-                            ]
-                          },
-                          "readiness_required": {
-                            "type": "boolean"
-                          },
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "ACTIVE",
-                              "INACTIVE"
-                            ]
-                          },
-                          "skills": {
-                            "type": "array",
-                            "items": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "name": {
                               "type": "string"
-                            }
-                          },
-                          "position": {
-                            "anyOf": [
-                              {
-                                "type": "null"
-                              },
-                              {
-                                "type": "object",
-                                "properties": {
-                                  "age_s": {
-                                    "type": "integer"
-                                  },
-                                  "accuracy_m": {
-                                    "anyOf": [
-                                      {
-                                        "type": "number"
-                                      },
-                                      {
-                                        "type": "null"
-                                      }
-                                    ]
-                                  },
-                                  "source": {
-                                    "type": "string",
-                                    "enum": [
-                                      "GPS",
-                                      "MANUAL_PIN",
-                                      "COORDINATOR_REPORTED"
-                                    ]
-                                  },
-                                  "location": {
-                                    "type": "object",
-                                    "properties": {
-                                      "type": {
-                                        "type": "string",
-                                        "const": "Point"
-                                      },
-                                      "coordinates": {
-                                        "type": "array",
-                                        "items": {
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "VOLUNTEER",
+                                "MILITARY",
+                                "GOVERNMENT",
+                                "OTHER"
+                              ]
+                            },
+                            "reporting_mode": {
+                              "type": "string",
+                              "enum": [
+                                "APP",
+                                "COORDINATOR"
+                              ]
+                            },
+                            "availability": {
+                              "type": "string",
+                              "enum": [
+                                "AVAILABLE",
+                                "UNAVAILABLE"
+                              ]
+                            },
+                            "readiness_required": {
+                              "type": "boolean"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "ACTIVE",
+                                "INACTIVE"
+                              ]
+                            },
+                            "skills": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "external_contact_note": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Contact point of a coordinator-reported team; returned only to coordinators."
+                            },
+                            "position": {
+                              "anyOf": [
+                                {
+                                  "type": "null"
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "age_s": {
+                                      "type": "integer"
+                                    },
+                                    "accuracy_m": {
+                                      "anyOf": [
+                                        {
                                           "type": "number"
                                         },
-                                        "minItems": 2,
-                                        "maxItems": 2
-                                      }
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
                                     },
-                                    "required": [
-                                      "type",
-                                      "coordinates"
-                                    ]
+                                    "source": {
+                                      "type": "string",
+                                      "enum": [
+                                        "GPS",
+                                        "MANUAL_PIN",
+                                        "COORDINATOR_REPORTED"
+                                      ]
+                                    },
+                                    "location": {
+                                      "type": "object",
+                                      "properties": {
+                                        "type": {
+                                          "type": "string",
+                                          "const": "Point"
+                                        },
+                                        "coordinates": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "number"
+                                          },
+                                          "minItems": 2,
+                                          "maxItems": 2
+                                        }
+                                      },
+                                      "required": [
+                                        "type",
+                                        "coordinates"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "age_s",
+                                    "accuracy_m",
+                                    "source"
+                                  ]
+                                }
+                              ]
+                            },
+                            "version": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name",
+                            "kind",
+                            "reporting_mode",
+                            "availability",
+                            "readiness_required",
+                            "status",
+                            "skills",
+                            "position",
+                            "version"
+                          ]
+                        }
+                      },
+                      "more": {
+                        "type": "boolean"
+                      },
+                      "cursor": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "CURSOR_INVALID": {
+                      "summary": "CURSOR_INVALID",
+                      "value": {
+                        "code": "CURSOR_INVALID",
+                        "message": "Dữ liệu phân trang không còn hợp lệ. Vui lòng tải lại danh sách.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "UNAUTHENTICATED": {
+                      "summary": "UNAUTHENTICATED",
+                      "value": {
+                        "code": "UNAUTHENTICATED",
+                        "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "SESSION_EXPIRED": {
+                      "summary": "SESSION_EXPIRED",
+                      "value": {
+                        "code": "SESSION_EXPIRED",
+                        "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "FORBIDDEN": {
+                      "summary": "FORBIDDEN",
+                      "value": {
+                        "code": "FORBIDDEN",
+                        "message": "Bạn không có quyền thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "x-c48-contract-source": "docs/backend/03-response-api.md",
+          "parameters": [
+            {
+              "name": "availability",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "status",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "cursor",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "limit",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "default": 50
+              }
+            }
+          ],
+          "x-c48-controller-source": "backend/apps/response/src/teams/teams.controller.ts#TeamsController.list",
+          "security": [
+            {
+              "NativeBearer": []
+            },
+            {
+              "WebAccessCookie": []
+            }
+          ]
+        },
+      "post": {
+          "operationId": "responseTeamsCreate",
+          "summary": "TeamsController.create",
+          "description": "Route exported from backend/apps/response/src/teams/teams.controller.ts#TeamsController.create. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.",
+          "responses": {
+            "201": {
+              "description": "Documented response shape.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "VOLUNTEER",
+                          "MILITARY",
+                          "GOVERNMENT",
+                          "OTHER"
+                        ]
+                      },
+                      "reporting_mode": {
+                        "type": "string",
+                        "enum": [
+                          "APP",
+                          "COORDINATOR"
+                        ]
+                      },
+                      "availability": {
+                        "type": "string",
+                        "enum": [
+                          "AVAILABLE",
+                          "UNAVAILABLE"
+                        ]
+                      },
+                      "readiness_required": {
+                        "type": "boolean"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "ACTIVE",
+                          "INACTIVE"
+                        ]
+                      },
+                      "skills": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "external_contact_note": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Contact point of a coordinator-reported team; returned only to coordinators."
+                      },
+                      "position": {
+                        "anyOf": [
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "age_s": {
+                                "type": "integer"
+                              },
+                              "accuracy_m": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "source": {
+                                "type": "string",
+                                "enum": [
+                                  "GPS",
+                                  "MANUAL_PIN",
+                                  "COORDINATOR_REPORTED"
+                                ]
+                              },
+                              "location": {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "const": "Point"
+                                  },
+                                  "coordinates": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "number"
+                                    },
+                                    "minItems": 2,
+                                    "maxItems": 2
                                   }
                                 },
                                 "required": [
-                                  "age_s",
-                                  "accuracy_m",
-                                  "source"
+                                  "type",
+                                  "coordinates"
                                 ]
                               }
+                            },
+                            "required": [
+                              "age_s",
+                              "accuracy_m",
+                              "source"
                             ]
-                          },
-                          "version": {
-                            "type": "integer"
                           }
-                        },
-                        "required": [
-                          "id",
-                          "name",
-                          "kind",
-                          "reporting_mode",
-                          "availability",
-                          "readiness_required",
-                          "status",
-                          "skills",
-                          "position",
-                          "version"
                         ]
+                      },
+                      "version": {
+                        "type": "integer"
                       }
                     },
-                    "more": {
-                      "type": "boolean"
-                    },
-                    "cursor": {
-                      "type": "string"
-                    }
+                    "required": [
+                      "id",
+                      "name",
+                      "kind",
+                      "reporting_mode",
+                      "availability",
+                      "readiness_required",
+                      "status",
+                      "skills",
+                      "position",
+                      "version"
+                    ]
                   }
                 }
               }
-            }
-          },
-          "400": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "CURSOR_INVALID": {
-                    "summary": "CURSOR_INVALID",
-                    "value": {
-                      "code": "CURSOR_INVALID",
-                      "message": "Dữ liệu phân trang không còn hợp lệ. Vui lòng tải lại danh sách.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "UNAUTHENTICATED": {
-                    "summary": "UNAUTHENTICATED",
-                    "value": {
-                      "code": "UNAUTHENTICATED",
-                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
+            },
+            "401": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
                   },
-                  "SESSION_EXPIRED": {
-                    "summary": "SESSION_EXPIRED",
-                    "value": {
-                      "code": "SESSION_EXPIRED",
-                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                  "examples": {
+                    "UNAUTHENTICATED": {
+                      "summary": "UNAUTHENTICATED",
+                      "value": {
+                        "code": "UNAUTHENTICATED",
+                        "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "SESSION_EXPIRED": {
+                      "summary": "SESSION_EXPIRED",
+                      "value": {
+                        "code": "SESSION_EXPIRED",
+                        "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "FORBIDDEN": {
+                      "summary": "FORBIDDEN",
+                      "value": {
+                        "code": "FORBIDDEN",
+                        "message": "Bạn không có quyền thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "CSRF_INVALID": {
+                      "summary": "CSRF_INVALID",
+                      "value": {
+                        "code": "CSRF_INVALID",
+                        "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
                     }
                   }
                 }
               }
             }
           },
-          "403": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "FORBIDDEN": {
-                    "summary": "FORBIDDEN",
-                    "value": {
-                      "code": "FORBIDDEN",
-                      "message": "Bạn không có quyền thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "x-c48-contract-source": "docs/backend/03-response-api.md",
-        "parameters": [
-          {
-            "name": "availability",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "cursor",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100,
-              "default": 50
-            }
-          }
-        ],
-        "x-c48-controller-source": "backend/apps/response/src/teams/teams.controller.ts#TeamsController.list",
-        "security": [
-          {
-            "NativeBearer": []
-          },
-          {
-            "WebAccessCookie": []
-          }
-        ]
-      },
-      "post": {
-        "operationId": "responseTeamsCreate",
-        "summary": "TeamsController.create",
-        "description": "Route exported from backend/apps/response/src/teams/teams.controller.ts#TeamsController.create. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.",
-        "responses": {
-          "201": {
-            "description": "Documented response shape.",
+          "x-c48-contract-source": "docs/backend/03-response-api.md",
+          "requestBody": {
+            "required": true,
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "id": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
                     "name": {
                       "type": "string"
                     },
-                    "kind": {
-                      "type": "string",
-                      "enum": [
-                        "VOLUNTEER",
-                        "MILITARY",
-                        "GOVERNMENT",
-                        "OTHER"
-                      ]
+                    "team_kind": {
+                      "type": "string"
                     },
                     "reporting_mode": {
                       "type": "string",
@@ -10691,676 +10893,518 @@
                         "COORDINATOR"
                       ]
                     },
-                    "availability": {
+                    "leader_user_id": {
                       "type": "string",
-                      "enum": [
-                        "AVAILABLE",
-                        "UNAVAILABLE"
-                      ]
+                      "format": "uuid"
                     },
-                    "readiness_required": {
-                      "type": "boolean"
+                    "external_contact_note": {
+                      "type": "string"
                     },
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "ACTIVE",
-                        "INACTIVE"
-                      ]
-                    },
-                    "skills": {
+                    "skill_codes": {
                       "type": "array",
                       "items": {
                         "type": "string"
                       }
-                    },
-                    "position": {
-                      "anyOf": [
-                        {
-                          "type": "null"
-                        },
-                        {
-                          "type": "object",
-                          "properties": {
-                            "age_s": {
-                              "type": "integer"
-                            },
-                            "accuracy_m": {
-                              "anyOf": [
-                                {
-                                  "type": "number"
-                                },
-                                {
-                                  "type": "null"
-                                }
-                              ]
-                            },
-                            "source": {
-                              "type": "string",
-                              "enum": [
-                                "GPS",
-                                "MANUAL_PIN",
-                                "COORDINATOR_REPORTED"
-                              ]
-                            },
-                            "location": {
-                              "type": "object",
-                              "properties": {
-                                "type": {
-                                  "type": "string",
-                                  "const": "Point"
-                                },
-                                "coordinates": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "number"
-                                  },
-                                  "minItems": 2,
-                                  "maxItems": 2
-                                }
-                              },
-                              "required": [
-                                "type",
-                                "coordinates"
-                              ]
-                            }
-                          },
-                          "required": [
-                            "age_s",
-                            "accuracy_m",
-                            "source"
-                          ]
-                        }
-                      ]
-                    },
-                    "version": {
-                      "type": "integer"
                     }
                   },
                   "required": [
-                    "id",
                     "name",
-                    "kind",
+                    "team_kind",
                     "reporting_mode",
-                    "availability",
-                    "readiness_required",
-                    "status",
-                    "skills",
-                    "position",
-                    "version"
+                    "skill_codes"
                   ]
                 }
               }
             }
           },
-          "401": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "UNAUTHENTICATED": {
-                    "summary": "UNAUTHENTICATED",
-                    "value": {
-                      "code": "UNAUTHENTICATED",
-                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  },
-                  "SESSION_EXPIRED": {
-                    "summary": "SESSION_EXPIRED",
-                    "value": {
-                      "code": "SESSION_EXPIRED",
-                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
+          "x-c48-controller-source": "backend/apps/response/src/teams/teams.controller.ts#TeamsController.create",
+          "security": [
+            {
+              "NativeBearer": []
+            },
+            {
+              "WebAccessCookie": [],
+              "CsrfToken": []
             }
-          },
-          "403": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "FORBIDDEN": {
-                    "summary": "FORBIDDEN",
-                    "value": {
-                      "code": "FORBIDDEN",
-                      "message": "Bạn không có quyền thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  },
-                  "CSRF_INVALID": {
-                    "summary": "CSRF_INVALID",
-                    "value": {
-                      "code": "CSRF_INVALID",
-                      "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "x-c48-contract-source": "docs/backend/03-response-api.md",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string"
-                  },
-                  "team_kind": {
-                    "type": "string"
-                  },
-                  "reporting_mode": {
-                    "type": "string",
-                    "enum": [
-                      "APP",
-                      "COORDINATOR"
-                    ]
-                  },
-                  "leader_user_id": {
-                    "type": "string",
-                    "format": "uuid"
-                  },
-                  "external_contact_note": {
-                    "type": "string"
-                  },
-                  "skill_codes": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  }
-                },
-                "required": [
-                  "name",
-                  "team_kind",
-                  "reporting_mode",
-                  "skill_codes"
-                ]
-              }
-            }
-          }
-        },
-        "x-c48-controller-source": "backend/apps/response/src/teams/teams.controller.ts#TeamsController.create",
-        "security": [
-          {
-            "NativeBearer": []
-          },
-          {
-            "WebAccessCookie": [],
-            "CsrfToken": []
-          }
-        ]
-      }
+          ]
+        }
     },
     "/teams/{id}": {
       "get": {
-        "operationId": "responseTeamsDetail",
-        "summary": "TeamsController.detail",
-        "description": "Route exported from backend/apps/response/src/teams/teams.controller.ts#TeamsController.detail. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Documented response shape.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "name": {
-                      "type": "string"
-                    },
-                    "kind": {
-                      "type": "string",
-                      "enum": [
-                        "VOLUNTEER",
-                        "MILITARY",
-                        "GOVERNMENT",
-                        "OTHER"
-                      ]
-                    },
-                    "reporting_mode": {
-                      "type": "string",
-                      "enum": [
-                        "APP",
-                        "COORDINATOR"
-                      ]
-                    },
-                    "availability": {
-                      "type": "string",
-                      "enum": [
-                        "AVAILABLE",
-                        "UNAVAILABLE"
-                      ]
-                    },
-                    "readiness_required": {
-                      "type": "boolean"
-                    },
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "ACTIVE",
-                        "INACTIVE"
-                      ]
-                    },
-                    "skills": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "position": {
-                      "anyOf": [
-                        {
-                          "type": "null"
-                        },
-                        {
-                          "type": "object",
-                          "properties": {
-                            "age_s": {
-                              "type": "integer"
-                            },
-                            "accuracy_m": {
-                              "anyOf": [
-                                {
-                                  "type": "number"
-                                },
-                                {
-                                  "type": "null"
-                                }
-                              ]
-                            },
-                            "source": {
-                              "type": "string",
-                              "enum": [
-                                "GPS",
-                                "MANUAL_PIN",
-                                "COORDINATOR_REPORTED"
-                              ]
-                            },
-                            "location": {
-                              "type": "object",
-                              "properties": {
-                                "type": {
-                                  "type": "string",
-                                  "const": "Point"
-                                },
-                                "coordinates": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "number"
-                                  },
-                                  "minItems": 2,
-                                  "maxItems": 2
-                                }
-                              },
-                              "required": [
-                                "type",
-                                "coordinates"
-                              ]
-                            }
-                          },
-                          "required": [
-                            "age_s",
-                            "accuracy_m",
-                            "source"
-                          ]
-                        }
-                      ]
-                    },
-                    "version": {
-                      "type": "integer"
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "name",
-                    "kind",
-                    "reporting_mode",
-                    "availability",
-                    "readiness_required",
-                    "status",
-                    "skills",
-                    "position",
-                    "version"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "UNAUTHENTICATED": {
-                    "summary": "UNAUTHENTICATED",
-                    "value": {
-                      "code": "UNAUTHENTICATED",
-                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  },
-                  "SESSION_EXPIRED": {
-                    "summary": "SESSION_EXPIRED",
-                    "value": {
-                      "code": "SESSION_EXPIRED",
-                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "FORBIDDEN": {
-                    "summary": "FORBIDDEN",
-                    "value": {
-                      "code": "FORBIDDEN",
-                      "message": "Bạn không có quyền thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "x-c48-contract-source": "docs/backend/03-response-api.md",
-        "x-c48-controller-source": "backend/apps/response/src/teams/teams.controller.ts#TeamsController.detail",
-        "security": [
-          {
-            "NativeBearer": []
-          },
-          {
-            "WebAccessCookie": []
-          }
-        ]
-      },
-      "patch": {
-        "operationId": "responseTeamsUpdate",
-        "summary": "TeamsController.update",
-        "description": "Route exported from backend/apps/response/src/teams/teams.controller.ts#TeamsController.update. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Documented response shape.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "name": {
-                      "type": "string"
-                    },
-                    "kind": {
-                      "type": "string",
-                      "enum": [
-                        "VOLUNTEER",
-                        "MILITARY",
-                        "GOVERNMENT",
-                        "OTHER"
-                      ]
-                    },
-                    "reporting_mode": {
-                      "type": "string",
-                      "enum": [
-                        "APP",
-                        "COORDINATOR"
-                      ]
-                    },
-                    "availability": {
-                      "type": "string",
-                      "enum": [
-                        "AVAILABLE",
-                        "UNAVAILABLE"
-                      ]
-                    },
-                    "readiness_required": {
-                      "type": "boolean"
-                    },
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "ACTIVE",
-                        "INACTIVE"
-                      ]
-                    },
-                    "skills": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "position": {
-                      "anyOf": [
-                        {
-                          "type": "null"
-                        },
-                        {
-                          "type": "object",
-                          "properties": {
-                            "age_s": {
-                              "type": "integer"
-                            },
-                            "accuracy_m": {
-                              "anyOf": [
-                                {
-                                  "type": "number"
-                                },
-                                {
-                                  "type": "null"
-                                }
-                              ]
-                            },
-                            "source": {
-                              "type": "string",
-                              "enum": [
-                                "GPS",
-                                "MANUAL_PIN",
-                                "COORDINATOR_REPORTED"
-                              ]
-                            },
-                            "location": {
-                              "type": "object",
-                              "properties": {
-                                "type": {
-                                  "type": "string",
-                                  "const": "Point"
-                                },
-                                "coordinates": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "number"
-                                  },
-                                  "minItems": 2,
-                                  "maxItems": 2
-                                }
-                              },
-                              "required": [
-                                "type",
-                                "coordinates"
-                              ]
-                            }
-                          },
-                          "required": [
-                            "age_s",
-                            "accuracy_m",
-                            "source"
-                          ]
-                        }
-                      ]
-                    },
-                    "version": {
-                      "type": "integer"
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "name",
-                    "kind",
-                    "reporting_mode",
-                    "availability",
-                    "readiness_required",
-                    "status",
-                    "skills",
-                    "position",
-                    "version"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "UNAUTHENTICATED": {
-                    "summary": "UNAUTHENTICATED",
-                    "value": {
-                      "code": "UNAUTHENTICATED",
-                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  },
-                  "SESSION_EXPIRED": {
-                    "summary": "SESSION_EXPIRED",
-                    "value": {
-                      "code": "SESSION_EXPIRED",
-                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "FORBIDDEN": {
-                    "summary": "FORBIDDEN",
-                    "value": {
-                      "code": "FORBIDDEN",
-                      "message": "Bạn không có quyền thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  },
-                  "CSRF_INVALID": {
-                    "summary": "CSRF_INVALID",
-                    "value": {
-                      "code": "CSRF_INVALID",
-                      "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "x-c48-contract-source": "docs/backend/03-response-api.md",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
+          "operationId": "responseTeamsDetail",
+          "summary": "TeamsController.detail",
+          "description": "Route exported from backend/apps/response/src/teams/teams.controller.ts#TeamsController.detail. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "id",
+              "required": true,
               "schema": {
-                "type": "object",
-                "properties": {
-                  "expected_version": {
-                    "type": "integer"
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Documented response shape.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "VOLUNTEER",
+                          "MILITARY",
+                          "GOVERNMENT",
+                          "OTHER"
+                        ]
+                      },
+                      "reporting_mode": {
+                        "type": "string",
+                        "enum": [
+                          "APP",
+                          "COORDINATOR"
+                        ]
+                      },
+                      "availability": {
+                        "type": "string",
+                        "enum": [
+                          "AVAILABLE",
+                          "UNAVAILABLE"
+                        ]
+                      },
+                      "readiness_required": {
+                        "type": "boolean"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "ACTIVE",
+                          "INACTIVE"
+                        ]
+                      },
+                      "skills": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "external_contact_note": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Contact point of a coordinator-reported team; returned only to coordinators."
+                      },
+                      "position": {
+                        "anyOf": [
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "age_s": {
+                                "type": "integer"
+                              },
+                              "accuracy_m": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "source": {
+                                "type": "string",
+                                "enum": [
+                                  "GPS",
+                                  "MANUAL_PIN",
+                                  "COORDINATOR_REPORTED"
+                                ]
+                              },
+                              "location": {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "const": "Point"
+                                  },
+                                  "coordinates": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "number"
+                                    },
+                                    "minItems": 2,
+                                    "maxItems": 2
+                                  }
+                                },
+                                "required": [
+                                  "type",
+                                  "coordinates"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "age_s",
+                              "accuracy_m",
+                              "source"
+                            ]
+                          }
+                        ]
+                      },
+                      "version": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "kind",
+                      "reporting_mode",
+                      "availability",
+                      "readiness_required",
+                      "status",
+                      "skills",
+                      "position",
+                      "version"
+                    ]
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
                   },
-                  "name": {
-                    "type": "string"
+                  "examples": {
+                    "UNAUTHENTICATED": {
+                      "summary": "UNAUTHENTICATED",
+                      "value": {
+                        "code": "UNAUTHENTICATED",
+                        "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "SESSION_EXPIRED": {
+                      "summary": "SESSION_EXPIRED",
+                      "value": {
+                        "code": "SESSION_EXPIRED",
+                        "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
                   },
-                  "skill_codes": {
-                    "type": "array",
-                    "items": {
+                  "examples": {
+                    "FORBIDDEN": {
+                      "summary": "FORBIDDEN",
+                      "value": {
+                        "code": "FORBIDDEN",
+                        "message": "Bạn không có quyền thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "x-c48-contract-source": "docs/backend/03-response-api.md",
+          "x-c48-controller-source": "backend/apps/response/src/teams/teams.controller.ts#TeamsController.detail",
+          "security": [
+            {
+              "NativeBearer": []
+            },
+            {
+              "WebAccessCookie": []
+            }
+          ]
+        },
+      "patch": {
+          "operationId": "responseTeamsUpdate",
+          "summary": "TeamsController.update",
+          "description": "Route exported from backend/apps/response/src/teams/teams.controller.ts#TeamsController.update. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "id",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Documented response shape.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "VOLUNTEER",
+                          "MILITARY",
+                          "GOVERNMENT",
+                          "OTHER"
+                        ]
+                      },
+                      "reporting_mode": {
+                        "type": "string",
+                        "enum": [
+                          "APP",
+                          "COORDINATOR"
+                        ]
+                      },
+                      "availability": {
+                        "type": "string",
+                        "enum": [
+                          "AVAILABLE",
+                          "UNAVAILABLE"
+                        ]
+                      },
+                      "readiness_required": {
+                        "type": "boolean"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "ACTIVE",
+                          "INACTIVE"
+                        ]
+                      },
+                      "skills": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "external_contact_note": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Contact point of a coordinator-reported team; returned only to coordinators."
+                      },
+                      "position": {
+                        "anyOf": [
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "age_s": {
+                                "type": "integer"
+                              },
+                              "accuracy_m": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "source": {
+                                "type": "string",
+                                "enum": [
+                                  "GPS",
+                                  "MANUAL_PIN",
+                                  "COORDINATOR_REPORTED"
+                                ]
+                              },
+                              "location": {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "const": "Point"
+                                  },
+                                  "coordinates": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "number"
+                                    },
+                                    "minItems": 2,
+                                    "maxItems": 2
+                                  }
+                                },
+                                "required": [
+                                  "type",
+                                  "coordinates"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "age_s",
+                              "accuracy_m",
+                              "source"
+                            ]
+                          }
+                        ]
+                      },
+                      "version": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "kind",
+                      "reporting_mode",
+                      "availability",
+                      "readiness_required",
+                      "status",
+                      "skills",
+                      "position",
+                      "version"
+                    ]
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "UNAUTHENTICATED": {
+                      "summary": "UNAUTHENTICATED",
+                      "value": {
+                        "code": "UNAUTHENTICATED",
+                        "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "SESSION_EXPIRED": {
+                      "summary": "SESSION_EXPIRED",
+                      "value": {
+                        "code": "SESSION_EXPIRED",
+                        "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "FORBIDDEN": {
+                      "summary": "FORBIDDEN",
+                      "value": {
+                        "code": "FORBIDDEN",
+                        "message": "Bạn không có quyền thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "CSRF_INVALID": {
+                      "summary": "CSRF_INVALID",
+                      "value": {
+                        "code": "CSRF_INVALID",
+                        "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "x-c48-contract-source": "docs/backend/03-response-api.md",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "expected_version": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "skill_codes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "availability": {
                       "type": "string"
                     }
                   },
-                  "availability": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "expected_version"
-                ]
+                  "required": [
+                    "expected_version"
+                  ]
+                }
               }
             }
-          }
-        },
-        "x-c48-controller-source": "backend/apps/response/src/teams/teams.controller.ts#TeamsController.update",
-        "security": [
-          {
-            "NativeBearer": []
           },
-          {
-            "WebAccessCookie": [],
-            "CsrfToken": []
-          }
-        ]
-      }
+          "x-c48-controller-source": "backend/apps/response/src/teams/teams.controller.ts#TeamsController.update",
+          "security": [
+            {
+              "NativeBearer": []
+            },
+            {
+              "WebAccessCookie": [],
+              "CsrfToken": []
+            }
+          ]
+        }
     },
     "/teams/{id}/leader": {
       "post": {
@@ -13665,259 +13709,270 @@
     },
     "/teams/{id}/ready": {
       "post": {
-        "operationId": "responseTeamsReady",
-        "summary": "Explicitly confirm field readiness after active mission cancellation.",
-        "description": "An active APP leader uses SELF; a scoped TEAM_MANAGE_ANY caller records RADIO/PHONE/IN_PERSON/OTHER with reported_by. Requires the current team version, no active mission, and a confirmation time after the last active cancellation and not in the future. Atomically clears readiness_required, sets AVAILABLE, and records audit evidence. Generic PATCH does not clear the latch.",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
+          "operationId": "responseTeamsReady",
+          "summary": "Explicitly confirm field readiness after active mission cancellation.",
+          "description": "An active APP leader uses SELF; a scoped TEAM_MANAGE_ANY caller records RADIO/PHONE/IN_PERSON/OTHER with reported_by. Requires the current team version, no active mission, and a confirmation time after the last active cancellation and not in the future. Atomically clears readiness_required, sets AVAILABLE, and records audit evidence. Generic PATCH does not clear the latch.",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "id",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
             }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Documented response shape.",
+          ],
+          "responses": {
+            "200": {
+              "description": "Documented response shape.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "VOLUNTEER",
+                          "MILITARY",
+                          "GOVERNMENT",
+                          "OTHER"
+                        ]
+                      },
+                      "reporting_mode": {
+                        "type": "string",
+                        "enum": [
+                          "APP",
+                          "COORDINATOR"
+                        ]
+                      },
+                      "availability": {
+                        "type": "string",
+                        "enum": [
+                          "AVAILABLE",
+                          "UNAVAILABLE"
+                        ]
+                      },
+                      "readiness_required": {
+                        "type": "boolean"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "ACTIVE",
+                          "INACTIVE"
+                        ]
+                      },
+                      "skills": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "external_contact_note": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Contact point of a coordinator-reported team; returned only to coordinators."
+                      },
+                      "position": {
+                        "anyOf": [
+                          {
+                            "type": "null"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "age_s": {
+                                "type": "integer"
+                              },
+                              "accuracy_m": {
+                                "anyOf": [
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "source": {
+                                "type": "string",
+                                "enum": [
+                                  "GPS",
+                                  "MANUAL_PIN",
+                                  "COORDINATOR_REPORTED"
+                                ]
+                              },
+                              "location": {
+                                "type": "object",
+                                "properties": {
+                                  "type": {
+                                    "type": "string",
+                                    "const": "Point"
+                                  },
+                                  "coordinates": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "number"
+                                    },
+                                    "minItems": 2,
+                                    "maxItems": 2
+                                  }
+                                },
+                                "required": [
+                                  "type",
+                                  "coordinates"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "age_s",
+                              "accuracy_m",
+                              "source"
+                            ]
+                          }
+                        ]
+                      },
+                      "version": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "kind",
+                      "reporting_mode",
+                      "availability",
+                      "readiness_required",
+                      "status",
+                      "skills",
+                      "position",
+                      "version"
+                    ]
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "UNAUTHENTICATED": {
+                      "summary": "UNAUTHENTICATED",
+                      "value": {
+                        "code": "UNAUTHENTICATED",
+                        "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "SESSION_EXPIRED": {
+                      "summary": "SESSION_EXPIRED",
+                      "value": {
+                        "code": "SESSION_EXPIRED",
+                        "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "FORBIDDEN": {
+                      "summary": "FORBIDDEN",
+                      "value": {
+                        "code": "FORBIDDEN",
+                        "message": "Bạn không có quyền thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "CSRF_INVALID": {
+                      "summary": "CSRF_INVALID",
+                      "value": {
+                        "code": "CSRF_INVALID",
+                        "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "x-c48-contract-source": "docs/backend/03-response-api.md",
+          "x-c48-controller-source": "backend/apps/response/src/teams/teams.controller.ts#TeamsController.ready",
+          "security": [
+            {
+              "NativeBearer": []
+            },
+            {
+              "WebAccessCookie": [],
+              "CsrfToken": []
+            }
+          ],
+          "requestBody": {
+            "required": true,
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "id": {
-                      "type": "string",
-                      "format": "uuid"
+                    "expected_version": {
+                      "type": "integer"
                     },
-                    "name": {
-                      "type": "string"
-                    },
-                    "kind": {
+                    "confirmation_basis": {
                       "type": "string",
                       "enum": [
-                        "VOLUNTEER",
-                        "MILITARY",
-                        "GOVERNMENT",
+                        "SELF",
+                        "RADIO",
+                        "PHONE",
+                        "IN_PERSON",
                         "OTHER"
                       ]
                     },
-                    "reporting_mode": {
+                    "reported_by": {
                       "type": "string",
-                      "enum": [
-                        "APP",
-                        "COORDINATOR"
-                      ]
+                      "maxLength": 200
                     },
-                    "availability": {
+                    "occurred_at": {
                       "type": "string",
-                      "enum": [
-                        "AVAILABLE",
-                        "UNAVAILABLE"
-                      ]
-                    },
-                    "readiness_required": {
-                      "type": "boolean"
-                    },
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "ACTIVE",
-                        "INACTIVE"
-                      ]
-                    },
-                    "skills": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "position": {
-                      "anyOf": [
-                        {
-                          "type": "null"
-                        },
-                        {
-                          "type": "object",
-                          "properties": {
-                            "age_s": {
-                              "type": "integer"
-                            },
-                            "accuracy_m": {
-                              "anyOf": [
-                                {
-                                  "type": "number"
-                                },
-                                {
-                                  "type": "null"
-                                }
-                              ]
-                            },
-                            "source": {
-                              "type": "string",
-                              "enum": [
-                                "GPS",
-                                "MANUAL_PIN",
-                                "COORDINATOR_REPORTED"
-                              ]
-                            },
-                            "location": {
-                              "type": "object",
-                              "properties": {
-                                "type": {
-                                  "type": "string",
-                                  "const": "Point"
-                                },
-                                "coordinates": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "number"
-                                  },
-                                  "minItems": 2,
-                                  "maxItems": 2
-                                }
-                              },
-                              "required": [
-                                "type",
-                                "coordinates"
-                              ]
-                            }
-                          },
-                          "required": [
-                            "age_s",
-                            "accuracy_m",
-                            "source"
-                          ]
-                        }
-                      ]
-                    },
-                    "version": {
-                      "type": "integer"
+                      "format": "date-time"
                     }
                   },
                   "required": [
-                    "id",
-                    "name",
-                    "kind",
-                    "reporting_mode",
-                    "availability",
-                    "readiness_required",
-                    "status",
-                    "skills",
-                    "position",
-                    "version"
+                    "expected_version",
+                    "confirmation_basis",
+                    "occurred_at"
                   ]
                 }
               }
             }
-          },
-          "401": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "UNAUTHENTICATED": {
-                    "summary": "UNAUTHENTICATED",
-                    "value": {
-                      "code": "UNAUTHENTICATED",
-                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  },
-                  "SESSION_EXPIRED": {
-                    "summary": "SESSION_EXPIRED",
-                    "value": {
-                      "code": "SESSION_EXPIRED",
-                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "FORBIDDEN": {
-                    "summary": "FORBIDDEN",
-                    "value": {
-                      "code": "FORBIDDEN",
-                      "message": "Bạn không có quyền thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  },
-                  "CSRF_INVALID": {
-                    "summary": "CSRF_INVALID",
-                    "value": {
-                      "code": "CSRF_INVALID",
-                      "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "x-c48-contract-source": "docs/backend/03-response-api.md",
-        "x-c48-controller-source": "backend/apps/response/src/teams/teams.controller.ts#TeamsController.ready",
-        "security": [
-          {
-            "NativeBearer": []
-          },
-          {
-            "WebAccessCookie": [],
-            "CsrfToken": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "expected_version": {
-                    "type": "integer"
-                  },
-                  "confirmation_basis": {
-                    "type": "string",
-                    "enum": [
-                      "SELF",
-                      "RADIO",
-                      "PHONE",
-                      "IN_PERSON",
-                      "OTHER"
-                    ]
-                  },
-                  "reported_by": {
-                    "type": "string",
-                    "maxLength": 200
-                  },
-                  "occurred_at": {
-                    "type": "string",
-                    "format": "date-time"
-                  }
-                },
-                "required": [
-                  "expected_version",
-                  "confirmation_basis",
-                  "occurred_at"
-                ]
-              }
-            }
           }
         }
-      }
     },
     "/dashboard/overview": {
       "get": {
@@ -15197,7 +15252,7 @@
       "post": {
           "operationId": "responseCampaignsEngage",
           "summary": "Start or refresh the caller’s campaign coordination engagement.",
-          "description": "Requires CAMPAIGN_COORDINATOR and an ACTIVE campaign. Calls are idempotent by Idempotency-Key; at most three campaigns may be active for one user.",
+          "description": "Requires a SYSTEM COORDINATOR grant and an ACTIVE campaign. Calls are idempotent by Idempotency-Key; at most three campaigns may be active for one user.",
           "parameters": [
             {
               "in": "path",

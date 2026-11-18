@@ -127,7 +127,7 @@ export function allowedWorkspaces(user: Me | null): Workspace[] {
   const r: ReadonlySet<string> = roles(user);
   const result: Workspace[] = ['citizen'];
   if (r.has('VOLUNTEER')) result.push('volunteer');
-  if (r.has('COORDINATOR') || r.has('CAMPAIGN_COORDINATOR')) result.push('coordinator');
+  if (r.has('COORDINATOR')) result.push('coordinator');
   if (operationsRoles.some((role) => r.has(role))) result.push('operations');
   if (r.has('ADMIN')) result.push('admin');
   return result;
@@ -137,7 +137,7 @@ export function workspaceRoleCodes(workspace: Workspace, user: Me | null): strin
   const r: ReadonlySet<string> = roles(user);
   if (workspace === 'citizen') return ['CITIZEN'];
   if (workspace === 'volunteer') return ['VOLUNTEER'];
-  if (workspace === 'coordinator') return ['COORDINATOR', 'CAMPAIGN_COORDINATOR'].filter((role) => r.has(role));
+  if (workspace === 'coordinator') return ['COORDINATOR'].filter((role) => r.has(role));
   if (workspace === 'admin') return ['ADMIN'];
   return operationsRoles.filter((role) => r.has(role));
 }
@@ -146,7 +146,7 @@ export function allowedPages(workspace: Workspace, user: Me | null): Page[] {
   return pages[workspace].filter((page) => {
     if (workspace === 'citizen') return true;
     if (workspace === 'volunteer') return r.has('VOLUNTEER');
-    if (workspace === 'coordinator') return page.id === 'drives' ? r.has('COORDINATOR') : r.has('COORDINATOR') || r.has('CAMPAIGN_COORDINATOR');
+    if (workspace === 'coordinator') return r.has('COORDINATOR');
     if (workspace === 'admin') return r.has('ADMIN');
     const manages = r.has('OPERATIONS_MANAGER');
     const reviews = r.has('REVIEWER');

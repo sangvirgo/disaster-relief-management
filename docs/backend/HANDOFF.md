@@ -6,6 +6,22 @@ Read [AGENTS.md](../../AGENTS.md), [project context](../c48-project-context.md),
 
 **Current Compose contract:** `backend/infra/compose.yaml` is the only Compose file. Integration and smoke checks run from the host against the main `c48` APIs and the primary `c48_identity`, `c48_response`, and `c48_logistics` databases. SQL checks use the existing `postgres` service. There are no test database, helper/runner container, API variant, or integration profile. Only explicit `bash scripts/db/test-db --reset` or `bash scripts/db/reset-demo --reset` may remove the `c48_pgdata` volume; both preserve `c48_minio-data` and all MinIO objects.
 
+## Coordinator-reported teams (radio/phone) — 2026-11-17
+
+**Changed:** `external_contact_note` is now returned to coordinators (`GET /teams`, `GET /teams/{id}`, team candidates; `teamView(row, includeCoordinates, includeContact)`); `record-on-behalf` validates `occurred_at` (not in the future, not before the mission or its latest event, minute precision); Web shows the contact on the active-mission card and candidate list, adds a "Thời điểm đội báo" field to "Ghi tiến độ qua liên lạc", and shows channel and reporter ("Ghi nhận thay · Bộ đàm · người báo: …") in the mission history. Recording on behalf of an app team stays allowed at the API as a fallback (documented in 03); Web does not offer it.
+
+**Checks run:** jest for teams, missions and operations suites; new `record-on-behalf-reported-time.spec.ts`; `tsc` and `vite build` for Web; contracts re-exported. The extended T9 smoke (future and pre-mission times rejected) was not run against a live stack.
+
+## Retired CAMPAIGN_COORDINATOR — 2026-11-17
+
+**Decided:** the `CAMPAIGN_COORDINATOR` role is removed. Its grants are deleted (not remapped to `COORDINATOR`, which would widen access); holders must be re-granted `COORDINATOR`. Migration `RetireCampaignCoordinatorRole1795132800000` bumps `authz_version` for affected users, deletes the grants and narrows both `role_grant` CHECK constraints. `COORDINATOR` already holds every permission of the retired `CAMPAIGN_MANAGER` role, and `OPERATIONS_MANAGER` every permission of `INTAKE_STAFF` and `DISTRIBUTION_STAFF`.
+
+**Removed:** the engagement-scoped branches in `requestScopeFilter`, `canAccessRequest`, `canCoordinateRequest`, the `activeCampaignIds` session field, `refreshCampaignEngagement` and its callers, and the engagement lookup in `requestCoordinatorGrants`. Web, mobile, seeds (`coord2`, `coord_seed` are now `COORDINATOR`; `coord3` and `coord_extra` were removed) and the OpenAPI exports follow.
+
+**Kept:** the engagement endpoints (`engage`, `disengage`, `me/engagements`, `me/coordination-history`), triage, overview, history and the `campaign_engagement` table, now for `COORDINATOR`/SYSTEM only as presence and history; they no longer affect SOS access.
+
+**Checks run:** `tsc` (backend, backend tests, web, mobile), `eslint` (backend, no errors), full jest run. Remaining failures predate this change: `tracking-pagination.spec.ts` and `donations-queries.service.spec.ts` fail on the untouched tree too. `contracts:check` still reports the existing Logistics snapshot drift. The migration, seed and smoke scripts were not run against a live stack.
+
 ## Role consolidation — 2026-11-16
 
 **Decided:** the role codes `CAMPAIGN_MANAGER`, `INTAKE_STAFF` and `DISTRIBUTION_STAFF` are removed. `COORDINATOR` absorbs `CAMPAIGN_MANAGER` and gains `DONATION_DRIVE_MANAGE`. `OPERATIONS_MANAGER` absorbs `INTAKE_STAFF` and `DISTRIBUTION_STAFF` (adds `DONATION_INTAKE`, `DISTRIBUTION_DISPATCH`, `STOCK_ADJUST_REQUEST`, `HANDOFF_RECORD`); it is granted per campaign by default and SYSTEM only as an audited exception. `CATALOG_MANAGE` and `ASSET_MANAGE` need SYSTEM scope. `REVIEWER` remains the independent approver. New rule: the user who dispatched a distribution cannot record its handoff (`SELF_HANDOFF_FORBIDDEN`, 403). Migration: `DISTRIBUTION_STAFF` grants are deleted; `CAMPAIGN_MANAGER` becomes `COORDINATOR` and `INTAKE_STAFF` becomes `OPERATIONS_MANAGER`, scope preserved where valid. Matrix and open items: [05-permissions](05-permissions.md).

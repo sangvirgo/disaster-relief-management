@@ -36,14 +36,6 @@ function primaryCoordinator(grants: readonly Grant[]): boolean {
   return grants.some((grant) => grant.role_code === 'COORDINATOR' && grant.scope_type === 'SYSTEM');
 }
 
-function campaignCoordinator(grants: readonly Grant[]): boolean {
-  return grants.some((grant) => grant.role_code === 'CAMPAIGN_COORDINATOR' && grant.scope_type === 'SYSTEM');
-}
-
-function canViewTriage(grants: readonly Grant[]): boolean {
-  return primaryCoordinator(grants) || campaignCoordinator(grants);
-}
-
 function urgencyReasons(item: {
   highest_priority: string | null; highest_priority_unhandled_count: number; overdue_count: number;
   longest_wait_seconds: number; active_coordinator_count: number;
@@ -80,7 +72,7 @@ export class CampaignCoordinationService {
 
   async triage(request: Request): Promise<Record<string, unknown>> {
     const session = await this.sessions.require(request);
-    if (!canViewTriage(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
+    if (!primaryCoordinator(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
     const overdueMinutes = loadOperationsConfig().overdueMinutes;
     const result = rows(await this.dataSource.query(
       `WITH active AS (
@@ -155,7 +147,7 @@ export class CampaignCoordinationService {
 
   async engage(campaignId: string, key: string, request: Request): Promise<IdempotentResult<Record<string, unknown>>> {
     const session = await this.sessions.require(request);
-    if (!canViewTriage(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
+    if (!primaryCoordinator(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
     return this.idempotency.execute(this.dataSource, {
       scopeKey: `response.campaign-engagement:${session.userId}`,
       command: 'response.campaign.engage', key,
@@ -204,7 +196,7 @@ export class CampaignCoordinationService {
 
   async disengage(campaignId: string, key: string, request: Request): Promise<IdempotentResult<Record<string, unknown>>> {
     const session = await this.sessions.require(request);
-    if (!canViewTriage(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
+    if (!primaryCoordinator(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
     return this.idempotency.execute(this.dataSource, {
       scopeKey: `response.campaign-engagement:${session.userId}`,
       command: 'response.campaign.disengage', key,
@@ -230,7 +222,7 @@ export class CampaignCoordinationService {
 
   async myEngagements(request: Request): Promise<Record<string, unknown>> {
     const session = await this.sessions.require(request);
-    if (!canViewTriage(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
+    if (!primaryCoordinator(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
     const found = rows(await this.dataSource.query(
       `SELECT ce.*,c.name AS campaign_name,c.status AS campaign_status
          FROM campaign_engagement ce JOIN campaign c ON c.id=ce.campaign_id
@@ -474,7 +466,7 @@ export class CampaignCoordinationService {
 
   async myHistory(request: Request): Promise<Record<string, unknown>> {
     const session = await this.sessions.require(request);
-    if (!canViewTriage(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
+    if (!primaryCoordinator(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
     const found = rows(await this.dataSource.query(
       `SELECT ce.*,c.name AS campaign_name,c.status AS campaign_status FROM campaign_engagement ce JOIN campaign c ON c.id=ce.campaign_id
         WHERE ce.user_id=$1 ORDER BY ce.started_at DESC,ce.id DESC LIMIT 500`, [session.userId],
@@ -486,12 +478,7 @@ export class CampaignCoordinationService {
   private async assertCampaignHistoryAccess(campaignId: string, session: ReporterSession): Promise<void> {
     const campaign = rows(await this.dataSource.query('SELECT 1 FROM campaign WHERE id=$1', [campaignId]) as SqlRows<{ '?column?': number }>);
     if (!campaign.length) throw new AppError('NOT_FOUND', { status: 404 });
-    if (primaryCoordinator(session.grants)) return;
-    if (!campaignCoordinator(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
-    const rowsFound = rows(await this.dataSource.query(
-      'SELECT 1 FROM campaign_engagement WHERE campaign_id=$1 AND user_id=$2 LIMIT 1', [campaignId, session.userId],
-    ) as SqlRows<{ '?column?': number }>);
-    if (!rowsFound.length) throw new AppError('FORBIDDEN', { status: 403 });
+    if (!primaryCoordinator(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
   }
 
   private engagementView(row: EngagementRow): Record<string, unknown> {

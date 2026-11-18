@@ -16,13 +16,8 @@ export function claimConflictMessage(holderName: string | null): string {
 }
 
 /** Coordinators act on a request through their campaign grant, or through a SYSTEM grant for unattached requests. */
-export function canCoordinateRequest(grants: readonly Grant[], campaignId: string | null, activeCampaignIds: readonly string[] = []): boolean {
-  return grants.some((grant) => {
-    if (grant.role_code === 'CAMPAIGN_COORDINATOR') {
-      return hasPermission([grant], 'REQUEST_VERIFY', { campaignId }) && Boolean(campaignId && activeCampaignIds.includes(campaignId));
-    }
-    return hasPermission([grant], 'REQUEST_VERIFY', { campaignId });
-  });
+export function canCoordinateRequest(grants: readonly Grant[], campaignId: string | null): boolean {
+  return grants.some((grant) => hasPermission([grant], 'REQUEST_VERIFY', { campaignId }));
 }
 
 /** SYSTEM coordinators may take over or release another coordinator's claim (recorded in request_event). */

@@ -41,7 +41,7 @@ export class RequestOperationsTeamCandidatesService {
            FROM assistance_request r JOIN request_subject s ON s.request_id=r.id
           WHERE r.id=$1
        ), eligible AS (
-         SELECT t.id,t.name,t.team_kind,t.reporting_mode,t.availability,t.status,
+         SELECT t.id,t.name,t.team_kind,t.reporting_mode,t.external_contact_note,t.availability,t.status,
                 t.readiness_required,t.version,t.created_at,
                 COALESCE((SELECT array_agg(ts.skill_code ORDER BY ts.skill_code) FROM team_skill ts WHERE ts.team_id=t.id),ARRAY[]::text[]) AS skills,
                 floor(extract(epoch FROM (q.query_time-p.captured_at)))::int AS position_age_s,
@@ -89,7 +89,7 @@ export class RequestOperationsTeamCandidatesService {
                                AND NOT EXISTS (SELECT 1 FROM team_skill ts
                                                 WHERE ts.team_id=t.id AND ts.skill_code=required.skill_code))
        )
-       SELECT id,name,team_kind,reporting_mode,availability,status,readiness_required,version,created_at,
+       SELECT id,name,team_kind,reporting_mode,external_contact_note,availability,status,readiness_required,version,created_at,
               skills,position_age_s,position_accuracy_m,position_source,longitude,latitude,distance_m,recent_missions_24h,recent_missions_7d,recent_history
          FROM eligible
         WHERE position_team_id IS NULL
@@ -102,13 +102,13 @@ export class RequestOperationsTeamCandidatesService {
     const items = rankTeamCandidates(rows.filter((row): row is TeamCandidateRow & { distance_m: number } => row.distance_m !== null)
       .map((row) => ({ ...row, distance_m: Number(row.distance_m), recent_missions_24h: Number(row.recent_missions_24h), recent_missions_7d: Number(row.recent_missions_7d) })), toleranceM)
       .map((row) => ({
-        team: teamView(row), distance_m: Number(row.distance_m.toFixed(1)), position_age_s: row.position_age_s,
+        team: teamView(row, false, true), distance_m: Number(row.distance_m.toFixed(1)), position_age_s: row.position_age_s,
         accuracy_m: row.position_accuracy_m === null ? null : Number(row.position_accuracy_m),
         recent_missions_24h: row.recent_missions_24h, has_active_work: false, in_band: row.in_band, suggested: row.suggested,
         recent_missions_7d: Number(row.recent_missions_7d), recent_history: row.recent_history ?? [],
       }));
     const unknownPosition = rows.filter((row) => row.distance_m === null).map((row) => ({
-      team: teamView(row), distance_m: null, position_age_s: row.position_age_s,
+      team: teamView(row, false, true), distance_m: null, position_age_s: row.position_age_s,
       accuracy_m: row.position_accuracy_m === null ? null : Number(row.position_accuracy_m),
       recent_missions_24h: Number(row.recent_missions_24h), has_active_work: false, in_band: false, suggested: false,
       recent_missions_7d: Number(row.recent_missions_7d), recent_history: row.recent_history ?? [],

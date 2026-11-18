@@ -89,6 +89,10 @@ for service in identity response logistics; do
     expected_remaining=$((before_count - 1))
     [[ "$remaining_migrations" == "$expected_remaining" ]] || { printf 'FAIL %s rollback of %s did not remove exactly one migration\n' "$service" "$latest" >&2; exit 1; }
 
+    if [[ "$service" == identity && "$latest" == RetireCampaignCoordinatorRole1795132800000 ]]; then
+      restored_role="$(query identity "SELECT count(*) FROM pg_constraint WHERE conrelid='public.role_grant'::regclass AND contype='c' AND pg_get_constraintdef(oid) LIKE '%CAMPAIGN_COORDINATOR%'")"
+      [[ "$restored_role" == "2" ]] || { echo 'FAIL campaign coordinator retirement rollback did not restore the role catalog' >&2; exit 1; }
+    fi
     if [[ "$service" == identity && "$latest" == AddCampaignCoordinatorRole1794960000000 ]]; then
       role_constraint_count="$(query identity "SELECT count(*) FROM pg_constraint WHERE conrelid='public.role_grant'::regclass AND contype='c' AND pg_get_constraintdef(oid) LIKE '%CAMPAIGN_COORDINATOR%'")"
       [[ "$role_constraint_count" == "0" ]] || { echo 'FAIL campaign coordinator rollback left the role in an Identity check constraint' >&2; exit 1; }
@@ -131,6 +135,8 @@ for service in identity response logistics; do
   expected="${expected_counts[$service]}"
   [[ "$applied" == "$expected" ]] || { printf 'FAIL %s expected %s applied migrations, got %s\n' "$service" "$expected" "$applied" >&2; exit 1; }
   if [[ "$service" == identity ]]; then
+    campaign_coordinator_left="$(query identity "SELECT count(*) FROM pg_constraint WHERE conrelid='public.role_grant'::regclass AND contype='c' AND pg_get_constraintdef(oid) LIKE '%CAMPAIGN_COORDINATOR%'")"
+    [[ "$campaign_coordinator_left" == "0" ]] || { echo 'FAIL identity up migration left CAMPAIGN_COORDINATOR in a role_grant check constraint' >&2; exit 1; }
     retired_roles="$(query identity "SELECT count(*) FROM pg_constraint WHERE conrelid='public.role_grant'::regclass AND contype='c' AND pg_get_constraintdef(oid) LIKE '%CAMPAIGN_MANAGER%'")"
     [[ "$retired_roles" == "0" ]] || { echo 'FAIL identity up migration left retired staff roles in the role_grant check constraint' >&2; exit 1; }
   fi

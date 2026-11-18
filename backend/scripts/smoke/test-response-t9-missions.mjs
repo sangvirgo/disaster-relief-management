@@ -751,6 +751,17 @@ export async function runMissionSmoke({
     assert.equal(recorded.status, 200, JSON.stringify(recorded.value));
     assert.equal(recorded.value.status, to);
   }
+  for (const [label, occurredAt] of [['future', new Date(Date.now() + 3_600_000).toISOString()], ['before the mission', '2020-01-01T00:00:00.000Z']]) {
+    const invalidTime = await call(responseUrl, `missions/${coordinatorCompletionOffer.value.id}/record-on-behalf`, {
+      method: 'POST', body: {
+        expected_version: 4, to: 'COMPLETED', recorded_basis: 'RADIO', reported_by: 'Chỉ huy đội',
+        reason: 'Thời điểm báo không hợp lệ.', occurred_at: occurredAt, result: { outcome_note: 'Kiểm tra thời điểm báo.' },
+      },
+      headers: { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': key() },
+    });
+    assertVietnameseError(invalidTime, 400, 'VALIDATION_FAILED');
+    assert.ok(invalidTime.value.field_errors?.occurred_at ?? invalidTime.value.fieldErrors?.occurred_at, `${label} reported time is rejected on occurred_at`);
+  }
   const incompleteCompletion = await call(responseUrl, `missions/${coordinatorCompletionOffer.value.id}/record-on-behalf`, {
     method: 'POST', body: {
       expected_version: 4, to: 'COMPLETED', recorded_basis: 'PHONE', reported_by: 'Chỉ huy đội',

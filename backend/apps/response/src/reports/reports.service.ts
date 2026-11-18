@@ -33,7 +33,7 @@ export class ReportsService {
     const session = await this.sessions.require(request);
     const filters = dateWindowFilters(query as unknown as Record<string, unknown>, 366);
     const values: unknown[] = [];
-    const scope = scopeSql(session.grants, 'RESPONSE_REPORT_READ', values, 'r', session.userId);
+    const scope = scopeSql(session.grants, 'RESPONSE_REPORT_READ', values, 'r');
     const clauses = [
       `r.received_at >= $${values.push(filters.from)}`,
       `r.received_at < $${values.push(filters.to)}`,

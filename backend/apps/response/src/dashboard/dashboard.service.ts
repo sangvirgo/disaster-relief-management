@@ -32,7 +32,7 @@ export class DashboardService {
 
   private scoped(grants: readonly Grant[], alias: string, userId?: string, extra: unknown[] = []): { where: string; values: unknown[] } {
     const values: unknown[] = [];
-    const where = scopeSql(grants, 'RESPONSE_REPORT_READ', values, alias, userId);
+    const where = scopeSql(grants, 'RESPONSE_REPORT_READ', values, alias);
     values.push(...extra);
     return { where, values };
   }

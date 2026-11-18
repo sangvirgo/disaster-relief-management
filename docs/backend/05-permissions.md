@@ -1,46 +1,46 @@
 # 05 — Roles, permissions and scope rules
 
-Roles are a code catalog. The current role set has seven codes: `ADMIN`, `COORDINATOR`, `CAMPAIGN_COORDINATOR`, `OPERATIONS_MANAGER`, `REVIEWER`, `CITIZEN`, `VOLUNTEER`. The role-to-permission map is shared by the three services through `@c48/identity-contracts`. Identity introspection returns the user's live grants; each service evaluates `permission ∧ scope ∧ object relationship`. Hidden UI is never a control.
+Roles are a code catalog. The current role set has six codes: `ADMIN`, `COORDINATOR`, `OPERATIONS_MANAGER`, `REVIEWER`, `CITIZEN`, `VOLUNTEER`. The role-to-permission map is shared by the three services through `@c48/identity-contracts`. Identity introspection returns the user's live grants; each service evaluates `permission ∧ scope ∧ object relationship`. Hidden UI is never a control.
 
-**Role-set history.** [identity.sql](schema/identity.sql) is the historical Initial-migration baseline and is not edited. Its `role_grant.role_code` CHECK lists the earlier set (including `CAMPAIGN_MANAGER`, `INTAKE_STAFF` and `DISTRIBUTION_STAFF`), and `CAMPAIGN_COORDINATOR` is added by a later migration. The Identity role-consolidation migration changes the role set again: it deletes existing `DISTRIBUTION_STAFF` grants, maps `CAMPAIGN_MANAGER` grants to `COORDINATOR` and `INTAKE_STAFF` grants to `OPERATIONS_MANAGER` (scope preserved), and replaces the CHECK with the seven-role set. Use the migrations, not the baseline, as the live schema.
+**Role-set history.** [identity.sql](schema/identity.sql) is the historical Initial-migration baseline and is not edited. Its `role_grant.role_code` CHECK lists the earlier set (including `CAMPAIGN_MANAGER`, `INTAKE_STAFF` and `DISTRIBUTION_STAFF`), and `CAMPAIGN_COORDINATOR` is added by a later migration. The Identity role-consolidation migration changes the role set again: it deletes existing `DISTRIBUTION_STAFF` grants, maps `CAMPAIGN_MANAGER` grants to `COORDINATOR` and `INTAKE_STAFF` grants to `OPERATIONS_MANAGER` (scope preserved). A final migration (`RetireCampaignCoordinatorRole`) deletes all `CAMPAIGN_COORDINATOR` grants (holders must be re-granted `COORDINATOR` explicitly) and replaces the CHECK with the six-role set. Use the migrations, not the baseline, as the live schema.
 
 ## 1. Role-to-permission map
 
 ● = granted. Team leader/member is an explicit `team_member` relationship in Response. Citizen rights are based on ownership or a valid capability, not staff permissions.
 
-| Permission | CITIZEN | VOLUNTEER | COORDINATOR | CAMPAIGN_COORDINATOR | OPERATIONS_MANAGER | REVIEWER | ADMIN |
-|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
-| `USER_MANAGE`, `GRANT_MANAGE` |  |  |  |  |  |  | ● |
-| `AUDIT_READ` (Identity and Logistics audit) |  |  |  |  |  |  | ● |
-| `REQUEST_CREATE_PROXY` (needs live session) | ● | ● | ● | ● | ● |  | ● |
-| `REQUEST_QUEUE_READ`, `REQUEST_DETAIL_READ`, `MISSION_OVERDUE_READ` |  |  | ● | ● |  |  |  |
-| `REQUEST_UNASSIGNED_QUEUE` (shared intake queue; SYSTEM scope only) |  |  | ● |  |  |  |  |
-| `TEAM_READ`, `TEAM_MANAGE_ANY` (team setup and skills only; ADMIN has system-wide team scope) |  |  | ● | ● |  |  | ● |
-| `REQUEST_VERIFY`, `REQUEST_TRIAGE`, `REQUEST_CANCEL`, `REQUEST_REOPEN`, `REQUEST_RESOLVE` |  |  | ● | ● |  |  |  |
-| `MISSION_ASSIGN`, `MISSION_RECORD_ON_BEHALF`, `TEAM_POSITION_SET_ANY` |  |  | ● | ● |  |  |  |
-| `MAP_READ` (heatmap, grouped queue) |  |  | ● | ● | ● |  |  |
-| `CAMPAIGN_READ` |  |  | ● | ● | ● |  |  |
-| `CAMPAIGN_MANAGE` (create needs SYSTEM scope; update and pause need SYSTEM or a matching campaign grant) |  |  | ● |  | ● |  |  |
-| `DONATION_DRIVE_MANAGE` (donation drives) |  |  | ● |  | ● |  |  |
-| `RESPONSE_REPORT_READ` (Response aggregates) |  |  | ● | ● | ● |  | ● |
-| `REPORT_READ` (Logistics aggregates) |  |  | ● |  | ● |  | ● |
-| `CATALOG_MANAGE`, `ASSET_MANAGE` (items, warehouses, vehicles, relief points; SYSTEM scope only) |  |  |  |  | ● |  |  |
-| `DONATION_INTAKE` (count received goods) |  |  |  |  | ● |  |  |
-| `DONATION_REVIEW` (approve and post receipts) |  |  |  |  |  | ● |  |
-| `NEED_MANAGE` (define, reduce or cancel need) |  |  | ● |  | ● |  |  |
-| `COMMITMENT_MANAGE` |  |  |  |  | ● |  |  |
-| `DISTRIBUTION_PREPARE` |  |  |  |  | ● |  |  |
-| `DISTRIBUTION_REVIEW` (approve) |  |  |  |  | ● | ● |  |
-| `DISTRIBUTION_DISPATCH` (issue stock) |  |  |  |  | ● |  |  |
-| `HANDOFF_RECORD` (direct delivery, point receipt, household handout, return and loss recording) |  |  |  |  | ● |  |  |
-| `LOSS_APPROVE`, `ADJUSTMENT_REVIEW` (independent review) |  |  |  |  | ● | ● |  |
-| `STOCK_ADJUST_REQUEST` |  |  |  |  | ● |  |  |
+| Permission | CITIZEN | VOLUNTEER | COORDINATOR | OPERATIONS_MANAGER | REVIEWER | ADMIN |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|
+| `USER_MANAGE`, `GRANT_MANAGE` |  |  |  |  |  | ● |
+| `AUDIT_READ` (Identity and Logistics audit) |  |  |  |  |  | ● |
+| `REQUEST_CREATE_PROXY` (needs live session) | ● | ● | ● | ● |  | ● |
+| `REQUEST_QUEUE_READ`, `REQUEST_DETAIL_READ`, `MISSION_OVERDUE_READ` |  |  | ● |  |  |  |
+| `REQUEST_UNASSIGNED_QUEUE` (shared intake queue; SYSTEM scope only) |  |  | ● |  |  |  |
+| `TEAM_READ`, `TEAM_MANAGE_ANY` (team setup and skills only; ADMIN has system-wide team scope) |  |  | ● |  |  | ● |
+| `REQUEST_VERIFY`, `REQUEST_TRIAGE`, `REQUEST_CANCEL`, `REQUEST_REOPEN`, `REQUEST_RESOLVE` |  |  | ● |  |  |  |
+| `MISSION_ASSIGN`, `MISSION_RECORD_ON_BEHALF`, `TEAM_POSITION_SET_ANY` |  |  | ● |  |  |  |
+| `MAP_READ` (heatmap, grouped queue) |  |  | ● | ● |  |  |
+| `CAMPAIGN_READ` |  |  | ● | ● |  |  |
+| `CAMPAIGN_MANAGE` (create needs SYSTEM scope; update and pause need SYSTEM or a matching campaign grant) |  |  | ● | ● |  |  |
+| `DONATION_DRIVE_MANAGE` (donation drives) |  |  | ● | ● |  |  |
+| `RESPONSE_REPORT_READ` (Response aggregates) |  |  | ● | ● |  | ● |
+| `REPORT_READ` (Logistics aggregates) |  |  | ● | ● |  | ● |
+| `CATALOG_MANAGE`, `ASSET_MANAGE` (items, warehouses, vehicles, relief points; SYSTEM scope only) |  |  |  | ● |  |  |
+| `DONATION_INTAKE` (count received goods) |  |  |  | ● |  |  |
+| `DONATION_REVIEW` (approve and post receipts) |  |  |  |  | ● |  |
+| `NEED_MANAGE` (define, reduce or cancel need) |  |  | ● | ● |  |  |
+| `COMMITMENT_MANAGE` |  |  |  | ● |  |  |
+| `DISTRIBUTION_PREPARE` |  |  |  | ● |  |  |
+| `DISTRIBUTION_REVIEW` (approve) |  |  |  | ● | ● |  |
+| `DISTRIBUTION_DISPATCH` (issue stock) |  |  |  | ● |  |  |
+| `HANDOFF_RECORD` (direct delivery, point receipt, household handout, return and loss recording) |  |  |  | ● |  |  |
+| `LOSS_APPROVE`, `ADJUSTMENT_REVIEW` (independent review) |  |  |  | ● | ● |  |
+| `STOCK_ADJUST_REQUEST` |  |  |  | ● |  |  |
 
 Notes:
 - `REVIEWER` is the independent approver for receipts, distributions, losses and stock adjustments. It holds no other operational permission and no `REQUEST_CREATE_PROXY`.
 - `OPERATIONS_MANAGER` holds the former `INTAKE_STAFF` and `DISTRIBUTION_STAFF` permissions in addition to its own. It has no `DONATION_REVIEW`, so it cannot approve donation receipts it counted or any other receipt; those go to `REVIEWER`.
 - `COORDINATOR` gained `DONATION_DRIVE_MANAGE` when the former `CAMPAIGN_MANAGER` role was merged into it. It has no other Logistics permission beyond the rows above.
-- `CAMPAIGN_COORDINATOR` has no Logistics permission. ADMIN has no request, victim or donor detail permission.
+- ADMIN has no request, victim or donor detail permission.
 - The ADMIN team-management extension does not grant mission assignment, request detail, or team-position reporting. Self-grant is refused by Identity.
 - `GET` endpoints with no row above need a valid session and object scope (e.g. own notices, own team).
 
@@ -51,22 +51,20 @@ A grant is `(role_code, scope_type, campaign_id?)`. The only Identity `scope_typ
 | Role | Allowed scope | Notes |
 |---|---|---|
 | `COORDINATOR` | `SYSTEM` (primary coordinator) | A `CAMPAIGN` grant can exist only through migration of a former `CAMPAIGN_MANAGER` grant; its SOS effect is open (section 7). |
-| `CAMPAIGN_COORDINATOR` | `SYSTEM` only | Request access is narrowed by active campaign engagements. |
 | `OPERATIONS_MANAGER` | `CAMPAIGN` (default) or `SYSTEM` | One campaign per `CAMPAIGN` grant. `SYSTEM` is an exception, issued by ADMIN and audited. |
 | `REVIEWER` | `SYSTEM` or `CAMPAIGN` (validation accepts both) | Demo grants are SYSTEM; a campaign-scoped reviewer covers only that campaign. |
 | `ADMIN`, `CITIZEN`, `VOLUNTEER` | `SYSTEM` only | |
 
-A soft request claim (`handled_by`, 15-minute inactivity window) does not change scope. A primary coordinator (`COORDINATOR` + `SYSTEM`) can access every SOS and take over an active claim. A campaign coordinator can access SOS only for campaigns with their own active engagement; their takeover attempt returns `409 REQUEST_ALREADY_CLAIMED`.
+A soft request claim (`handled_by`, 15-minute inactivity window) does not change scope. A primary coordinator (`COORDINATOR` + `SYSTEM`) can access every SOS and take over an active claim.
 
 1. Alternative grants combine with **OR**. Each grant must independently match the action and object scope.
 2. `SYSTEM` is an explicit grant that covers all eligible objects, including SOS requests without a campaign. It is not implied by ADMIN.
-3. For roles other than the coordinators, `CAMPAIGN` covers only objects whose `campaign_id` matches the grant. It never covers an unassigned SOS.
-4. A `CAMPAIGN_COORDINATOR` grant must be `SYSTEM` and grants no SOS access by itself. The shared `requestScopeFilter` checks for an engagement with `ended_at IS NULL` and `last_active_at > now() - 60 minutes`; without one, list and aggregate queries return no SOS and item operations return `403 FORBIDDEN`.
-5. A campaign coordinator can engage at most three ACTIVE campaigns concurrently. Successful coordination commands refresh `last_active_at`; read requests do not. Expired sessions remain in the history.
-6. Campaign identifiers are validated by the owning API. They are opaque references without cross-service foreign keys.
-7. Logistics assets without campaign attribution are shared catalog resources and require a SYSTEM grant. Campaign-attributed drives, fulfillment cycles and distributions may be accessed through the matching campaign grant or SYSTEM.
+3. For roles other than the coordinator, `CAMPAIGN` covers only objects whose `campaign_id` matches the grant. It never covers an unassigned SOS.
+4. A `COORDINATOR` may start a campaign engagement (at most three ACTIVE campaigns concurrently). Engagement is a presence and history record only; it never narrows SOS access. Coordination commands do not refresh engagement activity; a session expires 60 minutes after it starts or is renewed by calling `engage` again. Expired sessions remain in the history.
+5. Campaign identifiers are validated by the owning API. They are opaque references without cross-service foreign keys.
+6. Logistics assets without campaign attribution are shared catalog resources and require a SYSTEM grant. Campaign-attributed drives, fulfillment cycles and distributions may be accessed through the matching campaign grant or SYSTEM.
 
-Only a primary system coordinator sees the shared intake queue. `unassigned=true` includes `UNMATCHED` and `CONFLICT` SOS, both of which have `campaign_id IS NULL`. Campaign coordinators never see either state. When a primary coordinator attaches or removes a campaign manually, the request match state becomes `MANUAL` and an attaching claim is released.
+Only a primary system coordinator sees the shared intake queue. `unassigned=true` includes `UNMATCHED` and `CONFLICT` SOS, both of which have `campaign_id IS NULL`. When a primary coordinator attaches or removes a campaign manually, the request match state becomes `MANUAL` and an attaching claim is released.
 
 ### 2.1 Campaign versus system scope for OPERATIONS_MANAGER
 

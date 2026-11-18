@@ -48,7 +48,7 @@ Throttling (Nginx + app): login 5 / minute per IP+username, 30 / minute per IP; 
 | `GET /users/{id}` | → user + live grants | |
 | `POST /users/{id}/disable` / `/enable` (Idem) | `{ expected_version, reason }` → `200 user` | Disable revokes all families. `LAST_ADMIN` 409 if it removes the last active ADMIN |
 | `POST /users/{id}/reset-password` (Idem) | `{ expected_version, temporary_password, reason }` → `204` | Revokes all families, sets `must_change_password` |
-| `POST /users/{id}/grants` (Idem) | `{ role_code, scope_type, campaign_id?, reason }` → `201 grant` | Grant shape is validated in Identity; campaign validated via Response `GET /internal/campaigns/{id}` (service token, outside any DB transaction); duplicate live grant → `GRANT_EXISTS` 409; `ADMIN`, `CITIZEN`, `VOLUNTEER`, and `CAMPAIGN_COORDINATOR` require `SYSTEM` scope; self-grant of any role → `FORBIDDEN`. Revokes target's sessions |
+| `POST /users/{id}/grants` (Idem) | `{ role_code, scope_type, campaign_id?, reason }` → `201 grant` | Grant shape is validated in Identity; campaign validated via Response `GET /internal/campaigns/{id}` (service token, outside any DB transaction); duplicate live grant → `GRANT_EXISTS` 409; `ADMIN`, `CITIZEN`, and `VOLUNTEER` require `SYSTEM` scope; self-grant of any role → `FORBIDDEN`. Revokes target's sessions |
 | `POST /grants/{id}/revoke` (Idem) | `{ reason }` → `200 grant` | Soft revoke; `LAST_ADMIN` guard |
 | `GET /users/{id}/grants?include_revoked=&cursor=` | → paged grants (live first) | |
 | `GET /audit-logs?entity_type=&entity_id=&cursor=` | → paged audit rows | `entity_type` is required; `AUDIT_READ`; no password/token/secret ever stored |
@@ -56,7 +56,7 @@ Throttling (Nginx + app): login 5 / minute per IP+username, 30 / minute per IP; 
 
 Every admin write inserts an `audit_log` row (actor, action, entity, before/after, reason, correlation id) in the same transaction.
 
-Campaign-scoped grants call the Response internal campaign lookup before the Identity transaction. The lookup returns campaign status and version; grants fail closed when Response is unavailable. `CAMPAIGN_COORDINATOR` is SYSTEM-only; the selected campaign lives in Response as an engagement session, not an Identity grant.
+Campaign-scoped grants call the Response internal campaign lookup before the Identity transaction. The lookup returns campaign status and version; grants fail closed when Response is unavailable.
 
 ## 4. Internal endpoints (Compose network only; Nginx returns 404)
 
@@ -68,7 +68,7 @@ Campaign-scoped grants call the Response internal campaign lookup before the Ide
 | `POST /internal/users:search` | Response only | `{ query, cursor?, limit? }` → `{ items: [ { id, username, display_name } ], more, cursor? }`; searches ACTIVE accounts by case-insensitive username/display-name prefix (`query` 2–64 characters, `limit` 1–100, default 50). The filter-bound keyset cursor is private to this query. Only Response may call it; it exists for the scoped team-member picker, not as a general account directory. Responses are `no-store`. |
 | `POST /internal/users:check-active` | Response only | `{ user_id }` → `{ active: true }` or `{ active: false, reason: USER_NOT_FOUND\|USER_INACTIVE }`. Checks only whether `app_user` exists and has status `ACTIVE`; returns no Identity fields or grants, and explicitly rejects Logistics. Used only to gate team-roster changes. |
 | `POST /internal/team-leader-eligibility` | Response only | `{ user_id }` → `{ eligible: true }` or `{ eligible: false, reason }`, where `reason` is `USER_NOT_FOUND`, `USER_INACTIVE`, or `VOLUNTEER_GRANT_REQUIRED`. Eligibility requires an active account and a current VOLUNTEER grant. The endpoint returns no user identity fields and explicitly rejects Logistics. |
-| `POST /internal/request-coordinators` | Response only | `{ campaign_id? }` → active users' current COORDINATOR grants plus SYSTEM-scoped CAMPAIGN_COORDINATOR grants (Response keeps only those with an active engagement in the campaign); used to revalidate a second coordinator at verification and resolve coordinator notice recipients. The route requires a valid Identity service token and explicitly rejects callers other than Response. |
+| `POST /internal/request-coordinators` | Response only | `{ campaign_id? }` → active users' current COORDINATOR grants; used to revalidate a second coordinator at verification and resolve coordinator notice recipients. The route requires a valid Identity service token and explicitly rejects callers other than Response. |
 
 All Identity API responses include `Cache-Control: no-store`. Internal lookups authenticate the service caller; cross-service record ownership remains the caller service's responsibility and must be enforced in that service's query and integration tests.
 
@@ -89,4 +89,4 @@ The authoritative list of all codes and messages is [07-error-catalog.md](07-err
 
 ## 6. Seeds and tests
 
-Seed: one ADMIN, a primary `COORDINATOR` with SYSTEM scope, two `CAMPAIGN_COORDINATOR` accounts with SYSTEM scope, and the existing operational demo roles. The seed password remains environment-driven and accounts retain the existing demo password-change behavior. Tests: TC-BE-01, TC-BE-20, TC-BE-28, TC-L10N-01; add: two parallel refreshes → one child, the loser gets `REFRESH_RACE` and the family stays alive; replay after the grace window revokes the family; disable/reset racing a rotation leaves **no** live token (proven failing without the `authz_version` barrier), grant change revokes sessions, introspection under k6 load, last-admin guard, username case-insensitivity, native vs browser transport separation.
+Seed: one ADMIN, two `COORDINATOR` accounts with SYSTEM scope, and the existing operational demo roles. The seed password remains environment-driven and accounts retain the existing demo password-change behavior. Tests: TC-BE-01, TC-BE-20, TC-BE-28, TC-L10N-01; add: two parallel refreshes → one child, the loser gets `REFRESH_RACE` and the family stays alive; replay after the grace window revokes the family; disable/reset racing a rotation leaves **no** live token (proven failing without the `authz_version` barrier), grant change revokes sessions, introspection under k6 load, last-admin guard, username case-insensitivity, native vs browser transport separation.

@@ -216,14 +216,14 @@ Networks: single bridge `c48-internal`; APIs reach each other by service name (`
 | File | Content |
 |---|---|
 | `seed/seed-campaigns.sql` | Shared idempotent `UNKNOWN` incident category and eight campaigns; ACTIVE regions include an overlapping pair, and one active campaign has no spatial boundary. |
-| `seed/seed-identity.sql` | Base demo accounts and role grants. `coord1` is the primary `COORDINATOR` with SYSTEM scope; `coord2` and `coord3` are `CAMPAIGN_COORDINATOR` with SYSTEM scope only. Includes Identity expansion fixtures during a full seed. |
-| `seed/seed-expansion-identity.sql` | Additional synthetic operations, citizen, rescue-team leader/member and secondary coordinator accounts with SYSTEM grants; used by both seed modes. |
+| `seed/seed-identity.sql` | Base demo accounts and role grants. `coord1` is the primary `COORDINATOR` with SYSTEM scope; `coord2` is a second `COORDINATOR` with SYSTEM scope (used for two-coordinator verification). Includes Identity expansion fixtures during a full seed. |
+| `seed/seed-expansion-identity.sql` | Additional synthetic operations, citizen, rescue-team leader/member and second coordinator account (`coord_seed`) with a SYSTEM grant; used by both seed modes. |
 | `seed/seed-response.sql` | Base catalogs, campaigns, rescue teams, SOS lifecycle examples, missions, notices, and scenario assertions. Includes Response expansion fixtures during a full seed. |
 | `seed/seed-expansion-response.sql` | Additional teams, positions and skills; auto-attached, unmatched, conflict and manual SOS examples; a deduplicated conflict notice; active and ended engagement sessions; and event/audit rows for relief history. Idempotent in both seed modes. |
 | `seed/seed-logistics.sql` | Base catalog, warehouses, relief points, vehicles, append-only stock ledger, donation drives and review states, fulfillment, distributions, and notices. Includes Logistics expansion fixtures before ledger assertions during a full seed. |
 | `seed/seed-expansion-logistics.sql` | Additional catalog items, an open drive, declared donations, opening stock movements, and a draft campaign distribution; used by both seed modes. |
 
-**Shared ids** (prefix `00000000-0000-4000-8000-`): campaigns `…0000c1`–`…0000c8`, the aid request `…0000f5` that Logistics links to, and demo users `…000000000101`–`…000000000125`. `coord1` is not granted the secondary role, and `coord2`/`coord3` are not granted the primary role. The Response seed places one SOS in a single active region, one in the overlapping pair, one outside all regions, and one manually attributed. Full-seed assertions verify request/team examples, attribution states, and the stock-ledger invariants.
+**Shared ids** (prefix `00000000-0000-4000-8000-`): campaigns `…0000c1`–`…0000c8`, the aid request `…0000f5` that Logistics links to, and demo users `…000000000101`–`…000000000126`. No account holds the retired `CAMPAIGN_COORDINATOR` role. The Response seed places one SOS in a single active region, one in the overlapping pair, one outside all regions, and one manually attributed. Full-seed assertions verify request/team examples, attribution states, and the stock-ledger invariants.
 
 **Demo scripts the seed must support** (plan §17): guest SOS retry; PROXY report with separate reporter and household locations; verification and priority; nearby-team comparison (fresh vs stale vs accountless teams); heatmap of confirmed requests; donation 60/58/55/3; 12-of-20 then 8; denied cross-scope and self-review attempts.
 

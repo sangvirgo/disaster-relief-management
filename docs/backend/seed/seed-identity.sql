@@ -29,9 +29,7 @@ FROM (VALUES
   ('10d', 'vol_leader2',    'Đội trưởng tình nguyện 2 (demo)'),
   ('10e', 'vol_member1',    'Tình nguyện viên 1 (demo)'),
   ('10f', 'citizen1',       'Người dân 1 (demo)'),
-  ('110', 'citizen2',       'Người dân 2 (demo)'),
-  ('111', 'coord_extra',    'Điều phối viên chiến dịch bổ sung (demo)'),
-  ('125', 'coord3',         'Điều phối viên chiến dịch 3 (demo)')
+  ('110', 'citizen2',       'Người dân 2 (demo)')
 ) AS v(suffix, username, display_name)
 ON CONFLICT DO NOTHING;
 
@@ -40,7 +38,7 @@ SELECT pg_temp.u(g.suffix), g.role_code, g.scope_type, g.campaign_id
 FROM (VALUES
   ('101', 'ADMIN',              'SYSTEM',   NULL::uuid),
   ('102', 'COORDINATOR',        'SYSTEM',   NULL::uuid),
-  ('103', 'CAMPAIGN_COORDINATOR','SYSTEM',  NULL::uuid),
+  ('103', 'COORDINATOR',        'SYSTEM',   NULL::uuid),
   ('105', 'OPERATIONS_MANAGER', 'SYSTEM',   NULL::uuid),
   ('108', 'REVIEWER',           'SYSTEM',   NULL::uuid),
   ('109', 'REVIEWER',           'SYSTEM',   NULL::uuid),
@@ -48,9 +46,7 @@ FROM (VALUES
   ('10d', 'VOLUNTEER',          'SYSTEM',   NULL::uuid),
   ('10e', 'VOLUNTEER',          'SYSTEM',   NULL::uuid),
   ('10f', 'CITIZEN',            'SYSTEM',   NULL::uuid),
-  ('110', 'CITIZEN',            'SYSTEM',   NULL::uuid),
-  ('111', 'CAMPAIGN_COORDINATOR','SYSTEM',  NULL::uuid),
-  ('125', 'CAMPAIGN_COORDINATOR','SYSTEM',  NULL::uuid)
+  ('110', 'CITIZEN',            'SYSTEM',   NULL::uuid)
 ) AS g(suffix, role_code, scope_type, campaign_id)
 JOIN app_user u ON u.id = pg_temp.u(g.suffix)
 WHERE NOT EXISTS (

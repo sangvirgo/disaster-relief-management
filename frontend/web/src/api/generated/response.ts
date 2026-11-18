@@ -1387,7 +1387,7 @@ export interface paths {
         get?: never;
         /**
          * Update editable facts on an SOS report before verification.
-         * @description Uses expected_version for concurrency control. Omitted facts retain their current values. Reporters may authorize with the tracking code alone; cookie-authenticated writes require CSRF protection.
+         * @description Uses expected_version for concurrency control. Omitted facts retain their current values. The request must be owned by the signed-in reporter or accompanied by valid tracking credentials.
          */
         put: operations["responseTrackingUpdateReport"];
         post?: never;
@@ -1648,7 +1648,7 @@ export interface paths {
         put?: never;
         /**
          * Start or refresh the caller’s campaign coordination engagement.
-         * @description Requires CAMPAIGN_COORDINATOR and an ACTIVE campaign. Calls are idempotent by Idempotency-Key; at most three campaigns may be active for one user.
+         * @description Requires a SYSTEM COORDINATOR grant and an ACTIVE campaign. Calls are idempotent by Idempotency-Key; at most three campaigns may be active for one user.
          */
         post: operations["responseCampaignsEngage"];
         delete?: never;
@@ -1769,6 +1769,46 @@ export interface paths {
          * @description Route exported from backend/apps/response/src/campaigns/campaigns.controller.ts#CampaignsController.myEngagements. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.
          */
         get: operations["responseCampaignsMyEngagements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/area": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * CampaignsController.changeArea
+         * @description Route exported from backend/apps/response/src/campaigns/campaigns.controller.ts#CampaignsController.changeArea. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.
+         */
+        post: operations["responseCampaignsChangeArea"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/common-queue/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * CampaignsController.commonQueueSuggestions
+         * @description Route exported from backend/apps/response/src/campaigns/campaigns.controller.ts#CampaignsController.commonQueueSuggestions. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.
+         */
+        get: operations["responseCampaignsCommonQueueSuggestions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6888,6 +6928,8 @@ export interface operations {
                             /** @enum {string} */
                             status: "ACTIVE" | "INACTIVE";
                             skills: string[];
+                            /** @description Contact point of a coordinator-reported team; returned only to coordinators. */
+                            external_contact_note?: string | null;
                             position: null | {
                                 age_s: number;
                                 accuracy_m: number | null;
@@ -6977,6 +7019,8 @@ export interface operations {
                         /** @enum {string} */
                         status: "ACTIVE" | "INACTIVE";
                         skills: string[];
+                        /** @description Contact point of a coordinator-reported team; returned only to coordinators. */
+                        external_contact_note?: string | null;
                         position: null | {
                             age_s: number;
                             accuracy_m: number | null;
@@ -7043,6 +7087,8 @@ export interface operations {
                         /** @enum {string} */
                         status: "ACTIVE" | "INACTIVE";
                         skills: string[];
+                        /** @description Contact point of a coordinator-reported team; returned only to coordinators. */
+                        external_contact_note?: string | null;
                         position: null | {
                             age_s: number;
                             accuracy_m: number | null;
@@ -7118,6 +7164,8 @@ export interface operations {
                         /** @enum {string} */
                         status: "ACTIVE" | "INACTIVE";
                         skills: string[];
+                        /** @description Contact point of a coordinator-reported team; returned only to coordinators. */
+                        external_contact_note?: string | null;
                         position: null | {
                             age_s: number;
                             accuracy_m: number | null;
@@ -7757,11 +7805,11 @@ export interface operations {
         parameters: {
             query?: never;
             header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
                 /** @description Never place the tracking code in a URL. */
                 "X-Tracking-Code": components["parameters"]["TrackingCodeHeader"];
                 /** @description Required for cookie-authenticated writes. */
                 "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
             };
             path: {
                 id: components["parameters"]["RequestId"];
@@ -8053,6 +8101,8 @@ export interface operations {
                         /** @enum {string} */
                         status: "ACTIVE" | "INACTIVE";
                         skills: string[];
+                        /** @description Contact point of a coordinator-reported team; returned only to coordinators. */
+                        external_contact_note?: string | null;
                         position: null | {
                             age_s: number;
                             accuracy_m: number | null;
@@ -9045,6 +9095,80 @@ export interface operations {
                         }[];
                     };
                 };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    responseCampaignsChangeArea: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success response; see docs/backend/03-response-api.md for the documented response shape. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    responseCampaignsCommonQueueSuggestions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success response; see docs/backend/03-response-api.md for the documented response shape. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Documented error response; clients branch on the stable code. */
             401: {

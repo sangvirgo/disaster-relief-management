@@ -32,7 +32,7 @@ describe('Identity internal session introspection service', () => {
       revoked_at: null,
       absolute_expires_at: new Date(Date.now() + 60_000),
       grant_id: '00000000-0000-4000-8000-000000000002',
-      role_code: 'CAMPAIGN_COORDINATOR',
+      role_code: 'COORDINATOR',
       scope_type: 'SYSTEM',
       campaign_id: null,
     }]);
@@ -46,9 +46,9 @@ describe('Identity internal session introspection service', () => {
     });
     expect(result).toMatchObject({
       active: true,
-      grants: [{ role_code: 'CAMPAIGN_COORDINATOR', scope_type: 'SYSTEM', campaign_id: null }],
+      grants: [{ role_code: 'COORDINATOR', scope_type: 'SYSTEM', campaign_id: null }],
     });
-    expect(result.grants).toEqual([{ role_code: 'CAMPAIGN_COORDINATOR', scope_type: 'SYSTEM', campaign_id: null }]);
+    expect(result.grants).toEqual([{ role_code: 'COORDINATOR', scope_type: 'SYSTEM', campaign_id: null }]);
     expect(query).toHaveBeenCalledTimes(1);
   });
 });
@@ -66,7 +66,6 @@ describe('Identity internal request coordinator grants service', () => {
     await expect(service.requestCoordinators(campaignId)).resolves.toEqual({ items: [] });
     const [sql, values] = query.mock.calls[0]!;
     expect(sql).toContain("g.role_code='COORDINATOR'");
-    expect(sql).toContain("g.role_code='CAMPAIGN_COORDINATOR' AND g.scope_type='SYSTEM'");
     expect(sql).toContain("g.scope_type='SYSTEM'");
     expect(sql).toContain("$1::uuid IS NOT NULL AND g.scope_type='CAMPAIGN' AND g.campaign_id=$1");
     expect(values).toEqual([campaignId]);

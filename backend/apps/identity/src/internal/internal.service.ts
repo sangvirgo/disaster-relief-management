@@ -169,9 +169,8 @@ export class InternalService implements OnModuleInit, OnModuleDestroy {
       `SELECT g.user_id,g.role_code,g.scope_type,g.campaign_id
          FROM role_grant g JOIN app_user u ON u.id=g.user_id
         WHERE g.revoked_at IS NULL AND u.status='ACTIVE'
-          AND ((g.role_code='COORDINATOR' AND
-                (g.scope_type='SYSTEM' OR ($1::uuid IS NOT NULL AND g.scope_type='CAMPAIGN' AND g.campaign_id=$1)))
-            OR (g.role_code='CAMPAIGN_COORDINATOR' AND g.scope_type='SYSTEM'))
+          AND g.role_code='COORDINATOR' AND
+              (g.scope_type='SYSTEM' OR ($1::uuid IS NOT NULL AND g.scope_type='CAMPAIGN' AND g.campaign_id=$1))
         ORDER BY g.user_id,g.role_code,g.scope_type,g.campaign_id`,
       [campaignId],
     ) as Array<Record<string, unknown>>;

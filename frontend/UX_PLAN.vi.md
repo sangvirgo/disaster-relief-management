@@ -4,7 +4,7 @@
 
 ## 1. Quy tắc phân vai
 
-Năm nhóm giao diện là **Người dân**, **Tình nguyện viên/Đội cứu hộ**, **Điều phối viên**, **Quản lý vận hành**, **Quản trị viên**. Backend có bảy role code chi tiết hơn (`CITIZEN`, `VOLUNTEER`, `COORDINATOR`, `CAMPAIGN_COORDINATOR`, `OPERATIONS_MANAGER`, `REVIEWER`, `ADMIN`). Điều phối chính (`COORDINATOR` + grant `SYSTEM`) xử lý hàng chờ chung, quản lý chiến dịch và đợt quyên góp. Điều phối phụ (`CAMPAIGN_COORDINATOR` + grant `SYSTEM`) chọn chiến dịch qua phiên điều phối; chỉ xem SOS thuộc chiến dịch đang tham gia. Web gom các quyền kho, tiếp nhận, duyệt và phân phối vào không gian **Quản lý vận hành**, nhưng từng thao tác chỉ hiện và hoạt động theo grant thật của người đăng nhập. Một người có nhiều grant có thể chuyển không gian. Guest chỉ thấy các luồng công khai hoặc dùng mã theo dõi riêng tư.
+Năm nhóm giao diện là **Người dân**, **Tình nguyện viên/Đội cứu hộ**, **Điều phối viên**, **Quản lý vận hành**, **Quản trị viên**. Backend có sáu role code chi tiết hơn (`CITIZEN`, `VOLUNTEER`, `COORDINATOR`, `OPERATIONS_MANAGER`, `REVIEWER`, `ADMIN`). Điều phối viên (`COORDINATOR` + grant `SYSTEM`) xử lý hàng chờ chung, quản lý chiến dịch và đợt quyên góp. Web gom các quyền kho, tiếp nhận, duyệt và phân phối vào không gian **Quản lý vận hành**, nhưng từng thao tác chỉ hiện và hoạt động theo grant thật của người đăng nhập. Một người có nhiều grant có thể chuyển không gian. Guest chỉ thấy các luồng công khai hoặc dùng mã theo dõi riêng tư.
 
 Quản trị viên không mặc nhiên được xem chi tiết SOS, nạn nhân hay người quyên góp. Ẩn nút theo quyền giúp giao diện rõ hơn; backend vẫn là nơi quyết định quyền truy cập.
 

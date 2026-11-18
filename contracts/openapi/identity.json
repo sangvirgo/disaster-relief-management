@@ -4480,7 +4480,6 @@
                          "CITIZEN",
                          "VOLUNTEER",
                          "COORDINATOR",
-                         "CAMPAIGN_COORDINATOR",
                          "OPERATIONS_MANAGER",
                          "REVIEWER",
                          "ADMIN"
@@ -4708,7 +4707,6 @@
                        "CITIZEN",
                        "VOLUNTEER",
                        "COORDINATOR",
-                       "CAMPAIGN_COORDINATOR",
                        "OPERATIONS_MANAGER",
                        "REVIEWER",
                        "ADMIN"
@@ -4777,12 +4775,10 @@
                                     "CITIZEN",
                                     "VOLUNTEER",
                                     "COORDINATOR",
-                                    "CAMPAIGN_COORDINATOR",
                                     "OPERATIONS_MANAGER",
                                     "REVIEWER",
                                     "ADMIN"
-                                  ],
-                                  "description": "CAMPAIGN_COORDINATOR grants require SYSTEM scope."
+                                  ]
                                 },
                                 "scope_type": {
                                   "type": "string",

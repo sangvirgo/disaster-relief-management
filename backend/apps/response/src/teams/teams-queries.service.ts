@@ -9,7 +9,7 @@ import { ReporterSessionService } from '../requests/reporter-session';
 import { TeamPageQueryDto } from './teams.dto';
 import { teamView, TeamRow } from './teams.helpers';
 
-const teamSelect = `SELECT t.id,t.name,t.team_kind,t.reporting_mode,
+const teamSelect = `SELECT t.id,t.name,t.team_kind,t.reporting_mode,t.external_contact_note,
                            t.availability,t.status,t.readiness_required,t.version,t.created_at,
                            COALESCE(s.skills,ARRAY[]::text[]) AS skills,
                            CASE WHEN p.team_id IS NULL THEN NULL ELSE greatest(0,floor(extract(epoch FROM clock_timestamp()-p.captured_at)))::int END AS position_age_s,
@@ -79,7 +79,7 @@ export class TeamsQueriesService {
     const items = rows.slice(0, limit);
     const next = more ? items.at(-1) : undefined;
     return {
-      items: items.map((row) => teamView(row, hasPermission(session.grants, 'TEAM_READ', { campaignId: null }))),
+      items: items.map((row) => teamView(row, hasPermission(session.grants, 'TEAM_READ', { campaignId: null }), hasPermission(session.grants, 'TEAM_READ', { campaignId: null }))),
       more,
       ...(next ? { cursor: encodeKeysetCursor([next.id], next.id, filters) } : {}),
     };
@@ -97,7 +97,7 @@ export class TeamsQueriesService {
       ) as unknown[];
       if (!members.length) throw new AppError('FORBIDDEN', { status: 403 });
     }
-    return teamView(row, coordinatorRead);
+    return teamView(row, coordinatorRead, coordinatorRead);
   }
 
   async findTeam(queryable: Pick<DataSource | EntityManager, 'query'>, teamId: string, lock = false): Promise<TeamRow | undefined> {

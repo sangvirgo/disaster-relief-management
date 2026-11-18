@@ -93,27 +93,18 @@ async function createRequest(reporter, coordinates, suffix, idempotencyKey = key
 
 await Promise.all([responseDb.connect(), identityDb.connect()]);
 try {
-  const [primary, secondaryA, secondaryB, citizen] = await Promise.all([
-    login('coord1'), login('coord2'), login('coord3'), login('citizen1'),
+  const [primary, secondary, citizen] = await Promise.all([
+    login('coord1'), login('coord2'), login('citizen1'),
   ]);
   const grants = await identityDb.query(
     `SELECT role_code,scope_type FROM role_grant WHERE user_id=$1 AND revoked_at IS NULL ORDER BY role_code,scope_type`,
-    [secondaryB.id],
+    [secondary.id],
   );
-  assert.deepEqual(grants.rows, [{ role_code: 'CAMPAIGN_COORDINATOR', scope_type: 'SYSTEM' }]);
-  assert.equal((await responseDb.query(
-    'SELECT count(*)::int AS count FROM campaign_engagement WHERE user_id=$1 AND ended_at IS NULL AND last_active_at>now()-interval \'60 minutes\'',
-    [secondaryB.id],
-  )).rows[0].count, 0, 'coord3 starts without an engagement');
+  assert.deepEqual(grants.rows, [{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }]);
+  const retiredRole = await identityDb.query("SELECT count(*)::int AS count FROM role_grant WHERE role_code='CAMPAIGN_COORDINATOR'");
+  assert.equal(retiredRole.rows[0].count, 0, 'the retired campaign coordinator role has no grants');
 
-  const secondaryEmpty = await call(responseUrl, 'requests?limit=50', { actor: secondaryB });
-  expectSuccess(secondaryEmpty);
-  assert.deepEqual(secondaryEmpty.value.items, []);
-  const noEngagementAction = await command(secondaryB, `requests/${requestIds.southPriority}/claim`, {});
-  expectVietnameseError(noEngagementAction, 403, 'FORBIDDEN');
-  assert.match(noEngagementAction.value.message, /Hãy chọn một chiến dịch/u);
-
-  const triage = await call(responseUrl, 'campaigns/triage', { actor: secondaryB });
+  const triage = await call(responseUrl, 'campaigns/triage', { actor: primary });
   expectSuccess(triage);
   assert.ok(triage.value.items.length >= 4);
   assert.ok(triage.value.items.every((item) => item.status === 'ACTIVE'));
@@ -122,29 +113,29 @@ try {
   assert.ok(triage.value.items[0].urgency.reason_codes.includes('P1_UNHANDLED'));
 
   const engageKey = key();
-  const engaged = await command(secondaryB, `campaigns/${campaignIds.south}/engage`, undefined, engageKey);
+  const engaged = await command(primary, `campaigns/${campaignIds.south}/engage`, undefined, engageKey);
   expectSuccess(engaged, 201);
-  const engageReplay = await command(secondaryB, `campaigns/${campaignIds.south}/engage`, undefined, engageKey);
+  const engageReplay = await command(primary, `campaigns/${campaignIds.south}/engage`, undefined, engageKey);
   expectSuccess(engageReplay, 201);
   assert.equal(engageReplay.headers.get('idempotent-replay'), 'true');
   assert.equal(engageReplay.value.id, engaged.value.id);
 
-  const southQueue = await call(responseUrl, `requests?campaign_id=${campaignIds.south}&limit=100`, { actor: secondaryB });
+  const southQueue = await call(responseUrl, `requests?campaign_id=${campaignIds.south}&limit=100`, { actor: primary });
   expectSuccess(southQueue);
   assert.ok(southQueue.value.items.length > 0);
   assert.ok(southQueue.value.items.every((item) => item.campaign_id === campaignIds.south));
   assert.ok(southQueue.value.items.every((item) => !['UNMATCHED', 'CONFLICT'].includes(item.campaign_match_state)));
   const priorityRequest = southQueue.value.items.find((item) => item.id === requestIds.southPriority);
   assert.ok(priorityRequest, 'the active South campaign queue includes its P1 request');
-  const teamCandidates = await call(responseUrl, `requests/${requestIds.southPriority}/team-candidates?radius_m=50000`, { actor: secondaryB });
+  const teamCandidates = await call(responseUrl, `requests/${requestIds.southPriority}/team-candidates?radius_m=50000`, { actor: primary });
   expectSuccess(teamCandidates);
   const southTeam = teamCandidates.value.items.find((item) => item.suggested);
   assert.ok(southTeam, 'a nearby team is suggested regardless of any campaign association');
   assert.equal(southTeam.suggested, true);
   assert.equal(Object.hasOwn(southTeam.team, 'campaign_id'), false);
-  const priorityRequestDetail = await call(responseUrl, `requests/${requestIds.southPriority}`, { actor: secondaryB });
+  const priorityRequestDetail = await call(responseUrl, `requests/${requestIds.southPriority}`, { actor: primary });
   expectSuccess(priorityRequestDetail);
-  const assignment = await command(secondaryB, `requests/${requestIds.southPriority}/missions`, {
+  const assignment = await command(primary, `requests/${requestIds.southPriority}/missions`, {
     expected_version: priorityRequestDetail.value.version, team_id: southTeam.team.id,
   });
   expectSuccess(assignment, 201);
@@ -154,56 +145,42 @@ try {
       WHERE table_schema='public' AND table_name='rescue_team' AND column_name='campaign_id'`,
   );
   assert.equal(noTeamCampaignColumn.rows[0].count, 0, 'rescue teams have no campaign column');
-  const secondaryOverview = await call(responseUrl, 'campaigns/overview', { actor: secondaryB });
-  expectVietnameseError(secondaryOverview, 403, 'FORBIDDEN');
-
-  const secondEngagement = await command(secondaryB, `campaigns/${campaignIds.north}/engage`, undefined);
+  const secondEngagement = await command(primary, `campaigns/${campaignIds.north}/engage`, undefined);
   expectSuccess(secondEngagement, 201);
-  const secondaryACampaigns = await call(responseUrl, 'me/engagements', { actor: secondaryA });
-  expectSuccess(secondaryACampaigns);
-  assert.ok(secondaryACampaigns.value.items.some((item) => item.campaign_id === campaignIds.north));
-  const secondaryBCampaigns = await call(responseUrl, 'me/engagements', { actor: secondaryB });
-  expectSuccess(secondaryBCampaigns);
-  assert.ok(secondaryBCampaigns.value.items.some((item) => item.campaign_id === campaignIds.north));
-  for (const actor of [secondaryA, secondaryB]) {
-    const conflictHidden = await call(responseUrl, 'requests?campaign_match_state=CONFLICT&limit=50', { actor });
-    expectSuccess(conflictHidden);
-    assert.deepEqual(conflictHidden.value.items, []);
-  }
+  const primaryCampaigns = await call(responseUrl, 'me/engagements', { actor: primary });
+  expectSuccess(primaryCampaigns);
+  assert.ok(primaryCampaigns.value.items.some((item) => item.campaign_id === campaignIds.north));
+  const hiddenFromVolunteer = await call(responseUrl, 'me/engagements', { actor: citizen });
+  expectVietnameseError(hiddenFromVolunteer, 403, 'FORBIDDEN');
+  const conflictQueue = await call(responseUrl, 'requests?campaign_match_state=CONFLICT&limit=50', { actor: secondary });
+  expectSuccess(conflictQueue);
 
-  const secondaryClaim = await command(secondaryA, `requests/${requestIds.northClaim}/claim`, {});
+  const secondaryClaim = await command(secondary, `requests/${requestIds.northClaim}/claim`, {});
   expectSuccess(secondaryClaim);
-  const peerClaim = await command(secondaryB, `requests/${requestIds.northClaim}/claim`, {});
-  expectVietnameseError(peerClaim, 409, 'REQUEST_ALREADY_CLAIMED');
   const primaryTakeover = await command(primary, `requests/${requestIds.northClaim}/claim`, {});
   expectSuccess(primaryTakeover);
   assert.equal(primaryTakeover.value.handled_by, primary.id);
-  const secondaryBlocked = await command(secondaryA, `requests/${requestIds.northClaim}/claim`, {});
-  expectVietnameseError(secondaryBlocked, 409, 'REQUEST_ALREADY_CLAIMED');
   const takeover = await responseDb.query(
     `SELECT e.event_type,n.recipient_user_id,n.payload
        FROM request_event e LEFT JOIN notice n ON n.source_id=e.request_id AND n.recipient_user_id=$2
       WHERE e.request_id=$1 AND e.event_type='CLAIM_TAKEN_OVER'`,
-    [requestIds.northClaim, secondaryA.id],
+    [requestIds.northClaim, secondary.id],
   );
   assert.equal(takeover.rowCount, 1);
   assert.ok(takeover.rows[0].payload);
   assert.match(takeover.rows[0].payload.message, /vừa được .* tiếp quản/u);
 
-  const disengageSouth = await command(secondaryB, `campaigns/${campaignIds.south}/disengage`, undefined);
+  const disengageSouth = await command(primary, `campaigns/${campaignIds.south}/disengage`, undefined);
   expectSuccess(disengageSouth);
-  const afterOneDisengage = await call(responseUrl, `requests?campaign_id=${campaignIds.south}&limit=50`, { actor: secondaryB });
+  const afterOneDisengage = await call(responseUrl, `me/engagements`, { actor: primary });
   expectSuccess(afterOneDisengage);
-  assert.deepEqual(afterOneDisengage.value.items, []);
-  const disengageNorth = await command(secondaryB, `campaigns/${campaignIds.north}/disengage`, undefined);
+  assert.ok(!afterOneDisengage.value.items.some((item) => item.campaign_id === campaignIds.south));
+  const disengageNorth = await command(primary, `campaigns/${campaignIds.north}/disengage`, undefined);
   expectSuccess(disengageNorth);
-  const afterAllDisengage = await call(responseUrl, 'requests?limit=50', { actor: secondaryB });
-  expectSuccess(afterAllDisengage);
-  assert.deepEqual(afterAllDisengage.value.items, []);
-  const myHistory = await call(responseUrl, 'me/coordination-history?limit=50', { actor: secondaryB });
+  const myHistory = await call(responseUrl, 'me/coordination-history?limit=50', { actor: primary });
   expectSuccess(myHistory);
   assert.ok(myHistory.value.items.some((item) => item.campaign_id === campaignIds.south && item.ended_at));
-  const campaignHistory = await call(responseUrl, `campaigns/${campaignIds.south}/history?limit=50`, { actor: secondaryB });
+  const campaignHistory = await call(responseUrl, `campaigns/${campaignIds.south}/history?limit=50`, { actor: primary });
   expectSuccess(campaignHistory);
   assert.ok(campaignHistory.value.items.length > 0, 'campaign timeline persists after disengagement');
 
@@ -214,10 +191,10 @@ try {
   assert.equal(southOverview.has_active_coordinator, false);
   assert.ok(primaryOverview.value.common_queue.conflict >= 1);
 
-  const secondaryCreate = await command(secondaryB, 'campaigns', {
+  const volunteerCreate = await command(citizen, 'campaigns', {
     name: 'Không được phép tạo chiến dịch', center: { lat: 18, lng: 110 }, radius_m: 5000,
   });
-  expectVietnameseError(secondaryCreate, 403, 'FORBIDDEN');
+  expectVietnameseError(volunteerCreate, 403, 'FORBIDDEN');
   const invalidRadius = await command(primary, 'campaigns', {
     name: 'Chiến dịch bán kính không hợp lệ', center: { lat: 18, lng: 110 }, radius_m: 499,
   });
@@ -235,17 +212,17 @@ try {
   expectSuccess(patchedCampaign);
   const activatedCampaign = await command(primary, `campaigns/${createdCampaign.value.id}/activate`, { expected_version: 2 });
   expectSuccess(activatedCampaign);
-  const campaignEngagement = await command(secondaryB, `campaigns/${createdCampaign.value.id}/engage`, undefined);
+  const campaignEngagement = await command(primary, `campaigns/${createdCampaign.value.id}/engage`, undefined);
   expectSuccess(campaignEngagement, 201);
   const pausedCampaign = await command(primary, `campaigns/${createdCampaign.value.id}/pause`, {
     expected_version: 3, reason: 'Tạm dừng sau khi kiểm tra vùng chiến dịch.',
   });
   expectSuccess(pausedCampaign);
   assert.equal(pausedCampaign.value.status, 'PAUSED');
-  const pausedEngagementHistory = await call(responseUrl, `campaigns/${createdCampaign.value.id}/history?limit=50`, { actor: secondaryB });
+  const pausedEngagementHistory = await call(responseUrl, `campaigns/${createdCampaign.value.id}/history?limit=50`, { actor: primary });
   expectSuccess(pausedEngagementHistory);
   assert.ok(pausedEngagementHistory.value.items.some((item) => item.event_type === 'COORDINATION_CAMPAIGN_CLOSED'));
-  const pausedReengage = await command(secondaryB, `campaigns/${createdCampaign.value.id}/engage`, undefined);
+  const pausedReengage = await command(primary, `campaigns/${createdCampaign.value.id}/engage`, undefined);
   expectVietnameseError(pausedReengage, 409, 'CAMPAIGN_NOT_ACTIVE');
 
   const noCenterCampaign = await command(primary, 'campaigns', {
@@ -309,15 +286,13 @@ try {
   assert.equal(manuallyAttached.value.campaign_id, campaignIds.north);
   assert.equal(manuallyAttached.value.campaign_match_state, 'MANUAL');
 
-  // Two-coordinator verification where the concurring coordinator is a campaign coordinator (engaged, not a primary coordinator).
-  const reengaged = await command(secondaryB, `campaigns/${campaignIds.south}/engage`, undefined);
-  expectSuccess(reengaged, 201);
+  // Two-coordinator verification: the concurring coordinator is a second SYSTEM coordinator.
   async function startAndConcur(requestId) {
     const detail = await call(responseUrl, `requests/${requestId}`, { actor: primary });
     expectSuccess(detail);
     const started = await command(primary, `requests/${requestId}/start-verification`, { expected_version: detail.value.version });
     expectSuccess(started);
-    const concurrence = await command(secondaryB, `requests/${requestId}/concur`, {
+    const concurrence = await command(secondary, `requests/${requestId}/concur`, {
       expected_version: started.value.version, note: 'Đã rà soát độc lập.',
     });
     expectSuccess(concurrence);
@@ -330,15 +305,7 @@ try {
   });
   expectSuccess(verifiedByTwo);
   assert.equal(verifiedByTwo.value.status, 'VERIFIED');
-  const lapsed = await startAndConcur(boundary.id);
-  expectSuccess(await command(secondaryB, `campaigns/${campaignIds.south}/disengage`, undefined));
-  const rejectedAfterLapse = await command(primary, `requests/${boundary.id}/verify`, {
-    expected_version: lapsed.value.version, basis: 'TWO_COORDINATOR_JUDGMENT',
-    reason: 'Hai điều phối viên đã rà soát.', concurrence_event_id: lapsed.value.event_id,
-  });
-  expectVietnameseError(rejectedAfterLapse, 409, 'SECOND_COORDINATOR_REQUIRED');
-
-  console.log('PASS campaign coordination smoke: triage, role scope, engage/disengage history, takeover notice, campaign management, and spatial SOS attribution.');
+  console.log('PASS campaign coordination smoke: triage, engage/disengage, takeover notice, campaign management, spatial SOS attribution, and two-coordinator verification.');
 } finally {
   await Promise.all([responseDb.end().catch(() => {}), identityDb.end().catch(() => {})]);
 }

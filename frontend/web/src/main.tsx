@@ -1419,7 +1419,7 @@ function defaultWorkspaceForUser(user: Me | null): Workspace {
   if (!user) return 'citizen';
   const r: ReadonlySet<string> = roles(user);
   if (r.has('ADMIN')) return 'admin';
-  if (r.has('COORDINATOR') || r.has('CAMPAIGN_COORDINATOR')) return 'coordinator';
+  if (r.has('COORDINATOR')) return 'coordinator';
   if (r.has('VOLUNTEER')) return 'volunteer';
   if (['OPERATIONS_MANAGER', 'REVIEWER'].some((role) => r.has(role))) {
     return 'operations';

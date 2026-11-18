@@ -5,7 +5,6 @@ import type { DataSource, EntityManager } from 'typeorm';
 import { AppError } from '@c48/technical/errors/errors';
 import { canonicalRequestHash, IdempotencyService, IdempotentResult } from '@c48/technical/idempotency/idempotency';
 import { ReporterSessionService } from '../requests/reporter-session';
-import { refreshCampaignEngagement } from '../requests/campaign-engagement';
 import { RequestOperationsPersistenceService } from './request-operations.persistence.service';
 import type { AiAdvisoryReviewDto, RequestVersionDto } from './request-operations.dto';
 import { enqueueAiAdvisory, isAiAdvisoryFresh, loadAssessmentFacts } from '../ai/ai-advisory-input';
@@ -74,7 +73,6 @@ export class RequestOperationsAiAdvisoryService {
           [requestId, session.userId, JSON.stringify(payload)],
         ) as Array<{ id: string }>;
         if (!events[0]) throw new AppError('INTERNAL_ERROR', { status: 500 });
-        await refreshCampaignEngagement(manager, requestId, session.userId, session.grants);
         return { status: 200, value: { request_id: requestId, advisory_id: advisory.id, decision: dto.decision }, resource: { type: 'request_event', id: events[0].id } };
       },
       replay: async (manager: EntityManager, resource) => {
@@ -128,7 +126,6 @@ export class RequestOperationsAiAdvisoryService {
           [requestId, session.userId, JSON.stringify({ advisory_id: advisoryId, status: 'QUEUED' })],
         ) as Array<{ id: string }>;
         if (!events[0]) throw new AppError('INTERNAL_ERROR', { status: 500 });
-        await refreshCampaignEngagement(manager, requestId, session.userId, session.grants);
         return { status: 202, value: { request_id: requestId, advisory_id: advisoryId, status: 'QUEUED' }, resource: { type: 'request_event', id: events[0].id } };
       },
       replay: async (manager: EntityManager, resource) => {
@@ -179,7 +176,6 @@ export class RequestOperationsAiAdvisoryService {
           [requestId, session.userId, JSON.stringify(payload)],
         ) as Array<{ id: string }>;
         if (!events[0]) throw new AppError('INTERNAL_ERROR', { status: 500 });
-        await refreshCampaignEngagement(manager, requestId, session.userId, session.grants);
         return { status: 202, value: { request_id: requestId, advisory_id: advisory.id, status: 'QUEUED' }, resource: { type: 'request_event', id: events[0].id } };
       },
       replay: async (manager: EntityManager, resource) => {

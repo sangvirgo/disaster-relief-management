@@ -194,7 +194,7 @@ type Detail = QueueItem & {
   evidence?: { items: { id: string; state: string; size_bytes: number; detected_mime?: string; created_at: string }[] };
 };
 type Candidate = {
-  team: { id: string; name: string; reporting_mode: 'APP' | 'COORDINATOR' };
+  team: { id: string; name: string; reporting_mode: 'APP' | 'COORDINATOR'; external_contact_note?: string | null };
   distance_m: number | null;
   position_age_s: number | null;
   recent_missions_24h: number;
@@ -324,11 +324,24 @@ function CancelRequestPopup({ requestId, version, onCompleted, onStale }: {
   </div>;
 }
 
+const recordedBasisLabel: Record<string, string> = {
+  RADIO: 'Bộ đàm', PHONE: 'Điện thoại', IN_PERSON: 'Trao đổi trực tiếp', OTHER: 'Cách khác',
+};
+/** Who reported a coordinator-recorded update and over which channel; empty for updates the team sent itself. */
+function recordedByLabel(basis?: string | null, reportedBy?: string | null): string {
+  return basis ? `Ghi nhận thay · ${recordedBasisLabel[basis] ?? 'Cách khác'}${reportedBy ? ` · người báo: ${reportedBy}` : ''}` : '';
+}
+function localDateTimeValue(): string {
+  const now = new Date();
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 19);
+}
+
 function CoordinatorMissionControl({ missionId, teamId, revision, onSuccess, onStale }: {
   missionId: string; teamId: string; revision: number; onSuccess: () => void; onStale: () => void;
 }) {
   const [mission, setMission] = useState<{ status: string; version: number } | null>(null);
   const [reportingMode, setReportingMode] = useState('');
+  const [contactNote, setContactNote] = useState('');
   const [loadError, setLoadError] = useState('');
   const [teamError, setTeamError] = useState('');
   const [loadRevision, setLoadRevision] = useState(0);
@@ -337,13 +350,14 @@ function CoordinatorMissionControl({ missionId, teamId, revision, onSuccess, onS
     // Keep the mounted form during polling; its version key resets stale drafts.
     Promise.allSettled([
       api<{ status: string; version: number }>('response', `/missions/${missionId}`),
-      api<{ reporting_mode: string }>('response', `/teams/${teamId}`),
+      api<{ reporting_mode: string; external_contact_note?: string | null }>('response', `/teams/${teamId}`),
     ]).then(([missionResult, teamResult]) => {
       if (!live) return;
       setMission(missionResult.status === 'fulfilled' ? missionResult.value : null);
       setLoadError(missionResult.status === 'rejected'
         ? missionResult.reason instanceof Error ? missionResult.reason.message : 'Không thể tải nhiệm vụ.' : '');
       setReportingMode(teamResult.status === 'fulfilled' ? teamResult.value.reporting_mode : '');
+      setContactNote(teamResult.status === 'fulfilled' ? teamResult.value.external_contact_note?.trim() ?? '' : '');
       setTeamError(teamResult.status === 'rejected'
         ? teamResult.reason instanceof Error ? teamResult.reason.message : 'Không thể tải đội cứu hộ.' : '');
     });
@@ -365,7 +379,7 @@ function CoordinatorMissionControl({ missionId, teamId, revision, onSuccess, onS
   if (reportingMode !== 'COORDINATOR') return cancel;
   const next = { OFFERED: 'ACCEPTED', ACCEPTED: 'EN_ROUTE', EN_ROUTE: 'ON_SCENE', ON_SCENE: 'COMPLETED' }[mission.status];
   if (!next) return cancel;
-  return <><CommandForm
+  return <>{contactNote && <p className="notice"><strong>Đầu mối liên hệ của đội:</strong> {contactNote}</p>}<CommandForm
     key={`${missionId}-${mission.version}`}
     spec={{
       title: 'Ghi tiến độ qua liên lạc',
@@ -381,12 +395,13 @@ function CoordinatorMissionControl({ missionId, teamId, revision, onSuccess, onS
           options: [{ value: 'RADIO', label: 'Bộ đàm' }, { value: 'PHONE', label: 'Điện thoại' },
             { value: 'IN_PERSON', label: 'Trao đổi trực tiếp' }, { value: 'OTHER', label: 'Cách khác' }] },
         { name: 'reported_by', label: 'Người báo từ đội', required: true, maxLength: 200 },
+        { name: 'occurred_at', label: 'Thời điểm đội báo', type: 'datetime-local', required: true, initialValue: localDateTimeValue() },
         { name: 'reason', label: 'Nội dung xác nhận', required: true, type: 'textarea', maxLength: 2000 },
         { name: 'outcome_note', label: 'Kết quả nhiệm vụ', required: true, type: 'textarea', maxLength: 2000,
           visibleWhen: { field: 'to', value: 'COMPLETED' } },
       ],
       build: (values) => ({ to: values.to, recorded_basis: values.recorded_basis, reported_by: values.reported_by,
-        reason: values.reason, occurred_at: new Date().toISOString(),
+        reason: values.reason, occurred_at: new Date(values.occurred_at).toISOString(),
         ...(values.to === 'COMPLETED' ? { result: { outcome_note: values.outcome_note } } : {}) }),
     }}
     onSuccess={onSuccess} onStale={onStale}
@@ -1651,6 +1666,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                       summary={`Chọn đội khác: ${candidate.team.name} (cần ghi lý do)`}>
                     <div className="candidate">
                       <strong>{candidate.team.name}</strong>
+                      {candidate.team.reporting_mode === 'COORDINATOR' && <p>Đội báo qua điều phối viên{candidate.team.external_contact_note ? ` · Đầu mối: ${candidate.team.external_contact_note}` : ''}</p>}
                       <p>
                         {candidate.suggested
                           ? 'Gợi ý cân bằng tải và khoảng cách · '
@@ -1672,6 +1688,9 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                               {timeLabel(mission.created_at)}
                               {mission.last_progress?.status
                                 ? ` · ${label(mission.last_progress.status)}`
+                                : ''}
+                              {mission.last_progress?.recorded_basis
+                                ? ` · ${recordedByLabel(mission.last_progress.recorded_basis, mission.last_progress.reported_by)}`
                                 : ''}
                               {mission.override_reason
                                 ? ` · Lý do điều phối: ${mission.override_reason}`
@@ -2162,6 +2181,8 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                       <p>
                         {label(mission.status)} · {timeLabel(mission.created_at)}
                         {mission.last_status ? ` · Cập nhật: ${label(mission.last_status)}` : ''}
+                        {mission.recorded_basis ? ` · ${recordedByLabel(mission.recorded_basis, mission.reported_by)}` : ''}
+                        {mission.last_occurred_at ? ` · lúc ${timeLabel(mission.last_occurred_at)}` : ''}
                       </p>
                       <MissionOutcome key={mission.id + mission.status} id={mission.id} />
                       {mission.override_reason && (

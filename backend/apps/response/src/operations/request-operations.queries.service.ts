@@ -50,10 +50,10 @@ export class RequestOperationsQueriesService {
   async queue(query: RequestQueueQueryDto, request: Request): Promise<Record<string, unknown>> {
     const session = await this.sessions.require(request);
     const limit = query.limit ?? 50;
-    const filters = filtersHash(session.grants, session.userId, query, 'requests', session.activeCampaignIds);
+    const filters = filtersHash(session.grants, session.userId, query, 'requests');
     const cursor = query.cursor ? decodeKeysetCursor(query.cursor, filters) : undefined;
     const values: unknown[] = [];
-    const scope = scopeSql(session.grants, 'REQUEST_QUEUE_READ', values, 'r', session.userId);
+    const scope = scopeSql(session.grants, 'REQUEST_QUEUE_READ', values, 'r');
     const conditions = [scope];
     const add = (clause: (index: number) => string, value: unknown) => { values.push(value); conditions.push(clause(values.length)); };
     if (!(query.overdue === 'true' && query.review_lane === undefined)) add((index) => `r.review_lane=$${index}`, query.review_lane ?? 'NORMAL');
@@ -234,7 +234,7 @@ export class RequestOperationsQueriesService {
         proxyFlagCount: Array.isArray(flagViews[0]?.flags) ? (flagViews[0]!.flags as unknown[]).length : 0, peopleAffected: countOrNull(subject.people_affected), declaredDanger: row.reporter_declared_danger,
         ruleAdvisory: requestPriorityAdvisory, aiAdvisory: aiView,
         pendingSupplement: await hasPendingSupplement(this.dataSource, row.id),
-        possibleDuplicate: await hasPossibleDuplicate(this.dataSource, row.id, session.grants, session.userId),
+        possibleDuplicate: await hasPossibleDuplicate(this.dataSource, row.id, session.grants),
       }),
       reporter: { user_id: row.reporter_user_id, name: row.reporter_name, contact_phone: row.reporter_contact_phone },
       subject: {
@@ -341,7 +341,7 @@ export class RequestOperationsQueriesService {
 
   private async findCandidates(source: OperationRequestRow, session: ReporterSession, independentOnly: boolean): Promise<Record<string, unknown>> {
     const values: unknown[] = [source.id, source.received_at];
-    const scope = scopeSql(session.grants, 'REQUEST_VERIFY', values, 'candidate', session.userId);
+    const scope = scopeSql(session.grants, 'REQUEST_VERIFY', values, 'candidate');
     const independence = independentOnly
       ? `AND (target.reporter_user_id IS NULL OR candidate.reporter_user_id IS DISTINCT FROM target.reporter_user_id)
          AND (target.reporter_contact_phone IS NULL OR candidate.reporter_contact_phone IS DISTINCT FROM target.reporter_contact_phone)
@@ -430,10 +430,10 @@ export class RequestOperationsQueriesService {
     queryable: Pick<DataSource | EntityManager, 'query'>, requestId: string, rawCursor: string | undefined, limit: number,
     session: ReporterSession,
   ): Promise<{ items: Array<Record<string, unknown>>; more: boolean; cursor?: string }> {
-    const filters = filtersHash(session.grants, session.userId, { request_id: requestId }, 'duplicates', session.activeCampaignIds);
+    const filters = filtersHash(session.grants, session.userId, { request_id: requestId }, 'duplicates');
     const cursor = rawCursor ? decodeKeysetCursor(rawCursor, filters) : undefined;
     const values: unknown[] = [requestId];
-    const scope = scopeSql(session.grants, 'REQUEST_DETAIL_READ', values, 'child', session.userId);
+    const scope = scopeSql(session.grants, 'REQUEST_DETAIL_READ', values, 'child');
     const cursorTimeIndex = values.length + 1;
     values.push(cursor?.sort[0] ?? null, cursor?.id ?? null, limit + 1);
     const rows = await queryable.query(
@@ -455,7 +455,7 @@ export class RequestOperationsQueriesService {
     const ids = [...new Set(events.flatMap((event) => relatedRequestIds(asObject(event.payload))))];
     if (!ids.length) return events;
     const values: unknown[] = [ids];
-    const scope = scopeSql(session.grants, 'REQUEST_DETAIL_READ', values, 'r', session.userId);
+    const scope = scopeSql(session.grants, 'REQUEST_DETAIL_READ', values, 'r');
     const rows = await this.dataSource.query(
       `SELECT r.id FROM assistance_request r WHERE r.id=ANY($1::uuid[]) AND ${scope}`,
       values,

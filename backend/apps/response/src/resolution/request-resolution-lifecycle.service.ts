@@ -9,7 +9,6 @@ import { ReporterSessionService, type ReporterSession } from '../requests/report
 import { RequestResolutionFinalizer } from './request-resolution-finalizer.service';
 import type { RequestVersionReasonDto } from './request-resolution.dto';
 import { assertRequestPermission } from '../requests/request-scope';
-import { refreshCampaignEngagement } from '../requests/campaign-engagement';
 
 type OperationRequest = Request & { idempotencyKey?: string };
 interface RequestRow {
@@ -64,7 +63,6 @@ export class RequestResolutionLifecycleService {
       requestHash: canonicalRequestHash({ request_id: requestId, actor_user_id: session.userId, dto }),
       execute: async (manager) => {
         const outcome = await this.createCancellationIntent(manager, requestId, dto.expected_version, reason, session);
-        await refreshCampaignEngagement(manager, requestId, session.userId, session.grants);
         return outcome;
       },
       replay: async (_manager, resource) => {
@@ -124,7 +122,6 @@ export class RequestResolutionLifecycleService {
            VALUES ($1,$2,'RESOLUTION_INTENT_ADOPTED','STAFF','RESOLVING','RESOLVING',$3,$4::jsonb)`,
           [current.request_id, session.userId, reason, JSON.stringify({ operation_id: operationId, kind: current.kind })],
         );
-        await refreshCampaignEngagement(manager, current.request_id, session.userId, session.grants);
         return { status: 202, value: { operation_id: operationId, state: updated[0]!.state }, resource: { type: 'resolution_intent', id: operationId } };
       },
       replay: async (manager, resource) => {
@@ -174,7 +171,6 @@ export class RequestResolutionLifecycleService {
         } else if (current.state !== 'ABORTING') {
           throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
         }
-        await refreshCampaignEngagement(manager, current.request_id, session.userId, session.grants);
         return { status: 202, value: { operation_id: operationId, state: 'ABORTING' }, resource: { type: 'resolution_intent', id: operationId } };
       },
       replay: async (manager, resource) => {

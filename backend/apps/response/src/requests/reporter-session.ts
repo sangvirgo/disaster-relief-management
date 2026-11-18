@@ -1,6 +1,4 @@
-import { Inject, Injectable, OnModuleDestroy, Optional } from '@nestjs/common';
-import { InjectDataSource } from '@nestjs/typeorm';
-import type { DataSource } from 'typeorm';
+import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
 import type { Request } from 'express';
 import { AppError } from '@c48/technical/errors/errors';
 import { CircuitBreakerClient } from '@c48/technical/http/service-client';
@@ -9,7 +7,6 @@ import { ServiceTokenCache } from '@c48/technical/http/service-token-cache';
 import type { ServiceName } from '@c48/technical/security/service-token';
 import { RequestIntakeConfig, REQUEST_INTAKE_CONFIG } from './request-intake.service';
 import { reporterAccessClaims, ReporterAccessTokenClaims } from './reporter-token';
-import { engagementActiveSql } from './engagement-ttl';
 
 export const REPORTER_SESSION_CLIENT = Symbol('REPORTER_SESSION_CLIENT');
 export const REPORTER_SESSION_CONFIG = Symbol('REPORTER_SESSION_CONFIG');
@@ -24,16 +21,12 @@ export interface ReporterSessionConfig {
 export interface ReporterSession {
   userId: string;
   grants: Grant[];
-  activeCampaignIds?: string[];
 }
 
-/**
- * A coordinator who may act on a request of one campaign. A `CAMPAIGN_COORDINATOR` is only returned as a
- * `CAMPAIGN`-scoped grant for the campaign it is currently engaged in; Identity itself only knows its `SYSTEM` grant.
- */
+/** A coordinator who may act on a request of one campaign. */
 export interface RequestCoordinatorGrant {
   user_id: string;
-  role_code: 'COORDINATOR' | 'CAMPAIGN_COORDINATOR';
+  role_code: 'COORDINATOR';
   scope_type: 'SYSTEM' | 'CAMPAIGN';
   campaign_id: string | null;
 }
@@ -89,7 +82,6 @@ export class ReporterSessionService implements OnModuleDestroy {
     @Inject(REPORTER_SESSION_CONFIG) config: ReporterSessionConfig,
     @Inject(REQUEST_INTAKE_CONFIG) private readonly intakeConfig: RequestIntakeConfig,
     @Inject(REPORTER_SESSION_CLIENT) private readonly client: CircuitBreakerClient,
-    @Optional() @InjectDataSource() private readonly dataSource?: DataSource,
   ) {
     this.serviceTokens = new ServiceTokenCache(client, config);
   }
@@ -129,28 +121,12 @@ export class ReporterSessionService implements OnModuleDestroy {
       if (!item || typeof item !== 'object') return false;
       const value = item as Record<string, unknown>;
       if (typeof value.user_id !== 'string' || !uuidPattern.test(value.user_id)) return false;
-      if (value.role_code === 'CAMPAIGN_COORDINATOR') return value.scope_type === 'SYSTEM' && value.campaign_id === null;
       return value.role_code === 'COORDINATOR' && ['SYSTEM', 'CAMPAIGN'].includes(String(value.scope_type)) &&
         (value.scope_type === 'SYSTEM' ? value.campaign_id === null :
           (typeof value.campaign_id === 'string' && uuidPattern.test(value.campaign_id) && value.campaign_id === campaignId));
     });
     if (!valid) throw unavailable();
-    const all = items as Array<Omit<RequestCoordinatorGrant, 'role_code'> & { role_code: RequestCoordinatorGrant['role_code'] }>;
-    const primary = all.filter((grant) => grant.role_code === 'COORDINATOR');
-    const campaignCoordinators = [...new Set(all.filter((grant) => grant.role_code === 'CAMPAIGN_COORDINATOR').map((grant) => grant.user_id))];
-    if (!campaignId || !campaignCoordinators.length || !this.dataSource) return primary;
-    // Identity only knows the SYSTEM grant; the campaign this person is working on lives in the Response database.
-    const engaged = new Set((await this.dataSource.query(
-      `SELECT DISTINCT ce.user_id FROM campaign_engagement ce
-        WHERE ce.campaign_id=$1 AND ce.user_id=ANY($2::uuid[]) AND ${engagementActiveSql('ce')}`,
-      [campaignId, campaignCoordinators],
-    ) as Array<{ user_id: string }>).map(({ user_id }) => user_id));
-    return [
-      ...primary,
-      ...campaignCoordinators.filter((userId) => engaged.has(userId)).map((userId): RequestCoordinatorGrant => ({
-        user_id: userId, role_code: 'CAMPAIGN_COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: campaignId,
-      })),
-    ];
+    return items as RequestCoordinatorGrant[];
   }
 
   async teamLeaderEligibility(userId: string): Promise<TeamLeaderEligibility> {
@@ -293,14 +269,7 @@ export class ReporterSessionService implements OnModuleDestroy {
     if (value.active === false && value.user_id === claims.sub) throw new AppError('SESSION_EXPIRED', { status: 401 });
     if (value.active !== true || value.user_id !== claims.sub || !Array.isArray(value.grants) || !value.grants.every(validGrant)) throw unavailable();
     const grants = value.grants as Grant[];
-    const activeCampaignIds = grants.some((grant) => grant.role_code === 'CAMPAIGN_COORDINATOR') && this.dataSource
-      ? (await this.dataSource.query(
-        `SELECT campaign_id FROM campaign_engagement
-          WHERE user_id=$1 AND ${engagementActiveSql('campaign_engagement')}`,
-        [claims.sub],
-      ) as Array<{ campaign_id: string }>).map(({ campaign_id }) => campaign_id)
-      : [];
-    return { userId: claims.sub, grants, activeCampaignIds };
+    return { userId: claims.sub, grants };
   }
 
 }

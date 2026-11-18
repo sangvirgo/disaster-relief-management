@@ -520,7 +520,7 @@ ON CONFLICT (source_id,source_version,recipient_user_id,notice_type) DO NOTHING;
 
 INSERT INTO campaign_engagement (id,campaign_id,user_id,started_at,last_active_at,ended_at,ended_reason) VALUES
   ('00000000-0000-4000-8000-00000000e201'::uuid,'00000000-0000-4000-8000-0000000000c1'::uuid,'00000000-0000-4000-8000-000000000103'::uuid,now()-interval '50 minutes',now()-interval '5 minutes',NULL,NULL),
-  ('00000000-0000-4000-8000-00000000e202'::uuid,'00000000-0000-4000-8000-0000000000c3'::uuid,'00000000-0000-4000-8000-000000000125'::uuid,now()-interval '25 minutes',now()-interval '20 minutes',now()-interval '15 minutes','LEFT'),
+  ('00000000-0000-4000-8000-00000000e202'::uuid,'00000000-0000-4000-8000-0000000000c3'::uuid,'00000000-0000-4000-8000-000000000118'::uuid,now()-interval '25 minutes',now()-interval '20 minutes',now()-interval '15 minutes','LEFT'),
   ('00000000-0000-4000-8000-00000000e203'::uuid,'00000000-0000-4000-8000-0000000000c4'::uuid,'00000000-0000-4000-8000-000000000103'::uuid,now()-interval '8 hours',now()-interval '7 hours',now()-interval '6 hours','LEFT'),
-  ('00000000-0000-4000-8000-00000000e204'::uuid,'00000000-0000-4000-8000-0000000000c7'::uuid,'00000000-0000-4000-8000-000000000125'::uuid,now()-interval '3 hours',now()-interval '2 hours',now()-interval '1 hour','EXPIRED')
+  ('00000000-0000-4000-8000-00000000e204'::uuid,'00000000-0000-4000-8000-0000000000c7'::uuid,'00000000-0000-4000-8000-000000000118'::uuid,now()-interval '3 hours',now()-interval '2 hours',now()-interval '1 hour','EXPIRED')
 ON CONFLICT DO NOTHING;

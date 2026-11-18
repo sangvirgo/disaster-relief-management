@@ -36,7 +36,7 @@ describe('CampaignCoordinationService triage', () => {
       { id: '00000000-0000-4000-8000-0000000000c5', name: 'D', status: 'ACTIVE', highest_priority: 'P2', highest_priority_unhandled_count: 2,
         p1_count: 0, p2_count: 2, p3_count: 0, p4_count: 0, overdue_count: 1, longest_wait_seconds: 5_000, active_coordinator_count: 1 },
     ];
-    const { service, dataSourceQuery } = fixture([{ role_code: 'CAMPAIGN_COORDINATOR', scope_type: 'SYSTEM' }], () => rows);
+    const { service, dataSourceQuery } = fixture([{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }], () => rows);
 
     const result = await service.triage(request) as { items: Array<{ id: string; urgency: { reason_codes: string[] }; urgency_reasons_vi: string[] }> };
 
@@ -48,8 +48,8 @@ describe('CampaignCoordinationService triage', () => {
     expect(dataSourceQuery.mock.calls[0]?.[0]).toContain("WHERE c.status='ACTIVE'");
   });
 
-  it('refuses overview for a secondary coordinator', async () => {
-    const { service, dataSourceQuery } = fixture([{ role_code: 'CAMPAIGN_COORDINATOR', scope_type: 'SYSTEM' }]);
+  it('refuses overview without a system coordinator grant', async () => {
+    const { service, dataSourceQuery } = fixture([{ role_code: 'VOLUNTEER', scope_type: 'SYSTEM' }]);
     await expect(service.overview(request)).rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
     expect(dataSourceQuery).not.toHaveBeenCalled();
   });
@@ -60,7 +60,7 @@ describe('CampaignCoordinationService engagements', () => {
     const now = new Date();
     const engagement = { id: '00000000-0000-4000-8000-0000000000e1', campaign_id: campaignA, user_id: userId,
       started_at: now, last_active_at: now, ended_at: null, ended_reason: null };
-    const { service, managerQuery } = fixture([{ role_code: 'CAMPAIGN_COORDINATOR', scope_type: 'SYSTEM' }], (sql) => {
+    const { service, managerQuery } = fixture([{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }], (sql) => {
       if (sql.includes('FROM campaign WHERE')) return [{ id: campaignA, status: 'ACTIVE' }];
       if (sql.includes('FROM campaign_engagement WHERE campaign_id')) return [];
       if (sql.includes('count(*)::int AS count')) return [{ count: 0 }];
@@ -75,11 +75,11 @@ describe('CampaignCoordinationService engagements', () => {
   });
 
   it('rejects PAUSED campaigns and enforces the three-session cap with Vietnamese copy', async () => {
-    const paused = fixture([{ role_code: 'CAMPAIGN_COORDINATOR', scope_type: 'SYSTEM' }], (sql) =>
+    const paused = fixture([{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }], (sql) =>
       sql.includes('FROM campaign WHERE') ? [{ id: campaignA, status: 'PAUSED' }] : []);
     await expect(paused.service.engage(campaignA, 'key-paused', request)).rejects.toMatchObject({ code: 'CAMPAIGN_NOT_ACTIVE', status: 409 });
 
-    const limited = fixture([{ role_code: 'CAMPAIGN_COORDINATOR', scope_type: 'SYSTEM' }], (sql) => {
+    const limited = fixture([{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }], (sql) => {
       if (sql.includes('FROM campaign WHERE')) return [{ id: campaignA, status: 'ACTIVE' }];
       if (sql.includes('FROM campaign_engagement WHERE campaign_id')) return [];
       if (sql.includes('count(*)::int AS count')) return [{ count: 3 }];

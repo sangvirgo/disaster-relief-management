@@ -4,7 +4,6 @@ export type UserRole =
   | 'CITIZEN'
   | 'VOLUNTEER'
   | 'COORDINATOR'
-  | 'CAMPAIGN_COORDINATOR'
   | 'OPERATIONS_MANAGER'
   | 'REVIEWER'
   | 'ADMIN';

@@ -8,12 +8,6 @@ export const ROLE_PERMISSIONS = {
     'TEAM_POSITION_SET_ANY', 'MAP_READ', 'CAMPAIGN_MANAGE', 'REPORT_READ', 'RESPONSE_REPORT_READ', 'NEED_MANAGE',
     'DONATION_DRIVE_MANAGE',
   ],
-  CAMPAIGN_COORDINATOR: [
-    'REQUEST_CREATE_PROXY', 'REQUEST_QUEUE_READ', 'REQUEST_DETAIL_READ', 'TEAM_READ', 'MISSION_OVERDUE_READ',
-    'CAMPAIGN_READ', 'REQUEST_VERIFY', 'REQUEST_TRIAGE', 'REQUEST_CANCEL', 'REQUEST_REOPEN', 'REQUEST_RESOLVE',
-    'MISSION_ASSIGN', 'MISSION_RECORD_ON_BEHALF', 'TEAM_MANAGE_ANY', 'TEAM_POSITION_SET_ANY', 'MAP_READ',
-    'RESPONSE_REPORT_READ',
-  ],
   OPERATIONS_MANAGER: [
     'REQUEST_CREATE_PROXY', 'MAP_READ', 'CAMPAIGN_READ', 'CAMPAIGN_MANAGE', 'REPORT_READ', 'RESPONSE_REPORT_READ', 'CATALOG_MANAGE',
     'ASSET_MANAGE', 'DONATION_DRIVE_MANAGE', 'NEED_MANAGE', 'COMMITMENT_MANAGE', 'DISTRIBUTION_PREPARE',
@@ -63,7 +57,6 @@ export function validGrant(value: unknown): value is Grant {
   if (Object.keys(grant).some((key) => !['role_code', 'scope_type', 'campaign_id'].includes(key)) ||
       typeof grant.role_code !== 'string' || !Object.hasOwn(ROLE_PERMISSIONS, grant.role_code) ||
       typeof grant.scope_type !== 'string' || !scopes.has(grant.scope_type)) return false;
-  if (grant.role_code === 'CAMPAIGN_COORDINATOR' && grant.scope_type !== 'SYSTEM') return false;
   if (grant.scope_type === 'SYSTEM') return grant.campaign_id === null || grant.campaign_id === undefined;
   return typeof grant.campaign_id === 'string' && uuidPattern.test(grant.campaign_id);
 }

@@ -179,7 +179,7 @@ Notes for the existing web navigation (`app/catalog.ts`): the operations `overvi
 - Delivery status: `DECLARED` Đã khai báo · `PENDING_REVIEW` Chờ duyệt kiểm đếm · `POSTED` Đã nhập kho.
 - Review decision: `APPROVE` Đã duyệt · `REJECT` Từ chối.
 - Drive/distribution/need: `OPEN` Đang mở · `CLOSED` Đã đóng · `DRAFT` Bản nháp · `APPROVED` Đã duyệt · `DISPATCHED` Đã xuất kho (distribution) · `RECONCILED` Đã đối soát · `PARTIALLY_FULFILLED` Đáp ứng một phần · `FULFILLED` Đã đáp ứng đủ · `CANCELLED` Đã hủy. (`DISPATCHED` on a *request* already has the label "Đã giao nhiệm vụ": keep context-specific labels.)
-- Roles: `ADMIN` Quản trị viên · `COORDINATOR` Điều phối viên · `CAMPAIGN_COORDINATOR` Điều phối viên chiến dịch · `OPERATIONS_MANAGER` Quản lý vận hành · `REVIEWER` Người xác minh · `VOLUNTEER` Tình nguyện viên · `CITIZEN` Người dân.
+- Roles: `ADMIN` Quản trị viên · `COORDINATOR` Điều phối viên · `OPERATIONS_MANAGER` Quản lý vận hành · `REVIEWER` Người xác minh · `VOLUNTEER` Tình nguyện viên · `CITIZEN` Người dân.
 - Organization kind: `COORDINATION` Điều phối · `VOLUNTEER` Tình nguyện. User status: `PENDING_EMAIL` Chờ xác minh email · `DISABLED` Đã khóa.
 - Incident category: `FLOOD` Ngập lụt · `LANDSLIDE` Sạt lở đất · `STORM` Bão, gió lốc · `MEDICAL` Cấp cứu y tế · `TRAPPED` Người bị mắc kẹt · `FIRE` Hỏa hoạn · `SUPPLY_SHORTAGE` Thiếu nhu yếu phẩm · `OTHER` Khác · `UNKNOWN` Chưa rõ.
 - Mission: `OFFERED` Chờ đội nhận · `ACCEPTED` Đã nhận · `EN_ROUTE` Đang di chuyển · `ON_SCENE` Đang tại hiện trường · `COMPLETED` Hoàn thành.

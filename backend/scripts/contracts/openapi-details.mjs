@@ -37,6 +37,7 @@ const teamViewSchema = object({
   readiness_required: boolean(),
   status: { type: 'string', enum: ['ACTIVE', 'INACTIVE'] },
   skills: array(text),
+  external_contact_note: { anyOf: [text, { type: 'null' }], description: 'Contact point of a coordinator-reported team; returned only to coordinators.' },
   position: { anyOf: [
     { type: 'null' },
     object({
@@ -136,7 +137,7 @@ const identityDetails = {
 };
 
 const identityRoleCodes = [
-  'CITIZEN', 'VOLUNTEER', 'COORDINATOR', 'CAMPAIGN_COORDINATOR',
+  'CITIZEN', 'VOLUNTEER', 'COORDINATOR',
   'OPERATIONS_MANAGER', 'REVIEWER', 'ADMIN',
 ];
 
@@ -236,7 +237,7 @@ const responseDetails = {
   },
   responseCampaignsEngage: {
     summary: 'Start or refresh the caller’s campaign coordination engagement.',
-    description: 'Requires CAMPAIGN_COORDINATOR and an ACTIVE campaign. Calls are idempotent by Idempotency-Key; at most three campaigns may be active for one user.',
+    description: 'Requires a SYSTEM COORDINATOR grant and an ACTIVE campaign. Calls are idempotent by Idempotency-Key; at most three campaigns may be active for one user.',
     response: response(campaignEngagementSchema, 'Engagement created or refreshed.', undefined, idempotentCommandResponseHeaders),
   },
   responseCampaignsDisengage: {
@@ -1319,8 +1320,6 @@ export function applyOpenApiDetails(document, service) {
       const role = document.components.schemas[name]?.properties?.role_code;
       if (role) role.enum = identityRoleCodes;
     }
-    const createRole = document.components.schemas.CreateGrantRequest?.properties?.role_code;
-    if (createRole) createRole.description = 'CAMPAIGN_COORDINATOR grants require SYSTEM scope.';
     const registerRequest = document.components.schemas.RegisterRequest;
     if (registerRequest) {
       registerRequest.required = [...new Set([...(registerRequest.required ?? []), 'email'])];

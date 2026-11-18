@@ -214,7 +214,7 @@ erDiagram
   SESSION_FAMILY ||--o{ REFRESH_SESSION : rotates
 ```
 
-`ROLE_GRANT.campaign_id` is an opaque Response campaign ID and has no foreign key to the Response database. The audit actor ID is not an FK. The grant scope is `SYSTEM` or `CAMPAIGN`; `CAMPAIGN_COORDINATOR` is allowed only at `SYSTEM` scope.
+`ROLE_GRANT.campaign_id` is an opaque Response campaign ID and has no foreign key to the Response database. The audit actor ID is not an FK. The grant scope is `SYSTEM` or `CAMPAIGN`.
 
 ## 6. Response physical ERD (core)
 

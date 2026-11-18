@@ -4,7 +4,6 @@ import { DataSource, EntityManager } from 'typeorm';
 import { AppError } from '@c48/technical/errors/errors';
 import { canonicalRequestHash, IdempotencyService, IdempotentOutcome, IdempotentResult } from '@c48/technical/idempotency/idempotency';
 import type { ReporterSession } from '../requests/reporter-session';
-import { refreshCampaignEngagement } from '../requests/campaign-engagement';
 import { RequestClaimGuard } from './request-claims.guard';
 
 /** Coordination commands that respect another coordinator's active claim (see request-claims.helpers). */
@@ -42,7 +41,6 @@ export class RequestOperationsCommandRunner {
     const guarded = async (manager: EntityManager) => {
       if (CLAIM_GUARDED_COMMANDS.has(command)) await this.claimGuard.assertCanCoordinate(manager, requestId, session, command);
       const outcome = await execute(manager);
-      await refreshCampaignEngagement(manager, requestId, session.userId, session.grants);
       return outcome;
     };
     return this.idempotency.execute(this.dataSource, {

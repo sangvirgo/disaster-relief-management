@@ -8,7 +8,6 @@ import { checkVersion, cleanText } from '../operations/request-operations.helper
 import { ReporterSessionService, type ReporterSession } from '../requests/reporter-session';
 import type { FailureReviewDto } from './request-resolution.dto';
 import { assertRequestPermission } from '../requests/request-scope';
-import { refreshCampaignEngagement } from '../requests/campaign-engagement';
 
 interface FailureMissionRow {
   id: string;
@@ -136,7 +135,6 @@ export class RequestFailureReviewService {
        VALUES ($1,$2,'MISSION_FAILURE_REVIEW','STAFF',$3,$3,$4,$5::jsonb)`,
       [requestRow.id, session.userId, requestRow.status, reason, JSON.stringify(payload)],
     );
-    await refreshCampaignEngagement(manager, requestRow.id, session.userId, session.grants);
     return {
       status: 200,
       value: this.resultValue(mission.id, Number(updatedMission[0].version), Number(updatedRequest[0].version), payload),

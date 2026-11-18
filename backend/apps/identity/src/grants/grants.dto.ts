@@ -2,7 +2,7 @@ import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength, Matches } from 'class-validator';
 import { Role, ScopeType } from '@c48/identity-contracts/permissions';
 
-const roles: readonly Role[] = ['CITIZEN', 'VOLUNTEER', 'COORDINATOR', 'CAMPAIGN_COORDINATOR', 'OPERATIONS_MANAGER', 'REVIEWER', 'ADMIN'];
+const roles: readonly Role[] = ['CITIZEN', 'VOLUNTEER', 'COORDINATOR', 'OPERATIONS_MANAGER', 'REVIEWER', 'ADMIN'];
 const scopes: readonly ScopeType[] = ['SYSTEM', 'CAMPAIGN'];
 
 export class CreateGrantDto {

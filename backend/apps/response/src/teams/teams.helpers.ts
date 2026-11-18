@@ -11,6 +11,7 @@ export interface TeamRow extends Record<string, unknown> {
   version: number;
   created_at: Date | string;
   cursor_id?: string;
+  external_contact_note?: string | null;
   skills: string[] | null;
   position_age_s: number | null;
   position_accuracy_m: string | number | null;
@@ -19,7 +20,8 @@ export interface TeamRow extends Record<string, unknown> {
   latitude: number | null;
 }
 
-export function teamView(row: TeamRow, includeCoordinates = false): Record<string, unknown> {
+/** `includeContact` is for coordinators only: the contact note of a coordinator-reported team (radio or phone point of contact). */
+export function teamView(row: TeamRow, includeCoordinates = false, includeContact = false): Record<string, unknown> {
   const position = row.position_source === null ? null : {
     age_s: Number(row.position_age_s),
     accuracy_m: row.position_accuracy_m === null ? null : Number(row.position_accuracy_m),
@@ -37,6 +39,7 @@ export function teamView(row: TeamRow, includeCoordinates = false): Record<strin
     readiness_required: row.readiness_required,
     status: row.status,
     skills: row.skills ?? [],
+    ...(includeContact && row.reporting_mode === 'COORDINATOR' ? { external_contact_note: row.external_contact_note ?? null } : {}),
     position,
     version: Number(row.version),
   };

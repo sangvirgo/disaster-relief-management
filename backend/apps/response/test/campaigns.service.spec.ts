@@ -42,7 +42,7 @@ describe('CampaignsService', () => {
     for (const grants of [
       [],
       [{ role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: campaignId }] as ReporterSession['grants'],
-      [{ role_code: 'CAMPAIGN_COORDINATOR', scope_type: 'SYSTEM' }] as ReporterSession['grants'],
+      [{ role_code: 'VOLUNTEER', scope_type: 'SYSTEM' }] as ReporterSession['grants'],
     ]) {
       const { service, idempotency } = fixture(grants);
       await expect(service.create({ name: 'Cứu trợ' }, idemKey, request))
@@ -51,8 +51,8 @@ describe('CampaignsService', () => {
     }
   });
 
-  it('rejects a campaign coordinator from changing campaign lifecycle', async () => {
-    const { service, idempotency, managerQuery } = fixture([{ role_code: 'CAMPAIGN_COORDINATOR', scope_type: 'SYSTEM' }]);
+  it('rejects a user without campaign management from changing campaign lifecycle', async () => {
+    const { service, idempotency, managerQuery } = fixture([{ role_code: 'VOLUNTEER', scope_type: 'SYSTEM' }]);
     managerQuery.mockResolvedValueOnce([{
       id: campaignId, name: 'Cứu trợ', objective: null, status: 'ACTIVE', starts_at: null, ends_at: null,
       version: 1, created_at: new Date('2026-01-01T00:00:00.000Z'),

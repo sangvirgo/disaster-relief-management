@@ -613,7 +613,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            role_code: "CITIZEN" | "VOLUNTEER" | "COORDINATOR" | "CAMPAIGN_COORDINATOR" | "OPERATIONS_MANAGER" | "REVIEWER" | "ADMIN";
+            role_code: "CITIZEN" | "VOLUNTEER" | "COORDINATOR" | "OPERATIONS_MANAGER" | "REVIEWER" | "ADMIN";
             scope_type: string;
             /** Format: uuid */
             campaign_id?: string | null;
@@ -663,7 +663,7 @@ export interface components {
             /** Format: uuid */
             user_id: string;
             /** @enum {string} */
-            role_code: "CITIZEN" | "VOLUNTEER" | "COORDINATOR" | "CAMPAIGN_COORDINATOR" | "OPERATIONS_MANAGER" | "REVIEWER" | "ADMIN";
+            role_code: "CITIZEN" | "VOLUNTEER" | "COORDINATOR" | "OPERATIONS_MANAGER" | "REVIEWER" | "ADMIN";
             /** @enum {string} */
             scope_type: "SYSTEM" | "CAMPAIGN";
             /** Format: uuid */
@@ -678,11 +678,8 @@ export interface components {
             next_cursor: string | null;
         };
         CreateGrantRequest: {
-            /**
-             * @description CAMPAIGN_COORDINATOR grants require SYSTEM scope.
-             * @enum {string}
-             */
-            role_code: "CITIZEN" | "VOLUNTEER" | "COORDINATOR" | "CAMPAIGN_COORDINATOR" | "OPERATIONS_MANAGER" | "REVIEWER" | "ADMIN";
+            /** @enum {string} */
+            role_code: "CITIZEN" | "VOLUNTEER" | "COORDINATOR" | "OPERATIONS_MANAGER" | "REVIEWER" | "ADMIN";
             /** @enum {string} */
             scope_type: "SYSTEM" | "CAMPAIGN";
             /** Format: uuid */

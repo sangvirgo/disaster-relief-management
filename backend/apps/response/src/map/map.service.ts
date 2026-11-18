@@ -63,8 +63,8 @@ export class MapService implements OnModuleInit {
     }
     const filters = { ...dateFilters, status_layer: statusLayer, category, cell_m: cellSize };
     const values: unknown[] = [];
-    const scopes = [scopeSql(session.grants, 'MAP_READ', values, 'r', session.userId)];
-    if (statusLayer === 'unverified') scopes.push(scopeSql(session.grants, 'REQUEST_QUEUE_READ', values, 'r', session.userId));
+    const scopes = [scopeSql(session.grants, 'MAP_READ', values, 'r')];
+    if (statusLayer === 'unverified') scopes.push(scopeSql(session.grants, 'REQUEST_QUEUE_READ', values, 'r'));
 
     const clauses = [
       `(${scopes.join(') AND (')})`,

@@ -13,7 +13,6 @@ import { cleanText, checkVersion } from '../operations/request-operations.helper
 import { CreateMissionDto, MissionReasonDto, MissionTransitionDto, MissionVersionDto, RecordMissionOnBehalfDto } from './missions.dto';
 import { missionProgressStatus, missionTransitionAllowed, MissionStatus } from './missions.helpers';
 import { canAccessRequest } from '../requests/request-scope';
-import { refreshCampaignEngagement } from '../requests/campaign-engagement';
 
 type MissionRequest = Request & { idempotencyKey?: string };
 type Queryable = Pick<DataSource | EntityManager, 'query'>;
@@ -220,7 +219,6 @@ export class MissionsCommandsService {
          ON CONFLICT DO NOTHING`, [recipient, mission.id, requestId],
       );
     }
-    await refreshCampaignEngagement(manager, requestId, session.userId, session.grants);
     return { status: 201, value: this.commandView(mission), resource: { type: 'mission', id: mission.id } };
   }
 
@@ -297,6 +295,7 @@ export class MissionsCommandsService {
       });
     }
     if (change.mode === 'ON_BEHALF' && !change.recordedBasis) throw new AppError('RECORDED_BASIS_REQUIRED', { status: 400 });
+    if (change.mode === 'ON_BEHALF' && change.occurredAt) await this.assertReportedTimeValid(manager, mission, change.occurredAt);
 
     const [updates] = await manager.query(
       `UPDATE mission SET status=$2,version=version+1 WHERE id=$1 AND version=$3
@@ -317,7 +316,6 @@ export class MissionsCommandsService {
       );
     }
     await this.recomputeRequest(manager, request, session.userId, missionId);
-    await refreshCampaignEngagement(manager, requestId, session.userId, session.grants);
     return { status: 200, value: this.commandView(updated!), resource: { type: 'mission', id: missionId } };
   }
 
@@ -345,6 +343,24 @@ export class MissionsCommandsService {
     if (row.campaign_id !== pointers[0].campaign_id) throw new AppError('VERSION_CONFLICT', { status: 409, details: { current_version: Number(row.version) } });
     if (permission && !canAccessRequest(session, permission, row)) throw new AppError('FORBIDDEN', { status: 403 });
     return row;
+  }
+
+  /** A reported time may be earlier than now (the call came in before it was entered) but never in the future or before the mission's own history. */
+  private async assertReportedTimeValid(manager: EntityManager, mission: MissionRow, occurredAt: string): Promise<void> {
+    const [row] = await manager.query(
+      `SELECT $1::timestamptz > clock_timestamp() + interval '1 minute' AS in_future,
+              $1::timestamptz < date_trunc('minute', GREATEST($2::timestamptz,
+                COALESCE((SELECT max(occurred_at) FROM mission_event WHERE mission_id=$3), $2::timestamptz))) AS too_early`,
+      [occurredAt, mission.created_at, mission.id],
+    ) as Array<{ in_future: boolean; too_early: boolean }>;
+    if (row?.in_future) {
+      throw new AppError('VALIDATION_FAILED', { status: 400, fieldErrors: { occurred_at: ['Thời điểm đội báo không được nằm trong tương lai.'] } });
+    }
+    if (row?.too_early) {
+      throw new AppError('VALIDATION_FAILED', {
+        status: 400, fieldErrors: { occurred_at: ['Thời điểm đội báo không được sớm hơn lúc giao nhiệm vụ hoặc lần cập nhật trước.'] },
+      });
+    }
   }
 
   private async recomputeRequest(manager: EntityManager, request: RequestRow, actorId: string, missionId: string): Promise<void> {

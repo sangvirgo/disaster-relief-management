@@ -27,7 +27,7 @@ SELECT fixture.user_id, fixture.role_code, fixture.scope_type, fixture.campaign_
     ('00000000-0000-4000-8000-000000000115'::uuid, 'vol_member3', 'VOLUNTEER', 'SYSTEM', NULL::uuid),
     ('00000000-0000-4000-8000-000000000116'::uuid, 'vol_leader4', 'VOLUNTEER', 'SYSTEM', NULL::uuid),
     ('00000000-0000-4000-8000-000000000117'::uuid, 'vol_member4', 'VOLUNTEER', 'SYSTEM', NULL::uuid),
-    ('00000000-0000-4000-8000-000000000118'::uuid, 'coord_seed', 'CAMPAIGN_COORDINATOR', 'SYSTEM', NULL::uuid),
+    ('00000000-0000-4000-8000-000000000118'::uuid, 'coord_seed', 'COORDINATOR', 'SYSTEM', NULL::uuid),
     ('00000000-0000-4000-8000-000000000119'::uuid, 'vol_leader_seed', 'VOLUNTEER', 'SYSTEM', NULL::uuid),
     ('00000000-0000-4000-8000-000000000120'::uuid, 'vol_climb_north1', 'VOLUNTEER', 'SYSTEM', NULL::uuid),
     ('00000000-0000-4000-8000-000000000121'::uuid, 'vol_climb_north2', 'VOLUNTEER', 'SYSTEM', NULL::uuid),
