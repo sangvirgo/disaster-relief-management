@@ -8,6 +8,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { proposalErrorMessage } from '../need-proposals/needProposalModel';
 import { AliasEditor, type AliasItem } from './AliasEditor';
+import { CreateItemForm } from './CreateItemForm';
 import { ALIAS_MAX_COUNT } from './itemAliasModel';
 import './catalog-items.css';
 
@@ -49,6 +50,7 @@ export function ItemCatalogPage({ user }: { user: Me }) {
   const [revision, setRevision] = useState(0);
   const [editing, setEditing] = useState<CatalogItem | null>(null);
   const [aliasesAvailable, setAliasesAvailable] = useState(true);
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     if (!canManage) return;
@@ -100,6 +102,7 @@ export function ItemCatalogPage({ user }: { user: Me }) {
             <h2 id="catalog-items-title">Danh mục vật phẩm</h2>
           </div>
           <div className="list-header-actions">
+            <Button size="sm" aria-haspopup="dialog" onClick={() => { setNotice(''); setCreating(true); }}>Thêm vật phẩm</Button>
             <Button variant="secondary" size="sm" disabled={loading} onClick={() => setRevision((value) => value + 1)}>Cập nhật</Button>
           </div>
         </div>
@@ -153,6 +156,25 @@ export function ItemCatalogPage({ user }: { user: Me }) {
         <div className="catalog-items__more">
           <Button variant="secondary" loading={loadingMore} disabled={loadingMore} onClick={() => void loadMore()}>Tải thêm</Button>
         </div>
+      )}
+
+      {creating && (
+        <DetailSurface
+          modal
+          open
+          onClose={() => setCreating(false)}
+          label="Thêm vật phẩm"
+          heading="Thêm vật phẩm"
+          className="campaign-management-dialog"
+        >
+          <CreateItemForm
+            onCreated={(name) => {
+              setCreating(false);
+              setNotice(`Đã thêm vật phẩm ${name}.`);
+              setRevision((value) => value + 1);
+            }}
+          />
+        </DetailSurface>
       )}
 
       {editing && (

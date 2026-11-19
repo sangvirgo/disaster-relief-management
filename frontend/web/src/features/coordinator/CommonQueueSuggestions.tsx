@@ -20,6 +20,7 @@ type SuggestionRequest = {
   location: LatLng;
   received_at: string;
   candidate_campaign_ids: string[];
+  needs_relief_supplies?: boolean;
   nearest_campaign: NearestCampaign | null;
 };
 type MapPoint = {
@@ -34,6 +35,7 @@ type SuggestionCampaign = {
 type Suggestions = {
   requests: SuggestionRequest[];
   total: number;
+  supply_need_total?: number;
   more: boolean;
   cursor?: string;
   map_points: MapPoint[];
@@ -312,6 +314,11 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
             ))}
           </div>
         </div>
+        {data && (data.supply_need_total ?? 0) > 0 && (
+          <p className="notice" role="status">
+            {data.supply_need_total} SOS cần hàng chưa thuộc chiến dịch. Hãy gắn các SOS này vào chiến dịch để hàng cứu trợ được tính vào kho.
+          </p>
+        )}
         {data && requests.length === 0 && <p className="empty">Không còn SOS nào cần quyết định chiến dịch.</p>}
         {requests.map((item) => {
           const nearest = item.nearest_campaign;
@@ -337,7 +344,8 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
                 <div>
                   <strong>{item.tracking_code}</strong>{' '}
                   {item.priority && <span className="badge">{item.priority}</span>}{' '}
-                  <span className={`chip${item.campaign_match_state === 'CONFLICT' ? ' chip--warn' : ''}`}>{STATE_VI[item.campaign_match_state] ?? item.campaign_match_state}</span>
+                  <span className={`chip${item.campaign_match_state === 'CONFLICT' ? ' chip--warn' : ''}`}>{STATE_VI[item.campaign_match_state] ?? item.campaign_match_state}</span>{' '}
+                  {item.needs_relief_supplies && <span className="chip chip--warn">Cần hàng cứu trợ</span>}
                   <p className="muted">
                     {item.campaign_match_state === 'CONFLICT'
                       ? `Nằm trong ${candidates.size || 'nhiều'} vùng; hãy chọn chiến dịch phù hợp.`

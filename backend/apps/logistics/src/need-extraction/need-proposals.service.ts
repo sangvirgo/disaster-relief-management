@@ -81,7 +81,10 @@ export class NeedProposalsService {
       .filter((campaignId) => hasPermission(grants, 'NEED_ESTIMATE_CONFIRM', { campaignId })))].sort();
     if (!scopeAll && campaignIds.length === 0) throw new AppError('FORBIDDEN', { status: 403 });
 
-    const filters = { route, scope: scopeAll ? 'SYSTEM' : campaignIds };
+    const unassignedOnly = query.campaign_scope === 'NONE';
+    // Proposals of an SOS outside every campaign have no warehouse, so they are listed apart and never mixed with campaign work.
+    if (unassignedOnly && !scopeAll) throw new AppError('FORBIDDEN', { status: 403 });
+    const filters = { route, scope: scopeAll ? 'SYSTEM' : campaignIds, campaign_scope: unassignedOnly ? 'NONE' : null };
     const cursor = query.cursor ? decodeKeysetCursor(query.cursor, filters) : null;
     if (cursor && (cursor.sort.length !== 1 || typeof cursor.sort[0] !== 'string' || !uuidPattern.test(cursor.id) || cursor.sort[0] !== cursor.id)) {
       throw new AppError('CURSOR_INVALID', { status: 400 });
@@ -89,9 +92,13 @@ export class NeedProposalsService {
 
     const values: unknown[] = [];
     const conditions = ["EXISTS (SELECT 1 FROM relief_need n WHERE n.cycle_id=c.id AND n.source='ESTIMATED' AND n.status='OPEN')"];
-    if (!scopeAll) {
+    if (unassignedOnly) {
+      conditions.push('c.campaign_id IS NULL');
+    } else if (!scopeAll) {
       values.push(campaignIds);
       conditions.push(`c.campaign_id=ANY($${values.length}::uuid[])`);
+    } else {
+      conditions.push('c.campaign_id IS NOT NULL');
     }
     if (cursor) {
       values.push(cursor.id);
@@ -110,7 +117,10 @@ export class NeedProposalsService {
     const more = cycles.length > limit;
     const last = page.at(-1);
     const generatedAt = new Date().toISOString();
-    if (page.length === 0) return { items: [], more: false, generated_at: generatedAt };
+    // Awareness count only: it is not part of any warehouse demand or supply gap number.
+    const unassignedTotal = scopeAll ? await this.countUnassigned() : null;
+    const unassigned = unassignedTotal === null ? {} : { unassigned_total: unassignedTotal };
+    if (page.length === 0) return { items: [], more: false, ...unassigned, generated_at: generatedAt };
 
     const cycleIds = page.map((row) => row.cycle_id);
     const lines = await this.dataSource.query(
@@ -207,7 +217,18 @@ export class NeedProposalsService {
       items,
       more,
       ...(more && last ? { cursor: encodeKeysetCursor([last.cycle_id], last.cycle_id, filters) } : {}),
+      ...unassigned,
       generated_at: generatedAt,
     };
+  }
+
+  /** SOS work cycles outside every campaign that still hold at least one OPEN estimated line. */
+  private async countUnassigned(): Promise<number> {
+    const rows = await this.dataSource.query(
+      `SELECT count(*)::int AS total FROM fulfillment_cycle AS unassigned
+        WHERE unassigned.campaign_id IS NULL
+          AND EXISTS (SELECT 1 FROM relief_need n WHERE n.cycle_id=unassigned.id AND n.source='ESTIMATED' AND n.status='OPEN')`,
+    ) as Array<{ total: number | string }>;
+    return Number(rows[0]?.total ?? 0);
   }
 }

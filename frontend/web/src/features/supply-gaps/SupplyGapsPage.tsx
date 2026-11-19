@@ -7,6 +7,7 @@ import { NeedProposalsPage } from '../need-proposals/NeedProposalsPage';
 import { Operations } from '../operations/Operations';
 import { NormEditor } from './NormEditor';
 import { SupplyGapInbox } from './SupplyGapInbox';
+import { UnassignedSupplyNotice } from './SupplyBadges';
 
 const supplySections = ['proposals', 'donations', 'catalog'] as const;
 const reviewerSections = ['donations'] as const;
@@ -37,6 +38,7 @@ export function SupplyGapsPage({ user }: { user: Me }) {
         aria-labelledby={canManage ? `supply-page-tab-${section}` : undefined} className="supply-page__content">
         {section === 'proposals' && <>
           <p className="supply-page__intro">SOS đã xác minh và cần hàng cứu trợ sẽ tạo đề xuất vật tư. Quản lý duyệt từng đề xuất; nhu cầu được xác nhận xuất hiện ở danh sách bên dưới.</p>
+          <UnassignedSupplyNotice user={user} />
           <NeedProposalsPage user={user} />
           <section className="card supply-page__related" aria-labelledby="supply-needs-title">
             <div>

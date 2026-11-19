@@ -147,18 +147,18 @@ try {
     });
     expectVietnameseError(intakeOnlyPublish, 403, 'FORBIDDEN');
 
-    const coordinatorCampaign = await call(responseUrl, 'campaigns', {
-      method: 'POST', actor: coordinator, idempotencyKey: key(),
-      body: { name: `Chiến dịch điều phối T12 ${suffix}` },
-    });
-    expectVietnameseError(coordinatorCampaign, 403, 'FORBIDDEN');
-    const campaign = await call(responseUrl, 'campaigns', {
+    const managerCampaign = await call(responseUrl, 'campaigns', {
       method: 'POST', actor: manager, idempotencyKey: key(),
+      body: { name: `Chiến dịch quản lý T12 ${suffix}` },
+    });
+    expectVietnameseError(managerCampaign, 403, 'FORBIDDEN');
+    const campaign = await call(responseUrl, 'campaigns', {
+      method: 'POST', actor: coordinator, idempotencyKey: key(),
       body: { name: `Chiến dịch T12 ${suffix}`, objective: 'Kiểm tra liên kết dịch vụ.' },
     });
     expectSuccess(campaign, 201);
     const activatedCampaign = await call(responseUrl, `campaigns/${campaign.value.id}/activate`, {
-      method: 'POST', actor: manager, idempotencyKey: key(), body: { expected_version: campaign.value.version },
+      method: 'POST', actor: coordinator, idempotencyKey: key(), body: { expected_version: campaign.value.version },
     });
     expectSuccess(activatedCampaign, 200);
 

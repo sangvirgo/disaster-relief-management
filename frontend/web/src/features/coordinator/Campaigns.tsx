@@ -29,9 +29,10 @@ function centerFromValue(value: string | undefined): { lat: number; lng: number 
   return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
 }
 
-// canSetup: create, activate, edit a draft and change the area (OPERATIONS_MANAGER only).
+// canSetup: create, activate, edit a draft and change the area (COORDINATOR only).
+// canAssignWarehouse: choose the primary warehouse of a campaign (OPERATIONS_MANAGER only).
 // canManage: pause, resume and close a live campaign (coordinators and operations managers).
-export function Campaigns({ canManage = false, canSetup = false }: { canManage?: boolean; canSetup?: boolean }) {
+export function Campaigns({ canManage = false, canSetup = false, canAssignWarehouse = false }: { canManage?: boolean; canSetup?: boolean; canAssignWarehouse?: boolean }) {
   const [items, setItems] = useState<Campaign[]>([]);
   const [cursor, setCursor, prevPage, pageIndex] = useCursorNav<string>('');
   const [next, setNext] = useState('');
@@ -272,7 +273,7 @@ export function Campaigns({ canManage = false, canSetup = false }: { canManage?:
               <div><dt>Tâm vùng</dt><dd>{selected.center ? `${selected.center.lat}, ${selected.center.lng}` : 'Chưa cấu hình vùng tự động gắn'}</dd></div>
               <div><dt>Bán kính tự động gắn</dt><dd>{selected.radius_m ? `${selected.radius_m.toLocaleString('vi-VN')} m` : 'Chưa cấu hình'}</dd></div>
             </dl>
-            <CampaignWarehousePanel campaignId={selected.id} canManage={canSetup} />
+            <CampaignWarehousePanel campaignId={selected.id} canManage={canAssignWarehouse} />
           </div>
           <div hidden={detailTab !== 'actions'}>
             <p>Chọn thao tác phù hợp với trạng thái hiện tại của chiến dịch.</p>
@@ -293,7 +294,7 @@ export function Campaigns({ canManage = false, canSetup = false }: { canManage?:
                 </>
               )}
               {!canManage && !canSetup && <p className="muted">Bạn có quyền xem chiến dịch nhưng không có quyền quản lý chiến dịch.</p>}
-              {selected.status === 'DRAFT' && !canSetup && <p className="muted">Chiến dịch đang ở trạng thái nháp. Quản lý vận hành sẽ kích hoạt chiến dịch.</p>}
+              {selected.status === 'DRAFT' && !canSetup && <p className="muted">Chiến dịch đang ở trạng thái nháp. Điều phối viên sẽ kích hoạt chiến dịch.</p>}
               {!['DRAFT', 'ACTIVE', 'PAUSED'].includes(selected.status) && (canManage || canSetup) && <p className="muted">Chiến dịch đã kết thúc, không còn thao tác quản lý.</p>}
             </div>
           </div>

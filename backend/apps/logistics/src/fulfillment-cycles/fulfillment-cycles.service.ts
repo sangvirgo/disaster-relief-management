@@ -5,6 +5,7 @@ import { AppError } from '@c48/technical/errors/errors';
 import { ResponseCycleIntentClient } from '../integrations/response/response-cycle-intent.client';
 import type { ResolutionOutcomeBasis, ResponseCycleIntent } from '../integrations/response/response-cycle-intent.client';
 import { CycleIntentDto, SealCycleDto } from './fulfillment-cycles.dto';
+import { adoptCycleCampaigns } from './cycle-campaign-adoption';
 
 type CycleState = 'OPEN' | 'FROZEN' | 'SEALED';
 type IntentKind = 'RESOLUTION' | 'CANCELLATION';
@@ -185,6 +186,8 @@ export class FulfillmentCyclesService {
        VALUES ($1,$2,$3) ON CONFLICT (request_id,work_cycle) DO NOTHING`,
       [intent.request_id, intent.work_cycle, intent.campaign_id],
     );
+    // A cycle created while the SOS had no campaign follows a later attachment while it only holds untouched proposals.
+    await adoptCycleCampaigns(manager, [intent]);
     const rows = await manager.query(
       `SELECT id,request_id,work_cycle,campaign_id,state
          FROM fulfillment_cycle WHERE request_id=$1 AND work_cycle=$2 FOR UPDATE`,

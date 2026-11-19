@@ -279,13 +279,18 @@ export class CampaignCoordinationService {
     const countRows = await this.dataSource.query(
       `SELECT count(*)::int AS total FROM assistance_request r WHERE ${conditions.join(' AND ')}`, values,
     ) as Array<{ total: number }>;
+    // Verified SOS outside every campaign that asked for relief supplies: their proposals have no warehouse until attached.
+    const supplyRows = await this.dataSource.query(
+      `SELECT count(*)::int AS total FROM assistance_request r
+        WHERE ${baseWhere} AND r.needs_relief_supplies=true AND r.status IN ('VERIFIED','TRIAGED','DISPATCHED','IN_PROGRESS')`,
+    ) as Array<{ total: number }>;
     if (cursor) {
       values.push(cursor.sort[0], cursor.id);
       conditions.push(`(date_trunc('milliseconds',r.received_at),r.id)>($${values.length - 1}::timestamptz,$${values.length}::uuid)`);
     }
     values.push(limit + 1);
     const pageRows = rows(await this.dataSource.query(
-      `SELECT r.id,r.tracking_code,r.priority,r.status,r.version,r.campaign_match_state,r.campaign_candidate_ids,
+      `SELECT r.id,r.tracking_code,r.priority,r.status,r.version,r.campaign_match_state,r.campaign_candidate_ids,r.needs_relief_supplies,
               date_trunc('milliseconds',r.received_at) AS received_at,
               ${lat} AS latitude,${lng} AS longitude
          FROM assistance_request r JOIN request_subject s ON s.request_id=r.id
@@ -299,9 +304,11 @@ export class CampaignCoordinationService {
       requests: page.map((item) => ({
         ...decorated.get(String(item.id)),
         candidate_campaign_ids: (item.campaign_candidate_ids as string[] | null) ?? [],
+        needs_relief_supplies: item.needs_relief_supplies === true,
         received_at: new Date(item.received_at as Date | string).toISOString(),
       })),
       total: Number(countRows[0]?.total ?? 0),
+      supply_need_total: Number(supplyRows[0]?.total ?? 0),
       more: pageRows.length > limit,
       ...(pageRows.length > limit && last
         ? { cursor: encodeKeysetCursor([new Date(last.received_at as Date | string).toISOString(), String(last.id)], String(last.id), filters) }

@@ -3,6 +3,7 @@ import { AppError } from '@c48/technical/errors/errors';
 import { randomUUID } from 'node:crypto';
 import type { Grant } from '@c48/identity-contracts/permissions';
 import type { ExtractionBasis } from '../need-extraction/need-extraction.types';
+import { adoptCycleCampaigns } from '../fulfillment-cycles/cycle-campaign-adoption';
 import { estimateNeeds, NeedEstimateLineInput, NeedEstimateNorm } from './need-estimate';
 import {
   NeedEstimateBasis, readNeed, requireNeedEstimateConfirm, writeNeedAudit,
@@ -55,6 +56,8 @@ export async function lockCycle(
      VALUES ($1,$2,$3) ON CONFLICT (request_id,work_cycle) DO NOTHING`,
     [admission.request_id, admission.work_cycle, admission.campaign_id],
   );
+  // A cycle created while the SOS had no campaign follows a later attachment while it only holds untouched proposals.
+  await adoptCycleCampaigns(manager, [admission]);
   const rows = await manager.query(
     `SELECT id,request_id,work_cycle,campaign_id,state
        FROM fulfillment_cycle WHERE request_id=$1 AND work_cycle=$2 FOR UPDATE`,

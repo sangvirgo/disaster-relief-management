@@ -1284,7 +1284,7 @@ Các sơ đồ riêng lẻ theo từng mã UC đã được gộp vào sơ đồ
 
 ### UC-10 — Publish and manage a donation drive
 
-**Actor:** Coordinator or operations manager with `DONATION_DRIVE_MANAGE`.
+**Actor:** Operations manager with `DONATION_DRIVE_MANAGE`.
 
 **Main flow:** Create draft with title, intake site, open/close time, optional campaign, needed items/types/units and acceptance criteria → open → pause/resume/close with reason and version check. Public pages show only sanitized fields (Section 25.4).
 
@@ -2229,7 +2229,7 @@ No mandatory donor registration, address, national ID or beneficiary photo. Name
 
 | Action | Grant and guard |
 |---|---|
-| Publish/open/pause/close appeal | Coordinator or operations manager with `DONATION_DRIVE_MANAGE` and appropriate organization/campaign/intake scope |
+| Publish/open/pause/close appeal | Operations manager with `DONATION_DRIVE_MANAGE` and appropriate organization/campaign/intake scope |
 | Declare, track, dispute | Owner account or donation-specific capability; no stock authority |
 | Count/inspect | Intake-site-scoped `DONATION_INTAKE` |
 | Review/post approved receipt | `DONATION_REVIEW`; reviewer differs from every count author |

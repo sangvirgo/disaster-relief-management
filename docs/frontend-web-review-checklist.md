@@ -50,7 +50,7 @@ Do not treat the rest of this list as defects without checking: many other route
 
 ### 1.4 Known gaps already recorded
 
-From `docs/frontend-web-audit-2026-10-21.md`, still open unless a newer commit fixed them:
+From the earlier (removed) Web audit, still open unless a newer commit fixed them:
 - Volunteer members see leader-only actions (for example "start moving to scene") because the Response projection does not say whether the current user is the leader. Needs a backend field first, then UI hiding.
 - Donation declaration revision cannot be offered: the owner projection lacks the delivery `version`.
 - Handoff history and loss review have no list or returned identifier in the web flow.

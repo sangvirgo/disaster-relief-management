@@ -24,18 +24,18 @@ CREATE TEMP TABLE nationwide_campaign_fixture (
 ) ON COMMIT DROP;
 
 INSERT INTO nationwide_campaign_fixture VALUES
-  (1, 'Cứu hộ địa hình Hà Giang (demo)', 'Tiếp nhận SOS và điều phối cứu hộ tại khu vực miền núi phía Bắc.', 104.984, 22.824, 32000, ARRAY['LANDSLIDE','TRAPPED','MEDICAL','STORM']),
-  (2, 'Hỗ trợ y tế Hà Nội (demo)', 'Kết nối yêu cầu sơ cứu và hỗ trợ y tế cộng đồng.', 105.851, 21.028, 30000, ARRAY['MEDICAL','FIRE','TRAPPED','OTHER']),
-  (3, 'Sơ tán an toàn Hải Phòng (demo)', 'Hỗ trợ sơ tán và theo dõi nhu cầu tại khu vực ven biển.', 106.683, 20.861, 30000, ARRAY['STORM','FLOOD','TRAPPED','SUPPLY_SHORTAGE']),
-  (4, 'Tiếp tế thiết yếu Lào Cai (demo)', 'Ghi nhận nhu cầu nước sạch, thực phẩm và vật tư thiết yếu.', 103.975, 22.481, 32000, ARRAY['SUPPLY_SHORTAGE','LANDSLIDE','STORM','MEDICAL']),
-  (5, 'Sơ tán cộng đồng Thanh Hóa (demo)', 'Theo dõi điểm cần hỗ trợ di chuyển và nơi trú tạm.', 105.776, 19.807, 32000, ARRAY['FLOOD','STORM','TRAPPED','SUPPLY_SHORTAGE']),
-  (6, 'Tiếp tế dân sinh Huế (demo)', 'Tổng hợp nhu cầu hàng cứu trợ và nước sạch tại địa phương.', 107.590, 16.463, 30000, ARRAY['SUPPLY_SHORTAGE','FLOOD','MEDICAL','OTHER']),
-  (7, 'Cứu hộ cơ động Đà Nẵng (demo)', 'Điều phối tiếp nhận và xác minh yêu cầu cứu hộ.', 108.202, 16.055, 28000, ARRAY['TRAPPED','STORM','MEDICAL','FIRE']),
-  (8, 'Hỗ trợ y tế Quy Nhơn (demo)', 'Hỗ trợ sơ cứu và tiếp nhận nhu cầu y tế khẩn cấp.', 109.220, 13.783, 28000, ARRAY['MEDICAL','STORM','FLOOD','SUPPLY_SHORTAGE']),
-  (9, 'Hỗ trợ y tế Đà Lạt (demo)', 'Theo dõi trường hợp cần hỗ trợ y tế tại khu vực cao nguyên.', 108.438, 11.940, 30000, ARRAY['MEDICAL','LANDSLIDE','FIRE','OTHER']),
-  (10, 'Tiếp tế cộng đồng TP. Hồ Chí Minh (demo)', 'Tiếp nhận nhu cầu nhu yếu phẩm và hỗ trợ cộng đồng.', 106.700, 10.776, 30000, ARRAY['SUPPLY_SHORTAGE','FIRE','MEDICAL','STORM']),
-  (11, 'Cứu hộ đường thủy Cần Thơ (demo)', 'Tiếp nhận SOS và phối hợp hỗ trợ tại khu vực sông nước.', 105.785, 10.045, 30000, ARRAY['FLOOD','TRAPPED','MEDICAL','SUPPLY_SHORTAGE']),
-  (12, 'Sơ tán ven biển Cà Mau (demo)', 'Theo dõi nhu cầu di chuyển an toàn và hỗ trợ thiết yếu.', 105.152, 9.177, 30000, ARRAY['STORM','FLOOD','TRAPPED','SUPPLY_SHORTAGE']);
+  (1, 'Cứu hộ địa hình Hà Giang', 'Tiếp nhận SOS và điều phối cứu hộ tại khu vực miền núi phía Bắc.', 104.984, 22.824, 32000, ARRAY['LANDSLIDE','TRAPPED','MEDICAL','STORM']),
+  (2, 'Hỗ trợ y tế Hà Nội', 'Kết nối yêu cầu sơ cứu và hỗ trợ y tế cộng đồng.', 105.851, 21.028, 30000, ARRAY['MEDICAL','FIRE','TRAPPED','OTHER']),
+  (3, 'Sơ tán an toàn Hải Phòng', 'Hỗ trợ sơ tán và theo dõi nhu cầu tại khu vực ven biển.', 106.683, 20.861, 30000, ARRAY['STORM','FLOOD','TRAPPED','SUPPLY_SHORTAGE']),
+  (4, 'Tiếp tế thiết yếu Lào Cai', 'Ghi nhận nhu cầu nước sạch, thực phẩm và vật tư thiết yếu.', 103.975, 22.481, 32000, ARRAY['SUPPLY_SHORTAGE','LANDSLIDE','STORM','MEDICAL']),
+  (5, 'Sơ tán cộng đồng Thanh Hóa', 'Theo dõi điểm cần hỗ trợ di chuyển và nơi trú tạm.', 105.776, 19.807, 32000, ARRAY['FLOOD','STORM','TRAPPED','SUPPLY_SHORTAGE']),
+  (6, 'Tiếp tế dân sinh Huế', 'Tổng hợp nhu cầu hàng cứu trợ và nước sạch tại địa phương.', 107.590, 16.463, 30000, ARRAY['SUPPLY_SHORTAGE','FLOOD','MEDICAL','OTHER']),
+  (7, 'Cứu hộ cơ động Đà Nẵng', 'Điều phối tiếp nhận và xác minh yêu cầu cứu hộ.', 108.202, 16.055, 28000, ARRAY['TRAPPED','STORM','MEDICAL','FIRE']),
+  (8, 'Hỗ trợ y tế Quy Nhơn', 'Hỗ trợ sơ cứu và tiếp nhận nhu cầu y tế khẩn cấp.', 109.220, 13.783, 28000, ARRAY['MEDICAL','STORM','FLOOD','SUPPLY_SHORTAGE']),
+  (9, 'Hỗ trợ y tế Đà Lạt', 'Theo dõi trường hợp cần hỗ trợ y tế tại khu vực cao nguyên.', 108.438, 11.940, 30000, ARRAY['MEDICAL','LANDSLIDE','FIRE','OTHER']),
+  (10, 'Tiếp tế cộng đồng TP. Hồ Chí Minh', 'Tiếp nhận nhu cầu nhu yếu phẩm và hỗ trợ cộng đồng.', 106.700, 10.776, 30000, ARRAY['SUPPLY_SHORTAGE','FIRE','MEDICAL','STORM']),
+  (11, 'Cứu hộ đường thủy Cần Thơ', 'Tiếp nhận SOS và phối hợp hỗ trợ tại khu vực sông nước.', 105.785, 10.045, 30000, ARRAY['FLOOD','TRAPPED','MEDICAL','SUPPLY_SHORTAGE']),
+  (12, 'Sơ tán ven biển Cà Mau', 'Theo dõi nhu cầu di chuyển an toàn và hỗ trợ thiết yếu.', 105.152, 9.177, 30000, ARRAY['STORM','FLOOD','TRAPPED','SUPPLY_SHORTAGE']);
 
 DO $$ BEGIN
   IF (SELECT count(*) FROM incident_category WHERE code IN

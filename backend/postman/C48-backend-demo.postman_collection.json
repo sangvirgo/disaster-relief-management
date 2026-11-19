@@ -3770,7 +3770,7 @@
               }
             ],
             "url": "{{logisticsBaseUrl}}/public/donation-drives?limit=100",
-            "description": "GET danh sách công khai; tự lấy đợt Demo A và mã mặt hàng Gạo."
+            "description": "GET danh sách công khai; tự lấy đợt khu A và mã mặt hàng Gạo."
           },
           "event": [
             {
@@ -3792,9 +3792,9 @@
                   "if (pm.response.code !== JSON.parse(pm.variables.get('_c48')).expectedStatus) return;",
                   "const body = pm.response.json();",
                   "try {",
-                  "const drive = (body.items || []).find((row) => row.title === 'Quyên góp nhu yếu phẩm cho vùng ngập Demo A' && row.status === 'OPEN');",
+                  "const drive = (body.items || []).find((row) => row.title === 'Quyên góp nhu yếu phẩm cho vùng ngập khu A' && row.status === 'OPEN');",
                   "const item = drive?.items?.find((row) => row.item_name === 'Gạo');",
-                  "if (!drive?.id || !item?.item_id) throw new Error('Không tìm thấy đợt quyên góp Demo A hoặc mặt hàng Gạo.');",
+                  "if (!drive?.id || !item?.item_id) throw new Error('Không tìm thấy đợt quyên góp khu A hoặc mặt hàng Gạo.');",
                   "pm.collectionVariables.set('donationDriveId', drive.id);",
                   "pm.collectionVariables.set('donationItemId', item.item_id);",
                   "} catch (error) { pm.test('Dữ liệu nghiệp vụ hợp lệ', function () { throw error; }); pm.execution.setNextRequest(null); }",
@@ -3946,7 +3946,7 @@
               }
             ],
             "url": "{{logisticsBaseUrl}}/donation-drives?status=OPEN&limit=100",
-            "description": "GET các đợt đang mở trong phạm vi nhân viên tiếp nhận; tự lấy kho của đợt Demo A."
+            "description": "GET các đợt đang mở trong phạm vi nhân viên tiếp nhận; tự lấy kho của đợt khu A."
           },
           "event": [
             {
@@ -3968,8 +3968,8 @@
                   "if (pm.response.code !== JSON.parse(pm.variables.get('_c48')).expectedStatus) return;",
                   "const body = pm.response.json();",
                   "try {",
-                  "const drive = (body.items || []).find((row) => row.title === 'Quyên góp nhu yếu phẩm cho vùng ngập Demo A' && row.status === 'OPEN');",
-                  "if (!drive?.intake_warehouse_id) throw new Error('Không tìm thấy kho tiếp nhận của đợt Demo A.');",
+                  "const drive = (body.items || []).find((row) => row.title === 'Quyên góp nhu yếu phẩm cho vùng ngập khu A' && row.status === 'OPEN');",
+                  "if (!drive?.intake_warehouse_id) throw new Error('Không tìm thấy kho tiếp nhận của đợt khu A.');",
                   "pm.collectionVariables.set('donationWarehouseId', drive.intake_warehouse_id);",
                   "} catch (error) { pm.test('Dữ liệu nghiệp vụ hợp lệ', function () { throw error; }); pm.execution.setNextRequest(null); }",
                   "})();"

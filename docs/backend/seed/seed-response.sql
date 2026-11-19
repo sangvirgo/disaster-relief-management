@@ -50,14 +50,14 @@ INSERT INTO rescue_team (id, name, team_kind, reporting_mode, external_contact_n
                          readiness_required, affiliation_verified_at, affiliation_verified_by, availability, created_at) VALUES
   (pg_temp.u('a1'), 'Đội xuồng cứu hộ 1',            'VOLUNTEER',  'APP',         NULL, false, now() - interval '5 days', pg_temp.u('102'), 'AVAILABLE',   now() - interval '6 days'),
   (pg_temp.u('a2'), 'Đội y tế lưu động',             'VOLUNTEER',  'APP',         NULL, false, now() - interval '5 days', pg_temp.u('102'), 'AVAILABLE',   now() - interval '6 days'),
-  (pg_temp.u('a3'), 'Đại đội cơ động (demo)',        'MILITARY',   'COORDINATOR', 'Liên lạc qua bộ đàm, hô hiệu DEMO-ALPHA (giả lập); tần số do điều phối viên giữ.', false, now() - interval '4 days', pg_temp.u('102'), 'AVAILABLE', now() - interval '5 days'),
-  (pg_temp.u('a4'), 'Đội cứu hỏa - cứu nạn (demo)',  'GOVERNMENT', 'COORDINATOR', 'Liên hệ trực ban qua số nội bộ 0900000900 (giả lập).', false, now() - interval '4 days', pg_temp.u('102'), 'AVAILABLE', now() - interval '5 days'),
+  (pg_temp.u('a3'), 'Đại đội cơ động',        'MILITARY',   'COORDINATOR', 'Liên lạc qua bộ đàm, hô hiệu ALPHA (giả lập); tần số do điều phối viên giữ.', false, now() - interval '4 days', pg_temp.u('102'), 'AVAILABLE', now() - interval '5 days'),
+  (pg_temp.u('a4'), 'Đội cứu hỏa - cứu nạn',  'GOVERNMENT', 'COORDINATOR', 'Liên hệ trực ban qua số nội bộ 0900000900 (giả lập).', false, now() - interval '4 days', pg_temp.u('102'), 'AVAILABLE', now() - interval '5 days'),
   -- readiness latch example: not yet verified and flagged UNAVAILABLE until a leader and affiliation are confirmed
   (pg_temp.u('a5'), 'Đội tình nguyện dự bị',         'VOLUNTEER',  'APP',         NULL, true,  NULL, NULL, 'UNAVAILABLE', now() - interval '1 day'),
   -- Candidate workload example: team B has two recent missions at 3 km; C is free at 4 km; D is free at 10 km.
-  (pg_temp.u('a6'), 'Đội cơ động B (demo)', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên; đội hình giả lập B.', false, now() - interval '5 days', pg_temp.u('102'), 'AVAILABLE', now() - interval '6 days'),
-  (pg_temp.u('a7'), 'Đội cơ động C (demo)', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên; đội hình giả lập C.', false, now() - interval '3 days', pg_temp.u('102'), 'AVAILABLE', now() - interval '4 days'),
-  (pg_temp.u('a8'), 'Đội cơ động D (demo)', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên; đội hình giả lập D.', false, now() - interval '5 days', pg_temp.u('102'), 'AVAILABLE', now() - interval '6 days')
+  (pg_temp.u('a6'), 'Đội cơ động B', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên; đội hình giả lập B.', false, now() - interval '5 days', pg_temp.u('102'), 'AVAILABLE', now() - interval '6 days'),
+  (pg_temp.u('a7'), 'Đội cơ động C', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên; đội hình giả lập C.', false, now() - interval '3 days', pg_temp.u('102'), 'AVAILABLE', now() - interval '4 days'),
+  (pg_temp.u('a8'), 'Đội cơ động D', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên; đội hình giả lập D.', false, now() - interval '5 days', pg_temp.u('102'), 'AVAILABLE', now() - interval '6 days')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO team_member (team_id, user_id, member_role) VALUES
@@ -96,14 +96,14 @@ INSERT INTO assistance_request (id, tracking_code, tracking_secret_hash, inciden
 -- R2 PROXY by citizen1, VERIFYING (verifying_since older than the 15 min threshold)
 INSERT INTO assistance_request (id, tracking_code, incident_category_code, report_mode, reporter_user_id, reporter_name, reporter_contact_phone,
                                 description, status, verifying_since, received_at) VALUES
-  (pg_temp.u('f2'), 'C48DEM0002', 'FLOOD', 'PROXY', pg_temp.u('10f'), 'Người dân 1 (demo)', '0900000002',
+  (pg_temp.u('f2'), 'C48DEM0002', 'FLOOD', 'PROXY', pg_temp.u('10f'), 'Người dân 1', '0900000002',
    'Báo hộ người thân lớn tuổi sống một mình, nước dâng quá thắt lưng.', 'VERIFYING',
    now() - interval '90 minutes', now() - interval '2 hours');
 
 -- R3 VERIFIED, campaign-linked
 INSERT INTO assistance_request (id, tracking_code, campaign_id, incident_category_code, report_mode, reporter_user_id, reporter_name, reporter_contact_phone,
                                 description, status, received_at) VALUES
-  (pg_temp.u('f3'), 'C48DEM0003', pg_temp.u('c1'), 'FLOOD', 'SELF', pg_temp.u('110'), 'Người dân 2 (demo)', '0900000003',
+  (pg_temp.u('f3'), 'C48DEM0003', pg_temp.u('c1'), 'FLOOD', 'SELF', pg_temp.u('110'), 'Người dân 2', '0900000003',
    'Nước ngập tầng trệt, còn 4 người trong nhà.', 'VERIFIED', now() - interval '3 hours');
 
 -- R4 duplicate of R3
@@ -116,7 +116,7 @@ INSERT INTO assistance_request (id, tracking_code, campaign_id, incident_categor
 INSERT INTO assistance_request (id, tracking_code, campaign_id, incident_category_code, report_mode, reporter_user_id, reporter_name, reporter_contact_phone,
                                 description, status, priority, priority_basis, work_cycle,
                                 attribution_locked_at, logistics_admitted_at, received_at, version) VALUES
-  (pg_temp.u('f5'), 'C48DEM0005', pg_temp.u('c1'), 'TRAPPED', 'SELF', pg_temp.u('10f'), 'Người dân 1 (demo)', '0900000005',
+  (pg_temp.u('f5'), 'C48DEM0005', pg_temp.u('c1'), 'TRAPPED', 'SELF', pg_temp.u('10f'), 'Người dân 1', '0900000005',
    'Gia đình 5 người mắc kẹt trên mái nhà, cần xuồng và nhu yếu phẩm.', 'IN_PROGRESS', 'P2', 'COMPLETE', 1,
    now() - interval '5 hours', now() - interval '4 hours', now() - interval '6 hours', 6);
 
@@ -124,7 +124,7 @@ INSERT INTO assistance_request (id, tracking_code, campaign_id, incident_categor
 INSERT INTO assistance_request (id, tracking_code, incident_category_code, report_mode, reporter_user_id, reporter_name, reporter_contact_phone,
                                 description, campaign_id, status, priority, priority_basis, reporter_declared_danger,
                                 attribution_locked_at, received_at, version) VALUES
-  (pg_temp.u('f6'), 'C48DEM0006', 'TRAPPED', 'SELF', pg_temp.u('110'), 'Người dân 2 (demo)', '0900000006',
+  (pg_temp.u('f6'), 'C48DEM0006', 'TRAPPED', 'SELF', pg_temp.u('110'), 'Người dân 2', '0900000006',
    'Có người già và trẻ nhỏ bị mắc kẹt, nước đang lên nhanh.', pg_temp.u('c1'), 'DISPATCHED', 'P1', 'COMPLETE', true,
    now() - interval '50 minutes', now() - interval '2 hours', 5);
 
@@ -155,7 +155,7 @@ INSERT INTO assistance_request (id, tracking_code, incident_category_code, repor
 -- R11 PROXY report held in the proxy quota review lane
 INSERT INTO assistance_request (id, tracking_code, incident_category_code, report_mode, reporter_user_id, reporter_name, reporter_contact_phone,
                                 description, status, review_lane, received_at) VALUES
-  (pg_temp.u('fb'), 'C48DEM0011', 'SUPPLY_SHORTAGE', 'PROXY', pg_temp.u('110'), 'Người dân 2 (demo)', '0900000011',
+  (pg_temp.u('fb'), 'C48DEM0011', 'SUPPLY_SHORTAGE', 'PROXY', pg_temp.u('110'), 'Người dân 2', '0900000011',
    'Báo hộ nhiều hộ trong cùng một xóm, vượt hạn mức báo hộ.', 'SUBMITTED', 'PROXY_QUOTA_REVIEW',
    now() - interval '20 minutes');
 
@@ -163,7 +163,7 @@ INSERT INTO assistance_request (id, tracking_code, incident_category_code, repor
 INSERT INTO assistance_request (id, tracking_code, incident_category_code, report_mode, reporter_user_id, reporter_name, reporter_contact_phone,
                                 description, campaign_id, status, priority, priority_basis, work_cycle,
                                 attribution_locked_at, logistics_admitted_at, resolution_seal_id, resolved_at, received_at, version) VALUES
-  (pg_temp.u('fc'), 'C48DEM0012', 'MEDICAL', 'SELF', pg_temp.u('10f'), 'Người dân 1 (demo)', '0900000012',
+  (pg_temp.u('fc'), 'C48DEM0012', 'MEDICAL', 'SELF', pg_temp.u('10f'), 'Người dân 1', '0900000012',
    'Người bị thương nhẹ cần sơ cứu và đưa đến trạm y tế.', pg_temp.u('c1'), 'RESOLVED', 'P3', 'COMPLETE', 1,
    now() - interval '20 hours', NULL, NULL, now() - interval '18 hours', now() - interval '22 hours', 8);
 
@@ -178,7 +178,7 @@ INSERT INTO request_subject (request_id, people_affected, location, location_sou
                              reporter_relationship, beneficiary_contact_phone, alternate_contact_name, alternate_contact_phone,
                              information_source, contactability) VALUES
   (pg_temp.u('f1'), NULL, pg_temp.pt(106.66, 10.77), 'GPS', 25.0, now() - interval '5 minutes', NULL, NULL, NULL, NULL, NULL, NULL),
-  (pg_temp.u('f2'), 3,    pg_temp.pt(106.72, 10.74), 'MANUAL_PIN', NULL, NULL, 'Con cháu', NULL, 'Người hàng xóm (demo)', '0900000102', 'Người nhà báo qua điện thoại', 'UNKNOWN'),
+  (pg_temp.u('f2'), 3,    pg_temp.pt(106.72, 10.74), 'MANUAL_PIN', NULL, NULL, 'Con cháu', NULL, 'Người hàng xóm', '0900000102', 'Người nhà báo qua điện thoại', 'UNKNOWN'),
   (pg_temp.u('f3'), 4,    pg_temp.pt(106.68, 10.76), 'GPS', 15.0, now() - interval '3 hours', NULL, '0900000003', NULL, NULL, NULL, 'REACHABLE'),
   (pg_temp.u('f4'), 4,    pg_temp.pt(106.68, 10.76), 'GPS', 30.0, now() - interval '150 minutes', NULL, NULL, NULL, NULL, NULL, 'REACHABLE'),
   (pg_temp.u('f5'), 5,    pg_temp.pt(106.69, 10.79), 'GPS', 10.0, now() - interval '6 hours', NULL, '0900000005', NULL, NULL, NULL, 'REACHABLE'),
@@ -187,7 +187,7 @@ INSERT INTO request_subject (request_id, people_affected, location, location_sou
   (pg_temp.u('f8'), NULL, pg_temp.pt(106.63, 10.72), 'GPS', 40.0, now() - interval '12 minutes', NULL, NULL, NULL, NULL, NULL, NULL),
   (pg_temp.u('f9'), 6,    pg_temp.pt(106.77, 10.83), 'GPS', 20.0, now() - interval '45 minutes', NULL, '0900000009', NULL, NULL, NULL, 'REACHABLE'),
   (pg_temp.u('fa'), 1,    pg_temp.pt(106.62, 10.71), 'MANUAL_PIN', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'UNKNOWN'),
-  (pg_temp.u('fb'), 12,   pg_temp.pt(106.64, 10.74), 'MANUAL_PIN', NULL, NULL, 'Hàng xóm', NULL, 'Trưởng xóm (demo)', '0900000111', 'Người báo hộ trực tiếp quan sát', 'REACHABLE'),
+  (pg_temp.u('fb'), 12,   pg_temp.pt(106.64, 10.74), 'MANUAL_PIN', NULL, NULL, 'Hàng xóm', NULL, 'Trưởng xóm', '0900000111', 'Người báo hộ trực tiếp quan sát', 'REACHABLE'),
   (pg_temp.u('fc'), 1,    pg_temp.pt(106.71, 10.77), 'GPS', 12.0, now() - interval '22 hours', NULL, '0900000012', NULL, NULL, NULL, 'REACHABLE'),
   (pg_temp.u('fd'), 2,    pg_temp.pt(106.69, 10.79), 'MANUAL_PIN', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'UNKNOWN');
 
@@ -301,9 +301,9 @@ INSERT INTO mission (id, request_id, team_id, work_cycle, status, mission_kind, 
 INSERT INTO mission_event (id, mission_id, actor_user_id, from_status, to_status, reason, outcome_note, occurred_at, recorded_at, recorded_basis, reported_by) VALUES
   -- b2: earlier failed attempt on R5 (EN_ROUTE history)
   (pg_temp.u('1b21'), pg_temp.u('b2'), pg_temp.u('102'), NULL,        'OFFERED',  NULL, NULL, now() - interval '300 minutes', now() - interval '300 minutes', NULL, NULL),
-  (pg_temp.u('1b22'), pg_temp.u('b2'), pg_temp.u('102'), 'OFFERED',   'ACCEPTED', 'Ghi nhận theo báo cáo vô tuyến trong dữ liệu demo.', NULL, now() - interval '295 minutes', now() - interval '295 minutes', 'RADIO', 'Đầu mối đội B (demo)'),
-  (pg_temp.u('1b23'), pg_temp.u('b2'), pg_temp.u('102'), 'ACCEPTED',  'EN_ROUTE', 'Ghi nhận theo báo cáo vô tuyến trong dữ liệu demo.', NULL, now() - interval '280 minutes', now() - interval '280 minutes', 'RADIO', 'Đầu mối đội B (demo)'),
-  (pg_temp.u('1b24'), pg_temp.u('b2'), pg_temp.u('102'), 'EN_ROUTE',  'FAILED',   'Xuồng không tiếp cận được do dòng chảy mạnh.', NULL, now() - interval '250 minutes', now() - interval '250 minutes', 'RADIO', 'Đầu mối đội B (demo)'),
+  (pg_temp.u('1b22'), pg_temp.u('b2'), pg_temp.u('102'), 'OFFERED',   'ACCEPTED', 'Ghi nhận theo báo cáo vô tuyến trong dữ liệu mẫu.', NULL, now() - interval '295 minutes', now() - interval '295 minutes', 'RADIO', 'Đầu mối đội B'),
+  (pg_temp.u('1b23'), pg_temp.u('b2'), pg_temp.u('102'), 'ACCEPTED',  'EN_ROUTE', 'Ghi nhận theo báo cáo vô tuyến trong dữ liệu mẫu.', NULL, now() - interval '280 minutes', now() - interval '280 minutes', 'RADIO', 'Đầu mối đội B'),
+  (pg_temp.u('1b24'), pg_temp.u('b2'), pg_temp.u('102'), 'EN_ROUTE',  'FAILED',   'Xuồng không tiếp cận được do dòng chảy mạnh.', NULL, now() - interval '250 minutes', now() - interval '250 minutes', 'RADIO', 'Đầu mối đội B'),
   -- b1: current accepted mission on R5
   (pg_temp.u('1b11'), pg_temp.u('b1'), pg_temp.u('102'), NULL,        'OFFERED',  NULL, NULL, now() - interval '230 minutes', now() - interval '230 minutes', NULL, NULL),
   (pg_temp.u('1b12'), pg_temp.u('b1'), pg_temp.u('10c'), 'OFFERED',   'ACCEPTED', NULL, NULL, now() - interval '220 minutes', now() - interval '220 minutes', NULL, NULL),
@@ -311,10 +311,10 @@ INSERT INTO mission_event (id, mission_id, actor_user_id, from_status, to_status
   (pg_temp.u('1b31'), pg_temp.u('b3'), pg_temp.u('102'), NULL,        'OFFERED',  NULL, NULL, now() - interval '50 minutes', now() - interval '50 minutes', NULL, NULL),
   -- b4: R12 completed with a human outcome note
   (pg_temp.u('1b41'), pg_temp.u('b4'), pg_temp.u('103'), NULL,        'OFFERED',   NULL, NULL, now() - interval '20 hours', now() - interval '20 hours', NULL, NULL),
-  (pg_temp.u('1b42'), pg_temp.u('b4'), pg_temp.u('103'), 'OFFERED',   'ACCEPTED',  'Ghi nhận theo báo cáo vô tuyến trong dữ liệu demo.', NULL, now() - interval '19 hours', now() - interval '19 hours', 'RADIO', 'Đầu mối đội B (demo)'),
-  (pg_temp.u('1b43'), pg_temp.u('b4'), pg_temp.u('103'), 'ACCEPTED',  'EN_ROUTE',  'Ghi nhận theo báo cáo vô tuyến trong dữ liệu demo.', NULL, now() - interval '1130 minutes', now() - interval '1130 minutes', 'RADIO', 'Đầu mối đội B (demo)'),
-  (pg_temp.u('1b44'), pg_temp.u('b4'), pg_temp.u('103'), 'EN_ROUTE',  'ON_SCENE',  'Ghi nhận theo báo cáo vô tuyến trong dữ liệu demo.', NULL, now() - interval '1100 minutes', now() - interval '1100 minutes', 'RADIO', 'Đầu mối đội B (demo)'),
-  (pg_temp.u('1b45'), pg_temp.u('b4'), pg_temp.u('103'), 'ON_SCENE',  'COMPLETED', 'Ghi nhận theo báo cáo vô tuyến trong dữ liệu demo.', 'Đã sơ cứu vết thương và đưa người bị thương đến trạm y tế gần nhất (demo).', now() - interval '18 hours', now() - interval '18 hours', 'RADIO', 'Đầu mối đội B (demo)');
+  (pg_temp.u('1b42'), pg_temp.u('b4'), pg_temp.u('103'), 'OFFERED',   'ACCEPTED',  'Ghi nhận theo báo cáo vô tuyến trong dữ liệu mẫu.', NULL, now() - interval '19 hours', now() - interval '19 hours', 'RADIO', 'Đầu mối đội B'),
+  (pg_temp.u('1b43'), pg_temp.u('b4'), pg_temp.u('103'), 'ACCEPTED',  'EN_ROUTE',  'Ghi nhận theo báo cáo vô tuyến trong dữ liệu mẫu.', NULL, now() - interval '1130 minutes', now() - interval '1130 minutes', 'RADIO', 'Đầu mối đội B'),
+  (pg_temp.u('1b44'), pg_temp.u('b4'), pg_temp.u('103'), 'EN_ROUTE',  'ON_SCENE',  'Ghi nhận theo báo cáo vô tuyến trong dữ liệu mẫu.', NULL, now() - interval '1100 minutes', now() - interval '1100 minutes', 'RADIO', 'Đầu mối đội B'),
+  (pg_temp.u('1b45'), pg_temp.u('b4'), pg_temp.u('103'), 'ON_SCENE',  'COMPLETED', 'Ghi nhận theo báo cáo vô tuyến trong dữ liệu mẫu.', 'Đã sơ cứu vết thương và đưa người bị thương đến trạm y tế gần nhất.', now() - interval '18 hours', now() - interval '18 hours', 'RADIO', 'Đầu mối đội B');
 
 -- closed resolution intent for R12 (command state machine finished; no seal because Logistics never admitted the request)
 INSERT INTO resolution_intent (id, request_id, work_cycle, kind, state, actor_user_id, expected_request_version, previous_status, reason, version, created_at, updated_at) VALUES
@@ -334,7 +334,7 @@ INSERT INTO notice (id, recipient_user_id, source_id, source_version, notice_typ
 
 -- minimal audit trail (evidence_metadata intentionally empty: the demo seed carries no files)
 INSERT INTO audit_log (actor_user_id, action, entity_type, entity_id, reason)
-VALUES (NULL, 'SEED_LOADED', 'SYSTEM', 'seed-response', 'Dữ liệu demo tổng hợp, không phải người thật');
+VALUES (NULL, 'SEED_LOADED', 'SYSTEM', 'seed-response', 'Dữ liệu mẫu tổng hợp, không phải người thật');
 
 -- ---------- scenario assertions (RAISE EXCEPTION aborts the whole transaction) ----------
 \o /dev/null

@@ -8,6 +8,7 @@ import {
   LogisticsResponseSupplyCandidatesClient, SupplyCandidate, SupplyCandidatePage,
 } from '../integrations/response/response-supply-candidates.client';
 import { EstimateFacts, persistEstimateBatch } from '../needs/need-estimate-batch';
+import { adoptCycleCampaigns } from '../fulfillment-cycles/cycle-campaign-adoption';
 import { ExtractionDependencies, extractNeedLines } from './need-extraction.logic';
 import {
   cycleHasNeeds, loadExtractionCatalog, loadExtractionNorms, processedKeys, ProcessedStatus, recordProcessed, takeDailyGeminiCall,
@@ -27,6 +28,8 @@ export interface NeedExtractionRunSummary {
   failed: number;
   /** Unexpected errors (for example a database error). Not recorded, so the candidate is retried on a later run. */
   errors: number;
+  /** Already processed cycles created without a campaign that adopted the campaign the SOS was attached to since. */
+  adopted: number;
 }
 
 export type CandidateOutcome = ProcessedStatus | 'ERROR';
@@ -91,7 +94,7 @@ export class NeedExtractionSweepService {
   ) {}
 
   async runOnce(env: Record<string, string | undefined> = process.env): Promise<NeedExtractionRunSummary> {
-    const summary: NeedExtractionRunSummary = { attempted: 0, created: 0, noLines: 0, skipped: 0, failed: 0, errors: 0 };
+    const summary: NeedExtractionRunSummary = { attempted: 0, created: 0, noLines: 0, skipped: 0, failed: 0, errors: 0, adopted: 0 };
     let catalog: ExtractionCatalogItem[];
     let norms: ExtractionNorm[];
     try {
@@ -118,6 +121,7 @@ export class NeedExtractionSweepService {
         break;
       }
       const known = await this.knownKeys(result.items);
+      summary.adopted += await this.adoptAttached(result.items.filter((candidate) => known.has(candidateKey(candidate))));
       for (const candidate of result.items) {
         if (summary.attempted >= NEED_EXTRACTION_MAX_PER_RUN) break;
         if (known.has(candidateKey(candidate))) continue;
@@ -133,6 +137,21 @@ export class NeedExtractionSweepService {
       cursor = result.cursor;
     }
     return summary;
+  }
+
+  /**
+   * A processed SOS that had no campaign may have been attached to one since. Its cycle adopts that campaign while it still
+   * holds only untouched proposals, so the proposals join the campaign's warehouse demand. A failure is retried next run.
+   */
+  private async adoptAttached(items: readonly SupplyCandidate[]): Promise<number> {
+    const attached = items.filter((candidate) => candidate.campaign_id !== null);
+    if (attached.length === 0) return 0;
+    try {
+      return await adoptCycleCampaigns(this.dataSource, attached);
+    } catch {
+      this.logger.warn('NEED_EXTRACTION_CAMPAIGN_ADOPTION_FAILED');
+      return 0;
+    }
   }
 
   private async knownKeys(items: readonly SupplyCandidate[]): Promise<Set<string>> {

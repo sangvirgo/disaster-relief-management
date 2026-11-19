@@ -38,11 +38,11 @@ function fixture(grants: ReporterSession['grants'] = []) {
 
 describe('CampaignsService', () => {
 
-  it('requires an operations manager system grant to create a campaign', async () => {
+  it('requires a coordinator system grant to create a campaign', async () => {
     for (const grants of [
       [],
       [{ role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: campaignId }] as ReporterSession['grants'],
-      [{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }] as ReporterSession['grants'],
+      [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' }] as ReporterSession['grants'],
       [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'CAMPAIGN', campaign_id: campaignId }] as ReporterSession['grants'],
       [{ role_code: 'VOLUNTEER', scope_type: 'SYSTEM' }] as ReporterSession['grants'],
     ]) {
@@ -65,12 +65,12 @@ describe('CampaignsService', () => {
     expect(managerQuery).toHaveBeenCalledTimes(1);
   });
 
-  it('rejects a coordinator from activating a campaign and lets it keep pausing one', async () => {
+  it('rejects an operations manager from activating a campaign and lets a coordinator activate and pause one', async () => {
     const campaign = {
       id: campaignId, name: 'Cứu trợ', objective: null, status: 'DRAFT', starts_at: null, ends_at: null,
       version: 1, created_at: new Date('2026-01-01T00:00:00.000Z'),
     };
-    const denied = fixture([{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }]);
+    const denied = fixture([{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' }]);
     denied.managerQuery.mockResolvedValueOnce([campaign]);
     await expect(denied.service.transition(campaignId, 'activate', { expected_version: 1 }, idemKey, request))
       .rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
@@ -83,17 +83,17 @@ describe('CampaignsService', () => {
       .resolves.toMatchObject({ value: { id: campaignId } });
   });
 
-  it('rejects a coordinator from changing the campaign area through the area endpoint or PATCH', async () => {
+  it('rejects an operations manager from changing the campaign area through the area endpoint or PATCH', async () => {
     const campaign = {
       id: campaignId, name: 'Cứu trợ', objective: null, status: 'DRAFT', starts_at: null, ends_at: null,
       version: 1, created_at: new Date('2026-01-01T00:00:00.000Z'),
     };
-    const area = fixture([{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }]);
+    const area = fixture([{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' }]);
     area.managerQuery.mockResolvedValueOnce([campaign]);
     await expect(area.service.changeArea(campaignId, { expected_version: 1, center: { lat: 10, lng: 106 }, radius_m: 1000 }, idemKey, request))
       .rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
 
-    const patch = fixture([{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }]);
+    const patch = fixture([{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' }]);
     patch.managerQuery.mockResolvedValueOnce([campaign]);
     await expect(patch.service.patch(campaignId, { expected_version: 1, radius_m: 1000 }, idemKey, request))
       .rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
@@ -179,7 +179,7 @@ describe('CampaignsService', () => {
 
   it('reads the returned campaign row from TypeORM UPDATE results when transitioning status', async () => {
     const { service, managerQuery } = fixture([{
-      role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM',
+      role_code: 'COORDINATOR', scope_type: 'SYSTEM',
     }]);
     const campaign = {
       id: campaignId, name: 'Cứu trợ', objective: null,

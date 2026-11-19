@@ -48,7 +48,6 @@ export const pages: Record<Workspace, Page[]> = {
   ],
   coordinator: [
     { id: 'campaigns', title: 'Chiến dịch và điều phối', icon: 'campaign', service: 'response', path: '/campaigns/overview' },
-    { id: 'drives', title: 'Đợt quyên góp', icon: 'drive', service: 'logistics', path: '/donation-drives' },
     { id: 'dashboard', title: 'Thống kê', icon: 'report' },
     {
       id: 'reports', title: 'Tổng quan và bản đồ', icon: 'report', service: 'response',
@@ -58,6 +57,7 @@ export const pages: Record<Workspace, Page[]> = {
     { id: 'notices', title: 'Thông báo', icon: 'notice', service: 'response', path: '/notices' },
   ],
   operations: [
+    { id: 'campaigns', title: 'Chiến dịch và kho', icon: 'campaign', service: 'response', path: '/campaigns' },
     {
       id: 'overview',
       title: 'Tổng quan',

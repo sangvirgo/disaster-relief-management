@@ -5,21 +5,25 @@ describe('role catalog after retiring staff roles', () => {
     expect(Object.keys(ROLE_PERMISSIONS)).not.toEqual(expect.arrayContaining(['CAMPAIGN_MANAGER', 'INTAKE_STAFF', 'DISTRIBUTION_STAFF']));
   });
 
-  it('gives the primary coordinator the donation drive permission absorbed from campaign managers', () => {
-    expect(ROLE_PERMISSIONS.COORDINATOR).toContain('DONATION_DRIVE_MANAGE');
+  it('reserves donation drive management for the operations manager', () => {
     expect(ROLE_PERMISSIONS.COORDINATOR).toContain('CAMPAIGN_MANAGE');
-  });
-
-  it('keeps campaign setup (create, activate, area change) with the operations manager only', () => {
-    expect(ROLE_PERMISSIONS.OPERATIONS_MANAGER).toContain('CAMPAIGN_SETUP_MANAGE');
-    expect(ROLE_PERMISSIONS.COORDINATOR).not.toContain('CAMPAIGN_SETUP_MANAGE');
+    expect(ROLE_PERMISSIONS.OPERATIONS_MANAGER).toContain('DONATION_DRIVE_MANAGE');
     for (const role of Object.keys(ROLE_PERMISSIONS)) {
       if (role === 'OPERATIONS_MANAGER') continue;
+      expect(ROLE_PERMISSIONS[role as keyof typeof ROLE_PERMISSIONS]).not.toContain('DONATION_DRIVE_MANAGE');
+    }
+  });
+
+  it('keeps campaign setup (create, activate, area change) with the coordinator only', () => {
+    expect(ROLE_PERMISSIONS.COORDINATOR).toContain('CAMPAIGN_SETUP_MANAGE');
+    for (const role of Object.keys(ROLE_PERMISSIONS)) {
+      if (role === 'COORDINATOR') continue;
       expect(ROLE_PERMISSIONS[role as keyof typeof ROLE_PERMISSIONS]).not.toContain('CAMPAIGN_SETUP_MANAGE');
     }
     const coordinator: Grant = { role_code: 'COORDINATOR', scope_type: 'SYSTEM' };
-    expect(hasPermission([coordinator], 'CAMPAIGN_SETUP_MANAGE', { campaignId: null })).toBe(false);
-    expect(hasPermission([coordinator], 'CAMPAIGN_MANAGE', { campaignId: 'campaign-a' })).toBe(true);
+    const manager: Grant = { role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' };
+    expect(hasPermission([coordinator], 'CAMPAIGN_SETUP_MANAGE', { campaignId: null })).toBe(true);
+    expect(hasPermission([manager], 'CAMPAIGN_SETUP_MANAGE', { campaignId: null })).toBe(false);
   });
 
   it('lets coordinators read campaign warehouse assignments but reserves changes for the operations manager', () => {

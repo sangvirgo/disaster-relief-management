@@ -19,17 +19,17 @@ SELECT pg_temp.u(v.suffix), v.username, v.display_name,
        v.username || '+' || substr(md5(pg_temp.u(v.suffix)::text), 1, 10) || '@example.test',
        now(), :'seed_password_hash', 'ACTIVE', false
 FROM (VALUES
-  ('101', 'admin',          'Quản trị hệ thống (demo)'),
-  ('102', 'coord1',         'Điều phối viên 1 (demo)'),
-  ('103', 'coord2',         'Điều phối viên 2 (demo)'),
-  ('105', 'ops_mgr',        'Quản lý vận hành (demo)'),
-  ('108', 'reviewer1',      'Người xác minh 1 (demo)'),
-  ('109', 'reviewer2',      'Người xác minh 2 (demo)'),
-  ('10c', 'vol_leader1',    'Đội trưởng tình nguyện 1 (demo)'),
-  ('10d', 'vol_leader2',    'Đội trưởng tình nguyện 2 (demo)'),
-  ('10e', 'vol_member1',    'Tình nguyện viên 1 (demo)'),
-  ('10f', 'citizen1',       'Người dân 1 (demo)'),
-  ('110', 'citizen2',       'Người dân 2 (demo)')
+  ('101', 'admin',          'Quản trị hệ thống'),
+  ('102', 'coord1',         'Điều phối viên 1'),
+  ('103', 'coord2',         'Điều phối viên 2'),
+  ('105', 'ops_mgr',        'Quản lý vận hành'),
+  ('108', 'reviewer1',      'Người xác minh 1'),
+  ('109', 'reviewer2',      'Người xác minh 2'),
+  ('10c', 'vol_leader1',    'Đội trưởng tình nguyện 1'),
+  ('10d', 'vol_leader2',    'Đội trưởng tình nguyện 2'),
+  ('10e', 'vol_member1',    'Tình nguyện viên 1'),
+  ('10f', 'citizen1',       'Người dân 1'),
+  ('110', 'citizen2',       'Người dân 2')
 ) AS v(suffix, username, display_name)
 ON CONFLICT DO NOTHING;
 
@@ -57,7 +57,7 @@ WHERE NOT EXISTS (
 
 -- The bootstrap seed is the only permitted self-grant.
 INSERT INTO audit_log (actor_user_id, action, entity_type, entity_id, reason)
-VALUES (NULL, 'SEED_LOADED', 'SYSTEM', 'seed-identity', 'Dữ liệu demo tổng hợp, không phải người thật');
+VALUES (NULL, 'SEED_LOADED', 'SYSTEM', 'seed-identity', 'Dữ liệu mẫu tổng hợp, không phải người thật');
 
 -- @include demo expansion
 

@@ -1,7 +1,11 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class NeedProposalQueryDto {
+  /** NONE lists only proposals of SOS that belong to no campaign (system-scope managers). Omitted lists campaign proposals. */
+  @IsOptional() @IsIn(['NONE'])
+  declare campaign_scope?: 'NONE';
+
   @IsOptional() @IsString() @MaxLength(2_000)
   declare cursor?: string;
 

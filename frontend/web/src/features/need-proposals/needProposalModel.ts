@@ -51,6 +51,8 @@ export interface ProposalPage {
   items: ProposalGroup[];
   more?: boolean;
   cursor?: string;
+  /** Present for system-scope managers: SOS cycles outside every campaign that still hold open proposals. */
+  unassigned_total?: number;
   generated_at?: string;
 }
 

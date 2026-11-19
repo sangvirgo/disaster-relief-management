@@ -51,3 +51,16 @@ export function validateAliasList(aliases: readonly string[]): string | null {
 export function aliasListChanged(saved: readonly string[], draft: readonly string[]): boolean {
   return saved.length !== draft.length || saved.some((alias, index) => alias !== draft[index]);
 }
+
+/** Splits the aliases textarea (one per line or comma-separated) into a clean, de-duplicated list. */
+export function parseAliasText(text: string): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const part of text.split(/[\n,;]/u)) {
+    const alias = normalizeAlias(part);
+    if (!alias || seen.has(alias.toLocaleLowerCase('vi-VN'))) continue;
+    seen.add(alias.toLocaleLowerCase('vi-VN'));
+    result.push(alias);
+  }
+  return result;
+}

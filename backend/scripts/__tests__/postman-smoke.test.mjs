@@ -114,13 +114,13 @@ test('GET setup requests populate AI SOS and donation IDs from API results', () 
     ['listRequestQueue', 'requestId',
       { items: [{ id: 'request-id', tracking_code: 'C48DEM0009', status: 'SUBMITTED' }] }, 'request-id'],
     ['logisticsDrivesPublicList', 'donationDriveId',
-      { items: [{ id: 'drive-id', title: 'Quyên góp nhu yếu phẩm cho vùng ngập Demo A', status: 'OPEN',
+      { items: [{ id: 'drive-id', title: 'Quyên góp nhu yếu phẩm cho vùng ngập khu A', status: 'OPEN',
         items: [{ item_id: 'item-id', item_name: 'Gạo' }] }] }, 'drive-id'],
     ['logisticsDrivesPublicList', 'donationItemId',
-      { items: [{ id: 'drive-id', title: 'Quyên góp nhu yếu phẩm cho vùng ngập Demo A', status: 'OPEN',
+      { items: [{ id: 'drive-id', title: 'Quyên góp nhu yếu phẩm cho vùng ngập khu A', status: 'OPEN',
         items: [{ item_id: 'item-id', item_name: 'Gạo' }] }] }, 'item-id'],
     ['logisticsDrivesList', 'donationWarehouseId',
-      { items: [{ intake_warehouse_id: 'warehouse-id', title: 'Quyên góp nhu yếu phẩm cho vùng ngập Demo A', status: 'OPEN' }] }, 'warehouse-id'],
+      { items: [{ intake_warehouse_id: 'warehouse-id', title: 'Quyên góp nhu yếu phẩm cho vùng ngập khu A', status: 'OPEN' }] }, 'warehouse-id'],
   ];
   for (const [operationId, variable, response, expected] of cases) {
     const request = all.find((item) => meta(item).operationId === operationId &&

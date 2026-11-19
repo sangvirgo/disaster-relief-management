@@ -135,15 +135,19 @@ export function NeedProposalsPage({ user }: { user: Me }) {
   const [activeItems, setActiveItems] = useState<SwapItem[]>([]);
   const [warehouses, setWarehouses] = useState<Map<string, string>>(new Map());
   const [lookupError, setLookupError] = useState('');
+  const [unassigned, setUnassigned] = useState(false);
+  const [unassignedTotal, setUnassignedTotal] = useState<number | null>(null);
+  const scopeQuery = unassigned ? '&campaign_scope=NONE' : '';
 
   useEffect(() => {
     if (!canManage) return;
     let live = true;
     setLoading(true);
     setError('');
-    api<ProposalPage>('logistics', `/need-proposals?limit=${PAGE_SIZE}`)
+    api<ProposalPage>('logistics', `/need-proposals?limit=${PAGE_SIZE}${scopeQuery}`)
       .then((page) => {
         if (!live) return;
+        if (typeof page.unassigned_total === 'number') setUnassignedTotal(page.unassigned_total);
         setGroups(page.items);
         setMore(Boolean(page.more));
         setCursor(page.more ? page.cursor ?? '' : '');
@@ -151,7 +155,7 @@ export function NeedProposalsPage({ user }: { user: Me }) {
       .catch((cause) => { if (live) { setGroups([]); setError(proposalListErrorMessage(cause)); } })
       .finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
-  }, [canManage, revision]);
+  }, [canManage, revision, scopeQuery]);
 
   useEffect(() => {
     if (!canManage) return;
@@ -183,7 +187,7 @@ export function NeedProposalsPage({ user }: { user: Me }) {
     if (!cursor) return;
     setLoadingMore(true);
     try {
-      const page = await api<ProposalPage>('logistics', `/need-proposals?limit=${PAGE_SIZE}&cursor=${encodeURIComponent(cursor)}`);
+      const page = await api<ProposalPage>('logistics', `/need-proposals?limit=${PAGE_SIZE}${scopeQuery}&cursor=${encodeURIComponent(cursor)}`);
       setGroups((current) => [...current, ...page.items]);
       setMore(Boolean(page.more));
       setCursor(page.more ? page.cursor ?? '' : '');
@@ -259,6 +263,18 @@ export function NeedProposalsPage({ user }: { user: Me }) {
           Đề xuất không tự động phân công hay điều phối.
         </p>
         <p className="need-proposals__timing">SOS có tick cần hàng cứu trợ được quét khoảng mỗi 5 phút. Danh sách tự làm mới khi bạn đang mở trang.</p>
+        <div className="campaign-filters" role="group" aria-label="Phạm vi đề xuất">
+          <button type="button" className={unassigned ? '' : 'active'} aria-pressed={!unassigned} onClick={() => { setUnassigned(false); setGroups([]); }}>Theo chiến dịch</button>
+          <button type="button" className={unassigned ? 'active' : ''} aria-pressed={unassigned} onClick={() => { setUnassigned(true); setGroups([]); }}>
+            Chưa thuộc chiến dịch nào{unassignedTotal === null ? '' : ` (${unassignedTotal})`}
+          </button>
+        </div>
+        {unassigned && (
+          <p className="muted">
+            SOS ở danh sách này chưa thuộc chiến dịch nào nên chưa có kho phục vụ và không được tính vào nhu cầu của bất kỳ kho nào.
+            Điều phối viên cần gắn SOS vào chiến dịch (hoặc mở rộng/tạo vùng chiến dịch); sau đó đề xuất sẽ chuyển sang danh sách theo chiến dịch và được đối chiếu với kho.
+          </p>
+        )}
         {notice && <p className="notice" role="status">{notice}</p>}
         {lookupError && <p className="notice error" role="alert">{lookupError}</p>}
         {error && (
@@ -272,7 +288,9 @@ export function NeedProposalsPage({ user }: { user: Me }) {
       {loading && groups.length === 0 && <Skeleton rows={4} label="Đang tải đề xuất cấp phát…" />}
 
       {!loading && !error && groups.length === 0 && (
-        <EmptyState title="Chưa có đề xuất cần duyệt" description="SOS phải được xác minh và có tick cần hàng cứu trợ. Hệ thống quét khoảng mỗi 5 phút; SOS ngoài chiến dịch vẫn có đề xuất nhưng chưa đối chiếu được kho." />
+        unassigned
+          ? <EmptyState title="Không có SOS cần hàng nào ngoài chiến dịch" description="Mọi SOS có nhu cầu hàng cứu trợ đều đã thuộc một chiến dịch." />
+          : <EmptyState title="Chưa có đề xuất cần duyệt" description="SOS phải được xác minh và có tick cần hàng cứu trợ. Hệ thống quét khoảng mỗi 5 phút; SOS ngoài chiến dịch vẫn có đề xuất nhưng chưa đối chiếu được kho." />
       )}
 
       {groups.map((group) => {

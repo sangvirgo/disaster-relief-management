@@ -55,4 +55,4 @@ The 38 prototype pages are represented as navigation destinations or page famili
 
 The coordinator can review an AI advisory, but priority and dispatch remain human decisions. Cash payments, offline ACK, and fake CSV export are not exposed.
 
-The [2026-10-21 Web integration audit](../../docs/frontend-web-audit-2026-10-21.md) records a historical implementation snapshot. The [2026-11-05 Web/backend contract review](../../docs/frontend-web-contract-review-2026-11-05.md) records the current comparison and remaining gaps. An earlier full backend test run on this Windows host passed 529 Jest tests, then encountered seven Node script-test failures involving host-specific shell/path/permission assumptions; that historical result was not rechecked in this Web review.
+The earlier dated Web audit and contract-review snapshots were removed as obsolete; the review checklist and current contracts are the reference.

@@ -36,10 +36,11 @@ function line(id: string, itemId: string, quantity: string, overrides: Record<st
   };
 }
 
-function setup(grants: Grant[], rows: { cycles?: unknown[]; lines?: unknown[]; primaries?: unknown[]; stock?: unknown[] } = {}) {
+function setup(grants: Grant[], rows: { cycles?: unknown[]; lines?: unknown[]; primaries?: unknown[]; stock?: unknown[]; unassigned?: number } = {}) {
   const sqls: string[] = [];
   const query = jest.fn(async (sql: string, _values: unknown[] = []): Promise<unknown[]> => {
     sqls.push(sql);
+    if (sql.includes('FROM fulfillment_cycle AS unassigned')) return [{ total: rows.unassigned ?? 0 }];
     if (sql.includes('FROM fulfillment_cycle c')) return rows.cycles ?? [];
     if (sql.includes('FROM relief_need n JOIN item i')) return rows.lines ?? [];
     if (sql.includes('FROM campaign_warehouse')) return rows.primaries ?? [];
@@ -68,10 +69,25 @@ describe('NeedProposalsService', () => {
     for (const sql of sqls) expect(sql).not.toMatch(/\b(INSERT|UPDATE|DELETE)\b/u);
   });
 
-  it('a system manager sees every campaign', async () => {
+  it('a system manager sees every campaign, but not proposals of SOS outside campaigns', async () => {
     const { service, sqls } = setup([{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' }], { cycles: [] });
     await service.list({}, request);
     expect(sqls[0]).not.toContain('c.campaign_id=ANY');
+    expect(sqls[0]).toContain('c.campaign_id IS NOT NULL');
+  });
+
+  it('lists proposals outside every campaign apart and reports their count', async () => {
+    const { service, sqls } = setup([{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' }], { cycles: [], unassigned: 3 });
+    const result = await service.list({ campaign_scope: 'NONE' }, request);
+    expect(sqls[0]).toContain('c.campaign_id IS NULL');
+    expect(result.unassigned_total).toBe(3);
+  });
+
+  it('keeps the unassigned list and count away from a campaign-scoped manager', async () => {
+    const { service } = setup([{ role_code: 'OPERATIONS_MANAGER', scope_type: 'CAMPAIGN', campaign_id: campaignId }], { cycles: [] });
+    await expect(service.list({ campaign_scope: 'NONE' }, request)).rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
+    const result = await service.list({}, request);
+    expect(result).not.toHaveProperty('unassigned_total');
   });
 
   it('flags a line whose quantity exceeds the free stock of the campaign PRIMARY warehouse', async () => {

@@ -16,13 +16,15 @@ const warehouseId = '88888888-8888-4888-8888-888888888888';
 const coordinatorGrant: Grant = {
   role_code: 'COORDINATOR', scope_type: 'SYSTEM', };
 
+const fixtureCampaignId = '88888888-8888-4888-8888-888888888888';
+
 const baseNeed = {
   id: needId,
   cycle_id: cycleId,
   request_id: '11111111-1111-4111-8111-111111111111',
   work_cycle: 2,
 
-  campaign_id: null,
+  campaign_id: fixtureCampaignId,
   item_id: itemId,
   item_name: 'Nước uống',
   unit_code: 'L',
@@ -43,6 +45,7 @@ type SetupOptions = {
   cycleState?: 'OPEN' | 'FROZEN' | 'SEALED';
   need?: Partial<typeof baseNeed>;
   grants?: Grant[];
+  cycleCampaignId?: string | null;
   commitments?: Array<{
     id: string; warehouse_id: string; quantity: string; released_quantity: string;
     issued_quantity: string; delivered_quantity: string; returned_quantity: string; lost_quantity: string; version: number;
@@ -61,7 +64,7 @@ function setup(options: SetupOptions = {}) {
   const cycle = {
     id: cycleId,
 
-    campaign_id: null,
+    campaign_id: options.cycleCampaignId === undefined ? fixtureCampaignId : options.cycleCampaignId,
     state: options.cycleState ?? 'OPEN',
   };
   const commitments = options.commitments ?? [];
@@ -88,7 +91,7 @@ function setup(options: SetupOptions = {}) {
   } as unknown as EntityManager;
   const dataSource = {
     query: jest.fn(async (sql: string) => sql.includes('FROM relief_need n JOIN fulfillment_cycle')
-      ? [{  campaign_id: null }]
+      ? [{ campaign_id: fixtureCampaignId }]
       : []),
     transaction: jest.fn(async (run: (manager: EntityManager) => Promise<unknown>) => run(manager)),
   };

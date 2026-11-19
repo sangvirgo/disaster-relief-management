@@ -56,10 +56,10 @@ ON CONFLICT (category) DO NOTHING;
 
 -- ---------- assets ----------
 INSERT INTO warehouse (id, name, address_note, location, location_public, service_radius_m) VALUES
-  ('00000000-0000-4000-8000-0000000a2001', 'Kho trung tâm Demo A',
-   'Số 10 đường Mẫu, Demo A (dữ liệu giả lập)', ST_GeogFromText('SRID=4326;POINT(106.6300 10.8200)'), true, 20000),
-  ('00000000-0000-4000-8000-0000000a2002', 'Kho Demo B',
-   'Số 25 đường Thử nghiệm, Demo B (dữ liệu giả lập)', ST_GeogFromText('SRID=4326;POINT(108.2000 16.0700)'), false, 30000);
+  ('00000000-0000-4000-8000-0000000a2001', 'Kho trung tâm A',
+   'Số 10 đường Mẫu, khu A (dữ liệu giả lập)', ST_GeogFromText('SRID=4326;POINT(106.6300 10.8200)'), true, 20000),
+  ('00000000-0000-4000-8000-0000000a2002', 'Kho B',
+   'Số 25 đường Thử nghiệm, khu B (dữ liệu giả lập)', ST_GeogFromText('SRID=4326;POINT(108.2000 16.0700)'), false, 30000);
 
 INSERT INTO relief_point (id, name, contact_note, operating_note, location, status) VALUES
   ('00000000-0000-4000-8000-0000000a3001', 'Điểm cứu trợ Trường tiểu học Mẫu',
@@ -97,10 +97,10 @@ INSERT INTO stock_movement (balance_id, movement_type, delta_on_hand, delta_rese
 -- ---------- donation drives (intake warehouse A; campaign status is the cached copy from Response) ----------
 INSERT INTO donation_drive (id, campaign_id, campaign_status, campaign_status_at, intake_warehouse_id, title, description, status, opens_at, closes_at, created_at) VALUES
   ('00000000-0000-4000-8000-0000000a6001', '00000000-0000-4000-8000-0000000000c1', 'ACTIVE', now() - interval '1 minute', '00000000-0000-4000-8000-0000000a2001',
-   'Quyên góp nhu yếu phẩm cho vùng ngập Demo A', 'Tiếp nhận lương thực, nước uống và chăn màn tại kho trung tâm Demo A. Dữ liệu giả lập phục vụ trình diễn.',
+   'Quyên góp nhu yếu phẩm cho vùng ngập khu A', 'Tiếp nhận lương thực, nước uống và chăn màn tại kho trung tâm A. Dữ liệu giả lập phục vụ trình diễn.',
    'OPEN', now() - interval '9 days', now() + interval '20 days', now() - interval '9 days'),
   ('00000000-0000-4000-8000-0000000a6002', '00000000-0000-4000-8000-0000000000c1', 'ACTIVE', now() - interval '1 minute', '00000000-0000-4000-8000-0000000a2002',
-   'Quyên góp vật tư y tế đợt 2 (bản nháp)', 'Bản nháp chưa công bố: vật tư y tế cho kho Demo B.',
+   'Quyên góp vật tư y tế đợt 2 (bản nháp)', 'Bản nháp chưa công bố: vật tư y tế cho kho B.',
    'DRAFT', NULL, NULL, now() - interval '1 day');
 
 INSERT INTO drive_item (drive_id, item_id, target_quantity, acceptance_note) VALUES
@@ -221,7 +221,7 @@ INSERT INTO stock_movement (balance_id, movement_type, delta_on_hand, delta_rese
   ('00000000-0000-4000-8000-0000000a5a03', 'ISSUE', -12, -12, '00000000-0000-4000-8000-0000000b2003', 'ISSUE:00000000-0000-4000-8000-0000000b4002', '00000000-0000-4000-8000-000000000105', now() - interval '3 days 18 hours');
 
 INSERT INTO handoff_record (id, distribution_id, handoff_kind, receiver_label, recorder_user_id, confirmation_basis, occurred_at, created_at) VALUES
-  ('00000000-0000-4000-8000-0000000b5001', '00000000-0000-4000-8000-0000000b3001', 'DIRECT_HOUSEHOLD', 'Hộ gia đình giả lập, tổ 5 Demo A',
+  ('00000000-0000-4000-8000-0000000b5001', '00000000-0000-4000-8000-0000000b3001', 'DIRECT_HOUSEHOLD', 'Hộ gia đình giả lập, tổ 5 khu A',
    '00000000-0000-4000-8000-000000000112', 'Chủ hộ ký nhận trên phiếu giao', now() - interval '3 days 17 hours', now() - interval '3 days 17 hours');
 INSERT INTO handoff_line (id, handoff_id, distribution_id, distribution_line_id, commitment_id, quantity) VALUES
   ('00000000-0000-4000-8000-0000000b6001', '00000000-0000-4000-8000-0000000b5001', '00000000-0000-4000-8000-0000000b3001', '00000000-0000-4000-8000-0000000b4001', '00000000-0000-4000-8000-0000000b2001', 12),
@@ -276,7 +276,7 @@ INSERT INTO stock_adjustment (id, balance_id, delta_on_hand, reason, status, req
 -- ---------- notices for ops_mgr ----------
 INSERT INTO notice (id, recipient_user_id, source_id, source_version, notice_type, payload, created_at) VALUES
   ('00000000-0000-4000-8000-0000000d1001', '00000000-0000-4000-8000-000000000105', '00000000-0000-4000-8000-0000000b8001', 1, 'STOCK_ADJUSTMENT_PENDING',
-   '{"title": "Có yêu cầu điều chỉnh tồn kho chờ duyệt", "message": "Kho trung tâm Demo A: giảm 3 gói Mì gói do ẩm mốc."}'::jsonb, now() - interval '1 hour'),
+   '{"title": "Có yêu cầu điều chỉnh tồn kho chờ duyệt", "message": "Kho trung tâm A: giảm 3 gói Mì gói do ẩm mốc."}'::jsonb, now() - interval '1 hour'),
   ('00000000-0000-4000-8000-0000000d1002', '00000000-0000-4000-8000-000000000105', '00000000-0000-4000-8000-0000000b5004', 1, 'LOSS_REVIEW_PENDING',
    '{"title": "Có biên bản thất thoát chờ xác minh", "message": "Phiếu phân phối tại Điểm cứu trợ Trường tiểu học Mẫu ghi thiếu 5 gói Mì gói."}'::jsonb, now() - interval '2 days 11 hours'),
   ('00000000-0000-4000-8000-0000000d1003', '00000000-0000-4000-8000-000000000105', '00000000-0000-4000-8000-0000000a7004', 1, 'DONATION_PENDING_REVIEW',

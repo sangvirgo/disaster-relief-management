@@ -40,33 +40,33 @@ ON CONFLICT DO NOTHING;
 INSERT INTO rescue_team (id, name, team_kind, reporting_mode, external_contact_note,
                          readiness_required, affiliation_verified_at, affiliation_verified_by, availability) VALUES
   ('00000000-0000-4000-8000-0000000000a9',
-   'Đội xuồng cứu hộ Bắc (demo)', 'VOLUNTEER', 'APP', NULL, false, now() - interval '2 days',
+   'Đội xuồng cứu hộ Bắc', 'VOLUNTEER', 'APP', NULL, false, now() - interval '2 days',
    '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
   ('00000000-0000-4000-8000-0000000000aa',
-   'Đội sơ cứu lưu động Nam (demo)', 'VOLUNTEER', 'APP', NULL, false, now() - interval '2 days',
+   'Đội sơ cứu lưu động Nam', 'VOLUNTEER', 'APP', NULL, false, now() - interval '2 days',
    '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
   ('00000000-0000-4000-8000-0000000000ab',
-   'Đội hỗ trợ cơ động Trung (demo)', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên, đội hình giả lập.', false,
+   'Đội hỗ trợ cơ động Trung', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên, đội hình giả lập.', false,
    now() - interval '2 days', '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
   ('00000000-0000-4000-8000-0000000000ac',
-   'Đội y tế cộng đồng Bắc (demo)', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên, đội hình giả lập.', false,
+   'Đội y tế cộng đồng Bắc', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên, đội hình giả lập.', false,
    now() - interval '1 day', '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
   ('00000000-0000-4000-8000-0000000000ad',
-   'Đội xuồng cứu hộ Nam (demo)', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên, đội xuồng giả lập.', false,
+   'Đội xuồng cứu hộ Nam', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên, đội xuồng giả lập.', false,
    now() - interval '1 day', '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
   ('00000000-0000-4000-8000-0000000000ae',
-   'Đội cứu hộ cơ động Bắc (demo)', 'VOLUNTEER', 'APP', NULL, false,
+   'Đội cứu hộ cơ động Bắc', 'VOLUNTEER', 'APP', NULL, false,
    now() - interval '1 day', '00000000-0000-4000-8000-000000000118', 'AVAILABLE')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO team_member (team_id, user_id, member_role)
 SELECT team.id, fixture.user_id, fixture.member_role
   FROM (VALUES
-    ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Bắc (demo)', 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000114'::uuid, 'LEADER'),
-    ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Bắc (demo)', 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000115'::uuid, 'MEMBER'),
-    ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Nam (demo)', 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000116'::uuid, 'LEADER'),
-    ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Nam (demo)', 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000117'::uuid, 'MEMBER'),
-    ('00000000-0000-4000-8000-0000000000ae'::uuid, 'Đội cứu hộ cơ động Bắc (demo)', 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000119'::uuid, 'LEADER')
+    ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Bắc', 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000114'::uuid, 'LEADER'),
+    ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Bắc', 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000115'::uuid, 'MEMBER'),
+    ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Nam', 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000116'::uuid, 'LEADER'),
+    ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Nam', 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000117'::uuid, 'MEMBER'),
+    ('00000000-0000-4000-8000-0000000000ae'::uuid, 'Đội cứu hộ cơ động Bắc', 'VOLUNTEER', 'APP', '00000000-0000-4000-8000-000000000119'::uuid, 'LEADER')
   ) AS fixture(team_id, team_name, team_kind, reporting_mode, user_id, member_role)
   JOIN rescue_team team ON team.id = fixture.team_id AND team.name = fixture.team_name
                        AND team.team_kind = fixture.team_kind AND team.reporting_mode = fixture.reporting_mode
@@ -76,16 +76,16 @@ ON CONFLICT DO NOTHING;
 INSERT INTO team_skill (team_id, skill_code)
 SELECT team.id, fixture.skill_code
   FROM (VALUES
-    ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Bắc (demo)', 'VOLUNTEER', 'APP', 'BOAT'),
-    ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Bắc (demo)', 'VOLUNTEER', 'APP', 'FIRST_AID'),
-    ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Nam (demo)', 'VOLUNTEER', 'APP', 'FIRST_AID'),
-    ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Nam (demo)', 'VOLUNTEER', 'APP', 'TRUCK_DRIVER'),
-    ('00000000-0000-4000-8000-0000000000ab'::uuid, 'Đội hỗ trợ cơ động Trung (demo)', 'GOVERNMENT', 'COORDINATOR', 'RADIO'),
-    ('00000000-0000-4000-8000-0000000000ab'::uuid, 'Đội hỗ trợ cơ động Trung (demo)', 'GOVERNMENT', 'COORDINATOR', 'TRUCK_DRIVER'),
-    ('00000000-0000-4000-8000-0000000000ac'::uuid, 'Đội y tế cộng đồng Bắc (demo)', 'GOVERNMENT', 'COORDINATOR', 'FIRST_AID'),
-    ('00000000-0000-4000-8000-0000000000ac'::uuid, 'Đội y tế cộng đồng Bắc (demo)', 'GOVERNMENT', 'COORDINATOR', 'CLIMBING'),
-    ('00000000-0000-4000-8000-0000000000ad'::uuid, 'Đội xuồng cứu hộ Nam (demo)', 'GOVERNMENT', 'COORDINATOR', 'BOAT'),
-    ('00000000-0000-4000-8000-0000000000ae'::uuid, 'Đội cứu hộ cơ động Bắc (demo)', 'VOLUNTEER', 'APP', 'BOAT')
+    ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Bắc', 'VOLUNTEER', 'APP', 'BOAT'),
+    ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Bắc', 'VOLUNTEER', 'APP', 'FIRST_AID'),
+    ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Nam', 'VOLUNTEER', 'APP', 'FIRST_AID'),
+    ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Nam', 'VOLUNTEER', 'APP', 'TRUCK_DRIVER'),
+    ('00000000-0000-4000-8000-0000000000ab'::uuid, 'Đội hỗ trợ cơ động Trung', 'GOVERNMENT', 'COORDINATOR', 'RADIO'),
+    ('00000000-0000-4000-8000-0000000000ab'::uuid, 'Đội hỗ trợ cơ động Trung', 'GOVERNMENT', 'COORDINATOR', 'TRUCK_DRIVER'),
+    ('00000000-0000-4000-8000-0000000000ac'::uuid, 'Đội y tế cộng đồng Bắc', 'GOVERNMENT', 'COORDINATOR', 'FIRST_AID'),
+    ('00000000-0000-4000-8000-0000000000ac'::uuid, 'Đội y tế cộng đồng Bắc', 'GOVERNMENT', 'COORDINATOR', 'CLIMBING'),
+    ('00000000-0000-4000-8000-0000000000ad'::uuid, 'Đội xuồng cứu hộ Nam', 'GOVERNMENT', 'COORDINATOR', 'BOAT'),
+    ('00000000-0000-4000-8000-0000000000ae'::uuid, 'Đội cứu hộ cơ động Bắc', 'VOLUNTEER', 'APP', 'BOAT')
   ) AS fixture(team_id, team_name, team_kind, reporting_mode, skill_code)
   JOIN rescue_team team ON team.id = fixture.team_id AND team.name = fixture.team_name
                        AND team.team_kind = fixture.team_kind AND team.reporting_mode = fixture.reporting_mode
@@ -96,12 +96,12 @@ INSERT INTO team_position (team_id, location, accuracy_m, captured_at, source, s
 SELECT team.id, ST_SetSRID(ST_MakePoint(fixture.longitude, fixture.latitude), 4326)::geography,
        NULL, now(), 'COORDINATOR_REPORTED', '00000000-0000-4000-8000-000000000118'
   FROM (VALUES
-    ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Bắc (demo)', 'VOLUNTEER', 'APP', 105.8500::float8, 21.0300::float8),
-    ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Nam (demo)', 'VOLUNTEER', 'APP', 106.7000::float8, 10.7800::float8),
-    ('00000000-0000-4000-8000-0000000000ab'::uuid, 'Đội hỗ trợ cơ động Trung (demo)', 'GOVERNMENT', 'COORDINATOR', 107.6000::float8, 16.0700::float8),
-    ('00000000-0000-4000-8000-0000000000ac'::uuid, 'Đội y tế cộng đồng Bắc (demo)', 'GOVERNMENT', 'COORDINATOR', 105.8700::float8, 21.0500::float8),
-    ('00000000-0000-4000-8000-0000000000ad'::uuid, 'Đội xuồng cứu hộ Nam (demo)', 'GOVERNMENT', 'COORDINATOR', 106.7000::float8, 10.7800::float8),
-    ('00000000-0000-4000-8000-0000000000ae'::uuid, 'Đội cứu hộ cơ động Bắc (demo)', 'VOLUNTEER', 'APP', 105.8600::float8, 21.0400::float8)
+    ('00000000-0000-4000-8000-0000000000a9'::uuid, 'Đội xuồng cứu hộ Bắc', 'VOLUNTEER', 'APP', 105.8500::float8, 21.0300::float8),
+    ('00000000-0000-4000-8000-0000000000aa'::uuid, 'Đội sơ cứu lưu động Nam', 'VOLUNTEER', 'APP', 106.7000::float8, 10.7800::float8),
+    ('00000000-0000-4000-8000-0000000000ab'::uuid, 'Đội hỗ trợ cơ động Trung', 'GOVERNMENT', 'COORDINATOR', 107.6000::float8, 16.0700::float8),
+    ('00000000-0000-4000-8000-0000000000ac'::uuid, 'Đội y tế cộng đồng Bắc', 'GOVERNMENT', 'COORDINATOR', 105.8700::float8, 21.0500::float8),
+    ('00000000-0000-4000-8000-0000000000ad'::uuid, 'Đội xuồng cứu hộ Nam', 'GOVERNMENT', 'COORDINATOR', 106.7000::float8, 10.7800::float8),
+    ('00000000-0000-4000-8000-0000000000ae'::uuid, 'Đội cứu hộ cơ động Bắc', 'VOLUNTEER', 'APP', 105.8600::float8, 21.0400::float8)
   ) AS fixture(team_id, team_name, team_kind, reporting_mode, longitude, latitude)
   JOIN rescue_team team ON team.id = fixture.team_id AND team.name = fixture.team_name
                        AND team.team_kind = fixture.team_kind AND team.reporting_mode = fixture.reporting_mode
@@ -118,19 +118,19 @@ ON CONFLICT (team_id) DO UPDATE SET
 INSERT INTO rescue_team (id, name, team_kind, reporting_mode,
                          readiness_required, affiliation_verified_at, affiliation_verified_by, availability) VALUES
   ('00000000-0000-4000-8000-0000000000af',
-   'Đội cứu hộ địa hình Bắc 1 (demo)', 'VOLUNTEER', 'APP', false, now(), '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
+   'Đội cứu hộ địa hình Bắc 1', 'VOLUNTEER', 'APP', false, now(), '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
   ('00000000-0000-4000-8000-0000000000b0',
-   'Đội cứu hộ địa hình Bắc 2 (demo)', 'VOLUNTEER', 'APP', false, now(), '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
+   'Đội cứu hộ địa hình Bắc 2', 'VOLUNTEER', 'APP', false, now(), '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
   ('00000000-0000-4000-8000-0000000000b1',
-   'Đội cứu hộ đa năng Bắc (demo)', 'VOLUNTEER', 'APP', false, now(), '00000000-0000-4000-8000-000000000118', 'AVAILABLE')
+   'Đội cứu hộ đa năng Bắc', 'VOLUNTEER', 'APP', false, now(), '00000000-0000-4000-8000-000000000118', 'AVAILABLE')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO team_member (team_id, user_id, member_role)
 SELECT t.id, fixture.leader_id, 'LEADER'
   FROM (VALUES
-    ('00000000-0000-4000-8000-0000000000af'::uuid, 'Đội cứu hộ địa hình Bắc 1 (demo)', '00000000-0000-4000-8000-000000000120'::uuid),
-    ('00000000-0000-4000-8000-0000000000b0'::uuid, 'Đội cứu hộ địa hình Bắc 2 (demo)', '00000000-0000-4000-8000-000000000121'::uuid),
-    ('00000000-0000-4000-8000-0000000000b1'::uuid, 'Đội cứu hộ đa năng Bắc (demo)', '00000000-0000-4000-8000-000000000122'::uuid)
+    ('00000000-0000-4000-8000-0000000000af'::uuid, 'Đội cứu hộ địa hình Bắc 1', '00000000-0000-4000-8000-000000000120'::uuid),
+    ('00000000-0000-4000-8000-0000000000b0'::uuid, 'Đội cứu hộ địa hình Bắc 2', '00000000-0000-4000-8000-000000000121'::uuid),
+    ('00000000-0000-4000-8000-0000000000b1'::uuid, 'Đội cứu hộ đa năng Bắc', '00000000-0000-4000-8000-000000000122'::uuid)
   ) AS fixture(team_id, team_name, leader_id)
   JOIN rescue_team t ON t.id=fixture.team_id AND t.name=fixture.team_name
 ON CONFLICT DO NOTHING;
@@ -138,11 +138,11 @@ ON CONFLICT DO NOTHING;
 INSERT INTO team_skill (team_id, skill_code)
 SELECT t.id, fixture.skill_code
   FROM (VALUES
-    ('00000000-0000-4000-8000-0000000000af'::uuid, 'Đội cứu hộ địa hình Bắc 1 (demo)', 'CLIMBING'),
-    ('00000000-0000-4000-8000-0000000000b0'::uuid, 'Đội cứu hộ địa hình Bắc 2 (demo)', 'CLIMBING'),
-    ('00000000-0000-4000-8000-0000000000b0'::uuid, 'Đội cứu hộ địa hình Bắc 2 (demo)', 'FIRST_AID'),
-    ('00000000-0000-4000-8000-0000000000b1'::uuid, 'Đội cứu hộ đa năng Bắc (demo)', 'CLIMBING'),
-    ('00000000-0000-4000-8000-0000000000b1'::uuid, 'Đội cứu hộ đa năng Bắc (demo)', 'BOAT')
+    ('00000000-0000-4000-8000-0000000000af'::uuid, 'Đội cứu hộ địa hình Bắc 1', 'CLIMBING'),
+    ('00000000-0000-4000-8000-0000000000b0'::uuid, 'Đội cứu hộ địa hình Bắc 2', 'CLIMBING'),
+    ('00000000-0000-4000-8000-0000000000b0'::uuid, 'Đội cứu hộ địa hình Bắc 2', 'FIRST_AID'),
+    ('00000000-0000-4000-8000-0000000000b1'::uuid, 'Đội cứu hộ đa năng Bắc', 'CLIMBING'),
+    ('00000000-0000-4000-8000-0000000000b1'::uuid, 'Đội cứu hộ đa năng Bắc', 'BOAT')
   ) AS fixture(team_id, team_name, skill_code)
   JOIN rescue_team t ON t.id=fixture.team_id AND t.name=fixture.team_name
 ON CONFLICT DO NOTHING;
@@ -151,9 +151,9 @@ INSERT INTO team_position (team_id, location, accuracy_m, captured_at, source, s
 SELECT t.id, ST_SetSRID(ST_MakePoint(fixture.longitude, fixture.latitude), 4326)::geography,
        NULL, now(), 'COORDINATOR_REPORTED', '00000000-0000-4000-8000-000000000118'
   FROM (VALUES
-    ('00000000-0000-4000-8000-0000000000af'::uuid, 'Đội cứu hộ địa hình Bắc 1 (demo)', 105.8450::float8, 21.0280::float8),
-    ('00000000-0000-4000-8000-0000000000b0'::uuid, 'Đội cứu hộ địa hình Bắc 2 (demo)', 105.8550::float8, 21.0150::float8),
-    ('00000000-0000-4000-8000-0000000000b1'::uuid, 'Đội cứu hộ đa năng Bắc (demo)', 105.8500::float8, 21.0350::float8)
+    ('00000000-0000-4000-8000-0000000000af'::uuid, 'Đội cứu hộ địa hình Bắc 1', 105.8450::float8, 21.0280::float8),
+    ('00000000-0000-4000-8000-0000000000b0'::uuid, 'Đội cứu hộ địa hình Bắc 2', 105.8550::float8, 21.0150::float8),
+    ('00000000-0000-4000-8000-0000000000b1'::uuid, 'Đội cứu hộ đa năng Bắc', 105.8500::float8, 21.0350::float8)
   ) AS fixture(team_id, team_name, longitude, latitude)
   JOIN rescue_team t ON t.id=fixture.team_id AND t.name=fixture.team_name
 ON CONFLICT (team_id) DO UPDATE SET
@@ -170,18 +170,18 @@ SELECT fixture.id, fixture.tracking_code, fixture.tracking_secret_hash, fixture.
        fixture.reporter_user_id, fixture.reporter_name, fixture.phone, fixture.description,
        fixture.status::request_status, fixture.verifying_since, fixture.received_at
   FROM (VALUES
-    ('00000000-0000-4000-8000-00000000f101'::uuid, 'C48SEED0001', NULL::text, '00000000-0000-4000-8000-0000000000c3'::uuid, 'FLOOD', 'SUBMITTED', NULL::timestamptz, now() - interval '3 hours', 'Ngập vào sân nhà, cần hỗ trợ di chuyển đồ dùng.', '0900000301', '00000000-0000-4000-8000-000000000113'::uuid, 'Người dân 3 (demo)'),
-    ('00000000-0000-4000-8000-00000000f102'::uuid, 'C48SEED0002', 'demo$seed-expansion$0002', '00000000-0000-4000-8000-0000000000c4'::uuid, 'STORM', 'SUBMITTED', NULL::timestamptz, now() - interval '160 minutes', 'Mái tôn bị tốc sau gió lớn, gia đình đang ở nơi an toàn.', '0900000302', NULL::uuid, 'Người báo 02 (demo)'),
-    ('00000000-0000-4000-8000-00000000f103'::uuid, 'C48SEED0003', NULL::text, '00000000-0000-4000-8000-0000000000c5'::uuid, 'LANDSLIDE', 'SUBMITTED', NULL::timestamptz, now() - interval '145 minutes', 'Đất đá tràn ra lối đi, cần kiểm tra tuyến đường.', '0900000303', '00000000-0000-4000-8000-000000000113'::uuid, 'Người dân 3 (demo)'),
-    ('00000000-0000-4000-8000-00000000f104'::uuid, 'C48SEED0004', 'demo$seed-expansion$0004', '00000000-0000-4000-8000-0000000000c6'::uuid, 'FLOOD', 'SUBMITTED', NULL::timestamptz, now() - interval '120 minutes', 'Nước ngập tuyến đường trước nhà, cần hướng dẫn di chuyển.', '0900000304', NULL::uuid, 'Người báo 04 (demo)'),
-    ('00000000-0000-4000-8000-00000000f105'::uuid, 'C48SEED0005', NULL::text, '00000000-0000-4000-8000-0000000000c7'::uuid, 'MEDICAL', 'SUBMITTED', NULL::timestamptz, now() - interval '100 minutes', 'Người thân cần được hỗ trợ y tế tại điểm sơ tán.', '0900000305', '00000000-0000-4000-8000-000000000113'::uuid, 'Người dân 3 (demo)'),
-    ('00000000-0000-4000-8000-00000000f106'::uuid, 'C48SEED0006', 'demo$seed-expansion$0006', '00000000-0000-4000-8000-0000000000c8'::uuid, 'STORM', 'SUBMITTED', NULL::timestamptz, now() - interval '80 minutes', 'Cây đổ chắn lối vào khu dân cư, chưa ghi nhận người bị thương.', '0900000306', NULL::uuid, 'Người báo 06 (demo)'),
-    ('00000000-0000-4000-8000-00000000f107'::uuid, 'C48SEED0007', NULL::text, '00000000-0000-4000-8000-0000000000c3'::uuid, 'FLOOD', 'SUBMITTED', NULL::timestamptz, now() - interval '60 minutes', 'Một hộ cần nước uống và hỗ trợ kiểm tra an toàn.', '0900000307', '00000000-0000-4000-8000-000000000113'::uuid, 'Người dân 3 (demo)'),
-    ('00000000-0000-4000-8000-00000000f108'::uuid, 'C48SEED0008', 'demo$seed-expansion$0008', '00000000-0000-4000-8000-0000000000c4'::uuid, 'OTHER', 'SUBMITTED', NULL::timestamptz, now() - interval '50 minutes', 'Nước sinh hoạt bị gián đoạn sau mưa lớn.', '0900000308', NULL::uuid, 'Người báo 08 (demo)'),
-    ('00000000-0000-4000-8000-00000000f109'::uuid, 'C48SEED0009', NULL::text, '00000000-0000-4000-8000-0000000000c5'::uuid, 'LANDSLIDE', 'VERIFYING', now() - interval '30 minutes', now() - interval '45 minutes', 'Có vết nứt mới trên taluy gần nhà, đang chờ xác minh.', '0900000309', '00000000-0000-4000-8000-000000000113'::uuid, 'Người dân 3 (demo)'),
-    ('00000000-0000-4000-8000-00000000f10a'::uuid, 'C48SEED0010', 'demo$seed-expansion$0010', '00000000-0000-4000-8000-0000000000c6'::uuid, 'FLOOD', 'VERIFYING', now() - interval '25 minutes', now() - interval '40 minutes', 'Nước vào tầng trệt, cần xác nhận số người và tình hình hiện trường.', '0900000310', NULL::uuid, 'Người báo 10 (demo)'),
-    ('00000000-0000-4000-8000-00000000f10b'::uuid, 'C48SEED0011', NULL::text, '00000000-0000-4000-8000-0000000000c7'::uuid, 'MEDICAL', 'VERIFYING', now() - interval '20 minutes', now() - interval '35 minutes', 'Người cao tuổi cần hỗ trợ sơ cứu tại nơi trú tạm.', '0900000311', '00000000-0000-4000-8000-000000000113'::uuid, 'Người dân 3 (demo)'),
-    ('00000000-0000-4000-8000-00000000f10c'::uuid, 'C48SEED0012', 'demo$seed-expansion$0012', '00000000-0000-4000-8000-0000000000c8'::uuid, 'STORM', 'VERIFYING', now() - interval '15 minutes', now() - interval '30 minutes', 'Mái che bị hư hỏng, hộ dân đã đến điểm trú tạm.', '0900000312', NULL::uuid, 'Người báo 12 (demo)')
+    ('00000000-0000-4000-8000-00000000f101'::uuid, 'C48SEED0001', NULL::text, '00000000-0000-4000-8000-0000000000c3'::uuid, 'FLOOD', 'SUBMITTED', NULL::timestamptz, now() - interval '3 hours', 'Ngập vào sân nhà, cần hỗ trợ di chuyển đồ dùng.', '0900000301', '00000000-0000-4000-8000-000000000113'::uuid, 'Người dân 3'),
+    ('00000000-0000-4000-8000-00000000f102'::uuid, 'C48SEED0002', 'demo$seed-expansion$0002', '00000000-0000-4000-8000-0000000000c4'::uuid, 'STORM', 'SUBMITTED', NULL::timestamptz, now() - interval '160 minutes', 'Mái tôn bị tốc sau gió lớn, gia đình đang ở nơi an toàn.', '0900000302', NULL::uuid, 'Người báo 02'),
+    ('00000000-0000-4000-8000-00000000f103'::uuid, 'C48SEED0003', NULL::text, '00000000-0000-4000-8000-0000000000c5'::uuid, 'LANDSLIDE', 'SUBMITTED', NULL::timestamptz, now() - interval '145 minutes', 'Đất đá tràn ra lối đi, cần kiểm tra tuyến đường.', '0900000303', '00000000-0000-4000-8000-000000000113'::uuid, 'Người dân 3'),
+    ('00000000-0000-4000-8000-00000000f104'::uuid, 'C48SEED0004', 'demo$seed-expansion$0004', '00000000-0000-4000-8000-0000000000c6'::uuid, 'FLOOD', 'SUBMITTED', NULL::timestamptz, now() - interval '120 minutes', 'Nước ngập tuyến đường trước nhà, cần hướng dẫn di chuyển.', '0900000304', NULL::uuid, 'Người báo 04'),
+    ('00000000-0000-4000-8000-00000000f105'::uuid, 'C48SEED0005', NULL::text, '00000000-0000-4000-8000-0000000000c7'::uuid, 'MEDICAL', 'SUBMITTED', NULL::timestamptz, now() - interval '100 minutes', 'Người thân cần được hỗ trợ y tế tại điểm sơ tán.', '0900000305', '00000000-0000-4000-8000-000000000113'::uuid, 'Người dân 3'),
+    ('00000000-0000-4000-8000-00000000f106'::uuid, 'C48SEED0006', 'demo$seed-expansion$0006', '00000000-0000-4000-8000-0000000000c8'::uuid, 'STORM', 'SUBMITTED', NULL::timestamptz, now() - interval '80 minutes', 'Cây đổ chắn lối vào khu dân cư, chưa ghi nhận người bị thương.', '0900000306', NULL::uuid, 'Người báo 06'),
+    ('00000000-0000-4000-8000-00000000f107'::uuid, 'C48SEED0007', NULL::text, '00000000-0000-4000-8000-0000000000c3'::uuid, 'FLOOD', 'SUBMITTED', NULL::timestamptz, now() - interval '60 minutes', 'Một hộ cần nước uống và hỗ trợ kiểm tra an toàn.', '0900000307', '00000000-0000-4000-8000-000000000113'::uuid, 'Người dân 3'),
+    ('00000000-0000-4000-8000-00000000f108'::uuid, 'C48SEED0008', 'demo$seed-expansion$0008', '00000000-0000-4000-8000-0000000000c4'::uuid, 'OTHER', 'SUBMITTED', NULL::timestamptz, now() - interval '50 minutes', 'Nước sinh hoạt bị gián đoạn sau mưa lớn.', '0900000308', NULL::uuid, 'Người báo 08'),
+    ('00000000-0000-4000-8000-00000000f109'::uuid, 'C48SEED0009', NULL::text, '00000000-0000-4000-8000-0000000000c5'::uuid, 'LANDSLIDE', 'VERIFYING', now() - interval '30 minutes', now() - interval '45 minutes', 'Có vết nứt mới trên taluy gần nhà, đang chờ xác minh.', '0900000309', '00000000-0000-4000-8000-000000000113'::uuid, 'Người dân 3'),
+    ('00000000-0000-4000-8000-00000000f10a'::uuid, 'C48SEED0010', 'demo$seed-expansion$0010', '00000000-0000-4000-8000-0000000000c6'::uuid, 'FLOOD', 'VERIFYING', now() - interval '25 minutes', now() - interval '40 minutes', 'Nước vào tầng trệt, cần xác nhận số người và tình hình hiện trường.', '0900000310', NULL::uuid, 'Người báo 10'),
+    ('00000000-0000-4000-8000-00000000f10b'::uuid, 'C48SEED0011', NULL::text, '00000000-0000-4000-8000-0000000000c7'::uuid, 'MEDICAL', 'VERIFYING', now() - interval '20 minutes', now() - interval '35 minutes', 'Người cao tuổi cần hỗ trợ sơ cứu tại nơi trú tạm.', '0900000311', '00000000-0000-4000-8000-000000000113'::uuid, 'Người dân 3'),
+    ('00000000-0000-4000-8000-00000000f10c'::uuid, 'C48SEED0012', 'demo$seed-expansion$0012', '00000000-0000-4000-8000-0000000000c8'::uuid, 'STORM', 'VERIFYING', now() - interval '15 minutes', now() - interval '30 minutes', 'Mái che bị hư hỏng, hộ dân đã đến điểm trú tạm.', '0900000312', NULL::uuid, 'Người báo 12')
   ) AS fixture(id, tracking_code, tracking_secret_hash, campaign_id, category_code, status, verifying_since,
                received_at, description, phone, reporter_user_id, reporter_name)
   JOIN campaign ON campaign.id = fixture.campaign_id
@@ -300,21 +300,21 @@ INSERT INTO assistance_request (id, tracking_code, incident_category_code, repor
 SELECT fixture.id, fixture.tracking_code, fixture.category_code, 'SELF', fixture.status::request_status, fixture.verifying_since,
        fixture.received_at, fixture.description, fixture.phone, fixture.reporter_name
   FROM (VALUES
-    ('00000000-0000-4000-8000-00000000f201'::uuid, 'C48CAM00A01', 'FLOOD', 'SUBMITTED', NULL::timestamptz, now() - interval '17 minutes', 'Nước dâng vào nhà, cần hỗ trợ di dời người già và trẻ nhỏ.', '0900400001', 'Người báo A01 (demo)'),
-    ('00000000-0000-4000-8000-00000000f202'::uuid, 'C48CAM00A02', 'TRAPPED', 'SUBMITTED', NULL::timestamptz, now() - interval '24 minutes', 'Người cao tuổi mắc kẹt tầng trệt do nước chảy xiết.', '0900400002', 'Người báo A02 (demo)'),
-    ('00000000-0000-4000-8000-00000000f203'::uuid, 'C48CAM00A03', 'STORM', 'VERIFYING', now() - interval '23 minutes', now() - interval '31 minutes', 'Gió lớn làm sập mái nhà, gia đình cần chỗ trú tạm.', '0900400003', 'Người báo A03 (demo)'),
-    ('00000000-0000-4000-8000-00000000f204'::uuid, 'C48CAM00A04', 'MEDICAL', 'SUBMITTED', NULL::timestamptz, now() - interval '38 minutes', 'Người bệnh cần hỗ trợ y tế, đường vào bị ngập.', '0900400004', 'Người báo A04 (demo)'),
-    ('00000000-0000-4000-8000-00000000f205'::uuid, 'C48CAM00A05', 'LANDSLIDE', 'SUBMITTED', NULL::timestamptz, now() - interval '45 minutes', 'Sạt lở chặn đường vào bản, cần kiểm tra an toàn.', '0900400005', 'Người báo A05 (demo)'),
-    ('00000000-0000-4000-8000-00000000f206'::uuid, 'C48CAM00B01', 'FLOOD', 'SUBMITTED', NULL::timestamptz, now() - interval '52 minutes', 'Khu dân cư bị cô lập bởi nước lũ, cần xuồng cứu hộ.', '0900400006', 'Người báo B01 (demo)'),
-    ('00000000-0000-4000-8000-00000000f207'::uuid, 'C48CAM00B02', 'TRAPPED', 'VERIFYING', now() - interval '27 minutes', now() - interval '59 minutes', 'Gia đình mắc kẹt trên tầng hai, nước còn dâng.', '0900400007', 'Người báo B02 (demo)'),
-    ('00000000-0000-4000-8000-00000000f208'::uuid, 'C48CAM00B03', 'MEDICAL', 'SUBMITTED', NULL::timestamptz, now() - interval '66 minutes', 'Người già khó thở, cần sơ cứu tại chỗ.', '0900400008', 'Người báo B03 (demo)'),
-    ('00000000-0000-4000-8000-00000000f209'::uuid, 'C48CAM00C01', 'FLOOD', 'SUBMITTED', NULL::timestamptz, now() - interval '73 minutes', 'Nước ngập đường, cần nhu yếu phẩm cho 4 người.', '0900400009', 'Người báo C01 (demo)'),
-    ('00000000-0000-4000-8000-00000000f20a'::uuid, 'C48CAM00C02', 'STORM', 'SUBMITTED', NULL::timestamptz, now() - interval '80 minutes', 'Cây đổ chắn lối vào nhà, cần hỗ trợ dọn dẹp.', '0900400010', 'Người báo C02 (demo)'),
-    ('00000000-0000-4000-8000-00000000f20b'::uuid, 'C48CAM00C03', 'FLOOD', 'SUBMITTED', NULL::timestamptz, now() - interval '87 minutes', 'Ngập sâu, cần cứu trợ lương thực và nước sạch.', '0900400011', 'Người báo C03 (demo)'),
-    ('00000000-0000-4000-8000-00000000f20c'::uuid, 'C48CAM00C04', 'FLOOD', 'SUBMITTED', NULL::timestamptz, now() - interval '94 minutes', 'Nước tràn vào khu nhà, cần hỗ trợ di dời.', '0900400012', 'Người báo C04 (demo)'),
-    ('00000000-0000-4000-8000-00000000f20d'::uuid, 'C48CAM00C05', 'TRAPPED', 'SUBMITTED', NULL::timestamptz, now() - interval '101 minutes', 'Người già và trẻ nhỏ chờ cứu hộ trên mái nhà.', '0900400013', 'Người báo C05 (demo)'),
-    ('00000000-0000-4000-8000-00000000f20e'::uuid, 'C48CAM00C06', 'MEDICAL', 'VERIFYING', now() - interval '34 minutes', now() - interval '108 minutes', 'Cần hỗ trợ y tế khẩn cho người cao tuổi.', '0900400014', 'Người báo C06 (demo)'),
-    ('00000000-0000-4000-8000-00000000f20f'::uuid, 'C48CAM00C07', 'FLOOD', 'SUBMITTED', NULL::timestamptz, now() - interval '115 minutes', 'Nằm ngay sát ngoài vùng chiến dịch Nam, cần hỗ trợ nước uống.', '0900400015', 'Người báo C07 (demo)')
+    ('00000000-0000-4000-8000-00000000f201'::uuid, 'C48CAM00A01', 'FLOOD', 'SUBMITTED', NULL::timestamptz, now() - interval '17 minutes', 'Nước dâng vào nhà, cần hỗ trợ di dời người già và trẻ nhỏ.', '0900400001', 'Người báo A01'),
+    ('00000000-0000-4000-8000-00000000f202'::uuid, 'C48CAM00A02', 'TRAPPED', 'SUBMITTED', NULL::timestamptz, now() - interval '24 minutes', 'Người cao tuổi mắc kẹt tầng trệt do nước chảy xiết.', '0900400002', 'Người báo A02'),
+    ('00000000-0000-4000-8000-00000000f203'::uuid, 'C48CAM00A03', 'STORM', 'VERIFYING', now() - interval '23 minutes', now() - interval '31 minutes', 'Gió lớn làm sập mái nhà, gia đình cần chỗ trú tạm.', '0900400003', 'Người báo A03'),
+    ('00000000-0000-4000-8000-00000000f204'::uuid, 'C48CAM00A04', 'MEDICAL', 'SUBMITTED', NULL::timestamptz, now() - interval '38 minutes', 'Người bệnh cần hỗ trợ y tế, đường vào bị ngập.', '0900400004', 'Người báo A04'),
+    ('00000000-0000-4000-8000-00000000f205'::uuid, 'C48CAM00A05', 'LANDSLIDE', 'SUBMITTED', NULL::timestamptz, now() - interval '45 minutes', 'Sạt lở chặn đường vào bản, cần kiểm tra an toàn.', '0900400005', 'Người báo A05'),
+    ('00000000-0000-4000-8000-00000000f206'::uuid, 'C48CAM00B01', 'FLOOD', 'SUBMITTED', NULL::timestamptz, now() - interval '52 minutes', 'Khu dân cư bị cô lập bởi nước lũ, cần xuồng cứu hộ.', '0900400006', 'Người báo B01'),
+    ('00000000-0000-4000-8000-00000000f207'::uuid, 'C48CAM00B02', 'TRAPPED', 'VERIFYING', now() - interval '27 minutes', now() - interval '59 minutes', 'Gia đình mắc kẹt trên tầng hai, nước còn dâng.', '0900400007', 'Người báo B02'),
+    ('00000000-0000-4000-8000-00000000f208'::uuid, 'C48CAM00B03', 'MEDICAL', 'SUBMITTED', NULL::timestamptz, now() - interval '66 minutes', 'Người già khó thở, cần sơ cứu tại chỗ.', '0900400008', 'Người báo B03'),
+    ('00000000-0000-4000-8000-00000000f209'::uuid, 'C48CAM00C01', 'FLOOD', 'SUBMITTED', NULL::timestamptz, now() - interval '73 minutes', 'Nước ngập đường, cần nhu yếu phẩm cho 4 người.', '0900400009', 'Người báo C01'),
+    ('00000000-0000-4000-8000-00000000f20a'::uuid, 'C48CAM00C02', 'STORM', 'SUBMITTED', NULL::timestamptz, now() - interval '80 minutes', 'Cây đổ chắn lối vào nhà, cần hỗ trợ dọn dẹp.', '0900400010', 'Người báo C02'),
+    ('00000000-0000-4000-8000-00000000f20b'::uuid, 'C48CAM00C03', 'FLOOD', 'SUBMITTED', NULL::timestamptz, now() - interval '87 minutes', 'Ngập sâu, cần cứu trợ lương thực và nước sạch.', '0900400011', 'Người báo C03'),
+    ('00000000-0000-4000-8000-00000000f20c'::uuid, 'C48CAM00C04', 'FLOOD', 'SUBMITTED', NULL::timestamptz, now() - interval '94 minutes', 'Nước tràn vào khu nhà, cần hỗ trợ di dời.', '0900400012', 'Người báo C04'),
+    ('00000000-0000-4000-8000-00000000f20d'::uuid, 'C48CAM00C05', 'TRAPPED', 'SUBMITTED', NULL::timestamptz, now() - interval '101 minutes', 'Người già và trẻ nhỏ chờ cứu hộ trên mái nhà.', '0900400013', 'Người báo C05'),
+    ('00000000-0000-4000-8000-00000000f20e'::uuid, 'C48CAM00C06', 'MEDICAL', 'VERIFYING', now() - interval '34 minutes', now() - interval '108 minutes', 'Cần hỗ trợ y tế khẩn cho người cao tuổi.', '0900400014', 'Người báo C06'),
+    ('00000000-0000-4000-8000-00000000f20f'::uuid, 'C48CAM00C07', 'FLOOD', 'SUBMITTED', NULL::timestamptz, now() - interval '115 minutes', 'Nằm ngay sát ngoài vùng chiến dịch Nam, cần hỗ trợ nước uống.', '0900400015', 'Người báo C07')
   ) AS fixture(id, tracking_code, category_code, status, verifying_since, received_at, description, phone, reporter_name)
  WHERE true
 ON CONFLICT DO NOTHING;

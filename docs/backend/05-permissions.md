@@ -21,7 +21,7 @@ Roles are a code catalog. The current role set has six codes: `ADMIN`, `COORDINA
 | `MAP_READ` (heatmap, grouped queue) |  |  | ● | ● |  |  |
 | `CAMPAIGN_READ` |  |  | ● | ● |  |  |
 | `CAMPAIGN_MANAGE` (create needs SYSTEM scope; update and pause need SYSTEM or a matching campaign grant) |  |  | ● | ● |  |  |
-| `DONATION_DRIVE_MANAGE` (donation drives) |  |  | ● | ● |  |  |
+| `DONATION_DRIVE_MANAGE` (donation drives) |  |  |  | ● |  |  |
 | `CAMPAIGN_WAREHOUSE_VIEW` (campaign warehouse assignment read) |  |  | ● | ● |  |  |
 | `CAMPAIGN_WAREHOUSE_MANAGE` (manual primary warehouse, re-evaluation) |  |  |  | ● |  |  |
 | `SUPPLY_GAP_VIEW` (supply-gap warnings and suggestions, read-only; SYSTEM scope) |  |  | ● | ● |  |  |
@@ -49,7 +49,8 @@ Roles are a code catalog. The current role set has six codes: `ADMIN`, `COORDINA
 Notes:
 - `REVIEWER` is the independent approver for receipts, distributions, losses and stock adjustments. It holds no other operational permission and no `REQUEST_CREATE_PROXY`.
 - `OPERATIONS_MANAGER` holds the former `INTAKE_STAFF` and `DISTRIBUTION_STAFF` permissions in addition to its own. It has no `DONATION_REVIEW`, so it cannot approve donation receipts it counted or any other receipt; those go to `REVIEWER`.
-- `COORDINATOR` gained `DONATION_DRIVE_MANAGE` when the former `CAMPAIGN_MANAGER` role was merged into it. It has no other Logistics permission beyond the rows above.
+- `CAMPAIGN_SETUP_MANAGE` (create a campaign, activate it, change its area) is held by `COORDINATOR` only, because coordinators draw campaigns from the SOS map. `OPERATIONS_MANAGER` does not create campaigns; it assigns a campaign's primary warehouse (`CAMPAIGN_WAREHOUSE_MANAGE`).
+- `COORDINATOR` does not hold `DONATION_DRIVE_MANAGE` (user decision, 2026-11-19): donation drives are managed by `OPERATIONS_MANAGER` only. The coordinator holds `CAMPAIGN_SETUP_MANAGE` instead and creates campaigns from the SOS map.
 - ADMIN has no request, victim or donor detail permission.
 - The ADMIN team-management extension does not grant mission assignment, request detail, or team-position reporting. Self-grant is refused by Identity.
 - `GET` endpoints with no row above need a valid session and object scope (e.g. own notices, own team).

@@ -2080,8 +2080,6 @@ function App() {
                     <SupplyGapWarningBadge user={user!} />
                     <CampaignCoordination key={selectedRequestId} user={user!} initialRequestId={selectedRequestId} />
                   </>
-                ) : workspace === 'coordinator' && selected.id === 'drives' && user ? (
-                  <Operations key="coordinator-drives" page="drives" user={user} />
                 ) : workspace === 'coordinator' &&
                   ['queue', 'verify', 'triage', 'assign'].includes(selected.id) ? (
                   <Coordinator key={`${selected.id}:${selectedRequestId}`} page={selected.id} currentUserId={user!.id}
@@ -2099,7 +2097,7 @@ function App() {
                     writeRoute('volunteer', 'missions', user);
                   } : undefined} />
                 ) : workspace === 'operations' && selected.id === 'campaigns' ? (
-                  <Campaigns key={workspace} canManage={roles(user).has('OPERATIONS_MANAGER')} canSetup={roles(user).has('OPERATIONS_MANAGER')} />
+                  <Campaigns key={workspace} canAssignWarehouse={roles(user).has('OPERATIONS_MANAGER')} />
                 ) : workspace === 'operations' && selected.id === 'drives' && user ? (
                   <SupplyGapsPage key={`supply:${user.id}`} user={user} />
                 ) : workspace === 'volunteer' ? (

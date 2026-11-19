@@ -2,7 +2,7 @@ import { Dropdown } from '../../components/ui/Dropdown';
 import { useEffect, useState } from 'react';
 import { api, newCommandKey } from '../../api/client';
 import { useUrlView } from '../../app/useUrlView';
-import { roles, type Me } from '../../auth/session';
+import type { Me } from '../../auth/session';
 import { StatusBadge } from '../../components/StatusBadge';
 import { Pager } from '../../components/ui/Pager';
 import { Coordinator } from './Coordinator';
@@ -54,7 +54,6 @@ export function CampaignCoordination({ user, initialRequestId = '' }: { user: Me
   const [refresh, setRefresh] = useState(0);
   const [queueRevision, setQueueRevision] = useState(0);
   const [managementOpen, setManagementOpen] = useState(false);
-  const isOperationsManager = roles(user).has('OPERATIONS_MANAGER');
   const [overviewPage, setOverviewPage] = useState(0);
   const selectedEngagement = engagements.find((item) => item.campaign_id === selectedId) ?? engagements[0];
   const overviewCampaigns = overview;
@@ -208,7 +207,7 @@ export function CampaignCoordination({ user, initialRequestId = '' }: { user: Me
             count={visibleCampaigns.length} noun="chiến dịch" />
 
           <div id="campaign-management-panel" className="campaign-overview__expanded" hidden={!managementOpen}>
-            {managementOpen && <Campaigns canManage canSetup={isOperationsManager} />}
+            {managementOpen && <Campaigns canManage canSetup />}
           </div>
         </section>
       </div>
