@@ -82,6 +82,7 @@ const Operations = React.lazy(() => import('./features/operations/Operations').t
 const SupplyGapsPage = React.lazy(() => import('./features/supply-gaps/SupplyGapsPage').then((module) => ({ default: module.SupplyGapsPage })));
 const RoleDashboard = React.lazy(() => import('./features/dashboard/RoleDashboard').then((module) => ({ default: module.RoleDashboard })));
 const PickupTicketsPage = React.lazy(() => import('./features/pickup/PickupTicketsPage').then((module) => ({ default: module.PickupTicketsPage })));
+const WarehouseDetailPage = React.lazy(() => import('./features/operations/WarehouseDetailPage').then((module) => ({ default: module.WarehouseDetailPage })));
 
 function IntakeReview({ user }: { user: Me }) {
   const canReview = roles(user).has('REVIEWER');
@@ -91,6 +92,7 @@ function IntakeReview({ user }: { user: Me }) {
     setStep(next);
     const url = new URL(window.location.href);
     url.searchParams.delete('view');
+    url.searchParams.delete('ticket_id');
     window.history.replaceState(null, '', url);
   }
   const current = step === 'review' && !canReview ? 'intake' : step;
@@ -98,6 +100,7 @@ function IntakeReview({ user }: { user: Me }) {
     ['intake', 'Tiếp nhận'],
     ...(canReview ? [['review', 'Duyệt và khiếu nại'] as [(typeof intakeSteps)[number], string]] : []),
     ['distribution', 'Phân phối vật tư'],
+    ['pickup', 'Phiếu lấy hàng'],
   ];
   return (
     <div>
@@ -107,7 +110,7 @@ function IntakeReview({ user }: { user: Me }) {
             aria-pressed={current === id} onClick={() => changeStep(id)}>{label}</button>
         ))}
       </div>
-      <Operations key={current} page={current} user={user} />
+      {current === 'pickup' ? <PickupTicketsPage user={user} /> : <Operations key={current} page={current} user={user} />}
     </div>
   );
 }
@@ -1444,6 +1447,9 @@ function permittedRoute(user: Me | null, requested: ReturnType<typeof routeFromU
   if (!requested || !allowedWorkspaces(user).includes(requested.workspace)) {
     return { workspace: fallbackWorkspace, page: fallbackPage };
   }
+  if (requested.workspace === 'operations' && ['supply', 'needs'].includes(requested.page)) return { workspace: 'operations' as const, page: 'drives' };
+  if (requested.workspace === 'operations' && requested.page === 'pickup') return { workspace: 'operations' as const, page: 'intake' };
+  if (requested.workspace === 'operations' && requested.page === 'campaigns') return { workspace: 'operations' as const, page: 'overview' };
   if (requested.page === 'account' && user) return requested;
   if (allowedPages(requested.workspace, user).some((page) => page.id === requested.page)) return requested;
   return { workspace: requested.workspace, page: allowedPages(requested.workspace, user)[0]?.id || fallbackPage };
@@ -1454,6 +1460,7 @@ function normalizeSubview(url: URL, workspace: Workspace, page: string, user: Me
     && ['campaigns', 'routing', 'sos', 'workspace', 'history', 'choose', 'my-history'].includes(url.searchParams.get('campaign_tab') || '')))
     url.searchParams.delete('campaign_tab');
   const allowedViews: readonly string[] = workspace === 'citizen' && page === 'drives' ? donationViews
+    : workspace === 'operations' && page === 'drives' ? ['drives', 'norms']
     : (workspace === 'volunteer' || workspace === 'coordinator') && page === 'notices' ? noticeViews
     : workspace === 'volunteer' && page === 'missions' ? missionViews
     : workspace === 'operations' && page === 'assets' ? assetViews
@@ -1463,7 +1470,7 @@ function normalizeSubview(url: URL, workspace: Workspace, page: string, user: Me
   if (!allowedViews.includes(url.searchParams.get('view') || '')) url.searchParams.delete('view');
   if (!(workspace === 'operations' && page === 'intake' && roles(user).has('REVIEWER')
     && (intakeSteps as readonly string[]).includes(url.searchParams.get('step') || ''))
-    && !(workspace === 'operations' && page === 'intake' && url.searchParams.get('step') === 'distribution')) url.searchParams.delete('step');
+    && !(workspace === 'operations' && page === 'intake' && ['distribution', 'pickup'].includes(url.searchParams.get('step') || ''))) url.searchParams.delete('step');
   const sosId = url.searchParams.get('sos_id');
   if (!(workspace === 'coordinator' && ['queue', 'verify', 'triage', 'assign'].includes(page)
     && sosId && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(sosId))) {
@@ -1471,6 +1478,10 @@ function normalizeSubview(url: URL, workspace: Workspace, page: string, user: Me
     url.searchParams.delete('sos_tab');
   } else if (!['review', 'dispatch', 'ai', 'history'].includes(url.searchParams.get('sos_tab') || '')) {
     url.searchParams.delete('sos_tab');
+  }
+  if (!(workspace === 'operations' && page === 'assets' && url.searchParams.get('view') === 'warehouses' && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(url.searchParams.get('warehouse_id') || ''))) {
+    url.searchParams.delete('warehouse_id');
+    url.searchParams.delete('warehouse_name');
   }
 }
 
@@ -1486,6 +1497,9 @@ function writeRoute(workspace: Workspace, page: string, user: Me | null, mode: '
     url.searchParams.delete('sos_id');
     url.searchParams.delete('sos_tab');
     url.searchParams.delete('campaign_tab');
+    url.searchParams.delete('ticket_id');
+    url.searchParams.delete('warehouse_id');
+    url.searchParams.delete('warehouse_name');
   } else {
     normalizeSubview(url, workspace, page, user);
   }
@@ -2000,7 +2014,7 @@ function App() {
                   } : undefined} />
                 ) : workspace === 'operations' && selected.id === 'campaigns' ? (
                   <Campaigns key={workspace} canManage={roles(user).has('OPERATIONS_MANAGER')} canSetup={roles(user).has('OPERATIONS_MANAGER')} />
-                ) : workspace === 'operations' && selected.id === 'supply' && user ? (
+                ) : workspace === 'operations' && selected.id === 'drives' && user ? (
                   <SupplyGapsPage key={`supply:${user.id}`} user={user} />
                 ) : workspace === 'volunteer' ? (
                   <Volunteer key={`${selected.id}:${selectedMissionId}`} page={selected.id} currentUserId={user!.id} initialMissionId={selectedMissionId}
@@ -2015,6 +2029,8 @@ function App() {
                   <IntakeReview user={user} />
                 ) : workspace === 'operations' && selected.id === 'pickup' && user ? (
                   <PickupTicketsPage user={user} />
+                ) : workspace === 'operations' && selected.id === 'assets' && user && new URL(window.location.href).searchParams.get('warehouse_id') ? (
+                  <WarehouseDetailPage warehouseId={new URL(window.location.href).searchParams.get('warehouse_id')!} warehouseName={new URL(window.location.href).searchParams.get('warehouse_name') || undefined} />
                 ) : workspace === 'operations' && user ? (
                   <Operations key={selected.id} page={selected.id} user={user} />
                 ) : workspace === 'coordinator' && selected.id === 'teams' ? (

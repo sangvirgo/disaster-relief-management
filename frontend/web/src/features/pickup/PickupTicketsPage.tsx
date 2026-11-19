@@ -28,11 +28,27 @@ export function PickupTicketsPage({ user }: { user: Me }) {
   const [status, setStatus] = useState<'' | PickupStatus>('');
   const [items, setItems] = useState<PickupTicket[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
+  const [pageCursor, setPageCursor] = useState<string | null>(null);
+  const [previousCursors, setPreviousCursors] = useState<(string | null)[]>([]);
   const [more, setMore] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(() => new URL(window.location.href).searchParams.get('ticket_id'));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
+
+  useEffect(() => {
+    const restore = () => setSelectedId(new URL(window.location.href).searchParams.get('ticket_id'));
+    window.addEventListener('popstate', restore);
+    return () => window.removeEventListener('popstate', restore);
+  }, []);
+
+  function openTicket(id: string | null) {
+    setSelectedId(id);
+    const url = new URL(window.location.href);
+    if (id) url.searchParams.set('ticket_id', id);
+    else url.searchParams.delete('ticket_id');
+    window.history.pushState(null, '', url);
+  }
 
   useEffect(() => {
     if (!canView) return;
@@ -44,6 +60,7 @@ export function PickupTicketsPage({ user }: { user: Me }) {
     setMore(false);
     const query = new URLSearchParams({ limit: '25' });
     if (status) query.set('status', status);
+    if (pageCursor) query.set('cursor', pageCursor);
     readPickup<PickupTicketList>(`/pickup-tickets?${query}`)
       .then((page) => {
         if (!live) return;
@@ -54,23 +71,18 @@ export function PickupTicketsPage({ user }: { user: Me }) {
       .catch((cause) => { if (live) { setItems([]); setMore(false); setError(pickupErrorMessage(cause, 'load')); } })
       .finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
-  }, [canView, status, revision]);
+  }, [canView, status, pageCursor, revision]);
 
-  async function loadMore() {
+  function nextPage() {
     if (!cursor) return;
-    setLoading(true);
-    try {
-      const query = new URLSearchParams({ limit: '25', cursor });
-      if (status) query.set('status', status);
-      const page = await readPickup<PickupTicketList>(`/pickup-tickets?${query}`);
-      setItems((current) => [...current, ...(page.items as PickupTicket[])]);
-      setCursor(page.more ? page.cursor ?? null : null);
-      setMore(Boolean(page.more));
-    } catch (cause) {
-      setError(pickupErrorMessage(cause, 'load'));
-    } finally {
-      setLoading(false);
-    }
+    setPreviousCursors((current) => [...current, pageCursor]);
+    setPageCursor(cursor);
+  }
+
+  function previousPage() {
+    const previous = previousCursors.at(-1);
+    setPageCursor(previous ?? null);
+    setPreviousCursors((current) => current.slice(0, -1));
   }
 
   if (!canView) {
@@ -90,7 +102,7 @@ export function PickupTicketsPage({ user }: { user: Me }) {
           <h2 id={`${filterId}-title`}>Phiếu lấy hàng theo nhiệm vụ</h2>
           <div className="pickup-field pickup-field--inline">
             <label htmlFor={`${filterId}-status`}>Trạng thái</label>
-            <select id={`${filterId}-status`} value={status} onChange={(event) => { setStatus(event.target.value as '' | PickupStatus); setSelectedId(null); }}>
+            <select id={`${filterId}-status`} value={status} onChange={(event) => { setStatus(event.target.value as '' | PickupStatus); setPageCursor(null); setPreviousCursors([]); openTicket(null); }}>
               {STATUS_FILTERS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
           </div>
@@ -114,7 +126,7 @@ export function PickupTicketsPage({ user }: { user: Me }) {
             {items.map((ticket) => (
               <li key={ticket.id}>
                 <button type="button" className={`pickup-row${selectedId === ticket.id ? ' is-selected' : ''}`}
-                  aria-pressed={selectedId === ticket.id} onClick={() => setSelectedId(ticket.id)}>
+                  aria-pressed={selectedId === ticket.id} onClick={() => openTicket(ticket.id)}>
                   <span className="pickup-row__title">Nhiệm vụ …{ticket.mission_id.slice(-8)}</span>
                   <Badge tone={pickupStatusTone[ticket.status]} title={pickupStatusLabels[ticket.status]}>{pickupStatusLabels[ticket.status]}</Badge>
                   <span className="pickup-row__meta">{ticket.lines.length} mặt hàng · Cập nhật {timeLabel(ticket.updated_at)}</span>
@@ -126,20 +138,21 @@ export function PickupTicketsPage({ user }: { user: Me }) {
           </ul>
         )}
 
-        {more && (
-          <div className="pickup-form-actions">
-            <Button variant="secondary" size="sm" loading={loading} disabled={loading} onClick={() => void loadMore()}>Tải thêm</Button>
-          </div>
-        )}
+        {(more || previousCursors.length > 0) && <nav className="pickup-form-actions" aria-label="Phân trang phiếu lấy hàng">
+          <span>Trang {previousCursors.length + 1}</span>
+          <Button variant="secondary" size="sm" disabled={loading || previousCursors.length === 0} onClick={previousPage}>‹ Trang trước</Button>
+          <Button variant="secondary" size="sm" disabled={loading || !more || !cursor} onClick={nextPage}>Trang sau ›</Button>
+        </nav>}
       </section>
 
       {selectedId ? (
-        <PickupTicketPanel key={selectedId} user={user} ticketId={selectedId} headingLevel={2}
-          onChanged={() => setRevision((value) => value + 1)} />
+        <div className="pickup-detail-page">
+          <Button variant="secondary" size="sm" onClick={() => openTicket(null)}>← Danh sách phiếu</Button>
+          <PickupTicketPanel key={selectedId} user={user} ticketId={selectedId} headingLevel={2}
+            onChanged={() => setRevision((value) => value + 1)} />
+        </div>
       ) : (
-        <section className="card pickup-panel pickup-panel--placeholder" aria-label="Chi tiết phiếu lấy hàng">
-          <EmptyState title="Chọn một phiếu" description="Chọn phiếu trong danh sách để xem tiến trình, số liệu và thao tác." />
-        </section>
+        null
       )}
     </div>
   );

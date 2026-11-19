@@ -23,17 +23,20 @@
 }
 
 .pickup-page {
-  display: grid;
+  display: block;
   gap: 16px;
   min-width: 0;
 }
 
 @media (min-width: 960px) {
   .pickup-page {
-    grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
-    align-items: start;
+    max-width: 1200px;
   }
 }
+
+.pickup-detail-page { display: grid; gap: 16px; }
+.pickup-detail-page > button { justify-self: start; }
+.pickup-page:has(.pickup-detail-page) .pickup-list-card { display: none; }
 
 .pickup-panel,
 .pickup-subcard,

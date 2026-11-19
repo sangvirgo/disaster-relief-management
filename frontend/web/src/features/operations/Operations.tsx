@@ -55,7 +55,7 @@ const headings: Record<string, string> = {
   intake: 'Tiếp nhận đóng góp',
   review: 'Duyệt biên nhận',
   stock: 'Tồn kho theo kho',
-  assets: 'Điểm cứu trợ, phương tiện và kho',
+  assets: 'Kho, điểm cứu trợ và phương tiện',
   needs: 'Danh sách nhu cầu vật tư',
   distribution: 'Danh sách phiếu phân phối',
   handoff: 'Bàn giao vật tư',
@@ -108,7 +108,7 @@ function readReportFilters(userId: string): { warehouse?: string; campaign?: str
 
 export function Operations({ page, user }: { page: string; user: Me }) {
   const rights = roles(user);
-  const [asset, setAsset] = useUrlView('view', assetViews, 'relief-points');
+  const [asset, setAsset] = useUrlView('view', assetViews, 'warehouses');
   const [reviewTab, setReviewTab] = useUrlView('view', reviewViews, 'receipts');
   const [report, setReport] = useUrlView('view', reportViews, 'stock-summary');
   const [warehouse, setWarehouse] = useState(() => readReportFilters(user.id).warehouse || '');
@@ -448,9 +448,9 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           <div className="tabs">
             {(
               [
+                ['warehouses', 'Kho'],
                 ['relief-points', 'Điểm cứu trợ'],
                 ['vehicles', 'Phương tiện'],
-                ['warehouses', 'Kho'],
               ] as const
             ).map(([value, title]) => (
               <button
@@ -641,7 +641,9 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             <table className="operations-record-table">
               <thead><tr><th scope="col">{page === 'assets' ? asset === 'vehicles' ? 'Phương tiện' : asset === 'warehouses' ? 'Kho' : 'Điểm cứu trợ' : 'Tên bản ghi'}</th>{page !== 'assets' && <th scope="col">Thông tin chính</th>}<th scope="col">Thời gian</th><th scope="col">Trạng thái</th></tr></thead>
               <tbody>{items.map((item) => <tr key={operationRecordKey(item)}>
-                <th scope="row"><button type="button" className="table-row-link" onClick={() => { setDetailTab('overview'); setSelected(item); }}>{recordTitle(page, item)}</button>{page === 'needs' && <span className="supply-table-cell-stack"><NeedSourceBadge source={item.source} /><NeedReasonChips codes={item.reason_codes} /></span>}</th>
+                <th scope="row">{page === 'assets' && asset === 'warehouses' && item.id
+                  ? <a className="table-row-link" href={`?workspace=operations&page=assets&view=warehouses&warehouse_id=${encodeURIComponent(item.id)}&warehouse_name=${encodeURIComponent(recordTitle(page, item))}`} aria-label={`Xem tồn kho ${recordTitle(page, item)}`}>{recordTitle(page, item)}</a>
+                  : <button type="button" className="table-row-link" onClick={() => { setDetailTab('overview'); setSelected(item); }}>{recordTitle(page, item)}</button>}{page === 'needs' && <span className="supply-table-cell-stack"><NeedSourceBadge source={item.source} /><NeedReasonChips codes={item.reason_codes} /></span>}</th>
                 {page !== 'assets' && <td>{distributionPages.has(page) ? distributionItems(item, references.itemUnits)
                   : item.requested != null ? `Cần ${quantityWithUnit(item, item.requested)} · Đã giao ${quantityWithUnit(item, item.delivered)}`
                   : item.active_requested != null ? `Cần ${quantityWithUnit(item, item.active_requested)} · Đã giao ${quantityWithUnit(item, item.delivered)}`
@@ -1401,6 +1403,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 : asset === 'warehouses'
                   ? [
                       { name: 'name', label: 'Tên kho', required: true, maxLength: 200 },
+                      { name: 'address_note', label: 'Địa chỉ hoặc khu vực gần đúng', maxLength: 500 },
                       { name: 'location', label: 'Vùng phục vụ của kho', type: 'service-area', radiusFieldName: 'service_radius_m', radiusRange: { min: 500, max: 200_000 } },
                       { name: 'service_radius_m', label: 'Bán kính phục vụ (mét)', type: 'number', integer: true, min: 500, max: 200_000 },
                     ]
@@ -1420,6 +1423,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 : asset === 'warehouses'
                   ? (values) => ({
                       name: values.name,
+                      ...(values.address_note?.trim() ? { address_note: values.address_note.trim() } : {}),
                       // Location and radius are sent together or not at all (the form enforces the pair).
                       ...(values.location
                         ? {

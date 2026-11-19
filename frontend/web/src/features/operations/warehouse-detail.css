@@ -1,0 +1,5 @@
+.warehouse-detail { display: grid; gap: 16px; }
+.warehouse-detail__heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.warehouse-detail__heading h2 { margin: 0; }
+.warehouse-detail__heading p { margin: 6px 0 0; color: #52657b; }
+.warehouse-detail > .card { padding: 20px; }

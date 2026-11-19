@@ -10,6 +10,7 @@ import { AddNeedEstimates1795392000000 } from './migrations/AddNeedEstimates1795
 import { AddSupplyGaps1795564800000 } from './migrations/AddSupplyGaps1795564800000';
 import { AddPickupTickets1795651200000 } from './migrations/AddPickupTickets1795651200000';
 import { AddPickupCloseout1795737600000 } from './migrations/AddPickupCloseout1795737600000';
+import { GrantCampaignWarehouseAccess1795824000000 } from './migrations/GrantCampaignWarehouseAccess1795824000000';
 
 export default new DataSource(postgresOptions([
   InitialLogistics1710000000000,
@@ -21,4 +22,5 @@ export default new DataSource(postgresOptions([
   AddSupplyGaps1795564800000,
   AddPickupTickets1795651200000,
   AddPickupCloseout1795737600000,
+  GrantCampaignWarehouseAccess1795824000000,
 ], 'logistics'));
