@@ -13,6 +13,7 @@ import { FulfillmentCyclesModule } from './fulfillment-cycles/fulfillment-cycles
 import { ReportsModule } from './reports/reports.module';
 import { SupplyGapsModule } from './supply-gaps/supply-gaps.module';
 import { PickupTicketsModule } from './pickup-tickets/pickup-tickets.module';
+import { NeedExtractionModule } from './need-extraction/need-extraction.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { PickupTicketsModule } from './pickup-tickets/pickup-tickets.module';
     AuditModule,
     SupplyGapsModule,
     PickupTicketsModule,
+    NeedExtractionModule,
   ],
 })
 export class AppModule {}

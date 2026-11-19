@@ -168,9 +168,8 @@ export function SosForm({
   function getClientErrors(): Record<string, string> {
     const errors: Record<string, string> = {};
     if (!category) errors.category = 'Loại sự cố là bắt buộc.';
-    const fullDescription = [description.trim(), needsRelief && reliefItems.trim() ? `Hàng cứu trợ cần: ${reliefItems.trim()}` : ''].filter(Boolean).join('\n');
-    if (fullDescription.length > 2000) errors.description = 'Tổng nội dung mô tả và hàng cứu trợ không được vượt quá 2.000 ký tự.';
-    if (reliefItems.length > 300) errors.reliefItems = 'Nhu cầu hàng cứu trợ không được vượt quá 300 ký tự.';
+    if (description.trim().length > 2000) errors.description = 'Mô tả tình huống không được vượt quá 2.000 ký tự.';
+    if (needsRelief && reliefItems.trim().length > 500) errors.reliefItems = 'Vật phẩm cần hỗ trợ không được vượt quá 500 ký tự.';
     if (name.length > 200) errors.name = 'Họ tên người báo không được vượt quá 200 ký tự.';
     for (const [field, value] of [['phone', phone], ['beneficiaryPhone', beneficiaryPhone], ['alternatePhone', alternatePhone]] as const) {
       if (!value.trim()) continue;
@@ -231,9 +230,8 @@ export function SosForm({
       reporter_declared_danger: danger,
       needs_rescue: needsRescue,
       needs_relief_supplies: needsRelief,
-      ...([description.trim(), needsRelief && reliefItems.trim() ? `Hàng cứu trợ cần: ${reliefItems.trim()}` : ''].filter(Boolean).length
-        ? { description: [description.trim(), needsRelief && reliefItems.trim() ? `Hàng cứu trợ cần: ${reliefItems.trim()}` : ''].filter(Boolean).join('\n') }
-        : {}),
+      ...(needsRelief && reliefItems.trim() ? { relief_items_text: reliefItems.trim() } : {}),
+      ...(description.trim() ? { description: description.trim() } : {}),
       ...(people ? { people_affected: Number(people) } : {}),
       ...(children ? { children_count: Number(children) } : {}),
       ...(elderly ? { elderly_count: Number(elderly) } : {}),
@@ -485,16 +483,20 @@ export function SosForm({
                 Cần hàng cứu trợ (lương thực, nước uống, vật dụng)
               </label>
               {needsRelief && <label className="sos-relief-items">
-                Hàng cứu trợ cần (nếu biết)
+                Vật phẩm cần hỗ trợ
                 <textarea
                   data-sos-field="reliefItems"
                   rows={2}
-                  maxLength={301}
+                  maxLength={500}
                   value={reliefItems}
                   aria-invalid={fieldInvalid('reliefItems')}
+                  aria-describedby="sos-relief-items-help"
                   onChange={(event) => { setReliefItems(event.target.value); pending.current = null; }}
-                  placeholder="Ví dụ: nước uống, lương thực, thuốc, chăn màn…"
+                  placeholder="Ví dụ: nước uống, mì tôm, thuốc"
                 />
+                <small id="sos-relief-items-help" className="sos-field-help">
+                  Chỉ cần ghi tên vật phẩm, ví dụ: nước uống, mì tôm, thuốc. Không cần ghi số lượng.
+                </small>
                 {fieldMessage('reliefItems')}
               </label>}
               {fieldMessage('needs')}

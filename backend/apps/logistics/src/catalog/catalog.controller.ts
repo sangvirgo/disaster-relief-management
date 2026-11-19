@@ -1,8 +1,8 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, Req, Res, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query, Req, Res, UseInterceptors } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotency.interceptor';
 import { CatalogService } from './catalog.service';
-import { CatalogPageQueryDto, CreateItemDto, CreateItemTypeDto, CreateUnitDto, DeactivateItemDto, ItemPageQueryDto } from './catalog.dto';
+import { CatalogPageQueryDto, CreateItemDto, CreateItemTypeDto, CreateUnitDto, DeactivateItemDto, ItemPageQueryDto, UpdateItemAliasesDto } from './catalog.dto';
 import { noStore, markIdempotentReplay as replay } from '@c48/technical/http/response-headers';
 
 type LogisticsRequest = Request & { idempotencyKey?: string };
@@ -55,6 +55,21 @@ export class CatalogController {
   async createItem(@Body() dto: CreateItemDto, @Req() request: LogisticsRequest, @Res({ passthrough: true }) response: Response) {
     noStore(response);
     const result = await this.catalog.createItem(dto, request);
+    replay(response, result.replay);
+    return result.value;
+  }
+
+  @Patch('items/:id')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(IdempotencyKeyInterceptor)
+  async updateItemAliases(
+    @Param('id', new ParseUUIDPipe({ version: 'all' })) id: string,
+    @Body() dto: UpdateItemAliasesDto,
+    @Req() request: LogisticsRequest,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    noStore(response);
+    const result = await this.catalog.updateItemAliases(id, dto, request);
     replay(response, result.replay);
     return result.value;
   }

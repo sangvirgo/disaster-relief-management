@@ -17,6 +17,11 @@ export interface ResponseAdmission {
   version: number;
   status: 'VERIFIED' | 'TRIAGED' | 'DISPATCHED' | 'IN_PROGRESS';
   campaign_id: string | null;
+  /** SOS facts used by need estimates. Null when the SOS has not recorded the count. */
+  people_affected: number | null;
+  children_count: number | null;
+  elderly_count: number | null;
+  needs_relief_supplies: boolean;
 }
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -44,6 +49,10 @@ export function loadResponseAdmissionConfig(env: Record<string, string | undefin
     throw new Error('Invalid Logistics configuration: RESPONSE_BASE_URL, INTROSPECT_TIMEOUT_MS');
   }
   return { baseUrl, timeoutMs };
+}
+
+function isNullableCount(value: unknown): boolean {
+  return value === null || (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0);
 }
 
 function unavailable(): AppError {
@@ -118,7 +127,9 @@ export class ResponseAdmissionClient implements OnModuleDestroy {
         typeof row.version !== 'number' || !Number.isSafeInteger(row.version) || row.version < 1 ||
         typeof row.status !== 'string' || !eligibleStatuses.has(row.status as ResponseAdmission['status']) ||
 
-        !(row.campaign_id === null || (typeof row.campaign_id === 'string' && uuidPattern.test(row.campaign_id)))) {
+        !(row.campaign_id === null || (typeof row.campaign_id === 'string' && uuidPattern.test(row.campaign_id))) ||
+        !isNullableCount(row.people_affected) || !isNullableCount(row.children_count) || !isNullableCount(row.elderly_count) ||
+        typeof row.needs_relief_supplies !== 'boolean') {
       throw unavailable();
     }
     return row as unknown as ResponseAdmission;

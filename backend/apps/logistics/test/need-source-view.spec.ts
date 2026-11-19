@@ -1,9 +1,9 @@
 import { needSourceView, NeedSourceFields } from '../src/needs/needs.helpers';
 
 const estimateBasis = {
-  batch_id: 'batch-1', category: 'WATER', item_type_code: 'NUOC_UONG', norm_id: 'norm-1', norm_version: 1,
-  people_count: 10, days: 3, infants: 0, elderly: 0, effective_persons: '10.00', raw_quantity: '90.00000',
-  estimated_quantity: '90.000', reason_codes: ['NORM_PER_PERSON_DAY'] as const, estimated_at: '2026-11-18T00:00:00.000Z',
+  batch_id: 'batch-1', category: 'WATER', item_type_code: 'NUOC_UONG', item_id: 'item-1', norm_id: 'norm-1', norm_version: 1,
+  basis: 'BY_GROUP', inputs: { people: 10, children: 0, elderly: 0, adults: 10, raw_quantity: '30.000' },
+  estimated_quantity: '30.000', reason_codes: ['NORM_BY_GROUP'] as const, estimated_at: '2026-11-18T00:00:00.000Z',
 };
 
 function declared(overrides: Partial<NeedSourceFields> = {}): NeedSourceFields {

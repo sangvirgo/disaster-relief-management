@@ -83,14 +83,20 @@ export interface CampaignWarehouseView {
   generated_at: string;
 }
 
+export type NeedQuantityBasis = 'BY_GROUP' | 'PER_N_PEOPLE' | 'PER_REQUEST';
+
 export interface NeedNorm {
   id: string;
   category: string;
   item_type_code: string;
-  quantity_basis: 'PER_PERSON_DAY' | 'PER_PERSON';
-  qty_per_person_per_day: string;
-  modifier_infant: string;
-  modifier_elderly: string;
+  quantity_basis: NeedQuantityBasis;
+  qty_adult: string;
+  qty_child: string;
+  qty_elderly: string;
+  people_per_unit: number | null;
+  fixed_quantity: string | null;
+  default_item_id: string | null;
+  in_default_bundle: boolean;
   active: boolean;
   version: number;
   updated_at: string | null;
@@ -158,3 +164,41 @@ export function distanceLabel(meters: number): string {
   if (meters < 1000) return `${Math.round(meters).toLocaleString('vi-VN')} m`;
   return `${(meters / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} km`;
 }
+
+const sameNumber = (left: string | number | null | undefined, right: string | number | null | undefined) =>
+  left !== '' && left != null && right != null && Number(left) === Number(right);
+
+/** Fields that apply to each quantity basis. The backend rejects a norm whose fields do not match its basis. */
+export const normBasisFields: Record<NeedQuantityBasis, readonly (keyof NeedNorm)[]> = {
+  BY_GROUP: ['qty_adult', 'qty_child', 'qty_elderly'],
+  PER_N_PEOPLE: ['people_per_unit'],
+  PER_REQUEST: ['fixed_quantity'],
+};
+
+/**
+ * Builds the PATCH body for a norm edit. Only fields that differ from the stored norm are sent.
+ * Empty default item means "clear the default" (sent as null). Throws when nothing changed.
+ */
+export function buildNormPatch(norm: NeedNorm, values: Record<string, string>): Record<string, unknown> {
+  const basis = values.quantity_basis as NeedQuantityBasis;
+  const switched = basis !== norm.quantity_basis;
+  const body: Record<string, unknown> = {};
+  if (switched) body.quantity_basis = basis;
+  for (const field of normBasisFields[basis]) {
+    const entered = (values[field] ?? '').trim();
+    if (entered === '') continue;
+    if (switched || !sameNumber(entered, norm[field] as string | number | null | undefined)) {
+      body[field] = field === 'people_per_unit' ? Number(entered) : entered;
+    }
+  }
+  const defaultItem = (values.default_item_id ?? '').trim();
+  if (defaultItem === '' ? norm.default_item_id !== null : defaultItem !== norm.default_item_id) {
+    body.default_item_id = defaultItem === '' ? null : defaultItem;
+  }
+  const inBundle = values.in_default_bundle === 'true';
+  if (inBundle !== norm.in_default_bundle) body.in_default_bundle = inBundle;
+  if ((values.active === 'true') !== norm.active) body.active = values.active === 'true';
+  if (!Object.keys(body).length) throw new Error('Chưa có thay đổi nào để lưu.');
+  return body;
+}
+

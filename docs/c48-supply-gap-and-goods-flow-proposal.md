@@ -42,9 +42,10 @@ campaign_warehouse(campaign_id, warehouse_id, role PRIMARY|BACKUP, source AUTO|M
 request_need_line(request_id, item, quantity, unit, source DECLARED|ESTIMATED|CONFIRMED)
 ```
 
-- If the SOS has no detail, the system estimates from a rule table, not AI:
-  `estimate = people x days x norm x (1 + group modifiers)`
-  Example norms: water 3 L per person per day, 3 meals of food, 1 blanket per person. The manager can configure them. Reason codes map to Vietnamese text.
+- If the SOS has no detail, the system estimates from a rule table, not AI. Each norm has one basis (superseded by the Step 4 implementation in [backend §13](backend/04-logistics-api.md)):
+  `BY_GROUP`: `adults x qty_adult + children x qty_child + elderly x qty_elderly`, with adults = people - children - elderly.
+  `PER_N_PEOPLE`: `ceil(people / people_per_unit)`. `PER_REQUEST`: a fixed quantity per SOS.
+  Example seeds: water 3 / 1 / 2 (adult / child / elderly), food 2 / 1 / 1, one blanket per 2 people, one medicine kit per request. The manager can configure them. Reason codes map to Vietnamese text. Days and infant modifiers are not part of the model.
 - The coordinator reviews and confirms during verification. Only CONFIRMED and DECLARED lines feed the gap. ESTIMATED lines are shown as a separate forecast.
 
 ### 3.4 Gap calculation

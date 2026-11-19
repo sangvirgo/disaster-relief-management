@@ -8783,164 +8783,197 @@
     },
     "/internal/requests/{id}/cycles/{work_cycle}/admit": {
       "post": {
-        "operationId": "responseRequestAdmissionAdmit",
-        "summary": "RequestAdmissionController.admit",
-        "description": "Route exported from backend/apps/response/src/operations/request-admission.controller.ts#RequestAdmissionController.admit. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
+          "operationId": "responseRequestAdmissionAdmit",
+          "summary": "RequestAdmissionController.admit",
+          "description": "Route exported from backend/apps/response/src/operations/request-admission.controller.ts#RequestAdmissionController.admit. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "id",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "in": "path",
+              "name": "work_cycle",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
             }
-          },
-          {
-            "in": "path",
-            "name": "work_cycle",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Documented response shape.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "request_id": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "work_cycle": {
-                      "type": "integer"
-                    },
-                    "version": {
-                      "type": "integer"
-                    },
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "VERIFIED",
-                        "TRIAGED",
-                        "DISPATCHED",
-                        "IN_PROGRESS"
-                      ]
-                    },
-                    "campaign_id": {
-                      "anyOf": [
-                        {
-                          "type": "string",
-                          "format": "uuid"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
+          ],
+          "responses": {
+            "200": {
+              "description": "Documented response shape.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "request_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "work_cycle": {
+                        "type": "integer"
+                      },
+                      "version": {
+                        "type": "integer"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "VERIFIED",
+                          "TRIAGED",
+                          "DISPATCHED",
+                          "IN_PROGRESS"
+                        ]
+                      },
+                      "campaign_id": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "people_affected": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "children_count": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "elderly_count": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "needs_relief_supplies": {
+                        "type": "boolean"
+                      }
                     }
                   }
                 }
               }
-            }
-          },
-          "401": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "UNAUTHENTICATED": {
-                    "summary": "UNAUTHENTICATED",
-                    "value": {
-                      "code": "UNAUTHENTICATED",
-                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
+            },
+            "401": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
                   },
-                  "SESSION_EXPIRED": {
-                    "summary": "SESSION_EXPIRED",
-                    "value": {
-                      "code": "SESSION_EXPIRED",
-                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                  "examples": {
+                    "UNAUTHENTICATED": {
+                      "summary": "UNAUTHENTICATED",
+                      "value": {
+                        "code": "UNAUTHENTICATED",
+                        "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "SESSION_EXPIRED": {
+                      "summary": "SESSION_EXPIRED",
+                      "value": {
+                        "code": "SESSION_EXPIRED",
+                        "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "FORBIDDEN": {
+                      "summary": "FORBIDDEN",
+                      "value": {
+                        "code": "FORBIDDEN",
+                        "message": "Bạn không có quyền thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "409": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "ATTRIBUTION_LOCKED": {
+                      "summary": "ATTRIBUTION_LOCKED",
+                      "value": {
+                        "code": "ATTRIBUTION_LOCKED",
+                        "message": "Phạm vi xử lý đã được cố định cho chu kỳ này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "PENDING_SUPPLEMENT_REVIEW": {
+                      "summary": "PENDING_SUPPLEMENT_REVIEW",
+                      "value": {
+                        "code": "PENDING_SUPPLEMENT_REVIEW",
+                        "message": "Còn thông tin bổ sung chưa được xem xét.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "REQUEST_NOT_VERIFIED": {
+                      "summary": "REQUEST_NOT_VERIFIED",
+                      "value": {
+                        "code": "REQUEST_NOT_VERIFIED",
+                        "message": "Yêu cầu chưa được xác minh.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
                     }
                   }
                 }
               }
             }
           },
-          "403": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "FORBIDDEN": {
-                    "summary": "FORBIDDEN",
-                    "value": {
-                      "code": "FORBIDDEN",
-                      "message": "Bạn không có quyền thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
+          "x-c48-contract-source": "docs/backend/03-response-api.md",
+          "x-c48-controller-source": "backend/apps/response/src/operations/request-admission.controller.ts#RequestAdmissionController.admit",
+          "security": [
+            {
+              "ServiceToken": [],
+              "ActorAuthorization": []
             }
-          },
-          "409": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "ATTRIBUTION_LOCKED": {
-                    "summary": "ATTRIBUTION_LOCKED",
-                    "value": {
-                      "code": "ATTRIBUTION_LOCKED",
-                      "message": "Phạm vi xử lý đã được cố định cho chu kỳ này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  },
-                  "PENDING_SUPPLEMENT_REVIEW": {
-                    "summary": "PENDING_SUPPLEMENT_REVIEW",
-                    "value": {
-                      "code": "PENDING_SUPPLEMENT_REVIEW",
-                      "message": "Còn thông tin bổ sung chưa được xem xét.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  },
-                  "REQUEST_NOT_VERIFIED": {
-                    "summary": "REQUEST_NOT_VERIFIED",
-                    "value": {
-                      "code": "REQUEST_NOT_VERIFIED",
-                      "message": "Yêu cầu chưa được xác minh.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "x-c48-contract-source": "docs/backend/03-response-api.md",
-        "x-c48-controller-source": "backend/apps/response/src/operations/request-admission.controller.ts#RequestAdmissionController.admit",
-        "security": [
-          {
-            "ServiceToken": [],
-            "ActorAuthorization": []
-          }
-        ]
-      }
+          ]
+        }
     },
     "/missions/{id}/review-failure": {
       "post": {
@@ -16913,6 +16946,231 @@
         ],
         "x-c48-contract-gap": "The API specification does not define this operation’s success response body."
       }
+    },
+    "/internal/requests/supply-candidates": {
+      "get": {
+        "operationId": "responseSupplyCandidatesList",
+        "summary": "SupplyCandidatesController.list",
+        "description": "Route exported from backend/apps/response/src/supply-candidates/supply-candidates.controller.ts#SupplyCandidatesController.list. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.",
+        "responses": {
+          "200": {
+            "description": "Documented response shape.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "request_id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "work_cycle": {
+                            "type": "integer"
+                          },
+                          "campaign_id": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "VERIFIED",
+                              "TRIAGED",
+                              "DISPATCHED",
+                              "IN_PROGRESS"
+                            ]
+                          },
+                          "people_affected": {
+                            "anyOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "children_count": {
+                            "anyOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "elderly_count": {
+                            "anyOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "relief_items_text": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 500
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "verified_at": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "request_id",
+                          "work_cycle",
+                          "campaign_id",
+                          "status",
+                          "people_affected",
+                          "children_count",
+                          "elderly_count",
+                          "relief_items_text",
+                          "verified_at"
+                        ]
+                      }
+                    },
+                    "more": {
+                      "type": "boolean"
+                    },
+                    "cursor": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "more"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "CURSOR_INVALID": {
+                    "summary": "CURSOR_INVALID",
+                    "value": {
+                      "code": "CURSOR_INVALID",
+                      "message": "Dữ liệu phân trang không còn hợp lệ. Vui lòng tải lại danh sách.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "UNAUTHENTICATED": {
+                    "summary": "UNAUTHENTICATED",
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "SESSION_EXPIRED": {
+                    "summary": "SESSION_EXPIRED",
+                    "value": {
+                      "code": "SESSION_EXPIRED",
+                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "FORBIDDEN": {
+                    "summary": "FORBIDDEN",
+                    "value": {
+                      "code": "FORBIDDEN",
+                      "message": "Bạn không có quyền thực hiện thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-c48-contract-source": "docs/backend/03-response-api.md",
+        "x-c48-controller-source": "backend/apps/response/src/supply-candidates/supply-candidates.controller.ts#SupplyCandidatesController.list",
+        "security": [
+          {
+            "ServiceToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -17273,212 +17531,234 @@
         ]
       },
       "CreateSelfRequest": {
-        "type": "object",
-        "required": [
-          "incident_category_code",
-          "location"
-        ],
-        "properties": {
-          "incident_category_code": {
-            "type": "string",
-            "pattern": "^[A-Z0-9_]{2,40}$"
-          },
-          "description": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 2000
-          },
-          "people_affected": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "minimum": 1,
-            "maximum": 10000
-          },
-          "reporter_name": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 200
-          },
-          "reporter_contact_phone": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 32
-          },
-          "reporter_declared_danger": {
-            "type": "boolean",
-            "default": false
-          },
-          "location": {
-            "$ref": "#/components/schemas/RequestLocation"
-          },
-          "children_count": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "minimum": 0,
-            "maximum": 10000
-          },
-          "elderly_count": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "minimum": 0,
-            "maximum": 10000
-          },
-          "needs_rescue": {
-            "type": "boolean",
-            "default": true
-          },
-          "needs_relief_supplies": {
-            "type": "boolean",
-            "default": false
-          }
-        },
-        "additionalProperties": false
-      },
+                             "type": "object",
+                             "required": [
+                               "incident_category_code",
+                               "location"
+                             ],
+                             "properties": {
+                               "incident_category_code": {
+                                 "type": "string",
+                                 "pattern": "^[A-Z0-9_]{2,40}$"
+                               },
+                               "description": {
+                                 "type": [
+                                   "string",
+                                   "null"
+                                 ],
+                                 "maxLength": 2000
+                               },
+                               "people_affected": {
+                                 "type": [
+                                   "integer",
+                                   "null"
+                                 ],
+                                 "minimum": 1,
+                                 "maximum": 10000
+                               },
+                               "reporter_name": {
+                                 "type": [
+                                   "string",
+                                   "null"
+                                 ],
+                                 "maxLength": 200
+                               },
+                               "reporter_contact_phone": {
+                                 "type": [
+                                   "string",
+                                   "null"
+                                 ],
+                                 "maxLength": 32
+                               },
+                               "reporter_declared_danger": {
+                                 "type": "boolean",
+                                 "default": false
+                               },
+                               "location": {
+                                 "$ref": "#/components/schemas/RequestLocation"
+                               },
+                               "children_count": {
+                                 "type": [
+                                   "integer",
+                                   "null"
+                                 ],
+                                 "minimum": 0,
+                                 "maximum": 10000
+                               },
+                               "elderly_count": {
+                                 "type": [
+                                   "integer",
+                                   "null"
+                                 ],
+                                 "minimum": 0,
+                                 "maximum": 10000
+                               },
+                               "needs_rescue": {
+                                 "type": "boolean",
+                                 "default": true
+                               },
+                               "needs_relief_supplies": {
+                                 "type": "boolean",
+                                 "default": false
+                               },
+                               "relief_items_text": {
+                                 "anyOf": [
+                                   {
+                                     "type": "string",
+                                     "maxLength": 500
+                                   },
+                                   {
+                                     "type": "null"
+                                   }
+                                 ]
+                               }
+                             },
+                             "additionalProperties": false
+                           },
       "CreateProxyRequest": {
-        "type": "object",
-        "required": [
-          "incident_category_code",
-          "location",
-          "relationship",
-          "information_source",
-          "last_known_situation_at",
-          "contactability"
-        ],
-        "properties": {
-          "incident_category_code": {
-            "type": "string",
-            "pattern": "^[A-Z0-9_]{2,40}$"
-          },
-          "description": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 2000
-          },
-          "people_affected": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "minimum": 1,
-            "maximum": 10000
-          },
-          "reporter_name": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 200
-          },
-          "reporter_contact_phone": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 32
-          },
-          "reporter_declared_danger": {
-            "type": "boolean",
-            "default": false
-          },
-          "location": {
-            "$ref": "#/components/schemas/RequestLocation"
-          },
-          "relationship": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 100
-          },
-          "beneficiary_contact_phone": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 32
-          },
-          "alternate_contact": {
-            "type": [
-              "object",
-              "null"
-            ],
-            "required": [
-              "name"
-            ],
-            "properties": {
-              "name": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 200
-              },
-              "phone": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "maxLength": 32
-              }
-            },
-            "additionalProperties": false
-          },
-          "information_source": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 500
-          },
-          "last_known_situation_at": {
-            "type": "string",
-            "format": "date-time",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$",
-            "example": "2026-10-11T08:30:00Z"
-          },
-          "contactability": {
-            "type": "string",
-            "enum": [
-              "REACHABLE",
-              "UNREACHABLE",
-              "UNKNOWN"
-            ]
-          },
-          "children_count": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "minimum": 0,
-            "maximum": 10000
-          },
-          "elderly_count": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "minimum": 0,
-            "maximum": 10000
-          },
-          "needs_rescue": {
-            "type": "boolean",
-            "default": true
-          },
-          "needs_relief_supplies": {
-            "type": "boolean",
-            "default": false
-          }
-        },
-        "additionalProperties": false
-      },
+                              "type": "object",
+                              "required": [
+                                "incident_category_code",
+                                "location",
+                                "relationship",
+                                "information_source",
+                                "last_known_situation_at",
+                                "contactability"
+                              ],
+                              "properties": {
+                                "incident_category_code": {
+                                  "type": "string",
+                                  "pattern": "^[A-Z0-9_]{2,40}$"
+                                },
+                                "description": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ],
+                                  "maxLength": 2000
+                                },
+                                "people_affected": {
+                                  "type": [
+                                    "integer",
+                                    "null"
+                                  ],
+                                  "minimum": 1,
+                                  "maximum": 10000
+                                },
+                                "reporter_name": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ],
+                                  "maxLength": 200
+                                },
+                                "reporter_contact_phone": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ],
+                                  "maxLength": 32
+                                },
+                                "reporter_declared_danger": {
+                                  "type": "boolean",
+                                  "default": false
+                                },
+                                "location": {
+                                  "$ref": "#/components/schemas/RequestLocation"
+                                },
+                                "relationship": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 100
+                                },
+                                "beneficiary_contact_phone": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ],
+                                  "maxLength": 32
+                                },
+                                "alternate_contact": {
+                                  "type": [
+                                    "object",
+                                    "null"
+                                  ],
+                                  "required": [
+                                    "name"
+                                  ],
+                                  "properties": {
+                                    "name": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 200
+                                    },
+                                    "phone": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ],
+                                      "maxLength": 32
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                "information_source": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 500
+                                },
+                                "last_known_situation_at": {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$",
+                                  "example": "2026-10-11T08:30:00Z"
+                                },
+                                "contactability": {
+                                  "type": "string",
+                                  "enum": [
+                                    "REACHABLE",
+                                    "UNREACHABLE",
+                                    "UNKNOWN"
+                                  ]
+                                },
+                                "children_count": {
+                                  "type": [
+                                    "integer",
+                                    "null"
+                                  ],
+                                  "minimum": 0,
+                                  "maximum": 10000
+                                },
+                                "elderly_count": {
+                                  "type": [
+                                    "integer",
+                                    "null"
+                                  ],
+                                  "minimum": 0,
+                                  "maximum": 10000
+                                },
+                                "needs_rescue": {
+                                  "type": "boolean",
+                                  "default": true
+                                },
+                                "needs_relief_supplies": {
+                                  "type": "boolean",
+                                  "default": false
+                                },
+                                "relief_items_text": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 500
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "additionalProperties": false
+                            },
       "CreatedSelfRequest": {
         "type": "object",
         "required": [

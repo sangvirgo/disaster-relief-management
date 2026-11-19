@@ -111,6 +111,11 @@ Every error the API can return has one row here. The implementation loads this t
 | `NEED_ALREADY_DECLARED` | 409 | Logistics | Yêu cầu SOS này đã có nhu cầu khai báo hoặc đã xác nhận cho vật phẩm này, không thể tạo ước tính trùng. |
 | `NEED_NORM_NOT_FOUND` | 400 | Logistics | Chưa có định mức đang hoạt động cho nhóm hàng đã chọn. |
 | `NEED_ITEM_TYPE_MISMATCH` | 400 | Logistics | Vật phẩm đã chọn không thuộc nhóm hàng của định mức. |
+| `NEED_ITEM_REQUIRED` | 400 | Logistics | Chưa chọn vật phẩm cho nhóm hàng này, và định mức chưa có vật phẩm mặc định. |
+| `NEED_RELIEF_NOT_REQUESTED` | 409 | Logistics | Yêu cầu SOS này không cần hàng cứu trợ nên chưa thể tạo đề xuất nhu cầu. |
+| `NEED_PEOPLE_MISSING` | 409 | Logistics | Yêu cầu SOS chưa có số người bị ảnh hưởng nên chưa thể ước tính nhu cầu. |
+| `NEED_NORM_SHAPE_INVALID` | 400 | Logistics | Định mức không khớp với kiểu tính đã chọn. Vui lòng kiểm tra các trường theo kiểu tính. |
+| `NEED_DEFAULT_ITEM_INVALID` | 400 | Logistics | Vật phẩm mặc định phải đang hoạt động và cùng nhóm hàng với định mức. |
 | `NEED_OVER_COMMITTED` | 409 | Logistics | Tổng số lượng cam kết vượt quá nhu cầu. |
 | `BELOW_PROTECTED_QUANTITY` | 409 | Logistics | Không thể giảm nhu cầu xuống thấp hơn lượng đã giữ chỗ hoặc đã giao. |
 | `UNSETTLED_ISSUED_GOODS` | 409 | Logistics | Còn hàng đã xuất chưa được xác nhận giao, trả hoặc ghi mất. |

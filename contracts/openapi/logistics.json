@@ -10202,571 +10202,627 @@
     },
     "/items": {
       "get": {
-        "operationId": "logisticsCatalogItems",
-        "summary": "CatalogController.items",
-        "description": "Route exported from backend/apps/logistics/src/catalog/catalog.controller.ts#CatalogController.items. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.",
-        "responses": {
-          "200": {
-            "description": "Documented response projection; see the source API specification for visibility and pagination rules.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "items": {
-                      "type": "array",
+          "operationId": "logisticsCatalogItems",
+          "summary": "CatalogController.items",
+          "description": "Route exported from backend/apps/logistics/src/catalog/catalog.controller.ts#CatalogController.items. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.",
+          "responses": {
+            "200": {
+              "description": "Documented response projection; see the source API specification for visibility and pagination rules.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
                       "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "item_type": {
-                            "type": "object",
-                            "properties": {
-                              "code": {
-                                "type": "string"
-                              },
-                              "display_name": {
-                                "type": "string"
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "item_type": {
+                              "type": "object",
+                              "properties": {
+                                "code": {
+                                  "type": "string"
+                                },
+                                "display_name": {
+                                  "type": "string"
+                                }
                               }
-                            }
-                          },
-                          "unit": {
-                            "type": "object",
-                            "properties": {
-                              "code": {
-                                "type": "string"
-                              },
-                              "display_name": {
-                                "type": "string"
-                              },
-                              "scale": {
-                                "type": "integer"
+                            },
+                            "unit": {
+                              "type": "object",
+                              "properties": {
+                                "code": {
+                                  "type": "string"
+                                },
+                                "display_name": {
+                                  "type": "string"
+                                },
+                                "scale": {
+                                  "type": "integer"
+                                }
                               }
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "aliases": {
+                              "type": "array",
+                              "maxItems": 20,
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 60
+                              }
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "ACTIVE",
+                                "INACTIVE"
+                              ]
+                            },
+                            "version": {
+                              "type": "integer"
+                            },
+                            "created_at": {
+                              "type": "string",
+                              "format": "date-time"
                             }
-                          },
-                          "name": {
-                            "type": "string"
-                          },
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "ACTIVE",
-                              "INACTIVE"
-                            ]
-                          },
-                          "version": {
-                            "type": "integer"
-                          },
-                          "created_at": {
-                            "type": "string",
-                            "format": "date-time"
                           }
                         }
+                      },
+                      "next_cursor": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "CURSOR_INVALID": {
+                      "summary": "CURSOR_INVALID",
+                      "value": {
+                        "code": "CURSOR_INVALID",
+                        "message": "Dữ liệu phân trang không còn hợp lệ. Vui lòng tải lại danh sách.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "UNAUTHENTICATED": {
+                      "summary": "UNAUTHENTICATED",
+                      "value": {
+                        "code": "UNAUTHENTICATED",
+                        "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
                       }
                     },
-                    "next_cursor": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
+                    "SESSION_EXPIRED": {
+                      "summary": "SESSION_EXPIRED",
+                      "value": {
+                        "code": "SESSION_EXPIRED",
+                        "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
                     }
                   }
                 }
               }
-            }
-          },
-          "400": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "CURSOR_INVALID": {
-                    "summary": "CURSOR_INVALID",
-                    "value": {
-                      "code": "CURSOR_INVALID",
-                      "message": "Dữ liệu phân trang không còn hợp lệ. Vui lòng tải lại danh sách.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "UNAUTHENTICATED": {
-                    "summary": "UNAUTHENTICATED",
-                    "value": {
-                      "code": "UNAUTHENTICATED",
-                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
+            },
+            "403": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
                   },
-                  "SESSION_EXPIRED": {
-                    "summary": "SESSION_EXPIRED",
-                    "value": {
-                      "code": "SESSION_EXPIRED",
-                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                  "examples": {
+                    "FORBIDDEN": {
+                      "summary": "FORBIDDEN",
+                      "value": {
+                        "code": "FORBIDDEN",
+                        "message": "Bạn không có quyền thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
                     }
                   }
                 }
               }
             }
           },
-          "403": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "FORBIDDEN": {
-                    "summary": "FORBIDDEN",
-                    "value": {
-                      "code": "FORBIDDEN",
-                      "message": "Bạn không có quyền thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
+          "x-c48-contract-source": "docs/backend/04-logistics-api.md",
+          "parameters": [
+            {
+              "name": "type",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "status",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "query",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "cursor",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "limit",
+              "in": "query",
+              "required": false,
+              "schema": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100,
+                "default": 50
               }
             }
-          }
+          ],
+          "x-c48-controller-source": "backend/apps/logistics/src/catalog/catalog.controller.ts#CatalogController.items",
+          "security": [
+            {
+              "NativeBearer": []
+            },
+            {
+              "WebAccessCookie": []
+            }
+          ]
         },
-        "x-c48-contract-source": "docs/backend/04-logistics-api.md",
-        "parameters": [
-          {
-            "name": "type",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "query",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "cursor",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100,
-              "default": 50
-            }
-          }
-        ],
-        "x-c48-controller-source": "backend/apps/logistics/src/catalog/catalog.controller.ts#CatalogController.items",
-        "security": [
-          {
-            "NativeBearer": []
-          },
-          {
-            "WebAccessCookie": []
-          }
-        ]
-      },
       "post": {
-        "operationId": "logisticsCatalogCreateItem",
-        "summary": "CatalogController.createItem",
-        "description": "Route exported from backend/apps/logistics/src/catalog/catalog.controller.ts#CatalogController.createItem. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.",
-        "responses": {
-          "201": {
-            "description": "Documented response projection; see the source API specification for visibility and pagination rules.",
+          "operationId": "logisticsCatalogCreateItem",
+          "summary": "CatalogController.createItem",
+          "description": "Route exported from backend/apps/logistics/src/catalog/catalog.controller.ts#CatalogController.createItem. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.",
+          "responses": {
+            "201": {
+              "description": "Documented response projection; see the source API specification for visibility and pagination rules.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "item_type": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string"
+                          },
+                          "display_name": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "unit": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string"
+                          },
+                          "display_name": {
+                            "type": "string"
+                          },
+                          "scale": {
+                            "type": "integer"
+                          }
+                        }
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "aliases": {
+                        "type": "array",
+                        "maxItems": 20,
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 60
+                        }
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "ACTIVE",
+                          "INACTIVE"
+                        ]
+                      },
+                      "version": {
+                        "type": "integer"
+                      },
+                      "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "VALIDATION_FAILED": {
+                      "summary": "VALIDATION_FAILED",
+                      "value": {
+                        "code": "VALIDATION_FAILED",
+                        "message": "Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại các trường được đánh dấu.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "UNAUTHENTICATED": {
+                      "summary": "UNAUTHENTICATED",
+                      "value": {
+                        "code": "UNAUTHENTICATED",
+                        "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "SESSION_EXPIRED": {
+                      "summary": "SESSION_EXPIRED",
+                      "value": {
+                        "code": "SESSION_EXPIRED",
+                        "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "FORBIDDEN": {
+                      "summary": "FORBIDDEN",
+                      "value": {
+                        "code": "FORBIDDEN",
+                        "message": "Bạn không có quyền thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "CSRF_INVALID": {
+                      "summary": "CSRF_INVALID",
+                      "value": {
+                        "code": "CSRF_INVALID",
+                        "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "409": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "ITEM_NAME_TAKEN": {
+                      "summary": "ITEM_NAME_TAKEN",
+                      "value": {
+                        "code": "ITEM_NAME_TAKEN",
+                        "message": "Tên mặt hàng đã tồn tại.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "x-c48-contract-source": "docs/backend/04-logistics-api.md",
+          "requestBody": {
+            "required": true,
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "id": {
-                      "type": "string",
-                      "format": "uuid"
+                    "item_type_code": {
+                      "type": "string"
                     },
-                    "item_type": {
-                      "type": "object",
-                      "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "display_name": {
-                          "type": "string"
-                        }
-                      }
-                    },
-                    "unit": {
-                      "type": "object",
-                      "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "display_name": {
-                          "type": "string"
-                        },
-                        "scale": {
-                          "type": "integer"
-                        }
-                      }
+                    "unit_code": {
+                      "type": "string"
                     },
                     "name": {
                       "type": "string"
                     },
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "ACTIVE",
-                        "INACTIVE"
-                      ]
-                    },
-                    "version": {
-                      "type": "integer"
-                    },
-                    "created_at": {
-                      "type": "string",
-                      "format": "date-time"
+                    "aliases": {
+                      "type": "array",
+                      "maxItems": 20,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 60
+                      }
                     }
-                  }
+                  },
+                  "required": [
+                    "item_type_code",
+                    "unit_code",
+                    "name"
+                  ]
                 }
               }
             }
           },
-          "401": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "UNAUTHENTICATED": {
-                    "summary": "UNAUTHENTICATED",
-                    "value": {
-                      "code": "UNAUTHENTICATED",
-                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  },
-                  "SESSION_EXPIRED": {
-                    "summary": "SESSION_EXPIRED",
-                    "value": {
-                      "code": "SESSION_EXPIRED",
-                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
+          "x-c48-controller-source": "backend/apps/logistics/src/catalog/catalog.controller.ts#CatalogController.createItem",
+          "security": [
+            {
+              "NativeBearer": []
+            },
+            {
+              "WebAccessCookie": [],
+              "CsrfToken": []
             }
-          },
-          "403": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "FORBIDDEN": {
-                    "summary": "FORBIDDEN",
-                    "value": {
-                      "code": "FORBIDDEN",
-                      "message": "Bạn không có quyền thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  },
-                  "CSRF_INVALID": {
-                    "summary": "CSRF_INVALID",
-                    "value": {
-                      "code": "CSRF_INVALID",
-                      "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "ITEM_NAME_TAKEN": {
-                    "summary": "ITEM_NAME_TAKEN",
-                    "value": {
-                      "code": "ITEM_NAME_TAKEN",
-                      "message": "Tên mặt hàng đã tồn tại.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "x-c48-contract-source": "docs/backend/04-logistics-api.md",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "item_type_code": {
-                    "type": "string"
-                  },
-                  "unit_code": {
-                    "type": "string"
-                  },
-                  "name": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "item_type_code",
-                  "unit_code",
-                  "name"
-                ]
-              }
-            }
-          }
-        },
-        "x-c48-controller-source": "backend/apps/logistics/src/catalog/catalog.controller.ts#CatalogController.createItem",
-        "security": [
-          {
-            "NativeBearer": []
-          },
-          {
-            "WebAccessCookie": [],
-            "CsrfToken": []
-          }
-        ]
-      }
+          ]
+        }
     },
     "/items/{id}/deactivate": {
       "post": {
-        "operationId": "logisticsCatalogDeactivateItem",
-        "summary": "CatalogController.deactivateItem",
-        "description": "Route exported from backend/apps/logistics/src/catalog/catalog.controller.ts#CatalogController.deactivateItem. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
+          "operationId": "logisticsCatalogDeactivateItem",
+          "summary": "CatalogController.deactivateItem",
+          "description": "Route exported from backend/apps/logistics/src/catalog/catalog.controller.ts#CatalogController.deactivateItem. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.",
+          "parameters": [
+            {
+              "in": "path",
+              "name": "id",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
             }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Documented response projection; see the source API specification for visibility and pagination rules.",
+          ],
+          "responses": {
+            "200": {
+              "description": "Documented response projection; see the source API specification for visibility and pagination rules.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "item_type": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string"
+                          },
+                          "display_name": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "unit": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string"
+                          },
+                          "display_name": {
+                            "type": "string"
+                          },
+                          "scale": {
+                            "type": "integer"
+                          }
+                        }
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "aliases": {
+                        "type": "array",
+                        "maxItems": 20,
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 60
+                        }
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "ACTIVE",
+                          "INACTIVE"
+                        ]
+                      },
+                      "version": {
+                        "type": "integer"
+                      },
+                      "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "UNAUTHENTICATED": {
+                      "summary": "UNAUTHENTICATED",
+                      "value": {
+                        "code": "UNAUTHENTICATED",
+                        "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "SESSION_EXPIRED": {
+                      "summary": "SESSION_EXPIRED",
+                      "value": {
+                        "code": "SESSION_EXPIRED",
+                        "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "FORBIDDEN": {
+                      "summary": "FORBIDDEN",
+                      "value": {
+                        "code": "FORBIDDEN",
+                        "message": "Bạn không có quyền thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "CSRF_INVALID": {
+                      "summary": "CSRF_INVALID",
+                      "value": {
+                        "code": "CSRF_INVALID",
+                        "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "409": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "VERSION_CONFLICT": {
+                      "summary": "VERSION_CONFLICT",
+                      "value": {
+                        "code": "VERSION_CONFLICT",
+                        "message": "Dữ liệu đã được cập nhật. Vui lòng tải lại trước khi tiếp tục.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "x-c48-contract-source": "docs/backend/04-logistics-api.md",
+          "requestBody": {
+            "required": true,
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "id": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "item_type": {
-                      "type": "object",
-                      "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "display_name": {
-                          "type": "string"
-                        }
-                      }
-                    },
-                    "unit": {
-                      "type": "object",
-                      "properties": {
-                        "code": {
-                          "type": "string"
-                        },
-                        "display_name": {
-                          "type": "string"
-                        },
-                        "scale": {
-                          "type": "integer"
-                        }
-                      }
-                    },
-                    "name": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "ACTIVE",
-                        "INACTIVE"
-                      ]
-                    },
-                    "version": {
+                    "expected_version": {
                       "type": "integer"
-                    },
-                    "created_at": {
-                      "type": "string",
-                      "format": "date-time"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "UNAUTHENTICATED": {
-                    "summary": "UNAUTHENTICATED",
-                    "value": {
-                      "code": "UNAUTHENTICATED",
-                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
                     }
                   },
-                  "SESSION_EXPIRED": {
-                    "summary": "SESSION_EXPIRED",
-                    "value": {
-                      "code": "SESSION_EXPIRED",
-                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
+                  "required": [
+                    "expected_version"
+                  ]
                 }
               }
             }
           },
-          "403": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "FORBIDDEN": {
-                    "summary": "FORBIDDEN",
-                    "value": {
-                      "code": "FORBIDDEN",
-                      "message": "Bạn không có quyền thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  },
-                  "CSRF_INVALID": {
-                    "summary": "CSRF_INVALID",
-                    "value": {
-                      "code": "CSRF_INVALID",
-                      "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
+          "x-c48-controller-source": "backend/apps/logistics/src/catalog/catalog.controller.ts#CatalogController.deactivateItem",
+          "security": [
+            {
+              "NativeBearer": []
+            },
+            {
+              "WebAccessCookie": [],
+              "CsrfToken": []
             }
-          },
-          "409": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "VERSION_CONFLICT": {
-                    "summary": "VERSION_CONFLICT",
-                    "value": {
-                      "code": "VERSION_CONFLICT",
-                      "message": "Dữ liệu đã được cập nhật. Vui lòng tải lại trước khi tiếp tục.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "x-c48-contract-source": "docs/backend/04-logistics-api.md",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "expected_version": {
-                    "type": "integer"
-                  }
-                },
-                "required": [
-                  "expected_version"
-                ]
-              }
-            }
-          }
-        },
-        "x-c48-controller-source": "backend/apps/logistics/src/catalog/catalog.controller.ts#CatalogController.deactivateItem",
-        "security": [
-          {
-            "NativeBearer": []
-          },
-          {
-            "WebAccessCookie": [],
-            "CsrfToken": []
-          }
-        ]
-      }
+          ]
+        }
     },
     "/needs": {
       "get": {
@@ -22744,7 +22800,7 @@
       "patch": {
           "operationId": "logisticsNeedsUpdateNorm",
           "summary": "NeedsController.updateNorm",
-          "description": "Requires NEED_NORM_MANAGE (OPERATIONS_MANAGER at system scope). Changes are version-checked and audited.",
+          "description": "Requires NEED_NORM_MANAGE (OPERATIONS_MANAGER at system scope). Changes are version-checked and audited. Fields must match the quantity basis: BY_GROUP takes qty_adult, qty_child and qty_elderly; PER_N_PEOPLE takes people_per_unit; PER_REQUEST takes fixed_quantity. default_item_id must be an ACTIVE item of the norm item type.",
           "parameters": [
             {
               "in": "path",
@@ -22772,6 +22828,22 @@
                       "value": {
                         "code": "VALIDATION_FAILED",
                         "message": "Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại các trường được đánh dấu.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "NEED_NORM_SHAPE_INVALID": {
+                      "summary": "NEED_NORM_SHAPE_INVALID",
+                      "value": {
+                        "code": "NEED_NORM_SHAPE_INVALID",
+                        "message": "Định mức không khớp với kiểu tính đã chọn. Vui lòng kiểm tra các trường theo kiểu tính.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "NEED_DEFAULT_ITEM_INVALID": {
+                      "summary": "NEED_DEFAULT_ITEM_INVALID",
+                      "value": {
+                        "code": "NEED_DEFAULT_ITEM_INVALID",
+                        "message": "Vật phẩm mặc định phải đang hoạt động và cùng nhóm hàng với định mức.",
                         "correlation_id": "00000000-0000-4000-8000-000000000000"
                       }
                     }
@@ -22897,24 +22969,62 @@
                     "expected_version": {
                       "type": "integer"
                     },
-                    "qty_per_person_per_day": {
-                      "type": "string",
-                      "description": "Decimal quantity encoded as a string and validated against the unit scale."
-                    },
-                    "modifier_infant": {
-                      "type": "string",
-                      "description": "Decimal quantity encoded as a string and validated against the unit scale."
-                    },
-                    "modifier_elderly": {
-                      "type": "string",
-                      "description": "Decimal quantity encoded as a string and validated against the unit scale."
-                    },
                     "quantity_basis": {
                       "type": "string",
                       "enum": [
-                        "PER_PERSON_DAY",
-                        "PER_PERSON"
+                        "BY_GROUP",
+                        "PER_N_PEOPLE",
+                        "PER_REQUEST"
                       ]
+                    },
+                    "qty_adult": {
+                      "type": "string",
+                      "description": "Decimal quantity encoded as a string and validated against the unit scale."
+                    },
+                    "qty_child": {
+                      "type": "string",
+                      "description": "Decimal quantity encoded as a string and validated against the unit scale."
+                    },
+                    "qty_elderly": {
+                      "type": "string",
+                      "description": "Decimal quantity encoded as a string and validated against the unit scale."
+                    },
+                    "people_per_unit": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 10000
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "fixed_quantity": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "Decimal quantity encoded as a string and validated against the unit scale."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "default_item_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "in_default_bundle": {
+                      "type": "boolean"
                     },
                     "active": {
                       "type": "boolean"
@@ -22934,7 +23044,7 @@
       "post": {
           "operationId": "logisticsNeedsConfirm",
           "summary": "NeedsController.confirm",
-          "description": "Requires NEED_ESTIMATE_CONFIRM. Turns an ESTIMATED need into CONFIRMED. Changing the quantity requires a reason. Only OPEN cycles accept confirmation.",
+          "description": "Requires OPERATIONS_MANAGER (NEED_ESTIMATE_CONFIRM). Turns an ESTIMATED need into CONFIRMED. Changing the quantity, or swapping item_id to another ACTIVE item of the same item type, requires a reason. A swap re-expresses the quantity in the new unit scale, rounded up. Only OPEN cycles accept confirmation.",
           "parameters": [
             {
               "in": "path",
@@ -22970,6 +23080,14 @@
                       "value": {
                         "code": "QUANTITY_SCALE_INVALID",
                         "message": "Số lượng có quá nhiều chữ số thập phân so với đơn vị tính.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "NEED_ITEM_TYPE_MISMATCH": {
+                      "summary": "NEED_ITEM_TYPE_MISMATCH",
+                      "value": {
+                        "code": "NEED_ITEM_TYPE_MISMATCH",
+                        "message": "Vật phẩm đã chọn không thuộc nhóm hàng của định mức.",
                         "correlation_id": "00000000-0000-4000-8000-000000000000"
                       }
                     }
@@ -23033,6 +23151,26 @@
                 }
               }
             },
+            "404": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "NOT_FOUND": {
+                      "summary": "NOT_FOUND",
+                      "value": {
+                        "code": "NOT_FOUND",
+                        "message": "Không tìm thấy dữ liệu yêu cầu.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
             "409": {
               "description": "Documented error response; clients branch on the stable code.",
               "content": {
@@ -23088,6 +23226,14 @@
                         "message": "Không thể giảm nhu cầu xuống thấp hơn lượng đã giữ chỗ hoặc đã giao.",
                         "correlation_id": "00000000-0000-4000-8000-000000000000"
                       }
+                    },
+                    "NEED_EXISTS": {
+                      "summary": "NEED_EXISTS",
+                      "value": {
+                        "code": "NEED_EXISTS",
+                        "message": "Nhu cầu cho mặt hàng này đã tồn tại.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
                     }
                   }
                 }
@@ -23121,6 +23267,10 @@
                     },
                     "reason": {
                       "type": "string"
+                    },
+                    "item_id": {
+                      "type": "string",
+                      "format": "uuid"
                     }
                   },
                   "required": [
@@ -23137,7 +23287,7 @@
       "post": {
           "operationId": "logisticsNeedsEstimate",
           "summary": "NeedsController.estimate",
-          "description": "Requires NEED_ESTIMATE_CONFIRM on the work cycle campaign. Generates ESTIMATED needs from active norms; the norm quantity is multiplied by the people count (and days for per-person-per-day norms) with infant and elderly modifiers, then rounded up to the item unit scale. Refused when the request already has a DECLARED or CONFIRMED need for the item. Estimated lines cannot be committed until confirmed.",
+          "description": "Requires OPERATIONS_MANAGER (NEED_ESTIMATE_CONFIRM) on the work cycle campaign. The SOS facts (people, children, elderly, relief flag) are read from Response admission, never from the body. One ESTIMATED line per category: BY_GROUP, PER_N_PEOPLE or PER_REQUEST norms, rounded up to the item unit scale. Without categories the bundle is every active norm marked in_default_bundle. An omitted item_id uses the norm default item. Refused unless the request is VERIFIED or later and needs relief supplies, and when the request already has a DECLARED or CONFIRMED need for the item. Estimated lines cannot be committed until confirmed.",
           "responses": {
             "201": {
               "description": "Documented response shape.",
@@ -23255,6 +23405,14 @@
                         "message": "Vật phẩm đã chọn không thuộc nhóm hàng của định mức.",
                         "correlation_id": "00000000-0000-4000-8000-000000000000"
                       }
+                    },
+                    "NEED_ITEM_REQUIRED": {
+                      "summary": "NEED_ITEM_REQUIRED",
+                      "value": {
+                        "code": "NEED_ITEM_REQUIRED",
+                        "message": "Chưa chọn vật phẩm cho nhóm hàng này, và định mức chưa có vật phẩm mặc định.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
                     }
                   }
                 }
@@ -23316,6 +23474,26 @@
                 }
               }
             },
+            "404": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "NOT_FOUND": {
+                      "summary": "NOT_FOUND",
+                      "value": {
+                        "code": "NOT_FOUND",
+                        "message": "Không tìm thấy dữ liệu yêu cầu.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
             "409": {
               "description": "Documented error response; clients branch on the stable code.",
               "content": {
@@ -23361,6 +23539,30 @@
                       "value": {
                         "code": "STATE_TRANSITION_INVALID",
                         "message": "Trạng thái hiện tại không cho phép thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "NEED_RELIEF_NOT_REQUESTED": {
+                      "summary": "NEED_RELIEF_NOT_REQUESTED",
+                      "value": {
+                        "code": "NEED_RELIEF_NOT_REQUESTED",
+                        "message": "Yêu cầu SOS này không cần hàng cứu trợ nên chưa thể tạo đề xuất nhu cầu.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "NEED_PEOPLE_MISSING": {
+                      "summary": "NEED_PEOPLE_MISSING",
+                      "value": {
+                        "code": "NEED_PEOPLE_MISSING",
+                        "message": "Yêu cầu SOS chưa có số người bị ảnh hưởng nên chưa thể ước tính nhu cầu.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "REQUEST_NOT_VERIFIED": {
+                      "summary": "REQUEST_NOT_VERIFIED",
+                      "value": {
+                        "code": "REQUEST_NOT_VERIFIED",
+                        "message": "Yêu cầu chưa được xác minh.",
                         "correlation_id": "00000000-0000-4000-8000-000000000000"
                       }
                     }
@@ -23414,18 +23616,6 @@
                     "work_cycle": {
                       "type": "integer"
                     },
-                    "people_count": {
-                      "type": "integer"
-                    },
-                    "days": {
-                      "type": "integer"
-                    },
-                    "infants": {
-                      "type": "integer"
-                    },
-                    "elderly": {
-                      "type": "integer"
-                    },
                     "categories": {
                       "type": "array",
                       "items": {
@@ -23440,17 +23630,14 @@
                           }
                         },
                         "required": [
-                          "category",
-                          "item_id"
+                          "category"
                         ]
                       }
                     }
                   },
                   "required": [
                     "request_id",
-                    "work_cycle",
-                    "people_count",
-                    "categories"
+                    "work_cycle"
                   ]
                 }
               }
@@ -30769,6 +30956,666 @@
             }
           }
         }
+      }
+    },
+    "/items/{id}": {
+      "patch": {
+        "operationId": "logisticsCatalogUpdateItemAliases",
+        "summary": "CatalogController.updateItemAliases",
+        "description": "Replaces the alias list of one item (aliases only widen text matching; they never change stock or need quantities). Requires CATALOG_MANAGE (OPERATIONS_MANAGER, system scope).",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Documented response projection; see the source API specification for visibility and pagination rules.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "item_type": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "display_name": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "unit": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "display_name": {
+                          "type": "string"
+                        },
+                        "scale": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "aliases": {
+                      "type": "array",
+                      "maxItems": 20,
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 60
+                      }
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ACTIVE",
+                        "INACTIVE"
+                      ]
+                    },
+                    "version": {
+                      "type": "integer"
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "VALIDATION_FAILED",
+                    "value": {
+                      "code": "VALIDATION_FAILED",
+                      "message": "Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại các trường được đánh dấu.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "UNAUTHENTICATED": {
+                    "summary": "UNAUTHENTICATED",
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "SESSION_EXPIRED": {
+                    "summary": "SESSION_EXPIRED",
+                    "value": {
+                      "code": "SESSION_EXPIRED",
+                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "FORBIDDEN": {
+                    "summary": "FORBIDDEN",
+                    "value": {
+                      "code": "FORBIDDEN",
+                      "message": "Bạn không có quyền thực hiện thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "CSRF_INVALID": {
+                    "summary": "CSRF_INVALID",
+                    "value": {
+                      "code": "CSRF_INVALID",
+                      "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "NOT_FOUND": {
+                    "summary": "NOT_FOUND",
+                    "value": {
+                      "code": "NOT_FOUND",
+                      "message": "Không tìm thấy dữ liệu yêu cầu.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "VERSION_CONFLICT": {
+                    "summary": "VERSION_CONFLICT",
+                    "value": {
+                      "code": "VERSION_CONFLICT",
+                      "message": "Dữ liệu đã được cập nhật. Vui lòng tải lại trước khi tiếp tục.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-c48-contract-source": "docs/backend/04-logistics-api.md",
+        "x-c48-controller-source": "backend/apps/logistics/src/catalog/catalog.controller.ts#CatalogController.updateItemAliases",
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": [],
+            "CsrfToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expected_version": {
+                    "type": "integer"
+                  },
+                  "aliases": {
+                    "type": "array",
+                    "maxItems": 20,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 60
+                    }
+                  }
+                },
+                "required": [
+                  "expected_version",
+                  "aliases"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/need-proposals": {
+      "get": {
+        "operationId": "logisticsNeedProposalsList",
+        "summary": "NeedProposalsController.list",
+        "description": "Route exported from backend/apps/logistics/src/need-extraction/need-proposals.controller.ts#NeedProposalsController.list. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.",
+        "responses": {
+          "200": {
+            "description": "Documented response projection; see the source API specification for visibility and pagination rules.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "cycle_id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "request_id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "work_cycle": {
+                            "type": "integer"
+                          },
+                          "campaign_id": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "sos": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "people": {
+                                    "type": "integer"
+                                  },
+                                  "children": {
+                                    "type": "integer"
+                                  },
+                                  "elderly": {
+                                    "type": "integer"
+                                  },
+                                  "adults": {
+                                    "type": "integer"
+                                  }
+                                }
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "warehouse": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  }
+                                }
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "lines": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "need_id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "version": {
+                                  "type": "integer"
+                                },
+                                "category": {
+                                  "type": "string"
+                                },
+                                "item": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "unit": {
+                                      "type": "object",
+                                      "properties": {
+                                        "code": {
+                                          "type": "string"
+                                        },
+                                        "display_name": {
+                                          "type": "string"
+                                        },
+                                        "scale": {
+                                          "type": "integer"
+                                        }
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "name",
+                                    "unit"
+                                  ]
+                                },
+                                "quantity": {
+                                  "type": "string",
+                                  "description": "Decimal quantity encoded as a string and validated against the unit scale."
+                                },
+                                "available": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "description": "Decimal quantity encoded as a string and validated against the unit scale."
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "shortfall": {
+                                  "anyOf": [
+                                    {
+                                      "type": "boolean"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "reason_codes": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "reasons": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "code": {
+                                        "type": "string"
+                                      },
+                                      "message": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "code",
+                                      "message"
+                                    ]
+                                  }
+                                }
+                              },
+                              "required": [
+                                "need_id",
+                                "version",
+                                "category",
+                                "item",
+                                "quantity",
+                                "available",
+                                "shortfall",
+                                "reason_codes",
+                                "reasons"
+                              ]
+                            }
+                          },
+                          "extraction": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "source": {
+                                    "type": "string",
+                                    "enum": [
+                                      "GEMINI",
+                                      "ALIAS",
+                                      "DEFAULT_BUNDLE"
+                                    ]
+                                  },
+                                  "model": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "unmatched_terms": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "mentioned_items": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "item_id": {
+                                          "type": "string",
+                                          "format": "uuid"
+                                        },
+                                        "item_name": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
+                                        "category": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        }
+                                      },
+                                      "required": [
+                                        "item_id"
+                                      ]
+                                    }
+                                  },
+                                  "reasons": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "code": {
+                                          "type": "string"
+                                        },
+                                        "message": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": [
+                                        "code",
+                                        "message"
+                                      ]
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "source",
+                                  "unmatched_terms",
+                                  "mentioned_items",
+                                  "reasons"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "cycle_id",
+                          "request_id",
+                          "work_cycle",
+                          "campaign_id",
+                          "sos",
+                          "warehouse",
+                          "lines",
+                          "extraction"
+                        ]
+                      }
+                    },
+                    "more": {
+                      "type": "boolean"
+                    },
+                    "cursor": {
+                      "type": "string"
+                    },
+                    "generated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "more",
+                    "generated_at"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "CURSOR_INVALID": {
+                    "summary": "CURSOR_INVALID",
+                    "value": {
+                      "code": "CURSOR_INVALID",
+                      "message": "Dữ liệu phân trang không còn hợp lệ. Vui lòng tải lại danh sách.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "UNAUTHENTICATED": {
+                    "summary": "UNAUTHENTICATED",
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "SESSION_EXPIRED": {
+                    "summary": "SESSION_EXPIRED",
+                    "value": {
+                      "code": "SESSION_EXPIRED",
+                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "FORBIDDEN": {
+                    "summary": "FORBIDDEN",
+                    "value": {
+                      "code": "FORBIDDEN",
+                      "message": "Bạn không có quyền thực hiện thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-c48-contract-source": "docs/backend/04-logistics-api.md",
+        "x-c48-controller-source": "backend/apps/logistics/src/need-extraction/need-proposals.controller.ts#NeedProposalsController.list",
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          }
+        ]
       }
     }
   },

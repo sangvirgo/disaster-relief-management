@@ -98,10 +98,15 @@ export class EstimateCategoryDto {
   @IsString() @Matches(/^[A-Z0-9_]{2,40}$/u)
   category!: string;
 
-  @IsUUID('all')
-  item_id!: string;
+  /** Optional: when absent the norm's default item is used. */
+  @ValidateIf((_object, value) => value !== undefined) @IsUUID('all')
+  item_id?: string;
 }
 
+/**
+ * The SOS facts (people, children, elderly, status, relief flag) are read from Response, never typed in here.
+ * Without `categories` the bundle is every active norm with in_default_bundle = true.
+ */
 export class EstimateNeedsDto {
   @IsUUID('all')
   request_id!: string;
@@ -109,20 +114,9 @@ export class EstimateNeedsDto {
   @IsInt() @Min(1)
   work_cycle!: number;
 
-  @IsInt() @Min(1) @Max(10_000)
-  people_count!: number;
-
-  @ValidateIf((_object, value) => value !== undefined) @IsInt() @Min(1) @Max(30)
-  days?: number;
-
-  @ValidateIf((_object, value) => value !== undefined) @IsInt() @Min(0) @Max(10_000)
-  infants?: number;
-
-  @ValidateIf((_object, value) => value !== undefined) @IsInt() @Min(0) @Max(10_000)
-  elderly?: number;
-
-  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(4) @ValidateNested({ each: true }) @Type(() => EstimateCategoryDto)
-  categories!: EstimateCategoryDto[];
+  @ValidateIf((_object, value) => value !== undefined) @IsArray() @ArrayMinSize(1) @ArrayMaxSize(16)
+  @ValidateNested({ each: true }) @Type(() => EstimateCategoryDto)
+  categories?: EstimateCategoryDto[];
 }
 
 export class ConfirmNeedDto {
@@ -132,27 +126,47 @@ export class ConfirmNeedDto {
   @ValidateIf((_object, value) => value !== undefined) @IsString() @MaxLength(100) @Matches(decimalQuantity)
   quantity?: string;
 
+  /** Optional swap to another ACTIVE item of the same item type. Requires reason. */
+  @ValidateIf((_object, value) => value !== undefined) @IsUUID('all')
+  item_id?: string;
+
   @ValidateIf((_object, value) => value !== undefined) @IsString() @MaxLength(1_000) @Matches(/\S/u)
   reason?: string;
 }
 
-const decimalNorm = /^(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/u;
+/** Up to 9 whole digits and 3 decimals, matching numeric(12,3) of need_norm. */
+const normQuantity = /^(?:0|[1-9][0-9]{0,8})(?:\.[0-9]{1,3})?$/u;
 
 export class NeedNormPatchDto {
   @Type(() => Number) @IsInt() @Min(1)
   expected_version!: number;
 
-  @ValidateIf((_object, value) => value !== undefined) @IsString() @MaxLength(20) @Matches(decimalNorm)
-  qty_per_person_per_day?: string;
+  @ValidateIf((_object, value) => value !== undefined) @IsIn(['BY_GROUP', 'PER_N_PEOPLE', 'PER_REQUEST'])
+  quantity_basis?: 'BY_GROUP' | 'PER_N_PEOPLE' | 'PER_REQUEST';
 
-  @ValidateIf((_object, value) => value !== undefined) @IsString() @MaxLength(20) @Matches(decimalNorm)
-  modifier_infant?: string;
+  @ValidateIf((_object, value) => value !== undefined) @IsString() @MaxLength(20) @Matches(normQuantity)
+  qty_adult?: string;
 
-  @ValidateIf((_object, value) => value !== undefined) @IsString() @MaxLength(20) @Matches(decimalNorm)
-  modifier_elderly?: string;
+  @ValidateIf((_object, value) => value !== undefined) @IsString() @MaxLength(20) @Matches(normQuantity)
+  qty_child?: string;
 
-  @ValidateIf((_object, value) => value !== undefined) @IsIn(['PER_PERSON_DAY', 'PER_PERSON'])
-  quantity_basis?: 'PER_PERSON_DAY' | 'PER_PERSON';
+  @ValidateIf((_object, value) => value !== undefined) @IsString() @MaxLength(20) @Matches(normQuantity)
+  qty_elderly?: string;
+
+  /** Only for PER_N_PEOPLE. */
+  @ValidateIf((_object, value) => value !== undefined && value !== null) @Type(() => Number) @IsInt() @Min(1) @Max(10_000)
+  people_per_unit?: number | null;
+
+  /** Only for PER_REQUEST. */
+  @ValidateIf((_object, value) => value !== undefined && value !== null) @IsString() @MaxLength(20) @Matches(normQuantity)
+  fixed_quantity?: string | null;
+
+  /** Null clears the default. Must be an ACTIVE item of the norm's item type (checked by the service). */
+  @ValidateIf((_object, value) => value !== undefined && value !== null) @IsUUID('all')
+  default_item_id?: string | null;
+
+  @ValidateIf((_object, value) => value !== undefined) @IsBoolean()
+  in_default_bundle?: boolean;
 
   @ValidateIf((_object, value) => value !== undefined) @IsBoolean()
   active?: boolean;

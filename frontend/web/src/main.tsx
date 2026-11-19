@@ -83,6 +83,8 @@ const SupplyGapsPage = React.lazy(() => import('./features/supply-gaps/SupplyGap
 const RoleDashboard = React.lazy(() => import('./features/dashboard/RoleDashboard').then((module) => ({ default: module.RoleDashboard })));
 const PickupTicketsPage = React.lazy(() => import('./features/pickup/PickupTicketsPage').then((module) => ({ default: module.PickupTicketsPage })));
 const WarehouseDetailPage = React.lazy(() => import('./features/operations/WarehouseDetailPage').then((module) => ({ default: module.WarehouseDetailPage })));
+const NeedProposalsPage = React.lazy(() => import('./features/need-proposals/NeedProposalsPage').then((module) => ({ default: module.NeedProposalsPage })));
+const ItemCatalogPage = React.lazy(() => import('./features/catalog/ItemCatalogPage').then((module) => ({ default: module.ItemCatalogPage })));
 
 function IntakeReview({ user }: { user: Me }) {
   const canReview = roles(user).has('REVIEWER');
@@ -2031,6 +2033,10 @@ function App() {
                   <PickupTicketsPage user={user} />
                 ) : workspace === 'operations' && selected.id === 'assets' && user && new URL(window.location.href).searchParams.get('warehouse_id') ? (
                   <WarehouseDetailPage warehouseId={new URL(window.location.href).searchParams.get('warehouse_id')!} warehouseName={new URL(window.location.href).searchParams.get('warehouse_name') || undefined} />
+                ) : workspace === 'operations' && selected.id === 'proposals' && user ? (
+                  <NeedProposalsPage key={`proposals:${user.id}`} user={user} />
+                ) : workspace === 'operations' && selected.id === 'items' && user ? (
+                  <ItemCatalogPage key={`items:${user.id}`} user={user} />
                 ) : workspace === 'operations' && user ? (
                   <Operations key={selected.id} page={selected.id} user={user} />
                 ) : workspace === 'coordinator' && selected.id === 'teams' ? (

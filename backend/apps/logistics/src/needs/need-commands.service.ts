@@ -87,6 +87,40 @@ async function lockCycle(manager: Pick<EntityManager, 'query'>, cycleId: string)
   return rows[0];
 }
 
+async function loadItemTypeAndScale(manager: Pick<EntityManager, 'query'>, itemId: string): Promise<{ item_type_code: string; scale: number }> {
+  const rows = await manager.query(
+    'SELECT i.item_type_code, u.scale FROM item i JOIN unit u ON u.code=i.unit_code WHERE i.id=$1',
+    [itemId],
+  ) as Array<{ item_type_code: string; scale: number | string }>;
+  if (!rows[0]) throw new AppError('NOT_FOUND', { status: 404 });
+  return { item_type_code: rows[0].item_type_code, scale: Number(rows[0].scale) };
+}
+
+/** The replacement item for a confirm swap: ACTIVE and of the same item type as the estimate it replaces. */
+async function loadConfirmTarget(
+  manager: Pick<EntityManager, 'query'>,
+  itemId: string,
+  itemTypeCode: string,
+): Promise<{ id: string; scale: number }> {
+  const rows = await manager.query(
+    `SELECT i.id,i.status,i.item_type_code,u.scale FROM item i JOIN unit u ON u.code=i.unit_code
+      WHERE i.id=$1 FOR SHARE OF i`,
+    [itemId],
+  ) as Array<{ id: string; status: string; item_type_code: string; scale: number | string }>;
+  const item = rows[0];
+  if (!item) throw new AppError('NOT_FOUND', { status: 404 });
+  if (item.status !== 'ACTIVE') throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
+  if (item.item_type_code !== itemTypeCode) throw new AppError('NEED_ITEM_TYPE_MISMATCH', { status: 400 });
+  return { id: item.id, scale: Number(item.scale) };
+}
+
+/** Re-expresses a quantity from one unit scale to another, rounding UP when the new scale is coarser. */
+function convertUpUnits(units: bigint, fromScale: number, toScale: number): bigint {
+  if (toScale >= fromScale) return units * 10n ** BigInt(toScale - fromScale);
+  const divisor = 10n ** BigInt(fromScale - toScale);
+  return (units + divisor - 1n) / divisor;
+}
+
 async function lockNeed(manager: Pick<EntityManager, 'query'>, needId: string, cycleId: string): Promise<NeedRow> {
   const rows = await manager.query(
     `SELECT n.id,n.cycle_id,c.request_id,c.work_cycle,c.campaign_id,
@@ -218,10 +252,28 @@ export class NeedCommandsService {
           throw new AppError('VERSION_CONFLICT', { status: 409, details: { current_version: Number(need.version) } });
         }
 
-        const scale = Number(need.unit_scale);
-        const changed = dto.quantity !== undefined && quantityUnits(dto.quantity, scale) !== quantityUnits(need.requested_quantity, scale);
+        // Optional swap to another ACTIVE item of the same item type. An estimate has no commitments, so no stock moves here.
+        const currentItem = await loadItemTypeAndScale(manager, need.item_id);
+        const swap = dto.item_id !== undefined && dto.item_id !== need.item_id;
+        if (swap && !dto.reason?.trim()) throw new AppError('VALIDATION_FAILED', { status: 400 });
+        const target = swap
+          ? await loadConfirmTarget(manager, dto.item_id!, currentItem.item_type_code)
+          : { id: need.item_id, scale: currentItem.scale };
+        if (swap) {
+          const clash = await manager.query(
+            `SELECT id FROM relief_need WHERE cycle_id=$1 AND item_id=$2 AND status<>'CANCELLED' LIMIT 1`,
+            [cycleId, target.id],
+          ) as Array<{ id: string }>;
+          if (clash[0]) throw new AppError('NEED_EXISTS', { status: 409 });
+        }
+        const scale = target.scale;
+        // A swap re-expresses the current quantity in the new unit scale, rounded UP, so no amount is silently truncated.
+        const baseUnits = swap
+          ? convertUpUnits(quantityUnits(need.requested_quantity, currentItem.scale), currentItem.scale, scale)
+          : quantityUnits(need.requested_quantity, scale);
+        const changed = swap || (dto.quantity !== undefined && quantityUnits(dto.quantity, scale) !== baseUnits);
         if (changed && !dto.reason?.trim()) throw new AppError('VALIDATION_FAILED', { status: 400 });
-        const quantity = dto.quantity === undefined ? need.requested_quantity : validateQuantity(dto.quantity, scale);
+        const quantity = dto.quantity === undefined ? decimalFromUnits(baseUnits, scale) : validateQuantity(dto.quantity, scale);
         const next = quantityUnits(quantity, scale);
         const before = needValue(need);
         const commitments = await lockCommitments(manager, id);
@@ -230,9 +282,9 @@ export class NeedCommandsService {
           throw new AppError('BELOW_PROTECTED_QUANTITY', { status: 409 });
         }
         const updated = await manager.query(
-          `UPDATE relief_need SET requested_quantity=$3::numeric,source='CONFIRMED',status=$4,version=version+1
+          `UPDATE relief_need SET item_id=$5::uuid,requested_quantity=$3::numeric,source='CONFIRMED',status=$4,version=version+1
             WHERE id=$1 AND version=$2 RETURNING id`,
-          [need.id, dto.expected_version, decimalFromUnits(next, scale), needStatus(current.delivered, next)],
+          [need.id, dto.expected_version, decimalFromUnits(next, scale), needStatus(current.delivered, next), target.id],
         ) as Array<{ id: string }>;
         if (!updated[0]) throw new AppError('VERSION_CONFLICT', { status: 409 });
         const value = await readNeed(manager, need.id);

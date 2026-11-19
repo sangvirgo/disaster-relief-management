@@ -48,6 +48,10 @@ type SetupOptions = {
     issued_quantity: string; delivered_quantity: string; returned_quantity: string; lost_quantity: string; version: number;
   }>;
   balances?: Array<{ id: string; warehouse_id: string; item_id: string; reserved: string }>;
+  /** Replacement item for a confirm swap (FOR SHARE lookup). */
+  swapTarget?: { id: string; status: 'ACTIVE' | 'INACTIVE'; item_type_code: string; scale: number };
+  /** Another live need already holds the swap target in this cycle. */
+  swapClash?: boolean;
 };
 
 function setup(options: SetupOptions = {}) {
@@ -75,6 +79,9 @@ function setup(options: SetupOptions = {}) {
       if (sql.includes('UPDATE commitment')) return [{ id: values?.[0] }];
       if (sql.includes('UPDATE relief_need')) return [{ id: needId }];
       if (sql.includes('FROM relief_need n JOIN fulfillment_cycle')) return [need];
+      if (sql.includes('FROM item i JOIN unit u ON u.code=i.unit_code WHERE i.id=$1')) return [{ item_type_code: 'NUOC_UONG', scale: 3 }];
+      if (sql.includes('FOR SHARE OF i') && sql.includes('i.status')) return options.swapTarget ? [options.swapTarget] : [];
+      if (sql.includes('SELECT id FROM relief_need WHERE cycle_id=$1 AND item_id=$2')) return options.swapClash ? [{ id: 'other-need' }] : [];
       if (sql.includes('INSERT INTO audit_log')) return [];
       throw new Error(`Unexpected SQL: ${sql}`);
     }),
@@ -247,30 +254,89 @@ describe('NeedCommandsService', () => {
 });
 
 describe('NeedCommandsService estimate confirmation', () => {
+  // Confirmation is an OPERATIONS_MANAGER decision (NEED_ESTIMATE_CONFIRM).
+  const operationsManagerGrant: Grant = { role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' };
   const estimated = { source: 'ESTIMATED', estimate_basis: { batch_id: 'batch-1', estimated_quantity: '3' } };
 
   it('confirms an estimate with an edited quantity, records the reason, and keeps the estimate basis', async () => {
-    const { service, calls, request, idempotency } = setup({ need: { ...estimated, requested_quantity: '3', version: 1 } });
+    const { service, calls, request, idempotency } = setup({ grants: [operationsManagerGrant],  need: { ...estimated, requested_quantity: '3', version: 1 } });
 
     const result = await service.confirm(needId, { expected_version: 1, quantity: '4', reason: 'Điều chỉnh theo khảo sát.' }, request);
 
     expect(result.status).toBe(200);
     expect(calls.find((call) => call.sql.includes('UPDATE relief_need'))?.sql).toContain("source='CONFIRMED'");
-    expect(calls.find((call) => call.sql.includes('UPDATE relief_need'))?.values).toEqual([needId, 1, '4', 'OPEN']);
+    expect(calls.find((call) => call.sql.includes('UPDATE relief_need'))?.values)
+      .toEqual([needId, 1, '4.000', 'OPEN', '44444444-4444-4444-8444-444444444444']);
     expect(calls.some((call) => call.sql.includes('INSERT INTO audit_log') && call.values?.[1] === 'NEED_CONFIRMED')).toBe(true);
     expect(idempotency.execute).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ command: 'logistics.needs.confirm' }));
   });
 
   it('confirms an estimate without changing its quantity', async () => {
-    const { service, calls, request } = setup({ need: { ...estimated, requested_quantity: '3', version: 2 } });
+    const { service, calls, request } = setup({ grants: [operationsManagerGrant],  need: { ...estimated, requested_quantity: '3', version: 2 } });
 
     await service.confirm(needId, { expected_version: 2 }, request);
 
-    expect(calls.find((call) => call.sql.includes('UPDATE relief_need'))?.values).toEqual([needId, 2, '3', 'OPEN']);
+    expect(calls.find((call) => call.sql.includes('UPDATE relief_need'))?.values)
+      .toEqual([needId, 2, '3.000', 'OPEN', '44444444-4444-4444-8444-444444444444']);
+  });
+
+  it('swaps to another active item of the same type, re-expresses the quantity rounded up, and requires a reason', async () => {
+    const target = { id: '55555555-0000-4000-8000-000000000001', status: 'ACTIVE' as const, item_type_code: 'NUOC_UONG', scale: 0 };
+    const { service, calls, request } = setup({
+      grants: [operationsManagerGrant], need: { ...estimated, requested_quantity: '2.500', version: 1 }, swapTarget: target,
+    });
+
+    await service.confirm(needId, { expected_version: 1, item_id: target.id, reason: 'Chỉ có nước đóng chai.' }, request);
+
+    // 2.500 at scale 3 -> 3 whole units at scale 0 (rounded up)
+    expect(calls.find((call) => call.sql.includes('UPDATE relief_need'))?.values)
+      .toEqual([needId, 1, '3', 'OPEN', target.id]);
+  });
+
+  it('refuses a swap to an item of another type with NEED_ITEM_TYPE_MISMATCH', async () => {
+    const { service, request, manager } = setup({
+      grants: [operationsManagerGrant], need: { ...estimated, requested_quantity: '3', version: 1 },
+      swapTarget: { id: '55555555-0000-4000-8000-000000000002', status: 'ACTIVE', item_type_code: 'LUONG_THUC', scale: 3 },
+    });
+
+    await expect(service.confirm(needId, { expected_version: 1, item_id: '55555555-0000-4000-8000-000000000002', reason: 'Đổi.' }, request))
+      .rejects.toMatchObject({ code: 'NEED_ITEM_TYPE_MISMATCH', status: 400 });
+    expect(manager.query).not.toHaveBeenCalledWith(expect.stringContaining('UPDATE relief_need'), expect.anything());
+  });
+
+  it('refuses a swap to an inactive item', async () => {
+    const { service, request } = setup({
+      grants: [operationsManagerGrant], need: { ...estimated, requested_quantity: '3', version: 1 },
+      swapTarget: { id: '55555555-0000-4000-8000-000000000003', status: 'INACTIVE', item_type_code: 'NUOC_UONG', scale: 3 },
+    });
+
+    await expect(service.confirm(needId, { expected_version: 1, item_id: '55555555-0000-4000-8000-000000000003', reason: 'Đổi.' }, request))
+      .rejects.toMatchObject({ code: 'STATE_TRANSITION_INVALID', status: 409 });
+  });
+
+  it('refuses a swap when the cycle already has a live need for the target item', async () => {
+    const { service, request } = setup({
+      grants: [operationsManagerGrant], need: { ...estimated, requested_quantity: '3', version: 1 },
+      swapTarget: { id: '55555555-0000-4000-8000-000000000004', status: 'ACTIVE', item_type_code: 'NUOC_UONG', scale: 3 },
+      swapClash: true,
+    });
+
+    await expect(service.confirm(needId, { expected_version: 1, item_id: '55555555-0000-4000-8000-000000000004', reason: 'Đổi.' }, request))
+      .rejects.toMatchObject({ code: 'NEED_EXISTS', status: 409 });
+  });
+
+  it('requires a reason for a swap', async () => {
+    const { service, request } = setup({
+      grants: [operationsManagerGrant], need: { ...estimated, requested_quantity: '3', version: 1 },
+      swapTarget: { id: '55555555-0000-4000-8000-000000000005', status: 'ACTIVE', item_type_code: 'NUOC_UONG', scale: 3 },
+    });
+
+    await expect(service.confirm(needId, { expected_version: 1, item_id: '55555555-0000-4000-8000-000000000005' }, request))
+      .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 });
   });
 
   it('requires a reason when the confirmed quantity differs from the estimate', async () => {
-    const { service, request, manager } = setup({ need: { ...estimated, requested_quantity: '3', version: 1 } });
+    const { service, request, manager } = setup({ grants: [operationsManagerGrant],  need: { ...estimated, requested_quantity: '3', version: 1 } });
 
     await expect(service.confirm(needId, { expected_version: 1, quantity: '4' }, request))
       .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 });
@@ -278,21 +344,21 @@ describe('NeedCommandsService estimate confirmation', () => {
   });
 
   it('rejects confirming a need that was not an estimate', async () => {
-    const { service, request } = setup({ need: { source: 'DECLARED', requested_quantity: '3', version: 1 } });
+    const { service, request } = setup({ grants: [operationsManagerGrant],  need: { source: 'DECLARED', requested_quantity: '3', version: 1 } });
 
     await expect(service.confirm(needId, { expected_version: 1 }, request))
       .rejects.toMatchObject({ code: 'NEED_NOT_ESTIMATED', status: 409 });
   });
 
   it('rejects a stale version when confirming', async () => {
-    const { service, request } = setup({ need: { ...estimated, requested_quantity: '3', version: 3 } });
+    const { service, request } = setup({ grants: [operationsManagerGrant],  need: { ...estimated, requested_quantity: '3', version: 3 } });
 
     await expect(service.confirm(needId, { expected_version: 1 }, request))
       .rejects.toMatchObject({ code: 'VERSION_CONFLICT', status: 409 });
   });
 
   it('rejects confirming a quantity below stock already protected for the need', async () => {
-    const { service, request } = setup({
+    const { service, request } = setup({ grants: [operationsManagerGrant], 
       need: { ...estimated, requested_quantity: '3', version: 1 },
       commitments: [{
         id: 'commitment-1', warehouse_id: warehouseId, quantity: '2', released_quantity: '0',
@@ -305,14 +371,14 @@ describe('NeedCommandsService estimate confirmation', () => {
   });
 
   it('rejects confirming in a frozen cycle', async () => {
-    const { service, request } = setup({ cycleState: 'FROZEN', need: { ...estimated, requested_quantity: '3', version: 1 } });
+    const { service, request } = setup({ grants: [operationsManagerGrant],  cycleState: 'FROZEN', need: { ...estimated, requested_quantity: '3', version: 1 } });
 
     await expect(service.confirm(needId, { expected_version: 1 }, request))
       .rejects.toMatchObject({ code: 'CYCLE_FROZEN', status: 409 });
   });
 
   it.each(['increase', 'reduce'] as const)('rejects %s on an unconfirmed estimate', async (action) => {
-    const { service, request } = setup({ need: { ...estimated, requested_quantity: '3', version: 1 } });
+    const { service, request } = setup({ grants: [operationsManagerGrant],  need: { ...estimated, requested_quantity: '3', version: 1 } });
     const call = action === 'increase'
       ? () => service.increase(needId, { expected_version: 1, quantity: '5', reason: 'Tăng.' }, request)
       : () => service.reduce(needId, { expected_version: 1, quantity: '2', reason: 'Giảm.' }, request);
@@ -321,7 +387,7 @@ describe('NeedCommandsService estimate confirmation', () => {
   });
 
   it('still allows cancelling an unconfirmed estimate', async () => {
-    const { service, request } = setup({ need: { ...estimated, requested_quantity: '3', version: 1 } });
+    const { service, request } = setup({ grants: [operationsManagerGrant],  need: { ...estimated, requested_quantity: '3', version: 1 } });
 
     const result = await service.cancel(needId, { expected_version: 1, reason: 'Ước tính không phù hợp.' }, request);
 

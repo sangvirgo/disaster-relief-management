@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 
 const itemTypeCode = /^[A-Z0-9_]{2,40}$/u;
 const unitCode = /^[A-Z0-9_]{1,20}$/u;
@@ -51,6 +51,18 @@ export class CreateItemDto {
 
   @IsString() @MaxLength(200) @Matches(/\S/u)
   name!: string;
+
+  /** Alternative names used for text matching only; each entry is validated and cleaned by cleanItemAliases. */
+  @IsOptional() @IsArray() @ArrayMaxSize(20)
+  aliases?: string[];
+}
+
+export class UpdateItemAliasesDto {
+  @Type(() => Number) @IsInt() @Min(1)
+  expected_version!: number;
+
+  @IsArray() @ArrayMaxSize(20)
+  aliases!: string[];
 }
 
 export class DeactivateItemDto {

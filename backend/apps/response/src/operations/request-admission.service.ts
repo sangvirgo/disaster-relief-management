@@ -13,8 +13,15 @@ interface AdmissionRequestRow {
   work_cycle: number;
   version: number | string;
   campaign_id: string | null;
+  needs_relief_supplies: boolean;
   attribution_locked_at: Date | string | null;
   logistics_admitted_at: Date | string | null;
+}
+
+interface AdmissionSubjectCounts {
+  people_affected: number | null;
+  children_count: number | null;
+  elderly_count: number | null;
 }
 
 @Injectable()
@@ -42,21 +49,21 @@ export class RequestAdmissionService {
               SET attribution_locked_at=COALESCE(attribution_locked_at,clock_timestamp()),
                   logistics_admitted_at=clock_timestamp(),version=version+1
             WHERE id=$1 AND logistics_admitted_at IS NULL
-              RETURNING id,status,work_cycle,version,campaign_id,
+              RETURNING id,status,work_cycle,version,campaign_id,needs_relief_supplies,
                       attribution_locked_at,logistics_admitted_at`,
           [requestId],
         ) as [AdmissionRequestRow[], number];
         if (!updated[0]) throw new AppError('INTERNAL_ERROR', { status: 500 });
-        return this.view(updated[0]);
+        return this.view(updated[0], await this.subjectCounts(manager, requestId));
       }
 
-      return this.view(row);
+      return this.view(row, await this.subjectCounts(manager, requestId));
     });
   }
 
   private async findRequest(manager: Pick<EntityManager, 'query'>, requestId: string): Promise<AdmissionRequestRow> {
     const rows = await manager.query(
-      `SELECT id,status,work_cycle,version,campaign_id,attribution_locked_at,logistics_admitted_at
+      `SELECT id,status,work_cycle,version,campaign_id,needs_relief_supplies,attribution_locked_at,logistics_admitted_at
          FROM assistance_request WHERE id=$1 FOR UPDATE`,
       [requestId],
     ) as AdmissionRequestRow[];
@@ -64,13 +71,30 @@ export class RequestAdmissionService {
     return rows[0];
   }
 
-  private view(row: AdmissionRequestRow): Record<string, unknown> {
+  private async subjectCounts(manager: Pick<EntityManager, 'query'>, requestId: string): Promise<AdmissionSubjectCounts> {
+    const rows = await manager.query(
+      'SELECT people_affected,children_count,elderly_count FROM request_subject WHERE request_id=$1',
+      [requestId],
+    ) as Array<{ people_affected: number | null; children_count: number | null; elderly_count: number | null }>;
+    const subject = rows[0];
+    return {
+      people_affected: subject?.people_affected ?? null,
+      children_count: subject?.children_count ?? null,
+      elderly_count: subject?.elderly_count ?? null,
+    };
+  }
+
+  private view(row: AdmissionRequestRow, subject: AdmissionSubjectCounts): Record<string, unknown> {
     return {
       request_id: row.id,
       work_cycle: Number(row.work_cycle),
       version: Number(row.version),
       status: row.status,
       campaign_id: row.campaign_id,
+      people_affected: subject.people_affected,
+      children_count: subject.children_count,
+      elderly_count: subject.elderly_count,
+      needs_relief_supplies: row.needs_relief_supplies,
     };
   }
 }

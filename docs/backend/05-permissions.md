@@ -36,6 +36,8 @@ Roles are a code catalog. The current role set has six codes: `ADMIN`, `COORDINA
 | `DONATION_INTAKE` (count received goods) |  |  |  | ● |  |  |
 | `DONATION_REVIEW` (approve and post receipts) |  |  |  |  | ● |  |
 | `NEED_MANAGE` (define, reduce or cancel need) |  |  | ● | ● |  |  |
+| `NEED_ESTIMATE_CONFIRM` (generate SOS need estimates, confirm or edit them, and read the manager proposal queue `GET /need-proposals`) |  |  |  | ● |  |  |
+| `NEED_NORM_MANAGE` (need norm table; system scope) |  |  |  | ● |  |  |
 | `COMMITMENT_MANAGE` |  |  |  | ● |  |  |
 | `DISTRIBUTION_PREPARE` |  |  |  | ● |  |  |
 | `DISTRIBUTION_REVIEW` (approve) |  |  |  | ● | ● |  |
@@ -91,6 +93,7 @@ Only a primary system coordinator sees the shared intake queue. `unassigned=true
 | LOSS approver differs from the LOSS recorder. | Service rule | — |
 | Receipt reviewer differs from every count author. | Service rule and test | — |
 | Pickup ticket: the confirming user approves the draft; the reserving user is its preparer, so the existing self-approval rule applies. Handover dispatches the draft; the dispatcher differs from the approver (existing rule) and holds `DISTRIBUTION_DISPATCH`. A volunteer records no staff permission; the dispatcher may name the collector, who must be an active mission team member. | Existing distribution rules plus pickup-ticket facade (Step 6a). | `SELF_APPROVAL_FORBIDDEN`, `FORBIDDEN`, `PICKUP_COLLECTOR_NOT_MEMBER` |
+| Need extraction sweep: a SYSTEM job with a null actor. It creates ESTIMATED lines only (through the same core as the manual estimate) and never confirms, cancels, admits or reviews anything. Its audit rows have a null actor. | Step 7 (need-extraction sweep). | — |
 | Pickup close-out: the reviewer differs from the submitter (`SELF_REVIEW_FORBIDDEN`) and from the user who handed the goods over (`SELF_HANDOFF_FORBIDDEN`). Returns post a RETURN handoff with the reviewer as recorder, so the existing dispatch-actor rule applies as well. | Step 6b (pickup-goods service). | `SELF_REVIEW_FORBIDDEN`, `SELF_HANDOFF_FORBIDDEN` |
 
 A single `OPERATIONS_MANAGER` account can prepare, dispatch and record different distributions, but it cannot approve its own preparation and cannot record the handoff of a distribution it dispatched. Demo seeds keep the four actors of one distribution distinct (see [seed-logistics.sql](seed/seed-logistics.sql)).

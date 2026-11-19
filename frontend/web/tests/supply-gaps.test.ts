@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  buildNormPatch,
   canAcceptSupplyGap,
   canDismissSupplyGap,
   canManageCampaignWarehouses,
@@ -11,12 +12,15 @@ import {
   isoToLocalInput,
   summarizeSupplyGapWarnings,
   warningTone,
+  type NeedNorm,
   type SupplyGap,
 } from '../src/features/supply-gaps/supplyModel.ts';
 import {
+  extractionSourceLabels,
   labelFor,
   needReasonLabels,
   needSourceLabels,
+  normCategoryLabels,
   severityLabels,
   severityTones,
   supplyGapStatusLabels,
@@ -70,11 +74,76 @@ test('status, severity and need source map to Vietnamese labels and stable tones
 test('every need reason code known to the backend has Vietnamese copy', () => {
   // Mirrors backend NEED_REASON_CODES (apps/logistics/src/needs/need-reasons.ts).
   const backendCodes = [
-    'NORM_PER_PERSON_DAY', 'NORM_PER_PERSON', 'DAYS_DEFAULT', 'INFANT_MODIFIER_APPLIED',
-    'ELDERLY_MODIFIER_APPLIED', 'ROUNDED_UP_TO_UNIT_SCALE', 'NORM_NOT_FOUND', 'QUANTITY_FAR_ABOVE_ESTIMATE',
+    'NORM_BY_GROUP', 'NORM_PER_N_PEOPLE', 'NORM_PER_REQUEST', 'DEFAULT_ITEM_USED',
+    'ROUNDED_UP_TO_UNIT_SCALE', 'NORM_NOT_FOUND', 'QUANTITY_ZERO', 'QUANTITY_FAR_ABOVE_ESTIMATE',
+    'DEFAULT_BUNDLE_USED', 'EXTRACTED_FROM_TEXT', 'ALIAS_MATCHED', 'UNMATCHED_TERMS',
   ];
   assert.deepEqual(Object.keys(needReasonLabels).sort(), [...backendCodes].sort());
-  assert.match(needReasonLabels.QUANTITY_FAR_ABOVE_ESTIMATE, /3 lần/);
+  for (const code of backendCodes) assert.ok(labelFor(needReasonLabels, code, '').length > 0, code);
+  assert.match(needReasonLabels.QUANTITY_FAR_ABOVE_ESTIMATE!, /3 lần/);
+});
+
+test('extraction sources and norm categories use the Vietnamese wording of the proposal queue', () => {
+  assert.equal(labelFor(extractionSourceLabels, 'GEMINI', ''), 'AI gợi ý');
+  assert.equal(labelFor(extractionSourceLabels, 'ALIAS', ''), 'Khớp từ khóa');
+  assert.equal(labelFor(extractionSourceLabels, 'DEFAULT_BUNDLE', ''), 'Gói mặc định');
+  assert.equal(labelFor(normCategoryLabels, 'WATER', ''), 'Nước uống');
+  assert.equal(labelFor(normCategoryLabels, 'FOOD', ''), 'Thực phẩm');
+  assert.equal(labelFor(normCategoryLabels, 'BLANKET', ''), 'Chăn');
+  assert.equal(labelFor(normCategoryLabels, 'MEDICINE', ''), 'Thuốc hoặc vật tư y tế');
+});
+
+const norm = (overrides: Partial<NeedNorm> = {}): NeedNorm => ({
+  id: '00000000-0000-4000-8000-0000000000c1',
+  category: 'WATER',
+  item_type_code: 'NUOC_UONG',
+  quantity_basis: 'BY_GROUP',
+  qty_adult: '3',
+  qty_child: '1',
+  qty_elderly: '2',
+  people_per_unit: null,
+  fixed_quantity: null,
+  default_item_id: '00000000-0000-4000-8000-0000000000d1',
+  in_default_bundle: true,
+  active: true,
+  version: 4,
+  updated_at: null,
+  ...overrides,
+});
+
+const unchanged = (current: NeedNorm): Record<string, string> => ({
+  quantity_basis: current.quantity_basis,
+  qty_adult: current.qty_adult,
+  qty_child: current.qty_child,
+  qty_elderly: current.qty_elderly,
+  default_item_id: current.default_item_id ?? '',
+  in_default_bundle: current.in_default_bundle ? 'true' : 'false',
+  active: current.active ? 'true' : 'false',
+});
+
+test('norm PATCH sends only the fields that changed', () => {
+  const current = norm();
+  assert.throws(() => buildNormPatch(current, unchanged(current)), /Chưa có thay đổi/);
+  assert.deepEqual(buildNormPatch(current, { ...unchanged(current), qty_child: '2' }), { qty_child: '2' });
+  assert.deepEqual(buildNormPatch(current, { ...unchanged(current), in_default_bundle: 'false' }), { in_default_bundle: false });
+  assert.deepEqual(buildNormPatch(current, { ...unchanged(current), default_item_id: '00000000-0000-4000-8000-0000000000d2' }), {
+    default_item_id: '00000000-0000-4000-8000-0000000000d2',
+  });
+});
+
+test('clearing the default item sends null, and an unchanged default is not sent', () => {
+  const current = norm();
+  assert.deepEqual(buildNormPatch(current, { ...unchanged(current), default_item_id: '' }), { default_item_id: null });
+  const withoutDefault = norm({ default_item_id: null });
+  assert.throws(() => buildNormPatch(withoutDefault, unchanged(withoutDefault)), /Chưa có thay đổi/);
+});
+
+test('switching the basis sends the new basis and its fields, not the old group fields', () => {
+  const current = norm();
+  const body = buildNormPatch(current, {
+    ...unchanged(current), quantity_basis: 'PER_N_PEOPLE', people_per_unit: '2',
+  });
+  assert.deepEqual(body, { quantity_basis: 'PER_N_PEOPLE', people_per_unit: 2 });
 });
 
 test('role gating: only managers act; coordinators see warnings but no actions', () => {

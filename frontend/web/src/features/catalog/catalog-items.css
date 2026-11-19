@@ -1,0 +1,127 @@
+/* Item catalog and alias editor. Single column on phones; the item card grid widens from 720px. */
+.catalog-items {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.catalog-items__header p.muted {
+  margin: 4px 0 12px;
+}
+
+.catalog-items__list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.catalog-item {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.catalog-item__main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.catalog-item__name {
+  overflow-wrap: anywhere;
+}
+
+.catalog-item__no-alias {
+  margin: 0;
+}
+
+.catalog-items__more {
+  display: flex;
+  justify-content: center;
+}
+
+.alias-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.alias-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 2px 4px 2px 10px;
+  border: 1px solid var(--border, #d9dee5);
+  border-radius: 999px;
+  background: var(--surface-muted, #f4f6f8);
+  font-size: 0.9rem;
+}
+
+.alias-chip span {
+  overflow-wrap: anywhere;
+}
+
+.alias-chip__remove {
+  min-height: 32px;
+  min-width: 44px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.alias-chip__remove:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.alias-editor {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.alias-editor__help {
+  margin: 0;
+}
+
+.alias-editor__add {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: end;
+}
+
+.alias-editor__add label {
+  display: grid;
+  gap: 4px;
+}
+
+.alias-editor__add input {
+  width: 100%;
+  min-width: 0;
+}
+
+.alias-editor__count,
+.alias-editor__actions {
+  margin: 0;
+}
+
+@media (min-width: 720px) {
+  .catalog-items__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .alias-editor__add {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}

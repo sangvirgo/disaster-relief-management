@@ -17,7 +17,7 @@ import { RequestEvidencePanel } from './RequestEvidencePanel';
 import { SosNeedEstimatePanel } from './SosNeedEstimatePanel';
 import { TeamReadinessQueue } from './TeamReadinessQueue';
 import { PickupTicketPanel } from '../pickup/PickupTicketPanel';
-import type { Me } from '../../auth/session';
+import { roles, type Me } from '../../auth/session';
 import './coordinator-detail.css';
 
 type QueueItem = {
@@ -1200,10 +1200,8 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
               requestId={detail.id}
               workCycle={detail.work_cycle ?? 1}
               status={detail.status}
-              peopleAffected={detail.subject.people_affected}
-              elderlyCount={detail.subject.elderly_count}
               needsReliefSupplies={detail.needs_relief_supplies}
-              onChanged={() => setDetailRevision((value) => value + 1)}
+              canOpenQueue={roles(user ?? null).has('OPERATIONS_MANAGER')}
             />
             {(detail.declared_danger || detail.proxy_activity_flags.length > 0 || detail.tracking_code.startsWith('C48HM')) && (
               <div className="sos-alerts">

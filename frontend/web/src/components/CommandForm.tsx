@@ -9,7 +9,7 @@ import { confirmAction } from './confirmAction';
 export type Field = {
   name: string;
   label: string;
-  type?: 'text' | 'number' | 'password' | 'textarea' | 'select' | 'choice-cards' | 'datetime-local' | 'location' | 'service-area' | 'reference';
+  type?: 'text' | 'number' | 'password' | 'textarea' | 'select' | 'choice-cards' | 'datetime-local' | 'location' | 'service-area' | 'reference' | 'checkbox';
   required?: boolean;
   requiredWhen?: { field: string; values: string[] };
   min?: number;
@@ -433,6 +433,16 @@ export function CommandForm({
               <small className="field-error" id={errorId(field)} role="alert">{inlineError}</small>
             )}
           </div>
+        ) : field.type === 'checkbox' ? (
+          <label key={field.name} className="command-checkbox">
+            <input
+              type="checkbox"
+              checked={values[field.name] === 'true'}
+              onChange={(event) => updateField(field, event.target.checked ? 'true' : 'false')}
+            />
+            <span>{field.label}</span>
+            {field.hintFor?.(values) && <small className="field-hint" role="note">{field.hintFor(values)}</small>}
+          </label>
         ) : (
         <label key={field.name}>
           <span>{field.label}{isRequired(field, values) && <> <span className="required-mark" aria-hidden="true"> *</span></>}</span>

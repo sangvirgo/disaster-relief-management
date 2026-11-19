@@ -5,27 +5,29 @@ import { hasPermission, Grant } from '@c48/identity-contracts/permissions';
 import { quantityUnits } from '../common/quantity';
 import { ResponseAdmission } from './response-admission.client';
 import type { NeedReasonCode } from './need-reasons';
+import type { NeedEstimateBasisInputs, NeedQuantityBasis } from './need-estimate';
+import type { ExtractionBasis } from '../need-extraction/need-extraction.types';
 
 export type NeedCommandRequest = Request & { idempotencyKey?: string };
 export type NeedScope = Pick<ResponseAdmission, 'campaign_id'>;
 export type NeedSource = 'DECLARED' | 'ESTIMATED' | 'CONFIRMED';
 
 /** Snapshot written when an ESTIMATED need is generated; kept on the row after confirmation as history. */
+/** Snapshot written when an ESTIMATED need is generated: the norm used, the SOS facts it read and the rounded result. */
 export interface NeedEstimateBasis {
   batch_id: string;
   category: string;
   item_type_code: string;
+  item_id: string;
   norm_id: string;
   norm_version: number;
-  people_count: number;
-  days: number;
-  infants: number;
-  elderly: number;
-  effective_persons: string;
-  raw_quantity: string;
+  basis: NeedQuantityBasis;
+  inputs: NeedEstimateBasisInputs;
   estimated_quantity: string;
   reason_codes: NeedReasonCode[];
   estimated_at: string;
+  /** How the lines were chosen from the SOS text (sweep only). Absent on manually requested estimates. */
+  extraction?: ExtractionBasis;
 }
 
 export interface NeedRow extends Record<string, unknown>, NeedScope {
@@ -96,6 +98,7 @@ export function needSourceView(row: NeedSourceFields): Record<string, unknown> {
   };
 }
 
+/** NEED_ESTIMATE_CONFIRM is held by OPERATIONS_MANAGER only: estimate generation and confirmation are manager decisions. */
 export function requireNeedEstimateConfirm(grants: readonly Grant[], scope: NeedScope): void {
   if (!hasPermission(grants, 'NEED_ESTIMATE_CONFIRM', { campaignId: scope.campaign_id })) throw new AppError('FORBIDDEN', { status: 403 });
 }
@@ -153,7 +156,7 @@ export async function readNeed(manager: Pick<EntityManager, 'query'>, id: string
 
 export async function writeNeedAudit(
   manager: Pick<EntityManager, 'query'>,
-  actorId: string,
+  actorId: string | null,
   action: 'NEED_CREATED' | 'NEED_INCREASED' | 'NEED_REDUCED' | 'NEED_CANCELLED' | 'NEED_ESTIMATED' | 'NEED_CONFIRMED',
   needId: string,
   before: Record<string, unknown> | null,

@@ -5,22 +5,17 @@ import { AppError } from '@c48/technical/errors/errors';
 import {
   canonicalRequestHash, IdempotencyService, IdempotentResult, ResourceRef,
 } from '@c48/technical/idempotency/idempotency';
-import { randomUUID } from 'node:crypto';
 import { LogisticsSessionService } from '../auth/logistics-session.service';
 import { validateQuantity } from '../common/quantity';
 import { CreateNeedDto, EstimateNeedsDto } from './needs.dto';
 import {
-  NeedCommandRequest, needCommandKey, NeedEstimateBasis, readNeed, requireNeedEstimateConfirm, requireNeedManage, writeNeedAudit,
+  NeedCommandRequest, needCommandKey, readNeed, requireNeedEstimateConfirm, requireNeedManage, writeNeedAudit,
 } from './needs.helpers';
-import { estimateNeeds, NEED_ESTIMATE_DEFAULT_DAYS, NeedEstimateNorm } from './need-estimate';
+import { NeedEstimateLineInput } from './need-estimate';
+import { lockCycle, persistEstimateBatch } from './need-estimate-batch';
 import { ResponseAdmission, ResponseAdmissionClient } from './response-admission.client';
 
 export type { NeedCommandRequest } from './needs.helpers';
-
-interface CycleRow extends Pick<ResponseAdmission, 'request_id' | 'work_cycle' | 'campaign_id'> {
-  id: string;
-  state: 'OPEN' | 'FROZEN' | 'SEALED';
-}
 
 interface ItemRow {
   id: string;
@@ -47,33 +42,6 @@ function requestHash(dto: CreateNeedDto): string {
     designated_point_id: dto.designated_point_id ?? null,
     reason: dto.reason ?? null,
   });
-}
-
-function sameAttribution(cycle: CycleRow, admission: ResponseAdmission): boolean {
-  return cycle.request_id === admission.request_id && cycle.work_cycle === admission.work_cycle &&
-    cycle.campaign_id === admission.campaign_id;
-}
-
-async function lockCycle(
-  manager: Pick<EntityManager, 'query'>,
-  admission: ResponseAdmission,
-): Promise<CycleRow> {
-  await manager.query(
-    `INSERT INTO fulfillment_cycle (request_id,work_cycle,campaign_id)
-     VALUES ($1,$2,$3) ON CONFLICT (request_id,work_cycle) DO NOTHING`,
-    [admission.request_id, admission.work_cycle, admission.campaign_id],
-  );
-  const rows = await manager.query(
-    `SELECT id,request_id,work_cycle,campaign_id,state
-       FROM fulfillment_cycle WHERE request_id=$1 AND work_cycle=$2 FOR UPDATE`,
-    [admission.request_id, admission.work_cycle],
-  ) as CycleRow[];
-  const cycle = rows[0];
-  if (!cycle || !sameAttribution(cycle, admission)) throw new AppError('INTERNAL_ERROR', { status: 500 });
-  if (cycle.state === 'FROZEN') throw new AppError('CYCLE_FROZEN', { status: 409 });
-  if (cycle.state === 'SEALED') throw new AppError('CYCLE_SEALED', { status: 409 });
-  if (cycle.state !== 'OPEN') throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
-  return cycle;
 }
 
 async function loadItem(manager: Pick<EntityManager, 'query'>, itemId: string): Promise<ItemRow> {
@@ -176,13 +144,15 @@ export class NeedsService {
   }
 
   /**
-   * Generates ESTIMATED needs for one SOS work cycle from the active norm table. The lines go through the same cycle lock,
+   * Generates ESTIMATED needs for one SOS work cycle from the active norm table. The SOS facts come from the Response
+   * admission read, never from the caller. Each category yields one line. The lines go through the same cycle lock,
    * campaign scope, item validation and one-live-need index as a declared need, so no separate demand path exists.
    */
   async estimate(dto: EstimateNeedsDto, request: NeedCommandRequest): Promise<IdempotentResult<Record<string, unknown>>> {
     const session = await this.sessions.require(request);
     const idempotencyKey = needCommandKey(request);
-    if (new Set(dto.categories.map((line) => line.category)).size !== dto.categories.length) {
+    const categories = dto.categories;
+    if (categories && new Set(categories.map((line) => line.category)).size !== categories.length) {
       throw new AppError('VALIDATION_FAILED', { status: 400 });
     }
     const idempotent = {
@@ -192,11 +162,7 @@ export class NeedsService {
       requestHash: canonicalRequestHash({
         request_id: dto.request_id,
         work_cycle: dto.work_cycle,
-        people_count: dto.people_count,
-        days: dto.days ?? null,
-        infants: dto.infants ?? null,
-        elderly: dto.elderly ?? null,
-        categories: dto.categories.map((line) => ({ category: line.category, item_id: line.item_id })),
+        categories: categories ? categories.map((line) => ({ category: line.category, item_id: line.item_id ?? null })) : null,
       }),
     };
     const replay = async (manager: EntityManager, resource: ResourceRef | null): Promise<Record<string, unknown>> => {
@@ -222,88 +188,25 @@ export class NeedsService {
       });
     }
     requireNeedEstimateConfirm(session.grants, admission);
+    // Admission already refuses requests that are not VERIFIED or later; this guard covers the relief-supply flag.
+    if (!admission.needs_relief_supplies) throw new AppError('NEED_RELIEF_NOT_REQUESTED', { status: 409 });
+    if (admission.people_affected === null) throw new AppError('NEED_PEOPLE_MISSING', { status: 409 });
 
     return this.idempotency.execute(this.dataSource, {
       ...idempotent,
       databaseErrorMappings: { unique: { need_one_live_per_item_uq: 'NEED_EXISTS' } },
       execute: async (manager) => {
-        const cycle = await lockCycle(manager, admission);
-        requireNeedEstimateConfirm(session.grants, cycle);
-
-        const categoryItems = [];
-        for (const line of dto.categories) {
-          const item = await loadItem(manager, line.item_id);
-          const norms = await manager.query(
-            `SELECT id,category,item_type_code,quantity_basis,qty_per_person_per_day::text,
-                    modifier_infant::text,modifier_elderly::text,active,version
-               FROM need_norm WHERE category=$1 AND active`,
-            [line.category],
-          ) as NeedEstimateNorm[];
-          if (norms.length === 0) throw new AppError('NEED_NORM_NOT_FOUND', { status: 400 });
-          if (!norms.some((norm) => norm.item_type_code === item.item_type_code)) {
-            throw new AppError('NEED_ITEM_TYPE_MISMATCH', { status: 400 });
-          }
-          categoryItems.push({ line, item, norms });
-        }
-
-        const itemIds = categoryItems.map((entry) => entry.item.id);
-        const declared = await manager.query(
-          `SELECT n.id FROM relief_need n JOIN fulfillment_cycle c ON c.id=n.cycle_id
-            WHERE c.request_id=$1 AND n.item_id=ANY($2::uuid[]) AND n.source IN ('DECLARED','CONFIRMED') AND n.status<>'CANCELLED'
-            LIMIT 1`,
-          [admission.request_id, itemIds],
-        ) as Array<{ id: string }>;
-        if (declared[0]) throw new AppError('NEED_ALREADY_DECLARED', { status: 409 });
-
-        const allNorms = categoryItems.flatMap((entry) => entry.norms);
-        const result = estimateNeeds({
-          people_count: dto.people_count,
-          ...(dto.days !== undefined ? { days: dto.days } : {}),
-          infants: dto.infants ?? 0,
-          elderly: dto.elderly ?? 0,
-          categories: categoryItems.map((entry) => ({
-            category: entry.line.category,
-            item_type_code: entry.item.item_type_code,
-            unit_scale: Number(entry.item.scale),
-          })),
-        }, allNorms);
-        if (result.skipped.length > 0) throw new AppError('NEED_NORM_NOT_FOUND', { status: 400 });
-
-        const batchId = randomUUID();
-        const estimatedAt = new Date().toISOString();
-        const ids: string[] = [];
-        for (const line of result.lines) {
-          const item = categoryItems.find((entry) => entry.line.category === line.category)!.item;
-          const basis: NeedEstimateBasis = {
-            batch_id: batchId,
-            category: line.category,
-            item_type_code: line.item_type_code,
-            norm_id: line.norm_id,
-            norm_version: line.norm_version,
-            people_count: dto.people_count,
-            days: dto.days ?? NEED_ESTIMATE_DEFAULT_DAYS,
-            infants: dto.infants ?? 0,
-            elderly: dto.elderly ?? 0,
-            effective_persons: line.effective_persons,
-            raw_quantity: line.raw_quantity,
-            estimated_quantity: line.quantity,
-            reason_codes: line.reason_codes,
-            estimated_at: estimatedAt,
-          };
-          const inserted = await manager.query(
-            `INSERT INTO relief_need (cycle_id,item_id,original_quantity,requested_quantity,source,estimate_basis)
-             VALUES ($1,$2,$3,$3,'ESTIMATED',$4::jsonb) RETURNING id`,
-            [cycle.id, item.id, line.quantity, JSON.stringify(basis)],
-          ) as Array<{ id: string }>;
-          const id = inserted[0]?.id;
-          if (!id) throw new AppError('INTERNAL_ERROR', { status: 500 });
-          const value = await readNeed(manager, id);
-          await writeNeedAudit(manager, session.userId, 'NEED_ESTIMATED', id, null, value, null);
-          ids.push(id);
-        }
-        const items: Record<string, unknown>[] = [];
-        for (const id of ids) items.push(await readNeed(manager, id));
-        return { status: 201, value: { items }, resource: { type: 'need_estimate_batch', id: batchId } };
+        const lines: NeedEstimateLineInput[] | 'DEFAULT_BUNDLE' = categories
+          ? categories.map((line) => ({ category: line.category, item_id: line.item_id ?? null }))
+          : 'DEFAULT_BUNDLE';
+        const batch = await persistEstimateBatch(manager, {
+          admission,
+          lines,
+          actor: { userId: session.userId, grants: session.grants },
+        });
+        // Nothing to create (no active norm in the bundle, or every quantity rounds to zero) is a validation failure here.
+        if (batch.ids.length === 0) throw new AppError('VALIDATION_FAILED', { status: 400 });
+        return { status: 201, value: { items: batch.items }, resource: { type: 'need_estimate_batch', id: batch.batchId } };
       },
       replay,
     });

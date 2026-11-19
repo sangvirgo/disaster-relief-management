@@ -7,7 +7,8 @@ import { canonicalRequestHash, IdempotencyService, IdempotentResult } from '@c48
 import { decodeKeysetCursor, encodeKeysetCursor } from '@c48/technical/pagination/keyset';
 import { AuthenticatedLogisticsSession, LogisticsSessionService } from '../auth/logistics-session.service';
 import { hasCatalogManageGrant } from './catalog.helpers';
-import { CatalogPageQueryDto, CreateItemDto, CreateItemTypeDto, CreateUnitDto, DeactivateItemDto, ItemPageQueryDto } from './catalog.dto';
+import { CatalogPageQueryDto, CreateItemDto, CreateItemTypeDto, CreateUnitDto, DeactivateItemDto, ItemPageQueryDto, UpdateItemAliasesDto } from './catalog.dto';
+import { cleanItemAliases } from './item-aliases';
 import { requireIdempotencyKey as key } from '@c48/technical/http/response-headers';
 
 type Queryable = Pick<DataSource | EntityManager, 'query'>;
@@ -29,6 +30,7 @@ interface ItemRow {
   unit_name: string;
   scale: number;
   name: string;
+  aliases: string[];
   status: 'ACTIVE' | 'INACTIVE';
   version: number;
   created_at: Date | string;
@@ -51,6 +53,7 @@ function publicItem(row: ItemRow): Record<string, unknown> {
     item_type: { code: row.item_type_code, display_name: row.item_type_name },
     unit: { code: row.unit_code, display_name: row.unit_name, scale: Number(row.scale) },
     name: row.name,
+    aliases: row.aliases ?? [],
     status: row.status,
     version: Number(row.version),
     created_at: new Date(row.created_at).toISOString(),
@@ -71,7 +74,7 @@ async function readCode(manager: Queryable, table: 'item_type' | 'unit', code: s
 async function readItem(manager: Queryable, itemId: string): Promise<Record<string, unknown>> {
   const rows = await manager.query(
     `SELECT i.id, i.item_type_code, t.display_name AS item_type_name, i.unit_code,
-            u.display_name AS unit_name, u.scale, i.name, i.status, i.version, i.created_at
+            u.display_name AS unit_name, u.scale, i.name, i.status, i.version, i.created_at, i.aliases
        FROM item i JOIN item_type t ON t.code = i.item_type_code JOIN unit u ON u.code = i.unit_code
       WHERE i.id = $1`,
     [itemId],
@@ -124,7 +127,7 @@ export class CatalogService {
     values.push(limit + 1);
     const rows = await this.dataSource.query(
       `SELECT i.id, i.item_type_code, t.display_name AS item_type_name, i.unit_code,
-              u.display_name AS unit_name, u.scale, i.name, i.status, i.version, i.created_at
+              u.display_name AS unit_name, u.scale, i.name, i.status, i.version, i.created_at, i.aliases
          FROM item i JOIN item_type t ON t.code = i.item_type_code JOIN unit u ON u.code = i.unit_code
         ${conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''}
         ORDER BY i.created_at DESC, i.id DESC LIMIT $${values.length}`,
@@ -185,11 +188,41 @@ export class CatalogService {
       requestHash: canonicalRequestHash(dto),
       databaseErrorMappings: { unique: { item_name_unit_uq: 'ITEM_NAME_TAKEN' } },
       execute: async (manager) => {
+        const aliases = cleanItemAliases(dto.aliases ?? []);
         const rows = await manager.query(
-          `INSERT INTO item (item_type_code, unit_code, name) VALUES ($1, $2, $3) RETURNING id`,
-          [dto.item_type_code, dto.unit_code, name],
+          `INSERT INTO item (item_type_code, unit_code, name, aliases) VALUES ($1, $2, $3, $4::text[]) RETURNING id`,
+          [dto.item_type_code, dto.unit_code, name, aliases],
         ) as Array<{ id: string }>;
         return { status: 201, value: await readItem(manager, rows[0]!.id), resource: { type: 'item', id: rows[0]!.id } };
+      },
+      replay: async (manager, resource) => {
+        if (!resource || resource.type !== 'item') throw new AppError('INTERNAL_ERROR', { status: 500 });
+        return readItem(manager, resource.id);
+      },
+    });
+  }
+
+  /** Replaces the alias list of one item. Aliases only widen text matching; they never change stock or need quantities. */
+  async updateItemAliases(itemId: string, dto: UpdateItemAliasesDto, request: LogisticsRequest): Promise<IdempotentResult<Record<string, unknown>>> {
+    const session = await this.sessions.require(request);
+    requireCatalogManage(session);
+    const aliases = cleanItemAliases(dto.aliases);
+    return this.idempotency.execute(this.dataSource, {
+      scopeKey: `user:${session.userId}`,
+      command: 'logistics.items.aliases',
+      key: key(request),
+      requestHash: canonicalRequestHash({ item_id: itemId, expected_version: dto.expected_version, aliases }),
+      execute: async (manager) => {
+        const rows = await manager.query('SELECT version FROM item WHERE id = $1 FOR UPDATE', [itemId]) as Array<{ version: number }>;
+        const before = rows[0];
+        if (!before) throw new AppError('NOT_FOUND', { status: 404 });
+        if (Number(before.version) !== dto.expected_version) throw new AppError('VERSION_CONFLICT', { status: 409 });
+        const [updated] = await manager.query(
+          `UPDATE item SET aliases = $2::text[], version = version + 1 WHERE id = $1 AND version = $3 RETURNING id`,
+          [itemId, aliases, dto.expected_version],
+        ) as [Array<{ id: string }>, number];
+        if (!updated[0]) throw new AppError('VERSION_CONFLICT', { status: 409 });
+        return { status: 200, value: await readItem(manager, itemId), resource: { type: 'item', id: itemId } };
       },
       replay: async (manager, resource) => {
         if (!resource || resource.type !== 'item') throw new AppError('INTERNAL_ERROR', { status: 500 });

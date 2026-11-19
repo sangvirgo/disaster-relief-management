@@ -1,3 +1,5 @@
+import { logisticsCommandErrorCopy } from '../i18n/commandErrors';
+
 export type Service = 'identity' | 'response' | 'logistics';
 export type ApiErrorCode = string;
 export class ApiError extends Error {
@@ -82,6 +84,7 @@ function serverError(
 }
 
 const messages: Record<string, string> = {
+  ...logisticsCommandErrorCopy,
   GOOGLE_ACCOUNT_LINK_REQUIRED: 'Email này đã có tài khoản Reliva. Đăng nhập bằng tên đăng nhập và mật khẩu Reliva hiện có, rồi mở trình đơn tài khoản → Xem hồ sơ → Bảo mật và liên kết Google.',
   SESSION_REAUTH_REQUIRED: 'Để liên kết Google, hãy đăng xuất rồi đăng nhập lại tài khoản Reliva hiện có. Sau đó mở Xem hồ sơ → Bảo mật và liên kết Google trong vòng 15 phút.',
   GOOGLE_IDENTITY_IN_USE: 'Google vừa chọn đã liên kết với một tài khoản Reliva khác. Hãy chọn đúng Google của bạn hoặc đăng nhập bằng Google đó để sử dụng tài khoản đã liên kết.',

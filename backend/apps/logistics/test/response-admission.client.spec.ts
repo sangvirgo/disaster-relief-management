@@ -7,7 +7,7 @@ import { ResponseAdmissionClient } from '../src/needs/response-admission.client'
 const requestId = '11111111-1111-4111-8111-111111111111';
 const responseValue = {
   request_id: requestId, work_cycle: 2, version: 5, status: 'TRIAGED',
-   campaign_id: null,
+  campaign_id: null, people_affected: 10, children_count: 3, elderly_count: 2, needs_relief_supplies: true,
 };
 
 function setup(result: ServiceResponse = { status: 200, headers: {}, body: responseValue }) {

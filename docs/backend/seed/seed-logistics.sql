@@ -25,26 +25,34 @@ INSERT INTO item_type (code, display_name) VALUES
   ('CHAN_MEN',   'Chăn màn, nơi trú ẩn');
 
 -- returnable=false marks consumables (food, water, medicine and dressings) that cannot come back to stock (proposal 3.6).
-INSERT INTO item (id, item_type_code, unit_code, name, returnable) VALUES
-  ('00000000-0000-4000-8000-0000000a1001', 'LUONG_THUC', 'KG',    'Gạo', false),
-  ('00000000-0000-4000-8000-0000000a1002', 'LUONG_THUC', 'CAI',   'Mì gói', false),
-  ('00000000-0000-4000-8000-0000000a1003', 'NUOC_UONG',  'CAI',   'Nước đóng chai', false),
-  ('00000000-0000-4000-8000-0000000a1004', 'NUOC_UONG',  'LIT',   'Nước sạch đóng can', false),
-  ('00000000-0000-4000-8000-0000000a1005', 'Y_TE',       'CAI',   'Bộ sơ cứu', false),
-  ('00000000-0000-4000-8000-0000000a1006', 'Y_TE',       'THUNG', 'Băng gạc y tế', false),
-  ('00000000-0000-4000-8000-0000000a1007', 'CHAN_MEN',   'CAI',   'Chăn', true),
-  ('00000000-0000-4000-8000-0000000a1008', 'CHAN_MEN',   'CAI',   'Màn chống muỗi', true);
+INSERT INTO item (id, item_type_code, unit_code, name, returnable, aliases) VALUES
+  ('00000000-0000-4000-8000-0000000a1001', 'LUONG_THUC', 'KG',    'Gạo', false, ARRAY['gạo']::text[])),
+  ('00000000-0000-4000-8000-0000000a1002', 'LUONG_THUC', 'CAI',   'Mì gói', false, ARRAY['mì tôm','mì ăn liền']::text[])),
+  ('00000000-0000-4000-8000-0000000a1003', 'NUOC_UONG',  'CAI',   'Nước đóng chai', false, ARRAY['nước suối','nước lọc','nuoc']::text[])),
+  ('00000000-0000-4000-8000-0000000a1004', 'NUOC_UONG',  'LIT',   'Nước sạch đóng can', false, ARRAY['nước sạch','nước can']::text[])),
+  ('00000000-0000-4000-8000-0000000a1005', 'Y_TE',       'CAI',   'Bộ sơ cứu', false, ARRAY['thuốc','thuốc men','sơ cứu']::text[])),
+  ('00000000-0000-4000-8000-0000000a1006', 'Y_TE',       'THUNG', 'Băng gạc y tế', false, ARRAY['băng gạc','băng y tế']::text[])),
+  ('00000000-0000-4000-8000-0000000a1007', 'CHAN_MEN',   'CAI',   'Chăn', true, ARRAY['chăn','chăn ấm']::text[])),
+  ('00000000-0000-4000-8000-0000000a1008', 'CHAN_MEN',   'CAI',   'Màn chống muỗi', true, ARRAY['màn','mùng']::text[]));
 
 -- ---------- need norms (demo estimate table; managed by OPERATIONS_MANAGER) ----------
--- A norm quantity is expressed in the unit of the item the coordinator picks for that category, so these demo
--- values assume the litre water item (Nước sạch đóng can), the kg rice item (Gạo) and the piece items.
--- Modifiers are demo placeholders: the extra share of one norm added per infant / elderly person.
-INSERT INTO need_norm (category, item_type_code, quantity_basis, qty_per_person_per_day, modifier_infant, modifier_elderly) VALUES
-  ('WATER',    'NUOC_UONG',  'PER_PERSON_DAY', 3.000, 0.50, 0.20),
-  ('FOOD',     'LUONG_THUC', 'PER_PERSON_DAY', 0.600, 0.50, 0.20),
-  ('BLANKET',  'CHAN_MEN',   'PER_PERSON',     1.000, 0.00, 0.00),
-  ('MEDICINE', 'Y_TE',       'PER_PERSON',     0.010, 0.00, 0.00)
-ON CONFLICT (category, item_type_code) DO NOTHING;
+-- One norm per category. The quantity basis says how the SOS facts turn into a quantity:
+--   BY_GROUP      adults*qty_adult + children*qty_child + elderly*qty_elderly (adults = people - children - elderly)
+--   PER_N_PEOPLE  ceil(people / people_per_unit)
+--   PER_REQUEST   fixed_quantity once per SOS
+-- Quantities are in the unit of the default item (litre water, kg rice, pieces). default_item_id picks a seeded item of
+-- the category's item type; the coordinator may choose another active item of the same type.
+INSERT INTO need_norm (category, item_type_code, quantity_basis, qty_adult, qty_child, qty_elderly,
+                       people_per_unit, fixed_quantity, default_item_id) VALUES
+  ('WATER', 'NUOC_UONG', 'BY_GROUP', 3.000, 1.000, 2.000, NULL, NULL,
+     (SELECT id FROM item WHERE item_type_code = 'NUOC_UONG' AND unit_code = 'LIT' ORDER BY name LIMIT 1)),
+  ('FOOD', 'LUONG_THUC', 'BY_GROUP', 2.000, 1.000, 1.000, NULL, NULL,
+     (SELECT id FROM item WHERE item_type_code = 'LUONG_THUC' AND unit_code = 'KG' ORDER BY name LIMIT 1)),
+  ('BLANKET', 'CHAN_MEN', 'PER_N_PEOPLE', 0, 0, 0, 2, NULL,
+     (SELECT id FROM item WHERE item_type_code = 'CHAN_MEN' ORDER BY name LIMIT 1)),
+  ('MEDICINE', 'Y_TE', 'PER_REQUEST', 0, 0, 0, NULL, 1.000,
+     (SELECT id FROM item WHERE item_type_code = 'Y_TE' AND unit_code = 'CAI' ORDER BY name LIMIT 1))
+ON CONFLICT (category) DO NOTHING;
 
 -- ---------- assets ----------
 INSERT INTO warehouse (id, name, address_note, location, location_public, service_radius_m) VALUES

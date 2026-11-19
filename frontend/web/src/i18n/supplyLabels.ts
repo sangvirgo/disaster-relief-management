@@ -58,14 +58,31 @@ export const needSourceDescriptions: Record<string, string> = {
 
 // Copy matches the backend NEED_REASON_COPY. Only the code is returned by the need read model.
 export const needReasonLabels: Record<string, string> = {
-  NORM_PER_PERSON_DAY: 'Tính theo định mức mỗi người mỗi ngày, nhân với số ngày.',
-  NORM_PER_PERSON: 'Tính theo định mức mỗi người, dùng một lần (không nhân theo số ngày).',
-  DAYS_DEFAULT: 'Chưa nhập số ngày, hệ thống dùng mặc định 3 ngày.',
-  INFANT_MODIFIER_APPLIED: 'Đã cộng thêm định mức cho trẻ nhỏ.',
-  ELDERLY_MODIFIER_APPLIED: 'Đã cộng thêm định mức cho người cao tuổi.',
+  NORM_BY_GROUP: 'Tính theo nhóm người: người lớn, trẻ em và người cao tuổi, mỗi nhóm có định mức riêng.',
+  NORM_PER_N_PEOPLE: 'Tính theo số người: cứ mỗi nhóm người theo định mức thì cần một đơn vị.',
+  NORM_PER_REQUEST: 'Tính theo mỗi yêu cầu: số lượng cố định cho một yêu cầu cứu trợ.',
+  DEFAULT_ITEM_USED: 'Chưa chọn vật phẩm, hệ thống dùng vật phẩm mặc định của nhóm hàng.',
   ROUNDED_UP_TO_UNIT_SCALE: 'Đã làm tròn lên theo đơn vị tính của vật phẩm.',
   NORM_NOT_FOUND: 'Chưa có định mức đang hoạt động cho nhóm hàng này.',
+  QUANTITY_ZERO: 'Định mức của nhóm hàng này bằng 0 cho lần yêu cầu này, nên không tạo dòng nhu cầu.',
   QUANTITY_FAR_ABOVE_ESTIMATE: 'Số lượng khai báo lớn hơn 3 lần số ước tính. Hãy kiểm tra lại trước khi xác nhận.',
+  DEFAULT_BUNDLE_USED: 'Người dân không nêu rõ hàng cần, hệ thống dùng danh sách mặc định theo định mức. Cần kiểm tra lại.',
+  EXTRACTED_FROM_TEXT: 'Vật phẩm được đối chiếu từ mô tả của người dân bằng AI. Đây chỉ là gợi ý để con người xem xét.',
+  ALIAS_MATCHED: 'Vật phẩm được khớp theo tên gọi thường dùng trong mô tả của người dân (không dùng AI).',
+  UNMATCHED_TERMS: 'Có cụm từ người dân nêu nhưng không khớp vật phẩm nào trong danh mục. Cần xem xét thủ công.',
+};
+
+/** Where the proposed items came from. Codes are the backend extraction sources; GEMINI is only a suggestion. */
+export const extractionSourceLabels: Record<string, string> = {
+  GEMINI: 'AI gợi ý',
+  ALIAS: 'Khớp từ khóa',
+  DEFAULT_BUNDLE: 'Gói mặc định',
+};
+
+export const extractionSourceTones: Record<string, BadgeTone> = {
+  GEMINI: 'info',
+  ALIAS: 'success',
+  DEFAULT_BUNDLE: 'warning',
 };
 
 export const campaignWarehouseRoleLabels: Record<string, string> = {
@@ -92,9 +109,9 @@ export const assignmentFlagTones: Record<string, BadgeTone> = {
 
 export const normCategoryLabels: Record<string, string> = {
   WATER: 'Nước uống',
-  FOOD: 'Lương thực',
-  BLANKET: 'Chăn màn',
-  MEDICINE: 'Y tế',
+  FOOD: 'Thực phẩm',
+  BLANKET: 'Chăn',
+  MEDICINE: 'Thuốc hoặc vật tư y tế',
 };
 
 export const normItemTypeLabels: Record<string, string> = {
@@ -105,14 +122,24 @@ export const normItemTypeLabels: Record<string, string> = {
 };
 
 export const normBasisLabels: Record<string, string> = {
-  PER_PERSON_DAY: 'Mỗi người mỗi ngày (nhân số ngày)',
-  PER_PERSON: 'Mỗi người, dùng một lần',
+  BY_GROUP: 'Theo nhóm người',
+  PER_N_PEOPLE: 'Theo số người',
+  PER_REQUEST: 'Theo mỗi yêu cầu',
 };
 
 export const normBasisOptions = [
-  { value: 'PER_PERSON_DAY', label: 'Mỗi người mỗi ngày (nhân số ngày)' },
-  { value: 'PER_PERSON', label: 'Mỗi người, dùng một lần' },
+  { value: 'BY_GROUP', label: 'Theo nhóm người' },
+  { value: 'PER_N_PEOPLE', label: 'Theo số người' },
+  { value: 'PER_REQUEST', label: 'Theo mỗi yêu cầu' },
 ] as const;
+
+export const normFieldLabels: Record<string, string> = {
+  qty_adult: 'Người lớn',
+  qty_child: 'Trẻ em',
+  qty_elderly: 'Người cao tuổi',
+  people_per_unit: 'Số người mỗi đơn vị',
+  fixed_quantity: 'Số lượng cố định',
+};
 
 export const normActiveOptions = [
   { value: 'true', label: 'Đang áp dụng' },

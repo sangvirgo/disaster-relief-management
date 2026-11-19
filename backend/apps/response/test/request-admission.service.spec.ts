@@ -22,6 +22,7 @@ function setup(overrides: Partial<{
     work_cycle: overrides.workCycle ?? 2,
     version: overrides.version ?? 4,
     campaign_id: null,
+    needs_relief_supplies: true,
     attribution_locked_at: overrides.lockedAt ?? null,
     logistics_admitted_at: overrides.admittedAt ?? null,
   };
@@ -31,6 +32,7 @@ function setup(overrides: Partial<{
       calls.push({ sql, values });
       if (sql.includes('FROM assistance_request') && sql.includes('FOR UPDATE')) return [row];
       if (sql.includes("supplement.event_type='REPORTER_SUPPLEMENT'")) return overrides.pendingSupplement ? [{}] : [];
+      if (sql.includes('FROM request_subject')) return [{ people_affected: 10, children_count: 3, elderly_count: 2 }];
       if (sql.includes('UPDATE assistance_request')) {
         row.attribution_locked_at = new Date('2026-10-12T12:00:00.000Z');
         row.logistics_admitted_at = new Date('2026-10-12T12:00:00.000Z');
@@ -62,6 +64,10 @@ describe('RequestAdmissionService', () => {
       status: 'TRIAGED',
       campaign_id: null,
       version: 5,
+      people_affected: 10,
+      children_count: 3,
+      elderly_count: 2,
+      needs_relief_supplies: true,
     });
 
     expect(calls[0]?.sql).toContain('FOR UPDATE');
@@ -75,10 +81,10 @@ describe('RequestAdmissionService', () => {
 
     await expect(service.admit(requestId, 2, {} as Request)).resolves.toMatchObject({
       work_cycle: 2, status: 'IN_PROGRESS', version: 8,
-      campaign_id: null,
+      campaign_id: null, people_affected: 10, needs_relief_supplies: true,
     });
 
-    expect(calls).toHaveLength(2);
+    expect(calls).toHaveLength(3);
   });
 
   it('rejects an ineligible request before setting admission markers', async () => {

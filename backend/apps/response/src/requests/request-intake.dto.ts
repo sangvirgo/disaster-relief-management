@@ -49,6 +49,10 @@ export class CreateSelfRequestDto {
   @IsOptional() @IsBoolean()
   needs_relief_supplies?: boolean;
 
+  /** Supplies the citizen needs, in free text. Read only when needs_relief_supplies is true; never a quantity. */
+  @IsOptional() @IsString() @MaxLength(500)
+  relief_items_text?: string | null;
+
   @IsObject() @ValidateNested() @Type(() => RequestLocationDto)
   location!: RequestLocationDto;
 }

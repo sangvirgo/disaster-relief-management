@@ -215,3 +215,12 @@
 .rain-control small, .rain-legend { padding: 4px 10px; border-radius: 8px; background: #ffffffee; color: var(--color-text-secondary); font-size: 12px; line-height: 16px; }
 .rain-legend { display: grid; grid-template-columns: repeat(3, auto); gap: 2px 10px; }
 .rain-legend i { grid-column: 1 / -1; height: 8px; border-radius: 4px; background: linear-gradient(90deg, #9bd3ff, #2f8cf0, #1646c8, #7a2fd0); }
+
+.sos-field-help {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted, #5b6470);
+  font-size: 0.84rem;
+  line-height: 1.4;
+  font-weight: 400;
+}

@@ -61,12 +61,14 @@ describe('role catalog after retiring staff roles', () => {
     expect(hasPermission([campaign], 'DONATION_INTAKE', { campaignId: 'campaign-b' })).toBe(false);
   });
 
-  it('lets the coordinator and operations manager estimate and confirm SOS goods needs', () => {
-    expect(ROLE_PERMISSIONS.COORDINATOR).toContain('NEED_ESTIMATE_CONFIRM');
+  it('lets only the operations manager estimate and confirm SOS goods needs', () => {
+    expect(ROLE_PERMISSIONS.COORDINATOR).not.toContain('NEED_ESTIMATE_CONFIRM');
     expect(ROLE_PERMISSIONS.OPERATIONS_MANAGER).toContain('NEED_ESTIMATE_CONFIRM');
-    const coordinator: Grant = { role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: 'campaign-a' };
-    expect(hasPermission([coordinator], 'NEED_ESTIMATE_CONFIRM', { campaignId: 'campaign-a' })).toBe(true);
-    expect(hasPermission([coordinator], 'NEED_ESTIMATE_CONFIRM', { campaignId: 'campaign-b' })).toBe(false);
+    const coordinator: Grant = { role_code: 'COORDINATOR', scope_type: 'SYSTEM' };
+    const manager: Grant = { role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' };
+    expect(hasPermission([coordinator], 'NEED_ESTIMATE_CONFIRM', { campaignId: 'campaign-a' })).toBe(false);
+    expect(hasPermission([manager], 'NEED_ESTIMATE_CONFIRM', { campaignId: 'campaign-a' })).toBe(true);
+    expect(hasPermission([coordinator], 'NEED_MANAGE', { campaignId: 'campaign-a' })).toBe(true);
   });
 
   it('keeps need norm management with the system-scoped operations manager only', () => {

@@ -2,61 +2,87 @@ import { AppError } from '@c48/technical/errors/errors';
 import { decimalFromUnits } from '../common/quantity';
 import type { NeedReasonCode } from './need-reasons';
 
-// Pure estimate rule (no AI, no I/O):
-//   effective_persons = people_count + infants * modifier_infant + elderly * modifier_elderly
-//   raw               = qty_per_person_per_day * days * effective_persons   (PER_PERSON basis: days factor is 1)
-//   quantity          = raw rounded UP to the item's unit scale
-// People counts include infants and elderly; each modifier is the extra share of one norm added per person in that group.
-// All arithmetic uses BigInt units to avoid floating-point drift: norm quantities have 3 decimals, modifiers 2, raw 5.
+// Pure estimate rule (no AI, no I/O). One estimate line per category, computed from the SOS facts and one norm:
+//   BY_GROUP      quantity = adults*qty_adult + children*qty_child + elderly*qty_elderly
+//                 where adults = people - children - elderly
+//   PER_N_PEOPLE  quantity = ceil(people / people_per_unit)
+//   PER_REQUEST   quantity = fixed_quantity
+// The result is rounded UP to the item's unit scale. All arithmetic uses BigInt units (norms have 3 decimals), so there is
+// no floating-point drift. The quantity is never decided by AI and never by a human typing counts into the estimate.
 
-export const NEED_ESTIMATE_DEFAULT_DAYS = 3;
-export const NEED_ESTIMATE_MAX_DAYS = 30;
 export const NEED_ESTIMATE_MAX_PEOPLE = 10_000;
+export const NEED_ESTIMATE_MAX_CATEGORIES = 16;
+/** Upper bound for one estimated line, in whole item units. Keeps the stored quantity inside numeric(18,3). */
+export const NEED_ESTIMATE_MAX_QUANTITY = 1_000_000_000n;
 
-export type NeedQuantityBasis = 'PER_PERSON_DAY' | 'PER_PERSON';
+const NORM_SCALE = 3;
+const CATEGORY_PATTERN = /^[A-Z0-9_]{2,40}$/u;
+const decimalPattern = /^(0|[1-9][0-9]*)(\.[0-9]+)?$/u;
+
+export type NeedQuantityBasis = 'BY_GROUP' | 'PER_N_PEOPLE' | 'PER_REQUEST';
 
 export interface NeedEstimateNorm {
   id: string;
   category: string;
   item_type_code: string;
   quantity_basis: NeedQuantityBasis;
-  qty_per_person_per_day: string;
-  modifier_infant: string;
-  modifier_elderly: string;
+  qty_adult: string;
+  qty_child: string;
+  qty_elderly: string;
+  people_per_unit: number | null;
+  fixed_quantity: string | null;
+  default_item_id: string | null;
   active: boolean;
   version: number;
 }
 
-export interface NeedEstimateCategory {
-  category: string;
+/** Catalog snapshot for the items named by the lines or by a norm's default item. */
+export interface NeedEstimateItem {
+  id: string;
   item_type_code: string;
   unit_scale: number;
+  status: 'ACTIVE' | 'INACTIVE';
+}
+
+export interface NeedEstimateLineInput {
+  category: string;
+  item_id?: string | null;
 }
 
 export interface NeedEstimateInput {
-  people_count: number;
-  days?: number;
-  infants?: number;
-  elderly?: number;
-  categories: readonly NeedEstimateCategory[];
+  people: number;
+  children: number;
+  elderly: number;
+  lines: readonly NeedEstimateLineInput[];
+}
+
+export interface NeedEstimateBasisInputs {
+  people: number;
+  children: number;
+  elderly: number;
+  adults: number;
+  qty_adult: string;
+  qty_child: string;
+  qty_elderly: string;
+  people_per_unit: number | null;
+  fixed_quantity: string | null;
+  raw_quantity: string;
 }
 
 export interface NeedEstimateLine {
   category: string;
+  item_id: string;
   item_type_code: string;
   norm_id: string;
   norm_version: number;
   unit_scale: number;
   quantity: string;
-  raw_quantity: string;
-  days: number;
-  effective_persons: string;
+  estimate_basis: { basis: NeedQuantityBasis; inputs: NeedEstimateBasisInputs };
   reason_codes: NeedReasonCode[];
 }
 
 export interface NeedEstimateSkipped {
   category: string;
-  item_type_code: string;
   reason_codes: NeedReasonCode[];
 }
 
@@ -64,12 +90,6 @@ export interface NeedEstimateResult {
   lines: NeedEstimateLine[];
   skipped: NeedEstimateSkipped[];
 }
-
-const RAW_SCALE = 5;
-const NORM_SCALE = 3;
-const MODIFIER_SCALE = 2;
-const PERSON_SCALE = 2;
-const decimalPattern = /^(0|[1-9][0-9]*)(\.[0-9]+)?$/u;
 
 function invalid(): never {
   throw new AppError('VALIDATION_FAILED', { status: 400 });
@@ -87,67 +107,111 @@ export function decimalUnits(value: string, decimals: number): bigint {
   return BigInt(`${integer}${fraction.padEnd(decimals, '0')}`);
 }
 
-function validateInput(input: NeedEstimateInput): { people: number; days: number; infants: number; elderly: number } {
-  const people = input.people_count;
-  const days = input.days ?? NEED_ESTIMATE_DEFAULT_DAYS;
-  const infants = input.infants ?? 0;
-  const elderly = input.elderly ?? 0;
+/** People counts only: adults are derived, so the groups can never exceed the total. */
+export function validateEstimatePeople(people: number, children: number, elderly: number): { adults: number } {
   if (!isCount(people, 1, NEED_ESTIMATE_MAX_PEOPLE)) invalid();
-  if (!isCount(days, 1, NEED_ESTIMATE_MAX_DAYS)) invalid();
-  if (!isCount(infants, 0, NEED_ESTIMATE_MAX_PEOPLE) || !isCount(elderly, 0, NEED_ESTIMATE_MAX_PEOPLE)) invalid();
-  if (infants + elderly > people) invalid();
-  return { people, days, infants, elderly };
+  if (!isCount(children, 0, NEED_ESTIMATE_MAX_PEOPLE) || !isCount(elderly, 0, NEED_ESTIMATE_MAX_PEOPLE)) invalid();
+  if (children + elderly > people) invalid();
+  return { adults: people - children - elderly };
 }
 
-export function estimateNeeds(input: NeedEstimateInput, norms: readonly NeedEstimateNorm[]): NeedEstimateResult {
-  const { people, days, infants, elderly } = validateInput(input);
-  const daysDefaulted = input.days === undefined;
+function requestedQuantity(
+  norm: NeedEstimateNorm,
+  people: number,
+  adults: number,
+  children: number,
+  elderly: number,
+): { raw3: bigint; reasons: NeedReasonCode[] } {
+  switch (norm.quantity_basis) {
+    case 'BY_GROUP': {
+      const raw3 = BigInt(adults) * decimalUnits(norm.qty_adult, NORM_SCALE)
+        + BigInt(children) * decimalUnits(norm.qty_child, NORM_SCALE)
+        + BigInt(elderly) * decimalUnits(norm.qty_elderly, NORM_SCALE);
+      return { raw3, reasons: ['NORM_BY_GROUP'] };
+    }
+    case 'PER_N_PEOPLE': {
+      if (!isCount(norm.people_per_unit, 1, NEED_ESTIMATE_MAX_PEOPLE)) invalid();
+      const units = BigInt(Math.ceil(people / norm.people_per_unit));
+      return { raw3: units * 10n ** BigInt(NORM_SCALE), reasons: ['NORM_PER_N_PEOPLE'] };
+    }
+    case 'PER_REQUEST': {
+      if (norm.fixed_quantity === null) invalid();
+      return { raw3: decimalUnits(norm.fixed_quantity, NORM_SCALE), reasons: ['NORM_PER_REQUEST'] };
+    }
+    default:
+      return invalid();
+  }
+}
+
+export function estimateNeeds(
+  input: NeedEstimateInput,
+  norms: readonly NeedEstimateNorm[],
+  items: readonly NeedEstimateItem[],
+): NeedEstimateResult {
+  const { adults } = validateEstimatePeople(input.people, input.children, input.elderly);
+  if (!Array.isArray(input.lines) || input.lines.length === 0 || input.lines.length > NEED_ESTIMATE_MAX_CATEGORIES) invalid();
+
   const seen = new Set<string>();
   const result: NeedEstimateResult = { lines: [], skipped: [] };
 
-  for (const category of input.categories) {
-    if (!isCount(category.unit_scale, 0, 3)) invalid();
-    const key = `${category.category}|${category.item_type_code}`;
-    if (seen.has(key)) invalid();
-    seen.add(key);
+  for (const line of input.lines) {
+    if (typeof line.category !== 'string' || !CATEGORY_PATTERN.test(line.category)) invalid();
+    if (seen.has(line.category)) invalid();
+    seen.add(line.category);
 
-    const norm = norms.find((candidate) =>
-      candidate.active && candidate.category === category.category && candidate.item_type_code === category.item_type_code);
+    const norm = norms.find((candidate) => candidate.active && candidate.category === line.category);
     if (!norm) {
-      result.skipped.push({ category: category.category, item_type_code: category.item_type_code, reason_codes: ['NORM_NOT_FOUND'] });
+      result.skipped.push({ category: line.category, reason_codes: ['NORM_NOT_FOUND'] });
       continue;
     }
 
-    const perPersonDay = norm.quantity_basis === 'PER_PERSON_DAY';
-    const normUnits = decimalUnits(norm.qty_per_person_per_day, NORM_SCALE);
-    const infantModifier = decimalUnits(norm.modifier_infant, MODIFIER_SCALE);
-    const elderlyModifier = decimalUnits(norm.modifier_elderly, MODIFIER_SCALE);
-    if (normUnits <= 0n) invalid();
+    const usedDefault = !line.item_id;
+    const itemId = line.item_id ?? norm.default_item_id;
+    if (!itemId) throw new AppError('NEED_ITEM_REQUIRED', { status: 400 });
+    const item = items.find((candidate) => candidate.id === itemId);
+    if (!item) throw new AppError('NOT_FOUND', { status: 404 });
+    if (item.status !== 'ACTIVE') throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
+    if (item.item_type_code !== norm.item_type_code) throw new AppError('NEED_ITEM_TYPE_MISMATCH', { status: 400 });
+    if (!isCount(item.unit_scale, 0, NORM_SCALE)) invalid();
 
-    // effective persons in 10^-2 units
-    const personUnits = BigInt(people) * 100n + BigInt(infants) * infantModifier + BigInt(elderly) * elderlyModifier;
-    const daysFactor = perPersonDay ? BigInt(days) : 1n;
-    // norm (10^-3) * persons (10^-2) * days => raw in 10^-5 units
-    const rawUnits = normUnits * personUnits * daysFactor;
-    const step = 10n ** BigInt(RAW_SCALE - category.unit_scale);
-    const quantityUnits = (rawUnits + step - 1n) / step;
-    const reasons: NeedReasonCode[] = [perPersonDay ? 'NORM_PER_PERSON_DAY' : 'NORM_PER_PERSON'];
-    if (perPersonDay && daysDefaulted) reasons.push('DAYS_DEFAULT');
-    if (infants > 0 && infantModifier > 0n) reasons.push('INFANT_MODIFIER_APPLIED');
-    if (elderly > 0 && elderlyModifier > 0n) reasons.push('ELDERLY_MODIFIER_APPLIED');
-    if (rawUnits % step !== 0n) reasons.push('ROUNDED_UP_TO_UNIT_SCALE');
+    const { raw3, reasons } = requestedQuantity(norm, input.people, adults, input.children, input.elderly);
+    // raw3 is in 10^-3 units; the item's quantity is in 10^-scale units, so round the division up.
+    const step = 10n ** BigInt(NORM_SCALE - item.unit_scale);
+    const quantityUnits = (raw3 + step - 1n) / step;
+    if (quantityUnits === 0n) {
+      result.skipped.push({ category: line.category, reason_codes: ['QUANTITY_ZERO'] });
+      continue;
+    }
+    if (quantityUnits > NEED_ESTIMATE_MAX_QUANTITY * 10n ** BigInt(item.unit_scale)) invalid();
+
+    const reasonCodes: NeedReasonCode[] = [...reasons];
+    if (usedDefault) reasonCodes.push('DEFAULT_ITEM_USED');
+    if (raw3 % step !== 0n) reasonCodes.push('ROUNDED_UP_TO_UNIT_SCALE');
 
     result.lines.push({
-      category: category.category,
-      item_type_code: category.item_type_code,
+      category: norm.category,
+      item_id: item.id,
+      item_type_code: item.item_type_code,
       norm_id: norm.id,
       norm_version: norm.version,
-      unit_scale: category.unit_scale,
-      quantity: decimalFromUnits(quantityUnits, category.unit_scale),
-      raw_quantity: decimalFromUnits(rawUnits, RAW_SCALE),
-      days: perPersonDay ? days : 1,
-      effective_persons: decimalFromUnits(personUnits, PERSON_SCALE),
-      reason_codes: reasons,
+      unit_scale: item.unit_scale,
+      quantity: decimalFromUnits(quantityUnits, item.unit_scale),
+      estimate_basis: {
+        basis: norm.quantity_basis,
+        inputs: {
+          people: input.people,
+          children: input.children,
+          elderly: input.elderly,
+          adults,
+          qty_adult: norm.qty_adult,
+          qty_child: norm.qty_child,
+          qty_elderly: norm.qty_elderly,
+          people_per_unit: norm.people_per_unit,
+          fixed_quantity: norm.fixed_quantity,
+          raw_quantity: decimalFromUnits(raw3, NORM_SCALE),
+        },
+      },
+      reason_codes: reasonCodes,
     });
   }
   return result;

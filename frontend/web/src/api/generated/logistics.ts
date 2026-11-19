@@ -1723,7 +1723,7 @@ export interface paths {
         head?: never;
         /**
          * NeedsController.updateNorm
-         * @description Requires NEED_NORM_MANAGE (OPERATIONS_MANAGER at system scope). Changes are version-checked and audited.
+         * @description Requires NEED_NORM_MANAGE (OPERATIONS_MANAGER at system scope). Changes are version-checked and audited. Fields must match the quantity basis: BY_GROUP takes qty_adult, qty_child and qty_elderly; PER_N_PEOPLE takes people_per_unit; PER_REQUEST takes fixed_quantity. default_item_id must be an ACTIVE item of the norm item type.
          */
         patch: operations["logisticsNeedsUpdateNorm"];
         trace?: never;
@@ -1739,7 +1739,7 @@ export interface paths {
         put?: never;
         /**
          * NeedsController.confirm
-         * @description Requires NEED_ESTIMATE_CONFIRM. Turns an ESTIMATED need into CONFIRMED. Changing the quantity requires a reason. Only OPEN cycles accept confirmation.
+         * @description Requires OPERATIONS_MANAGER (NEED_ESTIMATE_CONFIRM). Turns an ESTIMATED need into CONFIRMED. Changing the quantity, or swapping item_id to another ACTIVE item of the same item type, requires a reason. A swap re-expresses the quantity in the new unit scale, rounded up. Only OPEN cycles accept confirmation.
          */
         post: operations["logisticsNeedsConfirm"];
         delete?: never;
@@ -1759,7 +1759,7 @@ export interface paths {
         put?: never;
         /**
          * NeedsController.estimate
-         * @description Requires NEED_ESTIMATE_CONFIRM on the work cycle campaign. Generates ESTIMATED needs from active norms; the norm quantity is multiplied by the people count (and days for per-person-per-day norms) with infant and elderly modifiers, then rounded up to the item unit scale. Refused when the request already has a DECLARED or CONFIRMED need for the item. Estimated lines cannot be committed until confirmed.
+         * @description Requires OPERATIONS_MANAGER (NEED_ESTIMATE_CONFIRM) on the work cycle campaign. The SOS facts (people, children, elderly, relief flag) are read from Response admission, never from the body. One ESTIMATED line per category: BY_GROUP, PER_N_PEOPLE or PER_REQUEST norms, rounded up to the item unit scale. Without categories the bundle is every active norm marked in_default_bundle. An omitted item_id uses the norm default item. Refused unless the request is VERIFIED or later and needs relief supplies, and when the request already has a DECLARED or CONFIRMED need for the item. Estimated lines cannot be committed until confirmed.
          */
         post: operations["logisticsNeedsEstimate"];
         delete?: never;
@@ -2050,6 +2050,46 @@ export interface paths {
          * @description Route exported from backend/apps/logistics/src/pickup-tickets/pickup-tickets.controller.ts#PickupTicketsController.deliveries. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
          */
         post: operations["logisticsPickupTicketsDeliveries"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/items/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * CatalogController.updateItemAliases
+         * @description Replaces the alias list of one item (aliases only widen text matching; they never change stock or need quantities). Requires CATALOG_MANAGE (OPERATIONS_MANAGER, system scope).
+         */
+        patch: operations["logisticsCatalogUpdateItemAliases"];
+        trace?: never;
+    };
+    "/need-proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * NeedProposalsController.list
+         * @description Route exported from backend/apps/logistics/src/need-extraction/need-proposals.controller.ts#NeedProposalsController.list. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
+         */
+        get: operations["logisticsNeedProposalsList"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -5513,6 +5553,7 @@ export interface operations {
                                 scale?: number;
                             };
                             name?: string;
+                            aliases?: string[];
                             /** @enum {string} */
                             status?: "ACTIVE" | "INACTIVE";
                             version?: number;
@@ -5565,6 +5606,7 @@ export interface operations {
                     item_type_code: string;
                     unit_code: string;
                     name: string;
+                    aliases?: string[];
                 };
             };
         };
@@ -5588,12 +5630,22 @@ export interface operations {
                             scale?: number;
                         };
                         name?: string;
+                        aliases?: string[];
                         /** @enum {string} */
                         status?: "ACTIVE" | "INACTIVE";
                         version?: number;
                         /** Format: date-time */
                         created_at?: string;
                     };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
             /** @description Documented error response; clients branch on the stable code. */
@@ -5661,6 +5713,7 @@ export interface operations {
                             scale?: number;
                         };
                         name?: string;
+                        aliases?: string[];
                         /** @enum {string} */
                         status?: "ACTIVE" | "INACTIVE";
                         version?: number;
@@ -10022,14 +10075,18 @@ export interface operations {
             content: {
                 "application/json": {
                     expected_version: number;
-                    /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                    qty_per_person_per_day?: string;
-                    /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                    modifier_infant?: string;
-                    /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                    modifier_elderly?: string;
                     /** @enum {string} */
-                    quantity_basis?: "PER_PERSON_DAY" | "PER_PERSON";
+                    quantity_basis?: "BY_GROUP" | "PER_N_PEOPLE" | "PER_REQUEST";
+                    /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                    qty_adult?: string;
+                    /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                    qty_child?: string;
+                    /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                    qty_elderly?: string;
+                    people_per_unit?: number | null;
+                    fixed_quantity?: string | null;
+                    default_item_id?: string | null;
+                    in_default_bundle?: boolean;
                     active?: boolean;
                 };
             };
@@ -10105,6 +10162,8 @@ export interface operations {
                     /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                     quantity?: string;
                     reason?: string;
+                    /** Format: uuid */
+                    item_id?: string;
                 };
             };
         };
@@ -10144,6 +10203,15 @@ export interface operations {
                 };
             };
             /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -10167,14 +10235,10 @@ export interface operations {
                     /** Format: uuid */
                     request_id: string;
                     work_cycle: number;
-                    people_count: number;
-                    days?: number;
-                    infants?: number;
-                    elderly?: number;
-                    categories: {
+                    categories?: {
                         category: string;
                         /** Format: uuid */
-                        item_id: string;
+                        item_id?: string;
                     }[];
                 };
             };
@@ -10233,6 +10297,15 @@ export interface operations {
             };
             /** @description Documented error response; clients branch on the stable code. */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -12215,6 +12288,213 @@ export interface operations {
             };
             /** @description Documented error response; clients branch on the stable code. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsCatalogUpdateItemAliases: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expected_version: number;
+                    aliases: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id?: string;
+                        item_type?: {
+                            code?: string;
+                            display_name?: string;
+                        };
+                        unit?: {
+                            code?: string;
+                            display_name?: string;
+                            scale?: number;
+                        };
+                        name?: string;
+                        aliases?: string[];
+                        /** @enum {string} */
+                        status?: "ACTIVE" | "INACTIVE";
+                        version?: number;
+                        /** Format: date-time */
+                        created_at?: string;
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsNeedProposalsList: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            /** Format: uuid */
+                            cycle_id: string;
+                            /** Format: uuid */
+                            request_id: string;
+                            work_cycle: number;
+                            campaign_id: string | null;
+                            sos: {
+                                people?: number;
+                                children?: number;
+                                elderly?: number;
+                                adults?: number;
+                            } | null;
+                            warehouse: {
+                                /** Format: uuid */
+                                id?: string;
+                            } | null;
+                            lines: {
+                                /** Format: uuid */
+                                need_id: string;
+                                version: number;
+                                category: string;
+                                item: {
+                                    /** Format: uuid */
+                                    id: string;
+                                    name: string;
+                                    unit: {
+                                        code?: string;
+                                        display_name?: string;
+                                        scale?: number;
+                                    };
+                                };
+                                /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                                quantity: string;
+                                available: string | null;
+                                shortfall: boolean | null;
+                                reason_codes: string[];
+                                reasons: {
+                                    code: string;
+                                    message: string;
+                                }[];
+                            }[];
+                            extraction: {
+                                /** @enum {string} */
+                                source: "GEMINI" | "ALIAS" | "DEFAULT_BUNDLE";
+                                model?: string | null;
+                                unmatched_terms: string[];
+                                mentioned_items: {
+                                    /** Format: uuid */
+                                    item_id: string;
+                                    item_name?: string | null;
+                                    category?: string | null;
+                                }[];
+                                reasons: {
+                                    code: string;
+                                    message: string;
+                                }[];
+                            } | null;
+                        }[];
+                        more: boolean;
+                        cursor?: string;
+                        /** Format: date-time */
+                        generated_at: string;
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -17,6 +17,7 @@ import { EvidenceModule } from './evidence/evidence.module';
 import { RequestOperationsModule } from './operations/request-operations.module';
 import { TeamsModule } from './teams/teams.module';
 import { MissionsModule } from './missions/missions.module';
+import { SupplyCandidatesModule } from './supply-candidates/supply-candidates.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
 import { MapModule } from './map/map.module';
 import { ReportsModule } from './reports/reports.module';
@@ -36,6 +37,7 @@ import { AiAdvisoryService } from './ai/ai-advisory.service';
     RequestOperationsModule,
     TeamsModule,
     MissionsModule,
+    SupplyCandidatesModule,
     CampaignsModule,
     MapModule,
     ReportsModule,

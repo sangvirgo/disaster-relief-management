@@ -12,6 +12,7 @@ const dateTime = string('date-time');
 const id = uuid();
 const version = integer();
 const quantity = { type: 'string', description: 'Decimal quantity encoded as a string and validated against the unit scale.' };
+const aliasList = { type: 'array', maxItems: 20, items: { type: 'string', minLength: 1, maxLength: 60 } };
 const response = (schema, description = 'Documented response shape.', example, headers) => ({
   description,
   ...(headers ? { headers } : {}),
@@ -363,12 +364,34 @@ const responseDetails = {
       campaign_id: null,
     }, idempotentCommandResponseHeaders),
   },
+  responseSupplyCandidatesList: {
+    response: response(object({
+      items: item({
+        request_id: id,
+        work_cycle: integer(),
+        campaign_id: { anyOf: [id, { type: 'null' }] },
+        status: { type: 'string', enum: ['VERIFIED', 'TRIAGED', 'DISPATCHED', 'IN_PROGRESS'] },
+        people_affected: { anyOf: [integer(), { type: 'null' }] },
+        children_count: { anyOf: [integer(), { type: 'null' }] },
+        elderly_count: { anyOf: [integer(), { type: 'null' }] },
+        relief_items_text: { anyOf: [{ type: 'string', maxLength: 500 }, { type: 'null' }] },
+        verified_at: { anyOf: [dateTime, { type: 'null' }] },
+      }, ['request_id', 'work_cycle', 'campaign_id', 'status', 'people_affected', 'children_count', 'elderly_count', 'relief_items_text', 'verified_at']),
+      more: boolean(),
+      cursor: text,
+    }, ['items', 'more'])),
+  },
   responseRequestResolutionInternalOperation: {
     response: response(object({ id, kind: text, state: text, request_id: id, work_cycle: integer(), request_status: text, campaign_id: { anyOf: [id, { type: 'null' }] }, outcome_basis: { anyOf: [text, { type: 'null' }] } })),
   },
   responseRequestAdmissionAdmit: {
     noBody: true,
-    response: response(object({ request_id: id, work_cycle: integer(), version, status: { type: 'string', enum: ['VERIFIED', 'TRIAGED', 'DISPATCHED', 'IN_PROGRESS'] }, campaign_id: { anyOf: [id, { type: 'null' }] } })),
+    response: response(object({
+      request_id: id, work_cycle: integer(), version, status: { type: 'string', enum: ['VERIFIED', 'TRIAGED', 'DISPATCHED', 'IN_PROGRESS'] },
+      campaign_id: { anyOf: [id, { type: 'null' }] }, people_affected: { anyOf: [integer(), { type: 'null' }] },
+      children_count: { anyOf: [integer(), { type: 'null' }] }, elderly_count: { anyOf: [integer(), { type: 'null' }] },
+      needs_relief_supplies: boolean(),
+    })),
   },
   responseMissionsReviewFailure: {
     request: request(object({ expected_version: version, disposition: { type: 'string', enum: ['REPLACED', 'NO_FURTHER_ACTION', 'REFERRED'] }, reason: text, replacement_mission_id: id }, ['expected_version', 'disposition', 'reason'])),
@@ -469,6 +492,7 @@ const responseDetails = {
 };
 
 const responsePaginationQueries = {
+  responseSupplyCandidatesList: ['cursor', 'limit'],
   listRequestQueue: ['cursor', 'limit', 'unassigned'],
   listUnassignedRequests: ['cursor', 'limit'],
   listRequestContactAttempts: ['cursor', 'limit'],
@@ -491,7 +515,11 @@ const responsePaginationQueries = {
 const logisticsDetails = {
   logisticsCatalogCreateItemType: { request: request(object({ code: text, display_name: text }, ['code', 'display_name'])) },
   logisticsCatalogCreateUnit: { request: request(object({ code: text, display_name: text, scale: { type: 'integer', minimum: 0, maximum: 3 } }, ['code', 'display_name', 'scale'])) },
-  logisticsCatalogCreateItem: { request: request(object({ item_type_code: text, unit_code: text, name: text }, ['item_type_code', 'unit_code', 'name'])) },
+  logisticsCatalogCreateItem: { request: request(object({ item_type_code: text, unit_code: text, name: text, aliases: aliasList }, ['item_type_code', 'unit_code', 'name'])) },
+  logisticsCatalogUpdateItemAliases: {
+    description: 'Replaces the alias list of one item (aliases only widen text matching; they never change stock or need quantities). Requires CATALOG_MANAGE (OPERATIONS_MANAGER, system scope).',
+    request: request(versionBody({ aliases: aliasList }, ['aliases'])),
+  },
   logisticsCatalogDeactivateItem: { request: request(object({ expected_version: version }, ['expected_version'])) },
   logisticsAssetsCreateWarehouse: { request: request(object({ name: text, address_note: text, location: object({ type: { type: 'string', const: 'Point' }, coordinates: { type: 'array', minItems: 2, maxItems: 2, items: { type: 'number' } } }), location_public: boolean(), service_radius_m: { type: 'integer', minimum: 1, maximum: 200000 } }, ['name'])) },
   logisticsAssetsPatchWarehouse: { request: request(versionBody({ name: text, address_note: { anyOf: [text, { type: 'null' }] }, location: { anyOf: [object({ type: { type: 'string', const: 'Point' }, coordinates: { type: 'array', minItems: 2, maxItems: 2, items: { type: 'number' } } }), { type: 'null' }] }, location_public: boolean(), service_radius_m: { anyOf: [{ type: 'integer', minimum: 1, maximum: 200000 }, { type: 'null' }] } })) },
@@ -623,16 +651,12 @@ const logisticsDetails = {
   logisticsNeedsReduce: { request: request(object({ expected_version: version, quantity, reason: text }, ['expected_version', 'quantity', 'reason'])) },
   logisticsNeedsCancel: { request: request(object({ expected_version: version, reason: text }, ['expected_version', 'reason'])) },
   logisticsNeedsEstimate: {
-    description: 'Requires NEED_ESTIMATE_CONFIRM on the work cycle campaign. Generates ESTIMATED needs from active norms; the norm quantity is multiplied by the people count (and days for per-person-per-day norms) with infant and elderly modifiers, then rounded up to the item unit scale. Refused when the request already has a DECLARED or CONFIRMED need for the item. Estimated lines cannot be committed until confirmed.',
+    description: 'Requires OPERATIONS_MANAGER (NEED_ESTIMATE_CONFIRM) on the work cycle campaign. The SOS facts (people, children, elderly, relief flag) are read from Response admission, never from the body. One ESTIMATED line per category: BY_GROUP, PER_N_PEOPLE or PER_REQUEST norms, rounded up to the item unit scale. Without categories the bundle is every active norm marked in_default_bundle. An omitted item_id uses the norm default item. Refused unless the request is VERIFIED or later and needs relief supplies, and when the request already has a DECLARED or CONFIRMED need for the item. Estimated lines cannot be committed until confirmed.',
     request: request(object({
       request_id: id,
       work_cycle: integer(),
-      people_count: integer(),
-      days: integer(),
-      infants: integer(),
-      elderly: integer(),
-      categories: item({ category: { type: 'string' }, item_id: id }, ['category', 'item_id']),
-    }, ['request_id', 'work_cycle', 'people_count', 'categories'])),
+      categories: item({ category: { type: 'string' }, item_id: id }, ['category']),
+    }, ['request_id', 'work_cycle'])),
     response: response(object({ items: item({
       id, cycle_id: id, request_id: id, work_cycle: integer(), item_id: id,
       source: { type: 'string', enum: ['ESTIMATED'] },
@@ -643,19 +667,23 @@ const logisticsDetails = {
     }, ['id', 'cycle_id', 'request_id', 'work_cycle', 'item_id', 'source', 'status', 'requested_quantity']) }, ['items'])),
   },
   logisticsNeedsConfirm: {
-    description: 'Requires NEED_ESTIMATE_CONFIRM. Turns an ESTIMATED need into CONFIRMED. Changing the quantity requires a reason. Only OPEN cycles accept confirmation.',
-    request: request(versionBody({ quantity, reason: text })),
+    description: 'Requires OPERATIONS_MANAGER (NEED_ESTIMATE_CONFIRM). Turns an ESTIMATED need into CONFIRMED. Changing the quantity, or swapping item_id to another ACTIVE item of the same item type, requires a reason. A swap re-expresses the quantity in the new unit scale, rounded up. Only OPEN cycles accept confirmation.',
+    request: request(versionBody({ quantity, reason: text, item_id: id })),
   },
   logisticsNeedsListNorms: {
     description: 'Requires NEED_NORM_MANAGE (OPERATIONS_MANAGER at system scope). Lists the per-person norm table used by need estimates.',
   },
   logisticsNeedsUpdateNorm: {
-    description: 'Requires NEED_NORM_MANAGE (OPERATIONS_MANAGER at system scope). Changes are version-checked and audited.',
+    description: 'Requires NEED_NORM_MANAGE (OPERATIONS_MANAGER at system scope). Changes are version-checked and audited. Fields must match the quantity basis: BY_GROUP takes qty_adult, qty_child and qty_elderly; PER_N_PEOPLE takes people_per_unit; PER_REQUEST takes fixed_quantity. default_item_id must be an ACTIVE item of the norm item type.',
     request: request(versionBody({
-      qty_per_person_per_day: quantity,
-      modifier_infant: quantity,
-      modifier_elderly: quantity,
-      quantity_basis: { type: 'string', enum: ['PER_PERSON_DAY', 'PER_PERSON'] },
+      quantity_basis: { type: 'string', enum: ['BY_GROUP', 'PER_N_PEOPLE', 'PER_REQUEST'] },
+      qty_adult: quantity,
+      qty_child: quantity,
+      qty_elderly: quantity,
+      people_per_unit: { anyOf: [{ type: 'integer', minimum: 1, maximum: 10000 }, { type: 'null' }] },
+      fixed_quantity: { anyOf: [quantity, { type: 'null' }] },
+      default_item_id: { anyOf: [id, { type: 'null' }] },
+      in_default_bundle: boolean(),
       active: boolean(),
     })),
   },
@@ -701,6 +729,7 @@ const catalogItemSchema = object({
   item_type: catalogCodeSchema,
   unit: catalogUnitSchema,
   name: text,
+  aliases: aliasList,
   status: { type: 'string', enum: ['ACTIVE', 'INACTIVE'] },
   version,
   created_at: dateTime,
@@ -872,6 +901,37 @@ const receiptViewSchema = object({
 });
 
 const sharedLogisticsResponses = {
+  logisticsNeedProposalsList: object({
+    items: item({
+      cycle_id: id,
+      request_id: id,
+      work_cycle: integer(),
+      campaign_id: nullableValue(id),
+      sos: nullableValue(object({ people: integer(), children: integer(), elderly: integer(), adults: integer() })),
+      warehouse: nullableValue(object({ id })),
+      lines: item({
+        need_id: id,
+        version: integer(),
+        category: text,
+        item: object({ id, name: text, unit: catalogUnitSchema }, ['id', 'name', 'unit']),
+        quantity,
+        available: nullableValue(quantity),
+        shortfall: nullableValue(boolean()),
+        reason_codes: array(text),
+        reasons: item({ code: text, message: text }, ['code', 'message']),
+      }, ['need_id', 'version', 'category', 'item', 'quantity', 'available', 'shortfall', 'reason_codes', 'reasons']),
+      extraction: nullableValue(object({
+        source: { type: 'string', enum: ['GEMINI', 'ALIAS', 'DEFAULT_BUNDLE'] },
+        model: nullableValue(text),
+        unmatched_terms: array(text),
+        mentioned_items: item({ item_id: id, item_name: nullableValue(text), category: nullableValue(text) }, ['item_id']),
+        reasons: item({ code: text, message: text }, ['code', 'message']),
+      }, ['source', 'unmatched_terms', 'mentioned_items', 'reasons'])),
+    }, ['cycle_id', 'request_id', 'work_cycle', 'campaign_id', 'sos', 'warehouse', 'lines', 'extraction']),
+    more: boolean(),
+    cursor: text,
+    generated_at: dateTime,
+  }, ['items', 'more', 'generated_at']),
   logisticsAuditList: object({
     items: item({
       id: text, actor_user_id: nullableValue(id), action: text, entity_type: text, entity_id: text,
@@ -888,6 +948,7 @@ const sharedLogisticsResponses = {
   logisticsCatalogCreateUnit: catalogUnitSchema,
   logisticsCatalogCreateItem: catalogItemSchema,
   logisticsCatalogDeactivateItem: catalogItemSchema,
+  logisticsCatalogUpdateItemAliases: catalogItemSchema,
   logisticsDrivesList: object({
     items: item({ ...driveValueSchema.properties, cursor_created_at: text, items: array(object({ drive_id: id, ...driveCommandItemSchema.properties, accepted_total: quantity })) }),
     more: boolean(), cursor: text,
@@ -1062,6 +1123,7 @@ const sharedLogisticsResponses = {
 };
 
 const logisticsQueries = {
+  logisticsNeedProposalsList: ['cursor', 'limit'],
   logisticsDonationsUploadEvidence: ['dispute_id'],
   logisticsAuditList: ['entity_type', 'entity_id', 'cursor', 'limit'],
   logisticsCatalogItemTypes: ['cursor', 'limit'], logisticsCatalogUnits: ['cursor', 'limit'],
@@ -1103,6 +1165,8 @@ const errorCatalog = new Map([...fs.readFileSync(errorCatalogPath, 'utf8').match
   .map(([, code, status, message]) => [code, { status, message }]));
 
 const routeErrorCodes = {
+  logisticsNeedProposalsList: ['CURSOR_INVALID', 'FORBIDDEN'],
+  responseSupplyCandidatesList: ['CURSOR_INVALID'],
   identityInternalActiveUserCheck: ['FORBIDDEN'],
   identityInternalSearchActiveUsers: ['FORBIDDEN', 'CURSOR_INVALID', 'VALIDATION_FAILED'],
   identityInternalTeamLeaderEligibility: ['FORBIDDEN'],
@@ -1167,12 +1231,13 @@ const routeErrorCodes = {
   responseTeamsRemoveMember: ['NOT_FOUND', 'LEADER_REQUIRED'],
   responseTeamsTransferLeader: ['NOT_FOUND', 'STATE_TRANSITION_INVALID', 'VERSION_CONFLICT', 'IDENTITY_UNAVAILABLE'],
   logisticsAuditList: ['CURSOR_INVALID', 'VALIDATION_FAILED'],
-  logisticsCatalogCreateItem: ['ITEM_NAME_TAKEN'],
+  logisticsCatalogCreateItem: ['ITEM_NAME_TAKEN', 'VALIDATION_FAILED'],
+  logisticsCatalogUpdateItemAliases: ['VALIDATION_FAILED', 'VERSION_CONFLICT', 'NOT_FOUND'],
   logisticsAssetsCreateVehicle: ['VEHICLE_IDENTIFIER_TAKEN'],
   logisticsNeedsCreate: ['QUANTITY_SCALE_INVALID', 'CYCLE_FROZEN', 'CYCLE_SEALED', 'VALIDATION_FAILED', 'NEED_EXISTS', 'POINT_INACTIVE'],
-  logisticsNeedsEstimate: ['VALIDATION_FAILED', 'NEED_NORM_NOT_FOUND', 'NEED_ITEM_TYPE_MISMATCH', 'NEED_ALREADY_DECLARED', 'NEED_EXISTS', 'CYCLE_FROZEN', 'CYCLE_SEALED', 'STATE_TRANSITION_INVALID', 'RESPONSE_UNAVAILABLE'],
-  logisticsNeedsConfirm: ['VALIDATION_FAILED', 'NEED_NOT_ESTIMATED', 'CYCLE_FROZEN', 'CYCLE_SEALED', 'STATE_TRANSITION_INVALID', 'VERSION_CONFLICT', 'BELOW_PROTECTED_QUANTITY', 'QUANTITY_SCALE_INVALID'],
-  logisticsNeedsUpdateNorm: ['VALIDATION_FAILED', 'VERSION_CONFLICT', 'NOT_FOUND'],
+  logisticsNeedsEstimate: ['VALIDATION_FAILED', 'NEED_NORM_NOT_FOUND', 'NEED_ITEM_REQUIRED', 'NEED_ITEM_TYPE_MISMATCH', 'NEED_ALREADY_DECLARED', 'NEED_RELIEF_NOT_REQUESTED', 'NEED_PEOPLE_MISSING', 'NEED_EXISTS', 'NOT_FOUND', 'CYCLE_FROZEN', 'CYCLE_SEALED', 'STATE_TRANSITION_INVALID', 'REQUEST_NOT_VERIFIED', 'RESPONSE_UNAVAILABLE'],
+  logisticsNeedsConfirm: ['VALIDATION_FAILED', 'NEED_NOT_ESTIMATED', 'NEED_ITEM_TYPE_MISMATCH', 'NEED_EXISTS', 'NOT_FOUND', 'CYCLE_FROZEN', 'CYCLE_SEALED', 'STATE_TRANSITION_INVALID', 'VERSION_CONFLICT', 'BELOW_PROTECTED_QUANTITY', 'QUANTITY_SCALE_INVALID'],
+  logisticsNeedsUpdateNorm: ['VALIDATION_FAILED', 'VERSION_CONFLICT', 'NOT_FOUND', 'NEED_NORM_SHAPE_INVALID', 'NEED_DEFAULT_ITEM_INVALID'],
   logisticsNeedsIncrease: ['QUANTITY_SCALE_INVALID', 'CYCLE_FROZEN', 'CYCLE_SEALED', 'STATE_TRANSITION_INVALID', 'NEED_ESTIMATE_NOT_CONFIRMED', 'VERSION_CONFLICT'],
   logisticsNeedsReduce: ['QUANTITY_SCALE_INVALID', 'CYCLE_FROZEN', 'CYCLE_SEALED', 'STATE_TRANSITION_INVALID', 'NEED_ESTIMATE_NOT_CONFIRMED', 'BELOW_PROTECTED_QUANTITY', 'VERSION_CONFLICT'],
   logisticsNeedsCancel: ['CYCLE_SEALED', 'STATE_TRANSITION_INVALID', 'UNSETTLED_ISSUED_GOODS', 'VERSION_CONFLICT'],
@@ -1514,6 +1579,7 @@ export function applyOpenApiDetails(document, service) {
     const needsFields = {
       needs_rescue: { type: 'boolean', default: true },
       needs_relief_supplies: { type: 'boolean', default: false },
+      relief_items_text: { anyOf: [{ type: 'string', maxLength: 500 }, { type: 'null' }] },
     };
     for (const name of ['CreateSelfRequest', 'CreateProxyRequest']) {
       const schema = document.components.schemas[name];

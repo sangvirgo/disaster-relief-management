@@ -3,7 +3,7 @@
  * CAMPAIGN_SETUP_MANAGE covers creating a campaign, activating it and changing its area; only OPERATIONS_MANAGER holds it.
  * CAMPAIGN_WAREHOUSE_VIEW reads a campaign's warehouse assignment (COORDINATOR and OPERATIONS_MANAGER).
  * CAMPAIGN_WAREHOUSE_MANAGE sets a manual primary warehouse and re-evaluates assignments; only OPERATIONS_MANAGER holds it.
- * NEED_ESTIMATE_CONFIRM generates estimated SOS goods needs and confirms or edits them (COORDINATOR and OPERATIONS_MANAGER).
+ * NEED_ESTIMATE_CONFIRM generates estimated SOS goods needs and confirms or edits them (OPERATIONS_MANAGER only).
  * NEED_NORM_MANAGE reads and changes the per-person norm table; only OPERATIONS_MANAGER holds it, at system scope.
  * SUPPLY_GAP_VIEW reads supply-gap warnings and suggestions (COORDINATOR and OPERATIONS_MANAGER, read-only).
  * SUPPLY_GAP_MANAGE accepts a suggested donation drive or dismisses a gap; only OPERATIONS_MANAGER holds it, at system scope.
@@ -22,7 +22,7 @@ export const ROLE_PERMISSIONS = {
     'CAMPAIGN_READ', 'REQUEST_VERIFY', 'REQUEST_TRIAGE', 'REQUEST_CANCEL', 'REQUEST_REOPEN', 'REQUEST_RESOLVE',
     'REQUEST_UNASSIGNED_QUEUE', 'MISSION_ASSIGN', 'MISSION_RECORD_ON_BEHALF', 'TEAM_MANAGE_ANY',
     'TEAM_POSITION_SET_ANY', 'MAP_READ', 'CAMPAIGN_MANAGE', 'REPORT_READ', 'RESPONSE_REPORT_READ', 'NEED_MANAGE',
-    'DONATION_DRIVE_MANAGE', 'CAMPAIGN_WAREHOUSE_VIEW', 'NEED_ESTIMATE_CONFIRM', 'SUPPLY_GAP_VIEW',
+    'DONATION_DRIVE_MANAGE', 'CAMPAIGN_WAREHOUSE_VIEW', 'SUPPLY_GAP_VIEW',
     'PICKUP_TICKET_VIEW', 'PICKUP_TICKET_MANAGE', 'PICKUP_CLOSEOUT_SUBMIT',
   ],
   OPERATIONS_MANAGER: [
