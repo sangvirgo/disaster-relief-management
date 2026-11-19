@@ -76,6 +76,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
   onConfirm,
 }) => {
   const webViewRef = useRef<WebView<object>>(null);
+  const searchAbortRef = useRef<AbortController | null>(null);
 
   const [longitude, setLongitude] = useState<number>(
     initialCoordinates ? initialCoordinates[0] : DEFAULT_LONGITUDE,
@@ -224,43 +225,67 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
     const q = searchQuery.trim();
     if (!q) return;
 
+    searchAbortRef.current?.abort();
+    const controller = new AbortController();
+    searchAbortRef.current = controller;
     setIsSearching(true);
     setSearchError("");
+    setSearchResults([]);
     try {
+      const params = new URLSearchParams({
+        q,
+        limit: "8",
+        lang: "vi",
+        countrycode: "VN",
+        lat: String(latitude),
+        lon: String(longitude),
+        zoom: "15",
+        location_bias_scale: "0.1",
+      });
       const response = await fetch(
-        `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=5`,
+        `https://photon.komoot.io/api/?${params.toString()}`,
+        { signal: controller.signal },
       );
+      if (!response.ok) throw new Error("Place search failed");
       const data = await response.json();
-      if (data && data.features && data.features.length > 0) {
-        const items: SearchPlaceItem[] = data.features.map(
-          (f: any, idx: number) => {
-            const { name, fullAddress } = formatPhotonProperties(
-              f.properties as PhotonPlaceProperties,
-            );
-            return {
-              id: `${idx}_${f.geometry.coordinates.join("_")}`,
-              name,
-              fullAddress,
-              coordinates: [
-                f.geometry.coordinates[0],
-                f.geometry.coordinates[1],
-              ],
-            };
-          },
-        );
+      if (controller.signal.aborted) return;
+      const features = Array.isArray(data?.features) ? data.features : [];
+      const items: SearchPlaceItem[] = features.flatMap(
+        (feature: any, idx: number) => {
+          const coordinates = feature?.geometry?.coordinates;
+          const properties = feature?.properties as PhotonPlaceProperties | undefined;
+          if (
+            !Array.isArray(coordinates) ||
+            !Number.isFinite(coordinates[0]) ||
+            !Number.isFinite(coordinates[1]) ||
+            !properties
+          ) return [];
+          const { name, fullAddress } = formatPhotonProperties(properties);
+          return [{
+            id: `${idx}_${coordinates.join("_")}`,
+            name,
+            fullAddress,
+            coordinates: [coordinates[0], coordinates[1]],
+          }];
+        },
+      );
+      if (items.length > 0) {
         setSearchResults(items);
       } else {
-        setSearchResults([]);
         setSearchError(
           "Không tìm thấy địa điểm phù hợp. Bạn có thể zoom và chạm trực tiếp trên bản đồ.",
         );
       }
     } catch {
+      if (controller.signal.aborted) return;
       setSearchError(
         "Lỗi tra cứu địa điểm. Vui lòng kiểm tra mạng hoặc chạm trực tiếp trên bản đồ.",
       );
     } finally {
-      setIsSearching(false);
+      if (searchAbortRef.current === controller) {
+        searchAbortRef.current = null;
+        setIsSearching(false);
+      }
     }
   };
 
@@ -426,6 +451,54 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
             position: absolute;
             border-radius: 50%;
           }
+          .rain-control {
+            border: 0;
+            background: transparent;
+            box-shadow: none;
+          }
+          .rain-toggle {
+            display: block;
+            padding: 7px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 999px;
+            background: #ffffff;
+            color: #334155;
+            font-size: 13px;
+            font-weight: 700;
+            box-shadow: 0 2px 6px rgba(15, 23, 42, 0.2);
+          }
+          .rain-toggle.active {
+            border-color: #1d6fd6;
+            background: #1d6fd6;
+            color: #ffffff;
+          }
+          .rain-details {
+            display: grid;
+            gap: 4px;
+            min-width: 205px;
+            margin-top: 6px;
+            padding: 6px 9px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.94);
+            color: #334155;
+            font-size: 11px;
+            line-height: 15px;
+            box-shadow: 0 1px 4px rgba(15, 23, 42, 0.14);
+          }
+          .rain-gradient {
+            height: 8px;
+            border-radius: 4px;
+            background: linear-gradient(90deg, #88ddee, #00a3e0, #005588, #ffee00, #ffaa00, #ff4400);
+          }
+          .rain-labels {
+            display: grid;
+            grid-template-columns: repeat(3, auto);
+            gap: 2px 8px;
+            text-align: center;
+          }
+          .rain-status:empty {
+            display: none;
+          }
         </style>
       </head>
       <body>
@@ -440,6 +513,126 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
             maxZoom: 19,
             attribution: '&copy; OpenStreetMap contributors'
           }).addTo(map);
+
+          var rainLayer = null;
+          var rainController = null;
+          var rainRequestId = 0;
+          var rainToggleButton = null;
+          var rainStatus = null;
+          var rainDetails = null;
+          var rainEnabled = true;
+          var rainControl = L.control({ position: 'topright' });
+
+          rainControl.onAdd = function() {
+            var container = L.DomUtil.create('div', 'rain-control leaflet-control');
+            container.innerHTML =
+              '<button type="button" class="rain-toggle active" aria-pressed="true">🌧 Lớp mưa</button>' +
+              '<div class="rain-details" aria-label="Chú giải cường độ mưa">' +
+                '<div>Radar quan trắc gần nhất · cường độ phản hồi</div>' +
+                '<div class="rain-gradient" aria-hidden="true"></div>' +
+                '<div class="rain-labels"><span>Nhẹ</span><span>Vừa</span><span>Mạnh</span></div>' +
+                '<div class="rain-status" role="status" aria-live="polite">Đang tải radar mưa…</div>' +
+              '</div>';
+            rainToggleButton = container.querySelector('.rain-toggle');
+            rainStatus = container.querySelector('.rain-status');
+            rainDetails = container.querySelector('.rain-details');
+            L.DomEvent.disableClickPropagation(container);
+            L.DomEvent.disableScrollPropagation(container);
+            rainToggleButton.addEventListener('click', function() {
+              setRainEnabled(!rainEnabled);
+            });
+            return container;
+          };
+          rainControl.addTo(map);
+
+          function setRainStatus(message) {
+            if (rainStatus) rainStatus.textContent = message;
+          }
+
+          async function loadRainRadar() {
+            var requestId = ++rainRequestId;
+            if (rainController) rainController.abort();
+            var controller = new AbortController();
+            rainController = controller;
+            setRainStatus('Đang tải radar mưa…');
+
+            try {
+              var response = await fetch('https://api.rainviewer.com/public/weather-maps.json', {
+                signal: controller.signal
+              });
+              if (!response.ok) throw new Error('radar');
+              var body = await response.json();
+              var frames = body && body.radar && body.radar.past;
+              var frame = frames && frames.length ? frames[frames.length - 1] : null;
+              if (!body.host || !frame || !frame.path) throw new Error('radar');
+              if (controller.signal.aborted || requestId !== rainRequestId || !rainEnabled) return;
+
+              var pane = map.getPane('rain');
+              if (!pane) pane = map.createPane('rain');
+              pane.style.zIndex = '350';
+              pane.style.pointerEvents = 'none';
+              if (rainLayer) rainLayer.remove();
+
+              var layer = L.tileLayer(body.host + frame.path + '/256/{z}/{x}/{y}/2/1_1.png', {
+                pane: 'rain',
+                opacity: 0.65,
+                maxNativeZoom: 7,
+                maxZoom: 19,
+                attribution: '<a href="https://www.rainviewer.com/" target="_blank" rel="noopener noreferrer">Radar mưa: RainViewer.com</a>'
+              });
+              rainLayer = layer;
+              var frameTime = Number.isFinite(frame.time)
+                ? new Date(frame.time * 1000).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+                : null;
+              var readyMessage = frameTime
+                ? 'Khung radar gần nhất: ' + frameTime + ' (giờ địa phương).'
+                : 'Đang hiển thị khung radar quan trắc gần nhất.';
+              var tileLoaded = false;
+              var tileTimeout = setTimeout(function() {
+                if (!tileLoaded && rainLayer === layer && rainEnabled) {
+                  setRainStatus('Chưa tải được radar mưa.');
+                }
+              }, 8000);
+              layer.on('tileload', function() {
+                tileLoaded = true;
+                clearTimeout(tileTimeout);
+                if (rainLayer === layer && rainEnabled) setRainStatus(readyMessage);
+              });
+              layer.on('tileerror', function() {
+                if (!tileLoaded && rainLayer === layer && rainEnabled) {
+                  clearTimeout(tileTimeout);
+                  setRainStatus('Chưa tải được radar mưa.');
+                }
+              });
+              layer.addTo(map);
+            } catch (error) {
+              if (!controller.signal.aborted && requestId === rainRequestId) {
+                setRainStatus('Chưa tải được radar mưa.');
+              }
+            } finally {
+              if (rainController === controller) rainController = null;
+            }
+          }
+
+          function setRainEnabled(enabled) {
+            rainEnabled = Boolean(enabled);
+            if (rainToggleButton) {
+              rainToggleButton.classList.toggle('active', rainEnabled);
+              rainToggleButton.setAttribute('aria-pressed', String(rainEnabled));
+            }
+            if (rainDetails) rainDetails.style.display = rainEnabled ? 'grid' : 'none';
+
+            if (!rainEnabled) {
+              rainRequestId += 1;
+              if (rainController) rainController.abort();
+              rainController = null;
+              if (rainLayer) rainLayer.remove();
+              rainLayer = null;
+              return;
+            }
+
+            void loadRainRadar();
+          }
 
           var pinIcon = L.divIcon({
             className: 'custom-pin-wrap',
@@ -483,6 +676,8 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
             placeMarker(lat, lng);
             map.setView([lat, lng], zoomLevel || 16);
           };
+
+          setRainEnabled(true);
 
           // Báo cho React Native biết map đã sẵn sàng
           if (window.ReactNativeWebView) {

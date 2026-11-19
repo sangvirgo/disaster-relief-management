@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { importLibrary, setOptions } from '@googlemaps/js-api-loader';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -68,20 +68,28 @@ export type LocationOverlay = {
 export function LocationPicker({
   value,
   onSelect,
+  onAddressResolved,
   initiallyOpen = false,
-  closeOnConfirm = false,
+  selectOnPick = false,
+  closeOnSelect = false,
+  hideMap = false,
   overlay,
 }: {
   value: Point | null;
   onSelect: (point: Point | null, address?: string) => void;
+  onAddressResolved?: (point: Point, address: string) => void;
   initiallyOpen?: boolean;
-  closeOnConfirm?: boolean;
+  /** Apply a picked or searched point immediately, without a separate confirmation button. */
+  selectOnPick?: boolean;
+  closeOnSelect?: boolean;
+  /** Keep the address search panel while another map owns point selection. */
+  hideMap?: boolean;
   overlay?: LocationOverlay;
 }) {
   const [open, setOpen] = useState(initiallyOpen);
   const activeGoogleKey = envApiKey;
   const [mapEngine, setMapEngine] = useState<'osm' | 'google'>(() =>
-    activeGoogleKey ? 'google' : 'osm'
+    activeGoogleKey && !hideMap ? 'google' : 'osm'
   );
 
   // Leaflet refs
@@ -98,6 +106,22 @@ export function LocationPicker({
 
   const selectRef = useRef(onSelect);
   selectRef.current = onSelect;
+  const addressResolvedRef = useRef(onAddressResolved);
+  addressResolvedRef.current = onAddressResolved;
+  const selectionModeRef = useRef({ selectOnPick, closeOnSelect });
+  selectionModeRef.current = { selectOnPick, closeOnSelect };
+
+  const applyAutoSelection = useCallback((point: Point, address?: string) => {
+    confirmedPointRef.current = point;
+    setDraftPoint(point);
+    setPinDropKey((current) => current + 1);
+    if (address) {
+      setSearchQuery(address);
+      setSelectedAddress(`Đã chọn: ${address}`);
+    }
+    selectRef.current(point, address);
+    if (selectionModeRef.current.closeOnSelect) setOpen(false);
+  }, []);
 
   // ArcGIS provides live suggestions; Photon is a backup when that service is unavailable.
   const [searchQuery, setSearchQuery] = useState('');
@@ -130,6 +154,7 @@ export function LocationPicker({
     if (original && samePoint(original.point, point)) {
       setSearchQuery(original.label);
       setSelectedAddress(`${confirmed ? 'Đã xác nhận' : 'Địa chỉ gần ghim'}: ${original.label}`);
+      addressResolvedRef.current?.(point, original.label);
       return;
     }
     const key = `${point.latitude.toFixed(5)},${point.longitude.toFixed(5)}`;
@@ -138,6 +163,7 @@ export function LocationPicker({
     if (cached) {
       setSearchQuery(cached);
       setSelectedAddress(`${prefix}: ${cached}`);
+      addressResolvedRef.current?.(point, cached);
       return;
     }
     const coordinateLabel = `Tọa độ ${pointLabel(point)}`;
@@ -178,7 +204,10 @@ export function LocationPicker({
           if (response.ok) address = nearbyAddress(await response.json());
         }
         if (controller.signal.aborted) return;
-        if (address) addressCacheRef.current.set(key, address);
+        if (address) {
+          addressCacheRef.current.set(key, address);
+          addressResolvedRef.current?.(point, address);
+        }
         setSearchQuery(address || coordinateLabel);
         setSelectedAddress(address ? `${prefix}: ${address}` : `Chưa tìm được địa chỉ gần ghim. Vị trí đã chọn: ${coordinateLabel}.`);
       } catch {
@@ -240,6 +269,11 @@ export function LocationPicker({
     map.on('click', (event: L.LeafletMouseEvent) => {
       const point = { latitude: event.latlng.lat, longitude: event.latlng.lng };
       chosenSearchRef.current = null;
+      if (selectionModeRef.current.selectOnPick) {
+        applyAutoSelection(point);
+        lookupAddress(point, true);
+        return;
+      }
       setDraftPoint(point);
       setSelectedAddress('Đang cập nhật vị trí ghim…');
       if (confirmedPointRef.current && !samePoint(point, confirmedPointRef.current)) {
@@ -259,7 +293,7 @@ export function LocationPicker({
       map.remove();
       leafletMapRef.current = null;
     };
-  }, [open, mapEngine]);
+  }, [open, mapEngine, applyAutoSelection]);
 
   // Observed rain radar (RainViewer, no key). Blue = rain; darker/violet = heavier rain, so flooding risk is visible at a glance.
   useEffect(() => {
@@ -388,7 +422,7 @@ export function LocationPicker({
           const point = { latitude: center.lat(), longitude: center.lng() };
           setDraftPoint(point);
           setSelectedAddress('Đang cập nhật vị trí ghim…');
-          if (confirmedPointRef.current && !samePoint(point, confirmedPointRef.current)) {
+          if (!selectionModeRef.current.selectOnPick && confirmedPointRef.current && !samePoint(point, confirmedPointRef.current)) {
             confirmedPointRef.current = null;
             selectRef.current(null);
           }
@@ -398,7 +432,13 @@ export function LocationPicker({
           if (suppressMoveRef.current || !userMovedMap) return;
           userMovedMap = false;
           const center = map.getCenter();
-          if (center) lookupAddress({ latitude: center.lat(), longitude: center.lng() });
+          if (center) {
+            const point = { latitude: center.lat(), longitude: center.lng() };
+            if (selectionModeRef.current.selectOnPick) {
+              applyAutoSelection(point);
+              lookupAddress(point, true);
+            } else lookupAddress(point);
+          }
         });
         clickListener = map.addListener('click', (event: google.maps.MapMouseEvent) => {
           if (!event.latLng) return;
@@ -438,7 +478,9 @@ export function LocationPicker({
                 point,
                 label: place.formattedAddress || pointLabel(point),
               };
-              if (confirmedPointRef.current) {
+              if (selectionModeRef.current.selectOnPick) {
+                applyAutoSelection(point, place.formattedAddress || pointLabel(point));
+              } else if (confirmedPointRef.current) {
                 confirmedPointRef.current = null;
                 selectRef.current(null);
               }
@@ -471,7 +513,7 @@ export function LocationPicker({
       autocomplete?.remove();
       googleMapRef.current = null;
     };
-  }, [open, mapEngine, activeGoogleKey]);
+  }, [open, mapEngine, activeGoogleKey, applyAutoSelection]);
 
   // Debounce live suggestions and ignore responses from superseded text.
   useEffect(() => {
@@ -623,7 +665,9 @@ export function LocationPicker({
     setSelectedAddress(label);
     setDraftPoint(point);
     setSuggestions([]);
-    if (confirmedPointRef.current) {
+    if (selectionModeRef.current.selectOnPick) {
+      applyAutoSelection(point, label);
+    } else if (confirmedPointRef.current) {
       confirmedPointRef.current = null;
       selectRef.current(null);
     }
@@ -645,7 +689,7 @@ export function LocationPicker({
     setPinDropKey((current) => current + 1);
     const original = chosenSearchRef.current;
     selectRef.current(point, original && samePoint(original.point, point) ? original.label : undefined);
-    if (closeOnConfirm) setOpen(false);
+    if (selectionModeRef.current.closeOnSelect) setOpen(false);
     if (original && samePoint(original.point, point)) {
       setSearchQuery(original.label);
       setSelectedAddress(`Đã xác nhận: ${original.label}`);
@@ -663,12 +707,14 @@ export function LocationPicker({
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
       >
-        {open ? 'Ẩn bản đồ chọn vị trí' : 'Tìm địa chỉ và chọn trên bản đồ'}
+        {open
+          ? hideMap ? 'Ẩn tìm địa chỉ' : 'Ẩn bản đồ chọn vị trí'
+          : hideMap ? 'Tìm địa chỉ' : 'Tìm địa chỉ và chọn trên bản đồ'}
       </button>
 
       {open && (
         <div className="location-map-panel">
-          {activeGoogleKey && (
+          {activeGoogleKey && !hideMap && (
             <div className="map-engine-switch">
               <div style={{ display: 'flex', gap: 6 }}>
                 <button
@@ -725,7 +771,13 @@ export function LocationPicker({
                   }
                 }}
               />
-              <small className="location-search-hint">Nhập địa chỉ rồi chọn một gợi ý, hoặc nhấn thẳng lên bản đồ để đặt ghim, rồi bấm “Xác nhận vị trí”.</small>
+              <small className="location-search-hint">
+                {selectOnPick
+                  ? hideMap
+                    ? 'Nhập địa chỉ rồi chọn một gợi ý, hoặc chạm bản đồ bên dưới để chọn tâm vùng ngay.'
+                    : 'Nhập địa chỉ rồi chọn một gợi ý, hoặc chạm bản đồ để chọn tâm vùng ngay.'
+                  : 'Nhập địa chỉ rồi chọn một gợi ý, hoặc nhấn thẳng lên bản đồ để đặt ghim, rồi bấm “Xác nhận vị trí”.'}
+              </small>
               {searching && (
                 <span className="location-search-status" role="status">
                   Đang tìm địa điểm…
@@ -755,7 +807,7 @@ export function LocationPicker({
           {/* Container tìm kiếm của Google Maps */}
           {mapEngine === 'google' && <div ref={googleSearchRef} className="location-search" />}
 
-          <div className="location-map-wrap">
+          {!hideMap && <div className="location-map-wrap">
             {mapEngine === 'osm' && (
               <div className="rain-control">
                 <button type="button" className={rainOn ? 'active' : ''} aria-pressed={rainOn} onClick={() => setRainOn(!rainOn)}>
@@ -796,15 +848,15 @@ export function LocationPicker({
               </span>
               <span className="location-center-pin-shadow" />
             </div>}
-            <button
+            {!selectOnPick && <button
               type="button"
               className="location-confirm-button"
               onClick={() => void confirmCenter()}
               disabled={!draftPoint}
             >
               Xác nhận vị trí
-            </button>
-          </div>
+            </button>}
+          </div>}
 
           {selectedAddress && (
             <p className="location-selection-status" role="status">

@@ -177,13 +177,15 @@
   gap: var(--space-4);
   margin: 0;
   padding: var(--space-3) var(--space-4);
-  border-top: 1px solid var(--color-surface-border);
-  background: var(--color-surface-card);
-  box-shadow: var(--shadow-md);
+  border-top: 0;
+  background: transparent;
+  box-shadow: none;
+  pointer-events: none;
 }
 .sos-submit-bar .ui-button {
   flex: none;
   min-width: 320px;
+  pointer-events: auto;
 }
 @media (max-width: 719px) {
   .sos-form .form-grid,

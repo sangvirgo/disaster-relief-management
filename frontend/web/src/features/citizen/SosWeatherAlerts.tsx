@@ -54,14 +54,7 @@ export function SosWeatherAlerts({ point }: { point: { latitude: number; longitu
     return () => { active = false; window.clearTimeout(first); window.clearInterval(timer); };
   }, [latitude, longitude]);
 
-  if (!point) {
-    return <Card className="sos-weather-banner sos-weather-banner--clear" aria-label="Thông tin thời tiết">
-      <span className="sos-weather-symbol" aria-hidden="true">i</span>
-      <div className="sos-weather-body">
-        <p>Chọn vị trí cần hỗ trợ trên bản đồ để xem dự báo mưa, gió tại đúng nơi đó.</p>
-      </div>
-    </Card>;
-  }
+  if (!point) return null;
 
   const top = data ? [...data.alerts].sort((a, b) => rank[b.level] - rank[a.level])[0] : undefined;
   const severity = !top ? 'clear' : top.level === 'SEVERE' ? 'severe' : top.level === 'WARNING' ? 'warning' : 'watch';

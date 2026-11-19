@@ -487,6 +487,30 @@ tbody td {
   background: var(--color-surface-card);
   border-bottom: 1px solid var(--color-surface-border);
 }
+@media (min-width: 1080px) {
+  .shell {
+    transition: grid-template-columns 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .shell > .sidebar {
+    min-width: 0;
+    overflow-x: hidden;
+  }
+  .shell.shell--sidebar-collapsed {
+    grid-template-columns: 0 minmax(0, 1fr);
+  }
+  .shell.shell--sidebar-collapsed > .sidebar {
+    width: 0;
+    padding-left: 0;
+    padding-right: 0;
+    border-right-width: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .menu-button {
+    display: grid;
+    place-items: center;
+  }
+}
 @media (max-width: 1079px) {
   .shell {
     display: block;
@@ -499,6 +523,7 @@ tbody td {
     height: 100dvh;
     min-height: 0;
     overflow-y: auto;
+    overscroll-behavior: contain;
     transform: translateX(-100%);
     visibility: hidden;
     box-shadow: var(--shadow-lg);
@@ -506,6 +531,28 @@ tbody td {
   .sidebar.open {
     transform: translateX(0);
     visibility: visible;
+  }
+  .sidebar-close-button {
+    display: grid;
+    place-items: center;
+  }
+  .sidebar-close-button.sidebar-close-button--visible {
+    display: grid;
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+    touch-action: manipulation;
+  }
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: calc(var(--z-drawer) - 1);
+    display: block;
+    padding: 0;
+    border: 0;
+    background: rgba(15, 23, 42, 0.36);
+    cursor: pointer;
+    touch-action: none;
   }
   .sidebar-content {
     position: static;

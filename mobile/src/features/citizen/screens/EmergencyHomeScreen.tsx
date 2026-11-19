@@ -5,7 +5,12 @@ import { ScreenContainer } from '../../../components/common/ScreenContainer';
 import { FormFieldError } from '../../../components/common/FormFieldError';
 import { SOSButton } from '../../../components/common/SOSButton';
 import { THEME } from '../../../constants/theme';
-import { getTrackingCodeError, isValidTrackingCode } from '../../../utils/formValidation';
+import {
+  getTrackingCodeError,
+  isValidTrackingCode,
+  TRACKING_CODE_MAX_LENGTH,
+} from '../../../utils/formValidation';
+import { queueTrackingCodeForNavigation } from '../../../navigation/trackingCodeHandoff';
 import { useAuthStore } from '../../../store/authStore';
 import { ResponseApi } from '../../../api/responseApi';
 import { NoticeItem } from '../../../types/api';
@@ -100,11 +105,12 @@ export const EmergencyHomeScreen: React.FC = () => {
       return;
     }
     if (!isValidTrackingCode(code)) {
-      setTrackingCodeError('Mã tra cứu phải gồm đúng 10 ký tự hợp lệ.');
+      setTrackingCodeError('Mã tra cứu phải gồm từ 10 đến 16 ký tự hợp lệ.');
       return;
     }
     setTrackingCodeError(undefined);
-    router.push({ pathname: '/tracking', params: { trackingCode: code } });
+    queueTrackingCodeForNavigation(code);
+    router.push('/tracking');
   };
 
   const handleLogout = () => {
@@ -400,8 +406,8 @@ export const EmergencyHomeScreen: React.FC = () => {
         <Text style={styles.trackingTitle}>TRA CỨU TIẾN ĐỘ CỨU TRỢ</Text>
         <Text style={styles.trackingDesc}>
           {isAuthenticated
-            ? 'Nhập mã tra cứu 10 ký tự được cấp khi gửi yêu cầu.'
-            : 'Nhập mã tra cứu 10 ký tự được cấp khi gửi yêu cầu.'}
+            ? 'Nhập mã tra cứu gồm 10–16 ký tự được cấp khi gửi yêu cầu.'
+            : 'Nhập mã tra cứu gồm 10–16 ký tự được cấp khi gửi yêu cầu.'}
         </Text>
         <View style={styles.searchRow}>
           <TextInput
@@ -420,12 +426,12 @@ export const EmergencyHomeScreen: React.FC = () => {
                 : getTrackingCodeError(trackingCode));
             }}
             autoCapitalize="characters"
-            maxLength={11}
+            maxLength={TRACKING_CODE_MAX_LENGTH + 1}
           />
           <TouchableOpacity
-            style={[styles.searchButton, (trackingCode.length > 10 || !isValidTrackingCode(trackingCode)) && { opacity: 0.5 }]}
+            style={[styles.searchButton, (trackingCode.length > TRACKING_CODE_MAX_LENGTH || !isValidTrackingCode(trackingCode)) && { opacity: 0.5 }]}
             onPress={handleTrackSubmit}
-            disabled={trackingCode.length > 10 || !isValidTrackingCode(trackingCode)}
+            disabled={trackingCode.length > TRACKING_CODE_MAX_LENGTH || !isValidTrackingCode(trackingCode)}
             activeOpacity={0.8}
           >
             <Search size={20} color="#FFFFFF" />

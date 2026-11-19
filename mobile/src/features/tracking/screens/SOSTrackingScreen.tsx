@@ -12,8 +12,9 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { goBackOrHome } from '../../../navigation/back';
+import { consumeTrackingCodeForNavigation } from '../../../navigation/trackingCodeHandoff';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
@@ -28,7 +29,13 @@ import { useAuthStore } from '../../../store/authStore';
 import { RequestTrackingDetail } from '../../../types/api';
 import { TIMELINE_EVENT_LABELS } from '../../../constants/labels';
 import { THEME } from '../../../constants/theme';
-import { getTrackingCodeError, getTrackingSecretError, isValidTrackingCode, isValidTrackingSecret } from '../../../utils/formValidation';
+import {
+  getTrackingCodeError,
+  getTrackingSecretError,
+  isValidTrackingCode,
+  isValidTrackingSecret,
+  TRACKING_CODE_MAX_LENGTH,
+} from '../../../utils/formValidation';
 import { getEvidenceSizeLimitBytes, getSupportedEvidenceMimeType } from '../../../utils/evidence';
 import {
   RefreshCw,
@@ -48,12 +55,10 @@ const MAX_EVIDENCE_FILES_PER_REQUEST = 5;
 export const SOSTrackingScreen: React.FC = () => {
   const router = useRouter();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const { trackingCode: routeCode } = useLocalSearchParams<{ trackingCode?: string }>();
-  const initialCode = Array.isArray(routeCode) ? routeCode[0] : routeCode;
 
-  const [trackingCode, setTrackingCode] = useState<string>(initialCode || '');
+  const [trackingCode, setTrackingCode] = useState<string>('');
   const [data, setData] = useState<RequestTrackingDetail | null>(null);
-  const [loading, setLoading] = useState<boolean>(Boolean(initialCode));
+  const [loading, setLoading] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [trackingCodeError, setTrackingCodeError] = useState<string | undefined>();
   const [eventsCursor, setEventsCursor] = useState<string | undefined>();
@@ -183,7 +188,7 @@ export const SOSTrackingScreen: React.FC = () => {
     if (!isValidTrackingCode(normalizedCode)) {
       setLoading(false);
       setData(null);
-      setErrorMsg('Mã tra cứu phải gồm đúng 10 ký tự hợp lệ.');
+      setErrorMsg('Mã tra cứu phải gồm từ 10 đến 16 ký tự hợp lệ.');
       return;
     }
     setLoading(true);
@@ -232,11 +237,12 @@ export const SOSTrackingScreen: React.FC = () => {
   };
 
   useEffect(() => {
+    const initialCode = consumeTrackingCodeForNavigation();
     if (initialCode && !initialFetchStarted.current) {
       initialFetchStarted.current = true;
-      fetchTrackingData();
+      void fetchTrackingData(initialCode);
     }
-  }, [initialCode, fetchTrackingData]);
+  }, [fetchTrackingData]);
 
   const openSupplementModal = async () => {
     if (!data) return;
@@ -408,7 +414,7 @@ export const SOSTrackingScreen: React.FC = () => {
     const token = recoveryCode.trim();
     const errors: Record<string, string> = {};
     if (!code) errors.trackingCode = 'Vui lòng nhập mã tra cứu.';
-    else if (!isValidTrackingCode(code)) errors.trackingCode = 'Mã tra cứu phải gồm đúng 10 ký tự hợp lệ.';
+    else if (!isValidTrackingCode(code)) errors.trackingCode = 'Mã tra cứu phải gồm từ 10 đến 16 ký tự hợp lệ.';
     if (!token) errors.recoveryCode = 'Vui lòng nhập mã khôi phục.';
     else if (!isValidTrackingSecret(token)) errors.recoveryCode = 'Mã hỗ trợ phải gồm đúng 43 ký tự hợp lệ.';
     setRecoveryErrors(errors);
@@ -458,9 +464,9 @@ export const SOSTrackingScreen: React.FC = () => {
     }
   };
 
-  const lookupDisabled = loading || trackingCode.length > 10 || !isValidTrackingCode(trackingCode);
+  const lookupDisabled = loading || trackingCode.length > TRACKING_CODE_MAX_LENGTH || !isValidTrackingCode(trackingCode);
   const supplementSubmitDisabled = isSubmittingSupplement || (!supplementNote.trim() && selectedImages.length === 0) || supplementNote.length > 2000;
-  const recoverySubmitDisabled = isRecovering || recoveryTrackingCode.length > 10 || recoveryCode.length > 43 ||
+  const recoverySubmitDisabled = isRecovering || recoveryTrackingCode.length > TRACKING_CODE_MAX_LENGTH || recoveryCode.length > 43 ||
     !isValidTrackingCode(recoveryTrackingCode) || !isValidTrackingSecret(recoveryCode);
 
   return (
@@ -508,7 +514,7 @@ export const SOSTrackingScreen: React.FC = () => {
             }}
             autoCapitalize="characters"
             autoCorrect={false}
-            maxLength={11}
+            maxLength={TRACKING_CODE_MAX_LENGTH + 1}
           />
           <FormFieldError message={trackingCodeError} />
           <FormFieldError message={errorMsg ?? undefined} />
@@ -883,7 +889,7 @@ export const SOSTrackingScreen: React.FC = () => {
               }}
               autoCapitalize="characters"
               autoCorrect={false}
-              maxLength={11}
+              maxLength={TRACKING_CODE_MAX_LENGTH + 1}
             />
             <FormFieldError message={recoveryErrors.trackingCode} />
 

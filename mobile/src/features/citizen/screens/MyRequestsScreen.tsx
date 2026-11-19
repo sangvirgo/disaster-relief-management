@@ -21,8 +21,13 @@ import { ResponseApi } from '../../../api/responseApi';
 import { getApiErrorMessage } from '../../../api/client';
 import { MyRequestItem } from '../../../types/api';
 import { THEME } from '../../../constants/theme';
-import { getTrackingCodeError, isValidTrackingCode } from '../../../utils/formValidation';
+import {
+  getTrackingCodeError,
+  isValidTrackingCode,
+  TRACKING_CODE_MAX_LENGTH,
+} from '../../../utils/formValidation';
 import { StorageService } from '../../../utils/secureStore';
+import { queueTrackingCodeForNavigation } from '../../../navigation/trackingCodeHandoff';
 import {
   ClipboardList,
   ChevronRight,
@@ -93,7 +98,7 @@ export const MyRequestsScreen: React.FC = () => {
 
     const errors: Record<string, string> = {};
     if (!code) errors.trackingCode = 'Vui lòng nhập mã tra cứu.';
-    else if (!isValidTrackingCode(code)) errors.trackingCode = 'Mã tra cứu phải gồm đúng 10 ký tự hợp lệ.';
+    else if (!isValidTrackingCode(code)) errors.trackingCode = 'Mã tra cứu phải gồm từ 10 đến 16 ký tự hợp lệ.';
     setClaimErrors(errors);
     if (Object.keys(errors).length > 0) {
       return;
@@ -122,7 +127,7 @@ export const MyRequestsScreen: React.FC = () => {
     }
   };
 
-  const claimDisabled = isClaiming || claimTrackingCode.length > 10 || !isValidTrackingCode(claimTrackingCode);
+  const claimDisabled = isClaiming || claimTrackingCode.length > TRACKING_CODE_MAX_LENGTH || !isValidTrackingCode(claimTrackingCode);
 
   const renderItem = ({ item }: { item: MyRequestItem }) => {
     const formattedDate = new Date(item.received_at).toLocaleString('vi-VN', {
@@ -136,11 +141,10 @@ export const MyRequestsScreen: React.FC = () => {
     return (
       <TouchableOpacity
         style={styles.card}
-        onPress={() =>
-          router.push({ pathname: '/tracking', params: {
-            trackingCode: item.tracking_code,
-          } })
-        }
+        onPress={() => {
+          queueTrackingCodeForNavigation(item.tracking_code);
+          router.push('/tracking');
+        }}
         activeOpacity={0.8}
       >
         <View style={styles.cardHeader}>
@@ -269,7 +273,7 @@ export const MyRequestsScreen: React.FC = () => {
                   }));
                 }}
                 autoCapitalize="characters"
-                maxLength={11}
+                maxLength={TRACKING_CODE_MAX_LENGTH + 1}
               />
               <FormFieldError message={claimErrors.trackingCode} />
             </View>

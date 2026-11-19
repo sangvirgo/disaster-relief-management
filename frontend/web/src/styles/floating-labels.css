@@ -1,0 +1,130 @@
+.floating-field {
+  position: relative;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0 !important;
+  min-width: 0;
+  font-size: 0 !important;
+  line-height: 0 !important;
+}
+
+.floating-field-group {
+  position: relative;
+  row-gap: 0 !important;
+}
+
+.floating-field--external {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  left: 0;
+  display: block !important;
+  width: 100%;
+  height: 0;
+  margin: 0 !important;
+  padding: 0;
+  pointer-events: none;
+}
+
+.floating-field::before {
+  position: absolute;
+  z-index: 2;
+  top: calc(var(--control-h, 44px) / 2);
+  left: var(--space-3, 12px);
+  max-width: calc(100% - 24px);
+  overflow: hidden;
+  color: var(--color-text-secondary, #536276);
+  background: var(--color-surface-card, #fff);
+  content: attr(data-floating-label);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transform: translateY(-50%);
+  pointer-events: none;
+  transition: top 140ms ease, left 140ms ease, color 140ms ease, font-size 140ms ease;
+}
+
+.floating-field:focus-within::before,
+.floating-field.is-filled::before,
+.floating-field:has(:autofill)::before,
+.floating-field-group:focus-within .floating-field--external::before,
+.floating-field-group.is-filled .floating-field--external::before,
+.floating-field-group:has(:autofill) .floating-field--external::before {
+  top: -7px;
+  left: 10px;
+  padding: 0 4px;
+  color: var(--color-primary-dark, #214fc7);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 14px;
+  transform: none;
+}
+
+.floating-field:has(textarea)::before {
+  top: 16px;
+  transform: none;
+}
+
+.floating-field:has(textarea:focus)::before,
+.floating-field.is-filled:has(textarea)::before {
+  top: -7px;
+}
+
+.floating-field :is(input, select, textarea) {
+  min-width: 0;
+  color: var(--color-text-primary, #172337);
+  font-size: 14px !important;
+  line-height: 20px !important;
+}
+
+.floating-field-group .floating-field__control {
+  min-width: 0;
+  color: var(--color-text-primary, #172337);
+  font-size: 14px !important;
+  line-height: 20px !important;
+}
+
+.floating-field:not(.is-filled):not(:focus-within):not(:has(:autofill)) :is(input, select, textarea) {
+  color: transparent !important;
+}
+
+.floating-field-group:not(.is-filled):not(:focus-within):not(:has(:autofill)) .floating-field__control {
+  color: transparent !important;
+}
+
+.floating-field:not(.is-filled):not(:focus-within) :is(input, textarea)::placeholder {
+  color: transparent !important;
+}
+
+.floating-field-group:not(.is-filled):not(:focus-within) .floating-field__control::placeholder {
+  color: transparent !important;
+}
+
+.floating-field :is(input:disabled, select:disabled, textarea:disabled) {
+  color: var(--color-text-muted, #778397) !important;
+}
+
+.floating-field-group .floating-field__control:disabled {
+  color: var(--color-text-muted, #778397) !important;
+}
+
+.floating-field__caption {
+  display: none !important;
+}
+
+.floating-field__support {
+  font-size: 13px !important;
+  line-height: 1.4 !important;
+}
+
+.floating-field__support:is(.field-error, .field-hint, .sos-field-error, .pickup-field-error) {
+  display: block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .floating-field::before {
+    transition: none;
+  }
+}

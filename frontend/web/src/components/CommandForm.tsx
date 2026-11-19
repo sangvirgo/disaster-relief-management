@@ -198,12 +198,26 @@ export function CommandForm({
   /** Writes a service-area centre and its paired radius in one update, so the two never disagree. */
   function updateServiceArea(field: Field, center: { longitude: number; latitude: number } | null, radiusM: number | null, address?: string) {
     const radiusName = field.radiusFieldName;
-    setValues((current) => ({
-      ...current,
-      [field.name]: center ? `${center.longitude},${center.latitude}` : '',
-      ...(radiusName ? { [radiusName]: center && radiusM ? String(Math.round(radiusM)) : '' } : {}),
-      ...(field.addressFieldName && address ? { [field.addressFieldName]: address.slice(0, 500) } : {}),
-    }));
+    setValues((current) => {
+      const previousCenter = pointValue(current[field.name] || '');
+      const sameCenter = Boolean(center && previousCenter
+        && Math.abs(center.longitude - previousCenter.longitude) < 0.000001
+        && Math.abs(center.latitude - previousCenter.latitude) < 0.000001);
+      let addressValue = '';
+      if (center && field.addressFieldName) {
+        if (address !== undefined) addressValue = address.slice(0, 500);
+        else if (sameCenter) addressValue = current[field.addressFieldName] || '';
+        else addressValue = `Tọa độ: ${center.latitude.toFixed(6)}, ${center.longitude.toFixed(6)}`;
+      }
+      return {
+        ...current,
+        [field.name]: center ? `${center.longitude},${center.latitude}` : '',
+        ...(radiusName ? { [radiusName]: center && radiusM ? String(Math.round(radiusM)) : '' } : {}),
+        ...(field.addressFieldName ? {
+          [field.addressFieldName]: addressValue,
+        } : {}),
+      };
+    });
     setTouched((current) => ({ ...current, [field.name]: true, ...(radiusName ? { [radiusName]: true } : {}) }));
     setFieldErrors((current) => ({ ...current, [field.name]: '', ...(radiusName ? { [radiusName]: '' } : {}) }));
     setMessage('');
@@ -397,23 +411,37 @@ export function CommandForm({
           return (
           <div key={field.name} className="form-stack service-area-field" role="group" aria-invalid={Boolean(inlineError)} aria-describedby={describedBy}>
             <strong>{field.label}</strong>
-            <small className="muted">Tìm địa chỉ, chọn điểm trên bản đồ rồi xác nhận. Sau đó chỉnh bán kính phục vụ.</small>
+            <small className="muted">Tìm địa chỉ hoặc chạm bản đồ để chọn tâm vùng. Vị trí được áp dụng ngay; kéo ghim để đổi tâm và kéo tay nắm trên vòng tròn để chỉnh bán kính.</small>
             <LocationPicker
               value={centre}
-              closeOnConfirm
+              onAddressResolved={(point, address) => {
+                if (!field.addressFieldName) return;
+                const selectedCenter = pointValue(values[field.name] || '');
+                if (!selectedCenter
+                  || Math.abs(selectedCenter.longitude - point.longitude) >= 0.000001
+                  || Math.abs(selectedCenter.latitude - point.latitude) >= 0.000001) return;
+                const coordinateNote = `Tọa độ: ${selectedCenter.latitude.toFixed(6)}, ${selectedCenter.longitude.toFixed(6)}`;
+                const currentAddress = values[field.addressFieldName] || '';
+                if (currentAddress && currentAddress !== coordinateNote) return;
+                const currentRadius = Number(field.radiusFieldName ? values[field.radiusFieldName] : '');
+                updateServiceArea(field, selectedCenter, Number.isFinite(currentRadius) && currentRadius > 0 ? currentRadius : 5_000, address);
+              }}
+              selectOnPick
+              closeOnSelect
+              hideMap
               onSelect={(point, address) => updateServiceArea(field, point, point ? (radiusValue > 0 ? radiusValue : 5_000) : null, address)}
             />
-            {centre && <CampaignAreaMap
+            <CampaignAreaMap
               requests={[]}
               campaigns={[]}
               ariaLabel={`${field.label}: chọn tâm và bán kính trên bản đồ`}
               editor={{
                 center: centre ? { lat: centre.latitude, lng: centre.longitude } : null,
-                radiusM: Number.isFinite(radiusValue) && radiusValue > 0 ? radiusValue : radiusRange.min,
+                radiusM: Number.isFinite(radiusValue) && radiusValue > 0 ? radiusValue : 5_000,
                 radiusRange,
                 onChange: (nextCenter, nextRadius) => updateServiceArea(field, { longitude: nextCenter.lng, latitude: nextCenter.lat }, nextRadius),
               }}
-            />}
+            />
             {centre && <div>
               <button type="button" className="button secondary" disabled={!centre && !values[field.radiusFieldName || '']}
                 onClick={() => updateServiceArea(field, null, null)}>Xóa vùng phục vụ</button>

@@ -15,8 +15,11 @@ export function isValidUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.trim());
 }
 
+export const TRACKING_CODE_MIN_LENGTH = 10;
+export const TRACKING_CODE_MAX_LENGTH = 16;
+
 export function isValidTrackingCode(value: string): boolean {
-  return /^[0-9A-HJKMNP-TV-Z]{10}$/i.test(value.trim());
+  return new RegExp(`^[0-9A-HJKMNP-TV-Z]{${TRACKING_CODE_MIN_LENGTH},${TRACKING_CODE_MAX_LENGTH}}$`, 'i').test(value.trim());
 }
 
 export function isValidTrackingSecret(value: string): boolean {
@@ -24,10 +27,10 @@ export function isValidTrackingSecret(value: string): boolean {
 }
 
 export function getTrackingCodeError(value: string, label = 'Mã tra cứu'): string | undefined {
-  if (value.length > 10) return `${label} không được vượt quá 10 ký tự.`;
+  if (value.length > TRACKING_CODE_MAX_LENGTH) return `${label} không được vượt quá ${TRACKING_CODE_MAX_LENGTH} ký tự.`;
   const code = value.trim();
   if (!code) return undefined;
-  if (code.length < 10) return `${label} phải có ít nhất 10 ký tự.`;
+  if (code.length < TRACKING_CODE_MIN_LENGTH) return `${label} phải có ít nhất ${TRACKING_CODE_MIN_LENGTH} ký tự.`;
   return isValidTrackingCode(code) ? undefined : `${label} chứa ký tự không hợp lệ.`;
 }
 

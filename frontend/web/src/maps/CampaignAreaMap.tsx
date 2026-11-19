@@ -60,7 +60,7 @@ const clampRadius = (radius: number, range?: { min: number; max: number }) =>
   Math.min(range?.max ?? RADIUS_MAX_M, Math.max(range?.min ?? RADIUS_MIN_M, radius));
 const editHandleIcon = (kind: 'center' | 'radius') => L.divIcon({
   className: `campaign-edit-handle campaign-edit-handle--${kind}`,
-  html: `<span aria-hidden="true">${kind === 'center' ? '✥' : '↔'}</span>`,
+  html: `<span aria-hidden="true">${kind === 'center' ? '+' : '↔'}</span>`,
   iconSize: [28, 28],
   iconAnchor: [14, 14],
 });
@@ -117,7 +117,12 @@ export function CampaignAreaMap({
     editLayerRef.current = L.layerGroup().addTo(map);
     map.on('click', (event: L.LeafletMouseEvent) => {
       const current = editorRef.current;
-      if (current && !current.center) current.onChange({ lat: event.latlng.lat, lng: event.latlng.lng }, current.radiusM);
+      if (!current) return;
+      const center = { lat: event.latlng.lat, lng: event.latlng.lng };
+      current.onChange(center, current.radiusM);
+      const bounds = L.circle([center.lat, center.lng], { radius: current.radiusM }).getBounds();
+      map.stop();
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14, animate: true });
     });
     // The container may still be laying out when the first fit runs, so size is re-read and the view re-fitted once.
     const timer = window.setTimeout(() => {
@@ -153,6 +158,9 @@ export function CampaignAreaMap({
       .bindTooltip('Kéo để di chuyển vùng').addTo(layer);
     const radiusMarker = L.marker(eastOf(center, editRadius), { icon: editHandleIcon('radius'), draggable: true, zIndexOffset: 2000 })
       .bindTooltip('Kéo để đổi bán kính').addTo(layer);
+    map.invalidateSize();
+    map.stop();
+    map.fitBounds(circle.getBounds(), { padding: [40, 40], maxZoom: 14, animate: false });
     const commit = (nextCenter: { lat: number; lng: number }, radius: number) =>
       editorRef.current?.onChange(nextCenter, clampRadius(Math.round(radius / 100) * 100, editorRef.current?.radiusRange));
     centerMarker.on('drag', () => {

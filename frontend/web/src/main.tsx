@@ -35,6 +35,7 @@ import { StatusBadge } from './components/StatusBadge';
 import { DetailSurface } from './components/DetailSurface';
 import { useModalScrollLock } from './components/modalScrollLock';
 import { PageHeader } from './components/ui/PageHeader';
+import { FloatingLabels } from './components/ui/FloatingLabels';
 import { SupplyGapWarningBadge } from './features/supply-gaps/SupplyBadges';
 
 declare global {
@@ -60,6 +61,7 @@ import './components/ui/Badge.css';
 import './components/ui/PageHeader.css';
 import './styles/layout.css';
 import './features/citizen/sos-page.css';
+import './styles/floating-labels.css';
 
 const commonPasswords = new Set([
   'password123', 'password1', '1234567890', 'qwerty1234', 'qwertyuiop', 'letmein123', 'iloveyou', 'welcome123',
@@ -1535,6 +1537,38 @@ function App() {
     return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc); };
   }, [wsMenuOpen]);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const menuCloseButtonRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const opener = menuButtonRef.current;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      setMenuOpen(false);
+    };
+    const closeOnDesktop = () => {
+      if (window.innerWidth > 1079) setMenuOpen(false);
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    window.addEventListener('resize', closeOnDesktop);
+    menuCloseButtonRef.current?.focus();
+    return () => {
+      document.removeEventListener('keydown', closeOnEscape);
+      window.removeEventListener('resize', closeOnDesktop);
+      if (opener?.isConnected && opener.getClientRects().length > 0) opener.focus();
+    };
+  }, [menuOpen]);
+  const isDesktopLayout = window.innerWidth > 1079;
+  const isSidebarExpanded = isDesktopLayout ? !desktopSidebarCollapsed : menuOpen;
+  const toggleSidebar = () => {
+    if (window.innerWidth > 1079) {
+      setDesktopSidebarCollapsed((collapsed) => !collapsed);
+      return;
+    }
+    setMenuOpen((open) => !open);
+  };
   const [logoutError, setLogoutError] = useState('');
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -1827,8 +1861,14 @@ function App() {
   }
 
   return (
-    <div className="shell">
-      <aside id="primary-navigation" className={`sidebar ${menuOpen ? 'open' : ''}`} aria-label="Điều hướng chính">
+    <div className={`shell${isDesktopLayout && desktopSidebarCollapsed ? ' shell--sidebar-collapsed' : ''}`}>
+      <aside
+        id="primary-navigation"
+        className={`sidebar ${menuOpen ? 'open' : ''}`}
+        aria-label="Điều hướng chính"
+        aria-hidden={isDesktopLayout && desktopSidebarCollapsed}
+        inert={isDesktopLayout && desktopSidebarCollapsed}
+      >
         <div className="sidebar-content">
           <div className="brand">
             <span className="brand-mark">
@@ -1838,6 +1878,19 @@ function App() {
               <strong>Reliva</strong>
               <small>CHUNG TAY CỨU TRỢ</small>
             </div>
+            <button
+              ref={menuCloseButtonRef}
+              type="button"
+              className={`sidebar-close-button${menuOpen ? ' sidebar-close-button--visible' : ''}`}
+              onClick={() => setMenuOpen(false)}
+              aria-label="Đóng trình đơn"
+              aria-expanded={menuOpen}
+              aria-controls="primary-navigation"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <path d="m6 6 12 12M18 6 6 18" />
+              </svg>
+            </button>
           </div>
 
           <p className="nav-label">Xem theo vai trò</p>
@@ -1879,15 +1932,25 @@ function App() {
           </nav>
         </div>
       </aside>
+      {menuOpen && (
+        <button
+          type="button"
+          className="sidebar-backdrop"
+          onClick={() => setMenuOpen(false)}
+          aria-label="Đóng trình đơn"
+        />
+      )}
 
-      <div className="main">
+      <div className="main" aria-hidden={menuOpen} inert={menuOpen}>
         <header className="topbar">
           <div className="topbar-left">
             <button
+              ref={menuButtonRef}
+              type="button"
               className="menu-button"
-              onClick={() => setMenuOpen(!menuOpen)}
-              aria-label={menuOpen ? 'Đóng trình đơn' : 'Mở trình đơn'}
-              aria-expanded={menuOpen}
+              onClick={toggleSidebar}
+              aria-label={isSidebarExpanded ? 'Thu gọn trình đơn' : 'Mở trình đơn'}
+              aria-expanded={isSidebarExpanded}
               aria-controls="primary-navigation"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
@@ -1935,15 +1998,32 @@ function App() {
             )}
           </div>
         </header>
-        {workspace === 'citizen' && <div className="emergency-bar" role="note">
-          <span className="emergency-icon" aria-hidden="true">!</span>
-          <strong>Khẩn cấp? Gọi ngay</strong>
-          <div className="emergency-links">
-            <a href="tel:113">113 <span>Công an</span></a>
-            <a href="tel:114">114 <span>Cứu hỏa</span></a>
-            <a href="tel:115">115 <span>Cấp cứu</span></a>
+        {workspace === 'citizen' && (
+          <div className="emergency-bar" role="note" aria-label="Thông tin khẩn cấp">
+            <div className="emergency-bar__viewport">
+              <div className="emergency-bar__track" id="emergency-banner-track">
+                <div className="emergency-bar__group">
+                  <span className="emergency-icon" aria-hidden="true">!</span>
+                  <strong>Khẩn cấp? Gọi ngay</strong>
+                  <div className="emergency-links">
+                    <a href="tel:113">113 <span>Công an</span></a>
+                    <a href="tel:114">114 <span>Cứu hỏa</span></a>
+                    <a href="tel:115">115 <span>Cấp cứu</span></a>
+                  </div>
+                </div>
+                <div className="emergency-bar__group" aria-hidden="true">
+                  <span className="emergency-icon" aria-hidden="true">!</span>
+                  <strong>Khẩn cấp? Gọi ngay</strong>
+                  <div className="emergency-links">
+                    <a href="tel:113" tabIndex={-1}>113 <span>Công an</span></a>
+                    <a href="tel:114" tabIndex={-1}>114 <span>Cứu hỏa</span></a>
+                    <a href="tel:115" tabIndex={-1}>115 <span>Cấp cứu</span></a>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>}
+        )}
 
         <main className={`content ${workspace === 'citizen' && selected.id === 'sos' ? 'content--sos' : ''} ${selected.id === 'track' ? 'content--tracking' : ''}`}>
           <ContentErrorBoundary key={`${user?.id || 'guest'}:${workspace}:${selected.id}`}>
@@ -2093,7 +2173,10 @@ if (window.location.protocol === 'http:' && window.location.hostname === '127.0.
 } else {
   createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
-      <App />
+      <>
+        <FloatingLabels />
+        <App />
+      </>
     </React.StrictMode>
   );
 }

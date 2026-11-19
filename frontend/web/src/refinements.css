@@ -574,15 +574,35 @@
   z-index: var(--z-sticky);
   display: flex;
   align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-  padding: 9px 14px;
+  gap: 0;
+  overflow: hidden;
   border-bottom: 1px solid #7f1d1d;
   background: var(--color-emergency-dark);
   color: #fff;
   font-size: 13px;
   box-shadow: 0 3px 12px rgba(127, 29, 29, 0.17);
+}
+.emergency-bar__viewport { flex: 1 1 auto; min-width: 0; overflow: hidden; }
+.emergency-bar__track {
+  --emergency-banner-duration: 30s;
+  display: flex;
+  width: max-content;
+  animation: emergency-banner-scroll var(--emergency-banner-duration) linear infinite;
+}
+.emergency-bar__group {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: max-content;
+  min-width: 100vw;
+  padding: 9px 32px 9px 14px;
+  white-space: nowrap;
+}
+@keyframes emergency-banner-scroll {
+  from { transform: translateX(-50%); }
+  to { transform: translateX(0); }
 }
 .emergency-icon {
   display: grid;
@@ -595,7 +615,7 @@
   color: #a51d1d;
   font-weight: 900;
 }
-.emergency-links { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.emergency-links { display: flex; gap: 6px; flex-wrap: nowrap; justify-content: center; }
 .emergency-links a {
   padding: 4px 9px;
   border: 1px solid rgba(255, 255, 255, 0.4);
@@ -608,11 +628,19 @@
 .emergency-links a:hover,
 .emergency-links a:focus-visible { background: #fff; color: #991b1b; }
 .emergency-links a span { font-weight: 500; }
+@media (max-width: 1079px) { .emergency-bar__track { --emergency-banner-duration: 22s; } }
 @media (max-width: 560px) {
-  .emergency-bar { gap: 5px 8px; padding: 7px 8px; font-size: 11px; }
+  .emergency-bar { gap: 0; padding: 0; font-size: 11px; }
+  .emergency-bar__track { --emergency-banner-duration: 16s; }
+  .emergency-bar__group { gap: 8px; padding: 7px 24px 7px 8px; }
   .emergency-links { gap: 4px; }
   .emergency-links a { padding: 3px 6px; }
   .emergency-links a span { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .emergency-bar__track {
+    animation: emergency-banner-scroll var(--emergency-banner-duration) linear infinite !important;
+  }
 }
 .account-request small {
   color: var(--color-text-secondary);

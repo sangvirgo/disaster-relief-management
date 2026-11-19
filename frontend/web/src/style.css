@@ -899,6 +899,35 @@ textarea:focus-visible {
   border-radius: var(--radius-sm);
 }
 
+.sidebar-close-button {
+  display: none;
+  flex: 0 0 40px;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  min-height: 40px;
+  margin-left: auto;
+  padding: 0;
+  border: 1px solid var(--sidebar-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-bg);
+  color: var(--color-text-primary);
+}
+
+.sidebar-close-button svg {
+  width: 20px;
+  height: 20px;
+}
+
+.sidebar-close-button--visible {
+  display: grid;
+  place-items: center;
+}
+
+.sidebar-backdrop {
+  display: none;
+}
+
 @media (max-width: 900px) {
   .shell {
     grid-template-columns: 220px minmax(0, 1fr);
@@ -925,7 +954,7 @@ textarea:focus-visible {
     position: fixed;
     inset: 0 auto 0 0;
     width: min(84vw, 300px);
-    z-index: 100;
+    z-index: var(--z-drawer);
     overflow-y: auto;
     transform: translateX(-100%);
     visibility: hidden;

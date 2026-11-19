@@ -1,4 +1,3 @@
-import { Dropdown } from '../../components/ui/Dropdown';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, newCommandKey, upload } from '../../api/client';
 import { evidenceFileError } from '../../i18n/evidence';
@@ -386,8 +385,9 @@ export function SosForm({
               onSelect={chooseMapPoint}
             />
             {longitude && latitude && <p className="sos-selected-coordinates">Vị trí đã chọn: {Number(latitude).toFixed(5)}, {Number(longitude).toFixed(5)}</p>}
-            <SosWeatherAlerts point={longitude && latitude && Number.isFinite(Number(longitude)) && Number.isFinite(Number(latitude))
-              ? { longitude: Number(longitude), latitude: Number(latitude) } : null} />
+            {longitude && latitude && Number.isFinite(Number(longitude)) && Number.isFinite(Number(latitude)) && (
+              <SosWeatherAlerts point={{ longitude: Number(longitude), latitude: Number(latitude) }} />
+            )}
           </Card>
         </div>
         <div className="sos-col-form">
@@ -426,7 +426,7 @@ export function SosForm({
             )}
               <label>
                 <span>Loại sự cố <span className="required-mark" aria-hidden="true">*</span></span>
-                <Dropdown
+                <select
                   data-sos-field="category"
                   aria-invalid={fieldInvalid('category')}
                   required
@@ -442,7 +442,7 @@ export function SosForm({
                       {title}
                     </option>
                   ))}
-                </Dropdown>
+                </select>
                 {fieldMessage('category')}
               </label>
             <label className="sos-danger-check">
@@ -488,12 +488,12 @@ export function SosForm({
                 <textarea
                   data-sos-field="reliefItems"
                   rows={2}
-                  maxLength={500}
+                  maxLength={501}
                   value={reliefItems}
                   aria-invalid={fieldInvalid('reliefItems')}
                   aria-describedby="sos-relief-items-help"
                   onChange={(event) => { setReliefItems(event.target.value); pending.current = null; }}
-                  placeholder="Ví dụ: nước uống, mì tôm, thuốc"
+                  placeholder="Ví dụ: nước uống, lương thực, thuốc, chăn màn…"
                 />
                 <small id="sos-relief-items-help" className="sos-field-help">
                   Chỉ cần ghi tên vật phẩm, ví dụ: nước uống, mì tôm, thuốc. Không cần ghi số lượng.
@@ -507,7 +507,7 @@ export function SosForm({
             <h2 id="sos-detail-title"><span className="sos-step-number" aria-hidden="true">3</span>Chi tiết thêm</h2>
             <div className="form-grid sos-grid-3">
               <label>
-                Số người cần hỗ trợ (nếu biết)
+                Số người cần hỗ trợ
                 <input
                   data-sos-field="people"
                   aria-invalid={fieldInvalid('people')}
@@ -524,7 +524,7 @@ export function SosForm({
                 {fieldMessage('people')}
               </label>
               <label>
-                Trẻ em (nếu biết)
+                Trẻ em
                 <input
                   data-sos-field="children"
                   aria-invalid={fieldInvalid('children')}
@@ -541,7 +541,7 @@ export function SosForm({
                 {fieldMessage('children')}
               </label>
               <label>
-                Người cao tuổi (nếu biết)
+                Người cao tuổi
                 <input
                   data-sos-field="elderly"
                   aria-invalid={fieldInvalid('elderly')}
@@ -559,7 +559,7 @@ export function SosForm({
               </label>
             </div>
             <label>
-              Mô tả tình hình (nếu muốn)
+              Mô tả tình hình
               <textarea
                 data-sos-field="description"
                 maxLength={2001}
@@ -595,7 +595,7 @@ export function SosForm({
             <h2 id="sos-contact-title"><span className="sos-step-number" aria-hidden="true">4</span>Người liên hệ</h2>
             <div className="form-grid">
               <label>
-                Họ tên người báo (nếu muốn)
+                Họ tên người báo
                 <input
                   data-sos-field="name"
                   aria-invalid={fieldInvalid('name')}
@@ -609,7 +609,7 @@ export function SosForm({
                 {fieldMessage('name')}
               </label>
               <label>
-                {mode === 'PROXY' ? 'Số điện thoại người báo hộ (nếu có)' : 'Số điện thoại liên hệ (nếu có)'}
+                {mode === 'PROXY' ? 'Số điện thoại người báo hộ' : 'Số điện thoại liên hệ'}
                 <input
                   data-sos-field="phone"
                   aria-invalid={fieldInvalid('phone')}
@@ -655,11 +655,11 @@ export function SosForm({
                 </label>
                 <label>
                   Khả năng liên hệ
-                  <Dropdown value={contactability} onChange={(e) => { setContactability(e.target.value); pending.current = null; }}>
+                  <select value={contactability} onChange={(e) => { setContactability(e.target.value); pending.current = null; }}>
                     <option value="UNKNOWN">Chưa rõ</option>
                     <option value="REACHABLE">Có thể liên hệ</option>
                     <option value="UNREACHABLE">Không thể liên hệ</option>
-                  </Dropdown>
+                  </select>
                 </label>
               </div>
               <details className="sos-proxy-contacts" open={proxyContactsOpen}
@@ -667,7 +667,7 @@ export function SosForm({
                 <summary>Thêm liên hệ của gia đình hoặc người liên hệ thay thế <span>Không bắt buộc</span></summary>
               <div className="form-grid">
                 <label>
-                  Số điện thoại gia đình cần hỗ trợ (nếu biết)
+                  Số điện thoại gia đình cần hỗ trợ
                   <input data-sos-field="beneficiaryPhone" aria-invalid={fieldInvalid('beneficiaryPhone')}
                     type="tel" inputMode="tel" maxLength={33} value={beneficiaryPhone}
                     onChange={(e) => { setBeneficiaryPhone(e.target.value); pending.current = null; }}
@@ -675,14 +675,14 @@ export function SosForm({
                   {fieldMessage('beneficiaryPhone')}
                 </label>
                 <label>
-                  <span>Tên người liên hệ thay thế (nếu có){Boolean(alternatePhone.trim()) && <> <span className="required-mark" aria-hidden="true">*</span></>}</span>
+                  <span>Tên người liên hệ thay thế{Boolean(alternatePhone.trim()) && <> <span className="required-mark" aria-hidden="true">*</span></>}</span>
                   <input data-sos-field="alternateName" aria-invalid={fieldInvalid('alternateName')}
                     maxLength={201} value={alternateName}
                     onChange={(e) => { setAlternateName(e.target.value); pending.current = null; }} />
                   {fieldMessage('alternateName')}
                 </label>
                 <label>
-                  Số điện thoại người liên hệ thay thế (nếu có)
+                  Số điện thoại người liên hệ thay thế
                   <input data-sos-field="alternatePhone" aria-invalid={fieldInvalid('alternatePhone')}
                     type="tel" inputMode="tel" maxLength={33} value={alternatePhone}
                     onChange={(e) => { setAlternatePhone(e.target.value); pending.current = null; }}

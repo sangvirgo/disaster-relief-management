@@ -14,6 +14,7 @@ import {
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useRouter } from 'expo-router';
 import { goBackOrHome } from '../../../navigation/back';
+import { queueTrackingCodeForNavigation } from '../../../navigation/trackingCodeHandoff';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
 import { FormFieldError } from '../../../components/common/FormFieldError';
 import { RequiredAsterisk } from '../../../components/common/RequiredAsterisk';
@@ -952,7 +953,8 @@ export const ProxySOSScreen: React.FC = () => {
             onPress: () => {
               const trackingCode = submissionSuccessCode;
               setSubmissionSuccessCode(null);
-              router.replace({ pathname: '/tracking', params: { trackingCode } });
+              queueTrackingCodeForNavigation(trackingCode);
+              router.replace('/tracking');
             },
           }}
         />
