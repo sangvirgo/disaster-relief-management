@@ -1,3 +1,4 @@
+import { Dropdown } from '../../components/ui/Dropdown';
 import { useEffect, useState } from 'react';
 import { api, newCommandKey } from '../../api/client';
 import { useUrlView } from '../../app/useUrlView';
@@ -216,9 +217,9 @@ export function CampaignCoordination({ user, initialRequestId = '' }: { user: Me
     {tab === 'sos' && <Coordinator key={`sos-${queueRevision}-${initialRequestId}`} page="queue" currentUserId={user.id} user={user} canSeeUnassigned initialRequestId={initialRequestId} />}
     {tab === 'history' && <>
       <p><button className="button secondary" type="button" onClick={() => void showMyHistory()}>Xem lịch sử điều phối của tôi</button></p>
-      <label className="campaign-history-select">Chiến dịch <select value={historyId} onChange={(event) => void showHistory(event.target.value)}>
+      <label className="campaign-history-select">Chiến dịch <Dropdown value={historyId} onChange={(event) => void showHistory(event.target.value)}>
         <option value="">Chọn chiến dịch</option>{overviewCampaigns.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-      </select></label>
+      </Dropdown></label>
       <HistorySummary summary={summary} />
       <Timeline items={history} />
       {cursor && <button className="button secondary" type="button" onClick={() => void loadMoreHistory()}>Tải các sự kiện cũ hơn</button>}
@@ -238,9 +239,9 @@ export function CampaignCoordination({ user, initialRequestId = '' }: { user: Me
     </section>}
     {tab === 'workspace' && <>
       {engagements.length > 0 ? <div className="card campaign-engagement-toolbar">
-        <label className="campaign-engagement-toolbar__select">Chiến dịch đang điều phối <select value={selectedEngagement?.campaign_id ?? ''} onChange={(event) => setSelectedId(event.target.value)}>
+        <label className="campaign-engagement-toolbar__select">Chiến dịch đang điều phối <Dropdown value={selectedEngagement?.campaign_id ?? ''} onChange={(event) => setSelectedId(event.target.value)}>
           {engagements.map((item) => <option key={item.id} value={item.campaign_id}>{item.campaign_name ?? item.campaign_id}</option>)}
-        </select></label>
+        </Dropdown></label>
         <div className="campaign-engagement-toolbar__actions">
           <button className="button secondary" type="button" onClick={() => setTab('choose')}>Chọn thêm chiến dịch gấp</button>
           {selectedEngagement && <button className="button secondary" type="button" disabled={loading} onClick={() => void disengage(selectedEngagement.campaign_id)}>Dừng điều phối</button>}

@@ -1,3 +1,4 @@
+import { Dropdown } from '../../components/ui/Dropdown';
 import { useEffect, useId, useState } from 'react';
 import type { Me } from '../../auth/session';
 import { Badge } from '../../components/ui/Badge';
@@ -102,9 +103,9 @@ export function PickupTicketsPage({ user }: { user: Me }) {
           <h2 id={`${filterId}-title`}>Phiếu lấy hàng theo nhiệm vụ</h2>
           <div className="pickup-field pickup-field--inline">
             <label htmlFor={`${filterId}-status`}>Trạng thái</label>
-            <select id={`${filterId}-status`} value={status} onChange={(event) => { setStatus(event.target.value as '' | PickupStatus); setPageCursor(null); setPreviousCursors([]); openTicket(null); }}>
+            <Dropdown id={`${filterId}-status`} value={status} onChange={(event) => { setStatus(event.target.value as '' | PickupStatus); setPageCursor(null); setPreviousCursors([]); openTicket(null); }}>
               {STATUS_FILTERS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
+            </Dropdown>
           </div>
         </div>
 

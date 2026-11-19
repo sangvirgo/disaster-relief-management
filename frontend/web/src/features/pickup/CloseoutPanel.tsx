@@ -1,3 +1,4 @@
+import { Dropdown } from '../../components/ui/Dropdown';
 import { useId, useMemo, useState } from 'react';
 import type { Me } from '../../auth/session';
 import { confirmAction } from '../../components/confirmAction';
@@ -204,7 +205,7 @@ export function CloseoutPanel({ ticket, closeout, granted, user, onChanged, onFa
                   </td>
                   <td>
                     {editable ? (
-                      <select aria-label={`Lý do hủy: ${line.item_name}`} value={line.retire_reason ?? ''}
+                      <Dropdown aria-label={`Lý do hủy: ${line.item_name}`} value={line.retire_reason ?? ''}
                         aria-invalid={Boolean(issue) && Number(line.retired) > 0 && !line.retire_reason}
                         onChange={(event) => patch(line.item_id, {
                           retire_reason: (event.target.value || null) as RetireReason | null,
@@ -213,7 +214,7 @@ export function CloseoutPanel({ ticket, closeout, granted, user, onChanged, onFa
                         {RETIRE_REASONS.map((reason) => (
                           <option key={reason} value={reason}>{retireReasonLabels[reason]}</option>
                         ))}
-                      </select>
+                      </Dropdown>
                     ) : (line.retire_reason ? retireReasonLabels[line.retire_reason] : '—')}
                   </td>
                 </tr>

@@ -19,11 +19,23 @@ interface CatalogItem extends AliasItem {
 }
 
 interface ItemPage {
-  items: CatalogItem[];
+  items: (Omit<CatalogItem, 'aliases'> & { aliases?: string[] })[];
   next_cursor?: string | null;
 }
 
 const PAGE_SIZE = 50;
+const withAliases = (item: ItemPage['items'][number]): CatalogItem => ({
+  ...item,
+  aliases: Array.isArray(item.aliases) ? item.aliases : [],
+});
+
+function catalogLoadError(error: unknown): string {
+  if (typeof error === 'object' && error !== null && 'status' in error) {
+    if (error.status === 404) return 'Dịch vụ Logistics đang chạy chưa có API danh mục vật phẩm của phiên bản mới. Cần cập nhật dịch vụ để xem danh sách này.';
+    if (error.status === 403) return 'Tài khoản hiện tại chưa được cấp quyền xem danh mục vật phẩm trong phạm vi này.';
+  }
+  return proposalErrorMessage(error);
+}
 
 /** Catalog items with their aliases. Only OPERATIONS_MANAGER (CATALOG_MANAGE) can edit aliases. */
 export function ItemCatalogPage({ user }: { user: Me }) {
@@ -36,6 +48,7 @@ export function ItemCatalogPage({ user }: { user: Me }) {
   const [notice, setNotice] = useState('');
   const [revision, setRevision] = useState(0);
   const [editing, setEditing] = useState<CatalogItem | null>(null);
+  const [aliasesAvailable, setAliasesAvailable] = useState(true);
 
   useEffect(() => {
     if (!canManage) return;
@@ -45,10 +58,11 @@ export function ItemCatalogPage({ user }: { user: Me }) {
     api<ItemPage>('logistics', `/items?limit=${PAGE_SIZE}`)
       .then((page) => {
         if (!live) return;
-        setItems(page.items);
+        setItems(page.items.map(withAliases));
+        setAliasesAvailable(page.items.every((item) => Array.isArray(item.aliases)));
         setCursor(page.next_cursor ?? '');
       })
-      .catch((cause) => { if (live) { setItems([]); setError(proposalErrorMessage(cause)); } })
+      .catch((cause) => { if (live) { setItems([]); setError(catalogLoadError(cause)); } })
       .finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
   }, [canManage, revision]);
@@ -58,10 +72,11 @@ export function ItemCatalogPage({ user }: { user: Me }) {
     setLoadingMore(true);
     try {
       const page = await api<ItemPage>('logistics', `/items?limit=${PAGE_SIZE}&cursor=${encodeURIComponent(cursor)}`);
-      setItems((current) => [...current, ...page.items]);
+      setItems((current) => [...current, ...page.items.map(withAliases)]);
+      if (page.items.some((item) => !Array.isArray(item.aliases))) setAliasesAvailable(false);
       setCursor(page.next_cursor ?? '');
     } catch (cause) {
-      setError(proposalErrorMessage(cause));
+      setError(catalogLoadError(cause));
     } finally {
       setLoadingMore(false);
     }
@@ -89,6 +104,7 @@ export function ItemCatalogPage({ user }: { user: Me }) {
           </div>
         </div>
         <p className="muted">Từ khóa (tên gọi khác) giúp hệ thống nhận ra vật phẩm trong mô tả của người dân. Tối đa {ALIAS_MAX_COUNT} từ khóa cho mỗi vật phẩm.</p>
+        {!aliasesAvailable && <p className="notice warning" role="status">Danh mục đang chạy phiên bản cũ: vẫn xem được vật phẩm, nhưng cần cập nhật dịch vụ Logistics để xem và sửa từ khóa.</p>}
         {notice && <p className="notice" role="status">{notice}</p>}
         {error && (
           <div className="notice error" role="alert">
@@ -120,14 +136,14 @@ export function ItemCatalogPage({ user }: { user: Me }) {
                   {item.aliases.map((alias) => <li key={alias} className="alias-chip"><span>{alias}</span></li>)}
                 </ul>
               ) : (
-                <p className="muted catalog-item__no-alias">Chưa có từ khóa.</p>
+                <p className="muted catalog-item__no-alias">{aliasesAvailable ? 'Chưa có từ khóa.' : 'Phiên bản API này chưa cung cấp từ khóa.'}</p>
               )}
-              <div>
+              {aliasesAvailable && <div>
                 <Button variant="secondary" size="sm" aria-haspopup="dialog" aria-label={`Sửa từ khóa của ${item.name}`}
                   onClick={() => { setNotice(''); setEditing(item); }}>
                   Sửa từ khóa
                 </Button>
-              </div>
+              </div>}
             </li>
           ))}
         </ul>

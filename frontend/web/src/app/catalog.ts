@@ -67,7 +67,7 @@ export const pages: Record<Workspace, Page[]> = {
     },
     {
       id: 'drives',
-      title: 'Đợt quyên góp',
+      title: 'Nhu cầu và quyên góp',
       icon: 'drive',
       service: 'logistics',
       path: '/donation-drives',
@@ -86,8 +86,6 @@ export const pages: Record<Workspace, Page[]> = {
       service: 'logistics',
       path: '/warehouses',
     },
-    { id: 'proposals', title: 'Đề xuất cấp phát', icon: 'needs', service: 'logistics', path: '/need-proposals' },
-    { id: 'items', title: 'Danh mục vật phẩm', icon: 'stock', service: 'logistics', path: '/items' },
     {
       id: 'reports',
       title: 'Báo cáo',

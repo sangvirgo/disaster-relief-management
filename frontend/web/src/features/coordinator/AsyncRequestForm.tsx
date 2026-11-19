@@ -1,3 +1,4 @@
+import { Dropdown } from '../../components/ui/Dropdown';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, newCommandKey } from '../../api/client';
 import { label } from '../../i18n/labels';
@@ -144,7 +145,7 @@ export function AsyncRequestForm({
           {kind === 'resolve' && (
             <label>
               <span>Căn cứ kết thúc <span className="required-mark" aria-hidden="true">*</span></span>
-              <select
+              <Dropdown
                 required
                 aria-invalid={Boolean(touched.basis && basisError)}
                 aria-describedby={touched.basis && basisError ? 'async-request-basis-error' : undefined}
@@ -160,7 +161,7 @@ export function AsyncRequestForm({
                 <option value="RESCUE_COMPLETED">Nhiệm vụ cứu hộ đã hoàn thành</option>
                 <option value="SUPPLY_ONLY">Chỉ hỗ trợ vật tư và đã bàn giao</option>
                 <option value="NO_ACTION_REQUIRED">Không còn cần hành động</option>
-              </select>
+              </Dropdown>
               {touched.basis && basisError && <small className="field-error" id="async-request-basis-error" role="alert">{basisError}</small>}
             </label>
           )}

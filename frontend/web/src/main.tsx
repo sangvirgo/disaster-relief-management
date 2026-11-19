@@ -83,8 +83,6 @@ const SupplyGapsPage = React.lazy(() => import('./features/supply-gaps/SupplyGap
 const RoleDashboard = React.lazy(() => import('./features/dashboard/RoleDashboard').then((module) => ({ default: module.RoleDashboard })));
 const PickupTicketsPage = React.lazy(() => import('./features/pickup/PickupTicketsPage').then((module) => ({ default: module.PickupTicketsPage })));
 const WarehouseDetailPage = React.lazy(() => import('./features/operations/WarehouseDetailPage').then((module) => ({ default: module.WarehouseDetailPage })));
-const NeedProposalsPage = React.lazy(() => import('./features/need-proposals/NeedProposalsPage').then((module) => ({ default: module.NeedProposalsPage })));
-const ItemCatalogPage = React.lazy(() => import('./features/catalog/ItemCatalogPage').then((module) => ({ default: module.ItemCatalogPage })));
 
 function IntakeReview({ user }: { user: Me }) {
   const canReview = roles(user).has('REVIEWER');
@@ -1449,7 +1447,7 @@ function permittedRoute(user: Me | null, requested: ReturnType<typeof routeFromU
   if (!requested || !allowedWorkspaces(user).includes(requested.workspace)) {
     return { workspace: fallbackWorkspace, page: fallbackPage };
   }
-  if (requested.workspace === 'operations' && ['supply', 'needs'].includes(requested.page)) return { workspace: 'operations' as const, page: 'drives' };
+  if (requested.workspace === 'operations' && ['supply', 'needs', 'proposals', 'items'].includes(requested.page)) return { workspace: 'operations' as const, page: 'drives' };
   if (requested.workspace === 'operations' && requested.page === 'pickup') return { workspace: 'operations' as const, page: 'intake' };
   if (requested.workspace === 'operations' && requested.page === 'campaigns') return { workspace: 'operations' as const, page: 'overview' };
   if (requested.page === 'account' && user) return requested;
@@ -1458,6 +1456,8 @@ function permittedRoute(user: Me | null, requested: ReturnType<typeof routeFromU
 }
 
 function normalizeSubview(url: URL, workspace: Workspace, page: string, user: Me | null) {
+  if (!(workspace === 'operations' && page === 'drives'
+    && ['proposals', 'donations', 'catalog'].includes(url.searchParams.get('section') || ''))) url.searchParams.delete('section');
   if (!(workspace === 'coordinator' && page === 'campaigns'
     && ['campaigns', 'routing', 'sos', 'workspace', 'history', 'choose', 'my-history'].includes(url.searchParams.get('campaign_tab') || '')))
     url.searchParams.delete('campaign_tab');
@@ -1489,10 +1489,14 @@ function normalizeSubview(url: URL, workspace: Workspace, page: string, user: Me
 
 function writeRoute(workspace: Workspace, page: string, user: Me | null, mode: 'push' | 'replace' = 'push') {
   const url = new URL(window.location.href);
+  const previousPage = url.searchParams.get('page');
   const changed = url.searchParams.get('workspace') !== workspace || url.searchParams.get('page') !== page;
   url.searchParams.set('workspace', workspace);
   url.searchParams.set('page', page);
   if (changed) {
+    if (workspace === 'operations' && page === 'drives' && previousPage === 'proposals') url.searchParams.set('section', 'proposals');
+    else if (workspace === 'operations' && page === 'drives' && previousPage === 'items') url.searchParams.set('section', 'catalog');
+    else url.searchParams.delete('section');
     url.hash = '';
     url.searchParams.delete('view');
     url.searchParams.delete('step');
@@ -2033,10 +2037,6 @@ function App() {
                   <PickupTicketsPage user={user} />
                 ) : workspace === 'operations' && selected.id === 'assets' && user && new URL(window.location.href).searchParams.get('warehouse_id') ? (
                   <WarehouseDetailPage warehouseId={new URL(window.location.href).searchParams.get('warehouse_id')!} warehouseName={new URL(window.location.href).searchParams.get('warehouse_name') || undefined} />
-                ) : workspace === 'operations' && selected.id === 'proposals' && user ? (
-                  <NeedProposalsPage key={`proposals:${user.id}`} user={user} />
-                ) : workspace === 'operations' && selected.id === 'items' && user ? (
-                  <ItemCatalogPage key={`items:${user.id}`} user={user} />
                 ) : workspace === 'operations' && user ? (
                   <Operations key={selected.id} page={selected.id} user={user} />
                 ) : workspace === 'coordinator' && selected.id === 'teams' ? (

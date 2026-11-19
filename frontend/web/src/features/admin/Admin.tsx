@@ -1,3 +1,4 @@
+import { Dropdown } from '../../components/ui/Dropdown';
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { useCursorNav, LIST_PAGE_SIZE } from '../../api/useCursorNav';
@@ -157,7 +158,7 @@ export function Admin({ page }: { page: string }) {
         {page === 'audit' && (
           <label className="filter">
             Loại đối tượng
-            <select
+            <Dropdown
               value={auditType}
               onChange={(event) => {
                 setAuditType(event.target.value as typeof auditTypes[number]);
@@ -166,7 +167,7 @@ export function Admin({ page }: { page: string }) {
             >
               <option value="app_user">Người dùng</option>
               <option value="role_grant">Quyền truy cập</option>
-            </select>
+            </Dropdown>
           </label>
         )}
         {['users', 'grants'].includes(page) && (
@@ -288,7 +289,7 @@ export function Admin({ page }: { page: string }) {
                 )}
             </>
             <div className="action-grid admin-user-actions">
-              {page === 'users' && userAction === 'revoke' && <div className="admin-selected-action"><label>Quyền cần thu hồi<select value={revokeGrantId} onChange={event => setRevokeGrantId(event.target.value)}><option value="">Chọn quyền</option>{detail.grants?.filter(grant => !grant.revoked_at).map(grant => <option key={grant.id} value={grant.id}>{label(grant.role_code)} · {label(grant.scope_type)}{grant.campaign_id ? ` · Chiến dịch ${grant.campaign_id}` : ''}</option>)}</select></label>{revokeGrantId && <CommandForm key={revokeGrantId} spec={{ title: 'Thu hồi quyền', service: 'identity', path: `/grants/${revokeGrantId}/revoke`, warning: `Thu hồi quyền này của ${detail.username}?`, fields: [{ name: 'reason', label: 'Lý do thu hồi', type: 'textarea', required: true, maxLength: 500 }] }} onSuccess={success} />}</div>}
+              {page === 'users' && userAction === 'revoke' && <div className="admin-selected-action"><label>Quyền cần thu hồi<Dropdown value={revokeGrantId} onChange={event => setRevokeGrantId(event.target.value)}><option value="">Chọn quyền</option>{detail.grants?.filter(grant => !grant.revoked_at).map(grant => <option key={grant.id} value={grant.id}>{label(grant.role_code)} · {label(grant.scope_type)}{grant.campaign_id ? ` · Chiến dịch ${grant.campaign_id}` : ''}</option>)}</Dropdown></label>{revokeGrantId && <CommandForm key={revokeGrantId} spec={{ title: 'Thu hồi quyền', service: 'identity', path: `/grants/${revokeGrantId}/revoke`, warning: `Thu hồi quyền này của ${detail.username}?`, fields: [{ name: 'reason', label: 'Lý do thu hồi', type: 'textarea', required: true, maxLength: 500 }] }} onSuccess={success} />}</div>}
               {['users', 'grants', 'overview'].includes(page) && userAction === 'disable' && detail.status === 'ACTIVE' && (
                 <CommandForm
                   spec={{

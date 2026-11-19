@@ -69,11 +69,13 @@ export function LocationPicker({
   value,
   onSelect,
   initiallyOpen = false,
+  closeOnConfirm = false,
   overlay,
 }: {
   value: Point | null;
-  onSelect: (point: Point | null) => void;
+  onSelect: (point: Point | null, address?: string) => void;
   initiallyOpen?: boolean;
+  closeOnConfirm?: boolean;
   overlay?: LocationOverlay;
 }) {
   const [open, setOpen] = useState(initiallyOpen);
@@ -641,9 +643,9 @@ export function LocationPicker({
     confirmedPointRef.current = point;
     setDraftPoint(point);
     setPinDropKey((current) => current + 1);
-    selectRef.current(point);
-
     const original = chosenSearchRef.current;
+    selectRef.current(point, original && samePoint(original.point, point) ? original.label : undefined);
+    if (closeOnConfirm) setOpen(false);
     if (original && samePoint(original.point, point)) {
       setSearchQuery(original.label);
       setSelectedAddress(`Đã xác nhận: ${original.label}`);

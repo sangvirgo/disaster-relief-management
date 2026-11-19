@@ -552,6 +552,22 @@
 .command-choice-card.selected { box-shadow: 0 0 0 2px rgba(37, 99, 235, .12); }
 .command-choice-indicator { display: inline-grid; flex: 0 0 22px; width: 22px; height: 22px; place-items: center; border: 2px solid #9bb0cf; border-radius: 50%; color: #fff; font-size: 13px; font-weight: 800; line-height: 1; }
 .command-choice-card.selected .command-choice-indicator { border-color: var(--color-primary); background: var(--color-primary); }
+.operations-management-dialog .command-choice-list--item_id.command-choice-list--scroll { max-height: min(380px, 50dvh); overflow-y: auto; padding: 2px 8px 2px 2px; }
+.operations-management-dialog.drive-detail-dialog #operations-detail-tabpanel > [hidden] { display: none; }
+.drive-detail-dialog .drive-items-empty { padding: 18px 16px; }
+.drive-detail-dialog .drive-items-empty p { margin: 0; }
+.drive-detail-dialog .drive-items-empty p + p { margin-top: 8px; }
+.drive-detail-dialog .operations-table-scroll:has(.drive-items-table) { margin: 12px 0 8px; }
+.drive-items-table { width: 100%; min-width: 600px; border-collapse: collapse; table-layout: fixed; background: #fff; }
+.drive-items-table th, .drive-items-table td { padding: 10px 12px; border-bottom: 1px solid var(--color-surface-border); text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+.drive-items-table thead { background: var(--color-surface-subtle); }
+.drive-items-table thead th { color: var(--color-text-secondary); font-size: 13px; }
+.drive-items-table tbody tr:last-child > * { border-bottom: 0; }
+.drive-items-table th:first-child { width: 38%; }
+.drive-items-table th:nth-child(2) { width: 25%; }
+.drive-item-note summary { color: var(--color-primary); cursor: pointer; font-weight: 600; }
+.drive-item-note p { max-height: 120px; overflow-y: auto; margin: 8px 0 0; }
+.drive-items-pager { margin: 8px 0 16px; }
 .emergency-bar {
   position: sticky;
   top: 56px;

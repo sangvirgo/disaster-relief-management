@@ -59,17 +59,49 @@
   margin-bottom: var(--space-3);
 }
 
-.supply-page__quick {
+.supply-page__content {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
-  margin-bottom: var(--space-3);
+  min-width: 0;
 }
-.supply-page__quick .card { padding: var(--space-3); }
-.supply-page__quick h2 { margin: 0 0 var(--space-2); font-size: 1rem; }
-.supply-page__quick p { margin: 0 0 var(--space-3); color: var(--color-text-secondary); }
-.supply-page__quick + .supply-inbox,
-.supply-page__quick + .operations-workspace { margin-bottom: var(--space-3); }
+
+.supply-page__content > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.supply-page .operations-record-table--drives {
+  min-width: 480px;
+}
+
+.supply-page__intro {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.supply-page__related {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.supply-page__related > div {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.supply-page__related h2 {
+  margin: 0 0 var(--space-1);
+  font-size: 1.05rem;
+}
+
+.supply-page__related p {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
 
 .supply-facts {
   display: grid;

@@ -1,3 +1,4 @@
+import { Dropdown } from '../../components/ui/Dropdown';
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { fetchAll } from '../../api/fetchAll';
@@ -212,11 +213,11 @@ export function SupplyGapInbox({ user }: { user: Me }) {
       <p className="muted">Hệ thống chỉ đề xuất. Chỉ quản lý vận hành mới tạo đợt quyên góp từ đề xuất thiếu hàng (mức đỏ).</p>
       <div className="filter">
         <label htmlFor="supply-status-filter">Trạng thái đề xuất</label>
-        <select id="supply-status-filter" value={status} onChange={(event) => changeStatus(event.target.value)}>
+        <Dropdown id="supply-status-filter" value={status} onChange={(event) => changeStatus(event.target.value)}>
           {supplyGapStatusOptions.map((option) => (
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
-        </select>
+        </Dropdown>
       </div>
       {notice && <p className="notice" role="status">{notice}</p>}
       {error && <p className="notice error" role="alert">{error}</p>}

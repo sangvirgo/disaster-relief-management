@@ -76,7 +76,7 @@ export function SosNeedEstimatePanel({ requestId, workCycle, status, needsRelief
       <div className="section-header list-action-header">
         <h3 id="sos-need-estimate-title">Đề xuất cấp phát</h3>
         {canOpenQueue && (
-          <a className="button secondary" href="/?workspace=operations&page=proposals">Mở hàng đợi cấp phát</a>
+          <a className="button secondary" href="/?workspace=operations&page=drives&section=proposals">Mở hàng đợi cấp phát</a>
         )}
       </div>
       <p className="sos-need-estimate__status">

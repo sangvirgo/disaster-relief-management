@@ -1,3 +1,4 @@
+import { Dropdown } from '../../components/ui/Dropdown';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, newCommandKey, upload } from '../../api/client';
 import { evidenceFileError } from '../../i18n/evidence';
@@ -425,7 +426,7 @@ export function SosForm({
             )}
               <label>
                 <span>Loại sự cố <span className="required-mark" aria-hidden="true">*</span></span>
-                <select
+                <Dropdown
                   data-sos-field="category"
                   aria-invalid={fieldInvalid('category')}
                   required
@@ -441,7 +442,7 @@ export function SosForm({
                       {title}
                     </option>
                   ))}
-                </select>
+                </Dropdown>
                 {fieldMessage('category')}
               </label>
             <label className="sos-danger-check">
@@ -654,11 +655,11 @@ export function SosForm({
                 </label>
                 <label>
                   Khả năng liên hệ
-                  <select value={contactability} onChange={(e) => { setContactability(e.target.value); pending.current = null; }}>
+                  <Dropdown value={contactability} onChange={(e) => { setContactability(e.target.value); pending.current = null; }}>
                     <option value="UNKNOWN">Chưa rõ</option>
                     <option value="REACHABLE">Có thể liên hệ</option>
                     <option value="UNREACHABLE">Không thể liên hệ</option>
-                  </select>
+                  </Dropdown>
                 </label>
               </div>
               <details className="sos-proxy-contacts" open={proxyContactsOpen}

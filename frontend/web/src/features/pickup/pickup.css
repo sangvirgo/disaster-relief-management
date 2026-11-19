@@ -274,9 +274,8 @@
   box-sizing: border-box;
 }
 
-.pickup-field--inline select {
-  width: auto;
-}
+.pickup-field--inline > label { white-space: nowrap; }
+.pickup-field--inline .ui-dropdown { width: 202px; }
 
 .pickup-field input[aria-invalid='true'],
 .pickup-field select[aria-invalid='true'],

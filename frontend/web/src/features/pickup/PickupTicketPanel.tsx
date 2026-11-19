@@ -1,3 +1,4 @@
+import { Dropdown } from '../../components/ui/Dropdown';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { api } from '../../api/client';
 import type { Me } from '../../auth/session';
@@ -337,13 +338,13 @@ export function PickupTicketPanel({ user, missionId, missionStatus, ticketId, he
               {handoverBlock && <p className="pickup-hint">{handoverBlock}</p>}
               <div className="pickup-field">
                 <label htmlFor={`${titleId}-collector`}>Người nhận hàng (không bắt buộc)</label>
-                <select id={`${titleId}-collector`} value={collector} disabled={busy !== null}
+                <Dropdown id={`${titleId}-collector`} value={collector} disabled={busy !== null}
                   onChange={(event) => setCollector(event.target.value)}>
                   <option value="">Không ghi tên người nhận</option>
                   {roster.map((member) => (
                     <option key={member.user_id} value={member.user_id}>{member.display_name}</option>
                   ))}
-                </select>
+                </Dropdown>
                 {rosterNote && <p className="pickup-muted">{rosterNote}</p>}
               </div>
               <Button loading={busy === 'handover'} disabled={busy !== null || Boolean(handoverBlock)}

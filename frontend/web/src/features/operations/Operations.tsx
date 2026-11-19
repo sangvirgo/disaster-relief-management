@@ -1,3 +1,4 @@
+import { Dropdown } from '../../components/ui/Dropdown';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../../api/client';
 import { fetchAll } from '../../api/fetchAll';
@@ -124,10 +125,16 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   const [next, setNext] = useState<string | null>(null);
   const [generatedAt, setGeneratedAt] = useState('');
   const [selected, setSelected] = useState<Row | null>(null);
+  const [driveItemPage, setDriveItemPage] = useState(0);
   const [detailTab, setDetailTab] = useState('overview');
   const [lastHandoff, setLastHandoff] = useState<{ distributionId: string; id: string } | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [detail, setDetail] = useState<Row | null>(null);
+  const driveItems = Array.isArray(detail?.items) ? detail.items as Row[] : [];
+  const driveItemPageSize = 5;
+  const driveItemPageCount = Math.max(1, Math.ceil(driveItems.length / driveItemPageSize));
+  const visibleDriveItemPage = Math.min(driveItemPage, driveItemPageCount - 1);
+  useEffect(() => setDriveItemPage(0), [selected?.id]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [revision, setRevision] = useState(0);
@@ -407,12 +414,15 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   const count = detail?.count as Row | null | undefined;
   const needCreate: CommandSpec = {
     title: 'Ghi nhận nhu cầu',
+    hideTitle: true,
     service: 'logistics',
     path: '/needs',
     fields: [
-      referenceField('request_id', 'Yêu cầu SOS', 'requests', true),
-      referenceField('item_id', 'Vật phẩm', 'items', true),
-      ...(!rights.has('COORDINATOR') ? [{ name: 'work_cycle', label: 'Chu kỳ xử lý do điều phối viên cung cấp', type: 'number' as const, required: true }] : []),
+      { ...referenceField('request_id', 'Mã nội bộ yêu cầu SOS', 'requests', true),
+        hintFor: () => 'Điều phối viên lấy mã này từ URL chi tiết SOS và gửi cùng lần xử lý hiện tại. Mã theo dõi SOS của người dân không thay thế được mã nội bộ.' },
+      { name: 'item_id', label: 'Vật phẩm', type: 'choice-cards', required: true, searchable: true, options: references.items || [] },
+      ...(!rights.has('COORDINATOR') ? [{ name: 'work_cycle', label: 'Lần xử lý SOS', type: 'number' as const, required: true, integer: true,
+        hintFor: () => 'Lần xử lý bắt đầu từ 1 và tăng khi SOS đã kết thúc được mở lại. Hãy lấy số hiện tại từ điều phối viên để gắn nhu cầu vào đúng lần xử lý.' }] : []),
       { name: 'quantity', label: 'Số lượng cần', type: 'number', required: true,
         scaleFor: (values) => { const unit = references.itemScales?.find(item => item.value === values.item_id); return unit ? Number(unit.label) : undefined; } },
     ],
@@ -430,7 +440,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
     (page === 'assets' && rights.has('OPERATIONS_MANAGER')) ||
     (page === 'distribution' &&
       rights.has('OPERATIONS_MANAGER'));
-  const createTitle = page === 'drives' ? 'Tạo đợt quyên góp' : page === 'needs' ? 'Ghi nhận nhu cầu' :
+  const createTitle = page === 'drives' ? 'Tạo đợt thủ công' : page === 'needs' ? 'Ghi nhận nhu cầu' :
     page === 'assets' ? asset === 'vehicles' ? 'Thêm phương tiện' : asset === 'warehouses' ? 'Thêm kho' : 'Thêm điểm cứu trợ' :
     'Tạo phiếu phân phối';
   useEffect(() => { setShowCreate(false); }, [page, asset]);
@@ -517,7 +527,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             {report === 'reconciliation' && (
               <label className="filter">
                 Kho cần đối soát
-                <select
+                <Dropdown
                   value={warehouse}
                   onChange={(event) => {
                     setWarehouse(event.target.value);
@@ -528,13 +538,13 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 >
                   <option value="">Chọn kho</option>
                   {warehouseOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                </select>
+                </Dropdown>
               </label>
             )}
             {report === 'fulfillment' && (
               <label className="filter">
                 Chiến dịch trong 30 ngày gần đây
-                <select
+                <Dropdown
                   value={campaign}
                   onChange={(event) => {
                     setCampaign(event.target.value);
@@ -545,31 +555,31 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 >
                   <option value="">Chọn chiến dịch</option>
                   {campaignOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                </select>
+                </Dropdown>
               </label>
             )}
           </>
         )}
         {(page === 'stock' || (page === 'reports' && report === 'stock-summary')) && <label className="filter">
           Kho cần xem tồn
-          <select value={warehouse} onChange={(event) => {
+          <Dropdown value={warehouse} onChange={(event) => {
             setWarehouse(event.target.value);
             setCursor(''); setSelected(null); setDetail(null);
           }}>
             <option value="">Tất cả kho được cấp quyền</option>
             {warehouseOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-          </select>
+          </Dropdown>
         </label>}
         {(page === 'stock' || page === 'reports') && <label className="filter">
           Số dòng mỗi lần tải
-          <select value={pageSize} onChange={event => {
+          <Dropdown value={pageSize} onChange={event => {
             setPageSize(Number(event.target.value));
             setCursor('');
             setSelected(null);
             setDetail(null);
           }}>
             {[10, 25, 50].map(size => <option key={size} value={size}>{size} dòng</option>)}
-          </select>
+          </Dropdown>
         </label>}
         {!ready && <p>Chọn kho hoặc chiến dịch để tải báo cáo theo phạm vi được cấp quyền.</p>}
         {loading && <p role="status">Đang tải dữ liệu…</p>}
@@ -638,13 +648,13 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           </>
         ) : (
           <div className="operations-table-scroll" role="region" aria-label={`Bảng ${headings[page] || 'bản ghi'}`} tabIndex={0}>
-            <table className="operations-record-table">
-              <thead><tr><th scope="col">{page === 'assets' ? asset === 'vehicles' ? 'Phương tiện' : asset === 'warehouses' ? 'Kho' : 'Điểm cứu trợ' : 'Tên bản ghi'}</th>{page !== 'assets' && <th scope="col">Thông tin chính</th>}<th scope="col">Thời gian</th><th scope="col">Trạng thái</th></tr></thead>
+            <table className={`operations-record-table${page === 'drives' ? ' operations-record-table--drives' : ''}`}>
+              <thead><tr><th scope="col">{page === 'assets' ? asset === 'vehicles' ? 'Phương tiện' : asset === 'warehouses' ? 'Kho' : 'Điểm cứu trợ' : 'Tên bản ghi'}</th>{page !== 'assets' && page !== 'drives' && <th scope="col">Thông tin chính</th>}<th scope="col">Thời gian</th><th scope="col">Trạng thái</th></tr></thead>
               <tbody>{items.map((item) => <tr key={operationRecordKey(item)}>
                 <th scope="row">{page === 'assets' && asset === 'warehouses' && item.id
                   ? <a className="table-row-link" href={`?workspace=operations&page=assets&view=warehouses&warehouse_id=${encodeURIComponent(item.id)}&warehouse_name=${encodeURIComponent(recordTitle(page, item))}`} aria-label={`Xem tồn kho ${recordTitle(page, item)}`}>{recordTitle(page, item)}</a>
                   : <button type="button" className="table-row-link" onClick={() => { setDetailTab('overview'); setSelected(item); }}>{recordTitle(page, item)}</button>}{page === 'needs' && <span className="supply-table-cell-stack"><NeedSourceBadge source={item.source} /><NeedReasonChips codes={item.reason_codes} /></span>}</th>
-                {page !== 'assets' && <td>{distributionPages.has(page) ? distributionItems(item, references.itemUnits)
+                {page !== 'assets' && page !== 'drives' && <td>{distributionPages.has(page) ? distributionItems(item, references.itemUnits)
                   : item.requested != null ? `Cần ${quantityWithUnit(item, item.requested)} · Đã giao ${quantityWithUnit(item, item.delivered)}`
                   : item.active_requested != null ? `Cần ${quantityWithUnit(item, item.active_requested)} · Đã giao ${quantityWithUnit(item, item.delivered)}`
                   : item.drive_title ? string(item.drive_title)
@@ -660,9 +670,9 @@ export function Operations({ page, user }: { page: string; user: Me }) {
         <ListNav page={pageIndex} hasNext={Boolean(next)} loading={loading} onPrev={prevPage} onNext={() => next && setCursor(next)} count={items.length} />
       </section>
       {page === 'distribution' && commitmentsError && <p role="alert" className="notice error">{commitmentsError} Hãy tải lại trước khi lập phiếu hỗ trợ SOS.</p>}
-      {(selected || showCreate) && <DetailSurface key={selected?.id || 'create'} className={`operations-detail-transition operations-management-dialog ${distributionPages.has(page) && !showCreate ? 'distribution-detail-panel' : ''}`} heading={selected ? recordTitle(page, selected) : createTitle} modal open={Boolean(selected) || showCreate} onClose={() => { setSelected(null); setDetail(null); setShowCreate(false); }} label={selected ? `Chi tiết ${recordTitle(page, selected)}` : createTitle}>
+      {(selected || showCreate) && <DetailSurface key={selected?.id || 'create'} className={`operations-detail-transition operations-management-dialog ${page === 'drives' && selected ? 'drive-detail-dialog' : ''} ${distributionPages.has(page) && !showCreate ? 'distribution-detail-panel' : ''}`} heading={selected ? recordTitle(page, selected) : createTitle} modal open={Boolean(selected) || showCreate} onClose={() => { setSelected(null); setDetail(null); setShowCreate(false); }} label={selected ? `Chi tiết ${recordTitle(page, selected)}` : createTitle}>
         {selected && !detail && <p role="status">Đang tải chi tiết…</p>}
-        {selected && detail && !['stock', 'assets'].includes(page) && <Tabs items={[
+        {selected && detail && !['stock', 'assets', 'drives'].includes(page) && <Tabs items={[
           { id: 'overview', label: 'Thông tin' },
           { id: 'details', label: page === 'reports' ? 'Số liệu' : page === 'needs' ? 'Cam kết xuất kho' : page === 'drives' ? 'Vật phẩm tiếp nhận' : 'Chi tiết' },
           ...(showActionsTab ? [{ id: 'actions', label: 'Thao tác' }] : []),
@@ -672,7 +682,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
         {distributionPages.has(page) && selected.id && <div hidden={detailTab !== 'handoff'} role="tabpanel" aria-labelledby="operations-detail-tab-handoff"><HandoffDetail key={selected.id + (lastHandoff?.distributionId === selected.id ? lastHandoff.id : '')} distributionId={selected.id} initialId={lastHandoff?.distributionId === selected.id ? lastHandoff.id : undefined} canReview={rights.has('REVIEWER') || rights.has('OPERATIONS_MANAGER')} userId={user.id} onChanged={() => setRevision((value) => value + 1)} /></div>}
         {detail && (
           <>
-            <div hidden={detailTab !== 'overview'} role="tabpanel" aria-labelledby="operations-detail-tab-overview">
+            <div hidden={page === 'drives' || detailTab !== 'overview'} role="tabpanel" aria-labelledby="operations-detail-tab-overview">
             <div className="detail-grid">
               {page === 'drives' && <>
                 <p><strong>Tên đợt quyên góp</strong><span className="detail-value">{string(detail.title) || 'Chưa có tên'}</span></p>
@@ -868,14 +878,28 @@ export function Operations({ page, user }: { page: string; user: Me }) {
               command({ title: 'Ngừng sử dụng', service: 'logistics', path: `/${asset}/${id}/deactivate`, version,
                 warning: 'Ngừng sử dụng tài sản hoặc địa điểm này? Các phiếu đang liên quan có thể cần xử lý trước.' })}
             </div>
-            <div hidden={detailTab !== 'details'} role="tabpanel" aria-labelledby="operations-detail-tab-details">
+            <div hidden={page !== 'drives' && detailTab !== 'details'} role={page === 'drives' ? undefined : 'tabpanel'} aria-labelledby={page === 'drives' ? undefined : 'operations-detail-tab-details'}>
             {page === 'drives' && <section aria-label="Vật phẩm cần tiếp nhận">
               <h3>Vật phẩm cần tiếp nhận</h3>
-              {Array.isArray(detail.items) && detail.items.length > 0 ? (detail.items as Row[]).map((item, index) => <article className="candidate" key={string(item.item_id) || index}>
-                <strong>{string(item.item_name) || 'Vật phẩm chưa có tên'}</strong>
-                <p>Mục tiêu: {quantityWithUnit(item, item.target_quantity)}</p>
-                {string(item.acceptance_note) && <p>Hướng dẫn tiếp nhận: {string(item.acceptance_note)}</p>}
-              </article>) : <p className="empty">Chưa có thông tin vật phẩm cần tiếp nhận. Hãy cập nhật trước khi mở đợt.</p>}
+              {driveItems.length > 0 ? <>
+                <div className="operations-table-scroll" role="region" aria-label="Bảng vật phẩm cần tiếp nhận" tabIndex={0}>
+                  <table className="drive-items-table">
+                    <thead><tr><th scope="col">Vật phẩm</th><th scope="col">Số lượng mục tiêu</th><th scope="col">Hướng dẫn tiếp nhận</th></tr></thead>
+                    <tbody>{driveItems.slice(visibleDriveItemPage * driveItemPageSize, (visibleDriveItemPage + 1) * driveItemPageSize).map((item, index) => <tr key={string(item.item_id) || `${visibleDriveItemPage}-${index}`}>
+                      <th scope="row">{string(item.item_name) || 'Vật phẩm chưa có tên'}</th>
+                      <td>{quantityWithUnit(item, item.target_quantity)}</td>
+                      <td>{string(item.acceptance_note) ? <details className="drive-item-note"><summary>Xem hướng dẫn</summary><p>{string(item.acceptance_note)}</p></details> : '—'}</td>
+                    </tr>)}</tbody>
+                  </table>
+                </div>
+                {driveItems.length > driveItemPageSize && <nav className="pager drive-items-pager" aria-label="Phân trang vật phẩm tiếp nhận">
+                  <span className="pager__info">{visibleDriveItemPage * driveItemPageSize + 1}–{Math.min((visibleDriveItemPage + 1) * driveItemPageSize, driveItems.length)} / {driveItems.length} vật phẩm · Trang {visibleDriveItemPage + 1}/{driveItemPageCount}</span>
+                  <div className="pager__buttons">
+                    <button type="button" className="pager__btn" disabled={visibleDriveItemPage === 0} onClick={() => setDriveItemPage(visibleDriveItemPage - 1)}>‹ Trang trước</button>
+                    <button type="button" className="pager__btn" disabled={visibleDriveItemPage >= driveItemPageCount - 1} onClick={() => setDriveItemPage(visibleDriveItemPage + 1)}>Trang sau ›</button>
+                  </div>
+                </nav>}
+              </> : <div className="empty drive-items-empty"><p>Đợt này chưa khai báo danh sách vật phẩm tiếp nhận.</p>{string(detail.description) && <p>Mô tả: {string(detail.description)}</p>}</div>}
             </section>}
             {Array.isArray(detail.lines) && (
               <div>
@@ -958,7 +982,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             )}
             {!['drives', 'needs', 'reports', 'distribution', 'handoff', 'intake', 'review'].includes(page) && !Array.isArray(detail.lines) && !count && <p className="muted">Thông tin chi tiết của bản ghi được hiển thị trong tab Thông tin.</p>}
             </div>
-            <div hidden={detailTab !== 'actions'} role="tabpanel" aria-labelledby="operations-detail-tab-actions">
+            <div hidden={page === 'drives' ? !showActionsTab : detailTab !== 'actions'} role={page === 'drives' ? undefined : 'tabpanel'} aria-labelledby={page === 'drives' ? undefined : 'operations-detail-tab-actions'}>
             <div className="action-grid">
               {page === 'drives' &&
                 id &&
@@ -1386,6 +1410,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           page === 'assets' &&
           rights.has('OPERATIONS_MANAGER') &&
           command({
+            hideTitle: true,
             title:
               asset === 'vehicles'
                 ? 'Thêm phương tiện'
@@ -1403,9 +1428,9 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 : asset === 'warehouses'
                   ? [
                       { name: 'name', label: 'Tên kho', required: true, maxLength: 200 },
-                      { name: 'address_note', label: 'Địa chỉ hoặc khu vực gần đúng', maxLength: 500 },
-                      { name: 'location', label: 'Vùng phục vụ của kho', type: 'service-area', radiusFieldName: 'service_radius_m', radiusRange: { min: 500, max: 200_000 } },
-                      { name: 'service_radius_m', label: 'Bán kính phục vụ (mét)', type: 'number', integer: true, min: 500, max: 200_000 },
+                      { name: 'location', label: 'Vị trí kho và vùng phục vụ', type: 'service-area', radiusFieldName: 'service_radius_m', addressFieldName: 'address_note', radiusRange: { min: 500, max: 200_000 } },
+                      { name: 'address_note', label: 'Địa chỉ', maxLength: 500, visibleFor: (values) => Boolean(values.location), hintFor: () => 'Có thể chỉnh lại địa chỉ gần đúng sau khi chọn điểm.' },
+                      { name: 'service_radius_m', label: 'Bán kính phục vụ (mét)', type: 'number', integer: true, min: 500, max: 200_000, visibleFor: (values) => Boolean(values.location) },
                     ]
                   : [
                       { name: 'name', label: 'Tên điểm cứu trợ', required: true, maxLength: 200 },

@@ -53,7 +53,7 @@ export const needSourceTones: Record<string, BadgeTone> = {
 export const needSourceDescriptions: Record<string, string> = {
   DECLARED: 'Nhu cầu do người nhập khai báo trực tiếp.',
   ESTIMATED: 'Nhu cầu ước tính từ định mức. Chưa được tính vào cam kết xuất kho cho đến khi được xác nhận.',
-  CONFIRMED: 'Nhu cầu ước tính đã được điều phối viên xác nhận.',
+  CONFIRMED: 'Nhu cầu ước tính đã được quản lý vận hành xác nhận.',
 };
 
 // Copy matches the backend NEED_REASON_COPY. Only the code is returned by the need read model.
@@ -66,7 +66,7 @@ export const needReasonLabels: Record<string, string> = {
   NORM_NOT_FOUND: 'Chưa có định mức đang hoạt động cho nhóm hàng này.',
   QUANTITY_ZERO: 'Định mức của nhóm hàng này bằng 0 cho lần yêu cầu này, nên không tạo dòng nhu cầu.',
   QUANTITY_FAR_ABOVE_ESTIMATE: 'Số lượng khai báo lớn hơn 3 lần số ước tính. Hãy kiểm tra lại trước khi xác nhận.',
-  DEFAULT_BUNDLE_USED: 'Người dân không nêu rõ hàng cần, hệ thống dùng danh sách mặc định theo định mức. Cần kiểm tra lại.',
+  DEFAULT_BUNDLE_USED: 'Hệ thống chưa xác định chắc vật phẩm từ mô tả nên dùng gói mặc định theo định mức. Cần kiểm tra lại.',
   EXTRACTED_FROM_TEXT: 'Vật phẩm được đối chiếu từ mô tả của người dân bằng AI. Đây chỉ là gợi ý để con người xem xét.',
   ALIAS_MATCHED: 'Vật phẩm được khớp theo tên gọi thường dùng trong mô tả của người dân (không dùng AI).',
   UNMATCHED_TERMS: 'Có cụm từ người dân nêu nhưng không khớp vật phẩm nào trong danh mục. Cần xem xét thủ công.',

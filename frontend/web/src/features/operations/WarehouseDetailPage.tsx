@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
+import { fetchAll } from '../../api/fetchAll';
 import { formatQuantity } from '../../i18n/quantity';
 import { ListNav } from '../../components/ui/Pager';
 import { useCursorNav, LIST_PAGE_SIZE } from '../../api/useCursorNav';
@@ -14,6 +15,7 @@ type Stock = {
   available: string;
 };
 type StockPage = { items: Stock[]; more?: boolean; cursor?: string | null };
+type Warehouse = { id: string; location?: { coordinates?: [number, number] } | null };
 
 export function WarehouseDetailPage({ warehouseId, warehouseName }: { warehouseId: string; warehouseName?: string }) {
   const [stock, setStock] = useState<Stock[]>([]);
@@ -22,6 +24,27 @@ export function WarehouseDetailPage({ warehouseId, warehouseName }: { warehouseI
   const [cursor, setCursor, prevPage, pageIndex] = useCursorNav<string>('');
   const [next, setNext] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
+  const [nearbyAddress, setNearbyAddress] = useState('Đang tìm địa chỉ gần đúng…');
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setNearbyAddress('Đang tìm địa chỉ gần đúng…');
+    void fetchAll<Warehouse>('logistics', '/warehouses')
+      .then(async (warehouses) => {
+        const coordinates = warehouses.find((item) => item.id === warehouseId)?.location?.coordinates;
+        if (!coordinates || !coordinates.every(Number.isFinite)) return 'Kho chưa khai báo vị trí.';
+        const [longitude, latitude] = coordinates.map((value) => Math.round(value * 100) / 100);
+        const query = new URLSearchParams({ location: `${longitude},${latitude}`, langCode: 'VI', featureTypes: 'Locality', forStorage: 'false', f: 'json' });
+        const response = await fetch(`https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode?${query}`, { signal: controller.signal });
+        if (!response.ok) return 'Chưa tìm được địa chỉ gần đúng cho kho này.';
+        const result = await response.json() as { address?: { Match_addr?: string; CountryCode?: string } };
+        return result.address?.CountryCode === 'VNM' && result.address.Match_addr?.trim()
+          ? `Gần ${result.address.Match_addr.trim()}` : 'Chưa tìm được địa chỉ gần đúng cho kho này.';
+      })
+      .then((address) => { if (!controller.signal.aborted) setNearbyAddress(address); })
+      .catch(() => { if (!controller.signal.aborted) setNearbyAddress('Chưa tìm được địa chỉ gần đúng cho kho này.'); });
+    return () => controller.abort();
+  }, [warehouseId, revision]);
 
   useEffect(() => {
     let live = true;
@@ -45,6 +68,10 @@ export function WarehouseDetailPage({ warehouseId, warehouseName }: { warehouseI
       </div>
       <button type="button" className="button secondary" onClick={() => setRevision((value) => value + 1)}>Cập nhật</button>
     </div>
+    <section className="card warehouse-detail__location" aria-label="Vị trí gần đúng của kho">
+      <h3>Vị trí gần đúng</h3>
+      <p role="status">{nearbyAddress}</p>
+    </section>
     <section className="card" aria-label="Tồn kho của kho">
       {loading && <p role="status">Đang tải tồn kho…</p>}
       {error && <p className="notice error" role="alert">{error}</p>}

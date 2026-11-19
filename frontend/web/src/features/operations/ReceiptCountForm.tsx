@@ -1,3 +1,4 @@
+import { Dropdown } from '../../components/ui/Dropdown';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, newCommandKey } from '../../api/client';
 import { fetchAll } from '../../api/fetchAll';
@@ -202,7 +203,7 @@ export function ReceiptCountForm({
           <legend>Vật phẩm {index + 1}</legend>
           <label>
             Vật phẩm trong đợt quyên góp
-            <select
+            <Dropdown
               disabled={heldRelease}
               value={items.some((item) => item.id === line.item_id) ? line.item_id : ''}
               onChange={(event) => edit(index, 'item_id', event.target.value)}
@@ -213,7 +214,7 @@ export function ReceiptCountForm({
                   {item.name} · {item.unit.display_name}{!driveItems.some(driveItem => driveItem.id === item.id) ? ' · ngoài đợt' : ''}
                 </option>
               ))}
-            </select>
+            </Dropdown>
           </label>
           {(allowUnexpected || heldRelease) && <label>
             <span>Mã vật phẩm <span className="required-mark" aria-hidden="true">*</span></span>

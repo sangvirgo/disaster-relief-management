@@ -1,3 +1,4 @@
+import { Dropdown } from './ui/Dropdown';
 import { useId, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, newCommandKey, upload, type Service, type HttpMethod } from '../api/client';
 import { evidenceFileError } from '../i18n/evidence';
@@ -38,6 +39,8 @@ export type Field = {
   overlayFor?: (values: Record<string, string>) => LocationOverlay | undefined;
   /** For `service-area` fields: the paired radius field (metres) that the map circle edits together with the centre. */
   radiusFieldName?: string;
+  /** For `service-area` fields: fill the paired address note from a selected search result. */
+  addressFieldName?: string;
   /** For `service-area` fields: allowed radius for the map handles (metres). */
   radiusRange?: { min: number; max: number };
 };
@@ -193,12 +196,13 @@ export function CommandForm({
     pending.current = null;
   }
   /** Writes a service-area centre and its paired radius in one update, so the two never disagree. */
-  function updateServiceArea(field: Field, center: { longitude: number; latitude: number } | null, radiusM: number | null) {
+  function updateServiceArea(field: Field, center: { longitude: number; latitude: number } | null, radiusM: number | null, address?: string) {
     const radiusName = field.radiusFieldName;
     setValues((current) => ({
       ...current,
       [field.name]: center ? `${center.longitude},${center.latitude}` : '',
       ...(radiusName ? { [radiusName]: center && radiusM ? String(Math.round(radiusM)) : '' } : {}),
+      ...(field.addressFieldName && address ? { [field.addressFieldName]: address.slice(0, 500) } : {}),
     }));
     setTouched((current) => ({ ...current, [field.name]: true, ...(radiusName ? { [radiusName]: true } : {}) }));
     setFieldErrors((current) => ({ ...current, [field.name]: '', ...(radiusName ? { [radiusName]: '' } : {}) }));
@@ -291,14 +295,14 @@ export function CommandForm({
           ? matchingChoices.filter((option, index) => index < 5 || option.value === values[field.name]) : matchingChoices;
         return (
         field.type === 'choice-cards' ? (
-          <fieldset key={field.name} className="command-choice-list" aria-invalid={Boolean(inlineError)} aria-describedby={describedBy}>
+          <fieldset key={field.name} className={`command-choice-list command-choice-list--${field.name}${expandedChoices[field.name] || search ? ' command-choice-list--scroll' : ''}`} aria-invalid={Boolean(inlineError)} aria-describedby={describedBy}>
             <legend>{field.label}{isRequired(field, values) && <> <span className="required-mark" aria-hidden="true">*</span></>}</legend>
             {field.searchable && (field.options?.length ?? 0) > 5 && <>
-              <label className="command-choice-search" htmlFor={`${formId}-${field.name}-search`}>Tìm chiến dịch</label>
+              <label className="command-choice-search" htmlFor={`${formId}-${field.name}-search`}>Tìm {sentenceLabel(field.label)}</label>
               <input id={`${formId}-${field.name}-search`} type="search" value={choiceSearch[field.name] ?? ''}
-                placeholder="Nhập tên chiến dịch cần gắn…"
+                placeholder={`Nhập tên ${sentenceLabel(field.label)}…`}
                 onChange={(event) => setChoiceSearch((current) => ({ ...current, [field.name]: event.target.value }))} />
-              {!search && <small className="muted">Hiển thị 5 chiến dịch đầu. Tìm theo tên để chọn chiến dịch khác.</small>}
+              {!search && !expandedChoices[field.name] && <small className="muted">Hiển thị 5 lựa chọn đầu. Tìm theo tên để chọn mục khác.</small>}
             </>}
             {field.options?.length ? shownChoices.map((option) => (
               <button
@@ -313,12 +317,12 @@ export function CommandForm({
                 <span>{option.label}</span>
                 <span className="command-choice-indicator" aria-hidden="true">{values[field.name] === option.value ? '✓' : ''}</span>
               </button>
-            )) : <p className="empty">Chưa có chiến dịch đang hoạt động phù hợp.</p>}
-            {field.options?.length && !shownChoices.length && <p className="empty">Không tìm thấy chiến dịch theo tên này.</p>}
+            )) : <p className="empty">Chưa có lựa chọn phù hợp.</p>}
+            {field.options?.length && !shownChoices.length && <p className="empty">Không tìm thấy mục phù hợp.</p>}
             {field.searchable && !search && matchingChoices.length > shownChoices.length &&
               <button type="button" className="button secondary command-choice-more"
                 onClick={() => setExpandedChoices((current) => ({ ...current, [field.name]: true }))}>
-                Xem tất cả {matchingChoices.length} chiến dịch
+                Xem tất cả {matchingChoices.length} lựa chọn
               </button>}
             {inlineError && <small className="field-error" id={errorId(field)} role="alert">{inlineError}</small>}
           </fieldset>
@@ -329,7 +333,7 @@ export function CommandForm({
             </label>
             {field.options?.length && !manualFields[field.name] &&
             (!values[field.name] || field.options.some((option) => option.value === values[field.name])) ? (
-              <select
+              <Dropdown
                 id={`reference-${field.name}`}
                 aria-label={field.label}
                 required={isRequired(field, values)}
@@ -351,7 +355,7 @@ export function CommandForm({
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
                 <option value="__manual__">Không thấy trong danh sách? Nhập mã</option>
-              </select>
+              </Dropdown>
             ) : (
               <>
                 <input
@@ -381,6 +385,7 @@ export function CommandForm({
                 )}
               </>
             )}
+            {field.hintFor?.(values) && <small className="field-hint" role="note">{field.hintFor(values)}</small>}
             {inlineError && (
               <small className="field-error" id={errorId(field)} role="alert">{inlineError}</small>
             )}
@@ -392,8 +397,13 @@ export function CommandForm({
           return (
           <div key={field.name} className="form-stack service-area-field" role="group" aria-invalid={Boolean(inlineError)} aria-describedby={describedBy}>
             <strong>{field.label}</strong>
-            <small className="muted">Nhấn lên bản đồ để đặt tâm vùng. Kéo tâm để di chuyển, kéo tay cầm ↔ để đổi bán kính.</small>
-            <CampaignAreaMap
+            <small className="muted">Tìm địa chỉ, chọn điểm trên bản đồ rồi xác nhận. Sau đó chỉnh bán kính phục vụ.</small>
+            <LocationPicker
+              value={centre}
+              closeOnConfirm
+              onSelect={(point, address) => updateServiceArea(field, point, point ? (radiusValue > 0 ? radiusValue : 5_000) : null, address)}
+            />
+            {centre && <CampaignAreaMap
               requests={[]}
               campaigns={[]}
               ariaLabel={`${field.label}: chọn tâm và bán kính trên bản đồ`}
@@ -403,11 +413,11 @@ export function CommandForm({
                 radiusRange,
                 onChange: (nextCenter, nextRadius) => updateServiceArea(field, { longitude: nextCenter.lng, latitude: nextCenter.lat }, nextRadius),
               }}
-            />
-            <div>
+            />}
+            {centre && <div>
               <button type="button" className="button secondary" disabled={!centre && !values[field.radiusFieldName || '']}
                 onClick={() => updateServiceArea(field, null, null)}>Xóa vùng phục vụ</button>
-            </div>
+            </div>}
             {centre && (
               <small>Tâm vùng: {centre.latitude.toFixed(6)}, {centre.longitude.toFixed(6)}</small>
             )}
@@ -460,7 +470,7 @@ export function CommandForm({
               onChange={(event) => updateField(field, event.target.value)}
             />
           ) : field.type === 'select' ? (
-            <select
+            <Dropdown
               aria-label={field.label}
               required={isRequired(field, values)}
               aria-invalid={Boolean(inlineError)}
@@ -477,7 +487,7 @@ export function CommandForm({
                   {option.label}
                 </option>
               ))}
-            </select>
+            </Dropdown>
           ) : (
             <input
               aria-label={field.label}

@@ -22,6 +22,7 @@ import {
   canManageNeedProposals,
   isStaleProposalError,
   proposalErrorMessage,
+  proposalListErrorMessage,
   runInSequence,
   sameQuantity,
   summarizeProposalGroup,
@@ -147,10 +148,18 @@ export function NeedProposalsPage({ user }: { user: Me }) {
         setMore(Boolean(page.more));
         setCursor(page.more ? page.cursor ?? '' : '');
       })
-      .catch((cause) => { if (live) { setGroups([]); setError(proposalErrorMessage(cause)); } })
+      .catch((cause) => { if (live) { setGroups([]); setError(proposalListErrorMessage(cause)); } })
       .finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
   }, [canManage, revision]);
+
+  useEffect(() => {
+    if (!canManage) return;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') setRevision((value) => value + 1);
+    }, 30_000);
+    return () => window.clearInterval(timer);
+  }, [canManage]);
 
   // Bounded lookups: the active catalog (swap choices and unit scales) and warehouse names. A failure only limits those features.
   useEffect(() => {
@@ -179,7 +188,7 @@ export function NeedProposalsPage({ user }: { user: Me }) {
       setMore(Boolean(page.more));
       setCursor(page.more ? page.cursor ?? '' : '');
     } catch (cause) {
-      setError(proposalErrorMessage(cause));
+      setError(proposalListErrorMessage(cause));
     } finally {
       setLoadingMore(false);
     }
@@ -249,6 +258,7 @@ export function NeedProposalsPage({ user }: { user: Me }) {
           Hệ thống tự tạo đề xuất từ SOS đã xác minh và định mức. Quản lý kiểm tra số lượng và vật phẩm rồi xác nhận hoặc từ chối.
           Đề xuất không tự động phân công hay điều phối.
         </p>
+        <p className="need-proposals__timing">SOS có tick cần hàng cứu trợ được quét khoảng mỗi 5 phút. Danh sách tự làm mới khi bạn đang mở trang.</p>
         {notice && <p className="notice" role="status">{notice}</p>}
         {lookupError && <p className="notice error" role="alert">{lookupError}</p>}
         {error && (
@@ -262,7 +272,7 @@ export function NeedProposalsPage({ user }: { user: Me }) {
       {loading && groups.length === 0 && <Skeleton rows={4} label="Đang tải đề xuất cấp phát…" />}
 
       {!loading && !error && groups.length === 0 && (
-        <EmptyState title="Chưa có đề xuất cần duyệt" description="Đề xuất được tạo tự động sau khi điều phối viên xác minh SOS có nhu cầu hàng cứu trợ." />
+        <EmptyState title="Chưa có đề xuất cần duyệt" description="SOS phải được xác minh và có tick cần hàng cứu trợ. Hệ thống quét khoảng mỗi 5 phút; SOS ngoài chiến dịch vẫn có đề xuất nhưng chưa đối chiếu được kho." />
       )}
 
       {groups.map((group) => {
@@ -272,27 +282,35 @@ export function NeedProposalsPage({ user }: { user: Me }) {
         const extractionTone = group.extraction ? (labelFor(extractionSourceTones, group.extraction.source, 'neutral') as BadgeTone) : 'neutral';
         const warehouseName = group.warehouse ? warehouses.get(group.warehouse.id) || `Kho mã ${shortId(group.warehouse.id)}` : '';
         return (
-          <section key={group.cycle_id} className="card proposal-group" aria-labelledby={`proposal-${group.cycle_id}-title`}>
+          <section key={group.cycle_id} className={`card proposal-group${open.length ? ' proposal-group--pending' : ''}`} aria-labelledby={`proposal-${group.cycle_id}-title`}>
             <header className="proposal-group__header">
-              <div>
+              <div className="proposal-group__identity">
+                <span className="proposal-group__kicker">Đề xuất từ SOS · {open.length ? 'Cần quản lý xem xét' : 'Đã xử lý tại trang này'}</span>
                 <h3 id={`proposal-${group.cycle_id}-title`} className="proposal-group__title">
                   SOS {shortId(group.request_id)} · Đợt {group.work_cycle}
                 </h3>
-                <p className="proposal-group__sos">
-                  {group.sos
-                    ? `Số người: ${group.sos.people} · Người lớn: ${group.sos.adults} · Trẻ em: ${group.sos.children} · Người cao tuổi: ${group.sos.elderly}`
-                    : 'Chưa có số người cần hỗ trợ'}
-                </p>
+                <div className="proposal-group__facts" aria-label="Thông tin đề xuất">
+                  <span><strong>{group.sos?.people ?? '—'}</strong> người cần hỗ trợ</span>
+                  <span><strong>{summary.lineCount}</strong> vật phẩm đề xuất</span>
+                  {summary.shortfallCount > 0 && <span className="proposal-group__fact--short"><strong>{summary.shortfallCount}</strong> vật phẩm thiếu hàng</span>}
+                </div>
               </div>
-              {group.extraction && (
+              <div className="proposal-group__badges">
+                {open.length > 0 && <span className="proposal-group__pending">{open.length} dòng chờ duyệt</span>}
+                {group.extraction && (
                 <Badge kind="meta" tone={extractionTone} title="Nguồn đề xuất vật phẩm">
                   {labelFor(extractionSourceLabels, group.extraction.source, 'Nguồn khác')}
                 </Badge>
-              )}
+                )}
+              </div>
             </header>
 
             {group.warehouse ? (
-              <p className="proposal-group__warehouse">Kho phục vụ: {warehouseName}</p>
+              <p className="proposal-group__warehouse"><strong>Kho phục vụ</strong> {warehouseName}</p>
+            ) : !group.campaign_id ? (
+              <p className="notice warning" role="note">
+                SOS chưa thuộc chiến dịch. Bạn vẫn có thể duyệt vật phẩm, nhưng chưa thể đối chiếu tồn kho hoặc tính đề xuất quyên góp. Điều phối viên cần gắn chiến dịch nếu muốn thực hiện các bước đó.
+              </p>
             ) : (
               <p className="notice error" role="alert">
                 Chưa có kho phục vụ cho chiến dịch của SOS này, nên chưa kiểm được tồn kho. Hãy kiểm tra trước khi xác nhận.
@@ -320,7 +338,7 @@ export function NeedProposalsPage({ user }: { user: Me }) {
                 const outcome = resolved[line.need_id];
                 const reasonCopy = line.reasons.map((reason) => labelFor(needReasonLabels, reason.code, reason.message));
                 return (
-                  <li key={line.need_id} className="proposal-line">
+                  <li key={line.need_id} className={`proposal-line${line.shortfall ? ' proposal-line--short' : ''}`}>
                     <div className="proposal-line__main">
                       <span className="proposal-line__category">{labelFor(normCategoryLabels, line.category, 'Nhóm khác')}</span>
                       <strong className="proposal-line__item">{line.item.name}</strong>

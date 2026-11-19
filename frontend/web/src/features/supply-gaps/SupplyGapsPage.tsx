@@ -1,52 +1,72 @@
 import { useState } from 'react';
-import type { Me } from '../../auth/session';
-import { Tabs } from '../../components/ui/Tabs';
+import { roles, type Me } from '../../auth/session';
 import { useUrlView } from '../../app/useUrlView';
+import { Tabs } from '../../components/ui/Tabs';
+import { ItemCatalogPage } from '../catalog/ItemCatalogPage';
+import { NeedProposalsPage } from '../need-proposals/NeedProposalsPage';
+import { Operations } from '../operations/Operations';
 import { NormEditor } from './NormEditor';
 import { SupplyGapInbox } from './SupplyGapInbox';
-import { Operations } from '../operations/Operations';
 
-const supplyViews = ['drives', 'norms'] as const;
+const supplySections = ['proposals', 'donations', 'catalog'] as const;
+const reviewerSections = ['donations'] as const;
 
-/** Manager workspace: supply-gap suggestions and the need norm table, kept together as one operations area. */
+/** One navigation destination with distinct SOS, donation and catalog work areas. */
 export function SupplyGapsPage({ user }: { user: Me }) {
-  const [view, setView] = useUrlView('view', supplyViews, 'drives');
-  const [expanded, setExpanded] = useState<'gaps' | 'needs' | null>(null);
+  const canManage = roles(user).has('OPERATIONS_MANAGER');
+  const legacyNorms = new URL(window.location.href).searchParams.get('view') === 'norms';
+  const [section, setSection] = useUrlView('section', canManage ? supplySections : reviewerSections, canManage && legacyNorms ? 'catalog' : 'donations');
+  const [showNeeds, setShowNeeds] = useState(false);
+  const [showGaps, setShowGaps] = useState(false);
+
   return (
     <div className="operations-workspace supply-page">
-      <Tabs
-        className="supply-page__tabs"
-        ariaLabel="Nội dung đợt quyên góp và định mức"
+      {canManage && <Tabs
+        ariaLabel="Công việc vật tư và quyên góp"
         idBase="supply-page"
+        className="supply-page__tabs"
         items={[
-          { id: 'drives', label: 'Đợt quyên góp' },
-          { id: 'norms', label: 'Định mức vật tư' },
+          { id: 'proposals', label: 'Nhu cầu từ SOS' },
+          { id: 'donations', label: 'Đợt quyên góp' },
+          { id: 'catalog', label: 'Vật phẩm và định mức' },
         ]}
-        value={view}
-        onChange={(value) => setView(value as (typeof supplyViews)[number])}
-      />
-      <div role="tabpanel" id="supply-page-tabpanel" aria-labelledby={`supply-page-tab-${view}`}>
-        {view === 'drives' ? <>
-          <div className="supply-page__quick">
-            <section className="card">
-              <h2>Đề xuất bổ sung vật tư</h2>
-              <p>Hệ thống tổng hợp thiếu hụt theo kho và vật phẩm. Quản lý vận hành duyệt đề xuất để tạo đợt quyên góp nháp.</p>
-              <button type="button" className="button secondary" aria-expanded={expanded === 'gaps'} onClick={() => setExpanded(expanded === 'gaps' ? null : 'gaps')}>
-                {expanded === 'gaps' ? 'Ẩn đề xuất' : 'Xem đề xuất'}
-              </button>
-            </section>
-            <section className="card">
-              <h2>Nhu cầu vật tư từ SOS</h2>
-              <p>Xem nhu cầu đã ghi nhận và cam kết xuất kho trước khi quyết định mở đợt quyên góp.</p>
-              <button type="button" className="button secondary" aria-expanded={expanded === 'needs'} onClick={() => setExpanded(expanded === 'needs' ? null : 'needs')}>
-                {expanded === 'needs' ? 'Ẩn nhu cầu' : 'Xem nhu cầu'}
-              </button>
-            </section>
-          </div>
-          {expanded === 'gaps' && <SupplyGapInbox user={user} />}
-          {expanded === 'needs' && <Operations page="needs" user={user} />}
+        value={section}
+        onChange={(value) => setSection(value as (typeof supplySections)[number])}
+      />}
+      <div role={canManage ? 'tabpanel' : undefined} id="supply-page-tabpanel"
+        aria-labelledby={canManage ? `supply-page-tab-${section}` : undefined} className="supply-page__content">
+        {section === 'proposals' && <>
+          <p className="supply-page__intro">SOS đã xác minh và cần hàng cứu trợ sẽ tạo đề xuất vật tư. Quản lý duyệt từng đề xuất; nhu cầu được xác nhận xuất hiện ở danh sách bên dưới.</p>
+          <NeedProposalsPage user={user} />
+          <section className="card supply-page__related" aria-labelledby="supply-needs-title">
+            <div>
+              <h2 id="supply-needs-title">Nhu cầu vật tư đã ghi nhận</h2>
+              <p>Xem các nhu cầu đã có và cam kết xuất kho của SOS.</p>
+            </div>
+            <button type="button" className="button secondary" aria-expanded={showNeeds} aria-controls="supply-needs-content"
+              onClick={() => setShowNeeds((value) => !value)}>{showNeeds ? 'Ẩn nhu cầu' : 'Xem nhu cầu'}</button>
+          </section>
+          <div id="supply-needs-content">{showNeeds && <Operations page="needs" user={user} />}</div>
+        </>}
+        {section === 'donations' && <>
+          <p className="supply-page__intro">Tạo đợt quyên góp thủ công từ danh sách này, hoặc xem đề xuất tự động từ thiếu hụt vật tư bên dưới.</p>
           <Operations page="drives" user={user} />
-        </> : <NormEditor user={user} />}
+          {canManage && <>
+            <section className="card supply-page__related" aria-labelledby="supply-gaps-title">
+              <div>
+                <h2 id="supply-gaps-title">Thiếu hụt và đề xuất mở đợt</h2>
+                <p>Hệ thống so sánh nhu cầu đã duyệt với tồn kho và số hàng đang kêu gọi. Quản lý quyết định có tạo đợt quyên góp nháp từ đề xuất hay không.</p>
+              </div>
+              <button type="button" className="button secondary" aria-expanded={showGaps} aria-controls="supply-gaps-content"
+                onClick={() => setShowGaps((value) => !value)}>{showGaps ? 'Ẩn đề xuất' : 'Xem đề xuất tự động'}</button>
+            </section>
+            <div id="supply-gaps-content">{showGaps && <SupplyGapInbox user={user} />}</div>
+          </>}
+        </>}
+        {section === 'catalog' && <>
+          <ItemCatalogPage user={user} />
+          <NormEditor user={user} />
+        </>}
       </div>
     </div>
   );

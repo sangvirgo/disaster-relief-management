@@ -1,3 +1,4 @@
+import { Dropdown } from '../../components/ui/Dropdown';
 import { useCursorNav, LIST_PAGE_SIZE } from '../../api/useCursorNav';
 import { ListNav } from '../../components/ui/Pager';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -1022,7 +1023,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
             <label className="queue-status-field">
             <span>Trạng thái yêu cầu</span>
             <span className="queue-status-select-wrap">
-              <select
+              <Dropdown
                 value={queueStatus}
                 onChange={(event) => {
                   setQueueStatus(event.target.value);
@@ -1034,13 +1035,13 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                     {name}
                   </option>
                 ))}
-              </select>
+              </Dropdown>
             </span>
             </label>
             <label className="queue-status-field">
             <span>Nhóm rà soát</span>
             <span className="queue-status-select-wrap">
-              <select
+              <Dropdown
                 value={reviewLane}
                 onChange={(event) => {
                   setReviewLane(event.target.value);
@@ -1052,7 +1053,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                   ['RATE_LIMITED_REVIEW', 'Báo lặp cần rà soát'],
                   ['PROXY_QUOTA_REVIEW', 'Báo hộ cần rà soát'],
                 ].map(([value, name]) => <option key={value} value={value}>{name}</option>)}
-              </select>
+              </Dropdown>
             </span>
             </label>
             <label className="check queue-attention-filter">

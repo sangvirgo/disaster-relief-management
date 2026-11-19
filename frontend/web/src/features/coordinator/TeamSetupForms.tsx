@@ -1,3 +1,4 @@
+import { Dropdown } from '../../components/ui/Dropdown';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, newCommandKey } from '../../api/client';
 import { fetchAll } from '../../api/fetchAll';
@@ -138,15 +139,15 @@ export function TeamCreateForm({ skills, onSuccess }: {
   return <form className="form-stack command-form" onSubmit={submit}>
     <h3>Tạo đội cứu hộ</h3>
     <label>Tên đội *<input required maxLength={200} value={name} onChange={(e) => { setName(e.target.value); changed(); }} />{fieldError('name') && <small className="field-error">{fieldError('name')}</small>}</label>
-    <label>Loại đội *<select value={teamKind} onChange={(e) => { setTeamKind(e.target.value); changed(); }}><option value="VOLUNTEER">Tình nguyện</option>
-      <option value="MILITARY">Lực lượng vũ trang</option><option value="GOVERNMENT">Cơ quan nhà nước</option><option value="OTHER">Khác</option></select></label>
-    <label>Chế độ báo cáo *<select value={reportingMode} onChange={(e) => { setReportingMode(e.target.value); changed(); }}><option value="APP">Qua ứng dụng</option>
-      <option value="COORDINATOR">Điều phối viên ghi nhận</option></select></label>
+    <label>Loại đội *<Dropdown value={teamKind} onChange={(e) => { setTeamKind(e.target.value); changed(); }}><option value="VOLUNTEER">Tình nguyện</option>
+      <option value="MILITARY">Lực lượng vũ trang</option><option value="GOVERNMENT">Cơ quan nhà nước</option><option value="OTHER">Khác</option></Dropdown></label>
+    <label>Chế độ báo cáo *<Dropdown value={reportingMode} onChange={(e) => { setReportingMode(e.target.value); changed(); }}><option value="APP">Qua ứng dụng</option>
+      <option value="COORDINATOR">Điều phối viên ghi nhận</option></Dropdown></label>
     {reportingMode === 'APP' ? <label>Đội trưởng *
-      <select required value={leaderId} disabled={leaders.loading || Boolean(leaders.error)} onChange={(event) => { setLeaderId(event.target.value); changed(); }}>
+      <Dropdown required value={leaderId} disabled={leaders.loading || Boolean(leaders.error)} onChange={(event) => { setLeaderId(event.target.value); changed(); }}>
         <option value="">{leaders.loading ? 'Đang tải tình nguyện viên…' : 'Chọn tình nguyện viên'}</option>
         {leaders.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-      </select>
+      </Dropdown>
       {leaders.error && <span className="notice error" role="alert">{leaders.error} <button type="button" className="button secondary" onClick={leaders.reload}>Tải lại</button></span>}
       {!leaders.loading && !leaders.error && leaders.options.length === 0 && <small>Chưa có tình nguyện viên đủ điều kiện và chưa thuộc đội.</small>}
       {fieldError('leader_user_id') && <small className="field-error">{fieldError('leader_user_id')}</small>}

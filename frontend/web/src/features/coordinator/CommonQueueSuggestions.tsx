@@ -1,3 +1,4 @@
+import { Dropdown } from '../../components/ui/Dropdown';
 import { useEffect, useMemo, useState } from 'react';
 import { api, newCommandKey } from '../../api/client';
 import { useCursorNav } from '../../api/useCursorNav';
@@ -233,10 +234,10 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
         <div className="campaign-area-editor__row">
           <button type="button" className="button primary" disabled={busy || editMode?.kind === 'create'} onClick={startCreate}>Vẽ chiến dịch mới trên bản đồ</button>
           <label>Chỉnh vùng chiến dịch
-            <select value={editMode?.kind === 'adjust' ? editMode.id : ''} disabled={busy} onChange={(event) => event.target.value ? startAdjust(event.target.value) : cancelEdit()}>
+            <Dropdown value={editMode?.kind === 'adjust' ? editMode.id : ''} disabled={busy} onChange={(event) => event.target.value ? startAdjust(event.target.value) : cancelEdit()}>
               <option value="">Chọn chiến dịch…</option>
               {data?.campaigns.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-            </select>
+            </Dropdown>
           </label>
         </div>
         {editMode && <>
@@ -348,13 +349,13 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
                     placeholder="Tìm chiến dịch theo tên…" value={campaignSearch[item.id] ?? ''}
                     onChange={(event) => setCampaignSearch((current) => ({ ...current, [item.id]: event.target.value }))} />
                   <div className="suggestion-actions__attach">
-                    <select aria-label={`Chiến dịch để gắn ${item.tracking_code}`} value={selectedTarget} disabled={busy}
+                    <Dropdown aria-label={`Chiến dịch để gắn ${item.tracking_code}`} value={selectedTarget} disabled={busy}
                       onChange={(event) => setChoice((current) => ({ ...current, [item.id]: event.target.value }))}>
                       <option value="">Gắn vào chiến dịch…</option>
                       {visibleOptions.map((target) => <option key={target.id} value={target.id}>
                         {candidates.has(target.id) ? 'Trong vùng · ' : ''}{target.name}{Number.isFinite(distance(target.id)) ? ` · ${km(distance(target.id))} km` : ''}
                       </option>)}
-                    </select>
+                    </Dropdown>
                     <button type="button" className="button primary" disabled={busy || !selectedTarget} onClick={() => void attach(item, selectedTarget)}>Gắn</button>
                   </div>
                   {!query && options.length > 5 && <small className="muted">5 chiến dịch gần nhất; tìm theo tên để xem lựa chọn khác.</small>}

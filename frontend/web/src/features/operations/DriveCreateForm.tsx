@@ -1,3 +1,4 @@
+import { Dropdown } from '../../components/ui/Dropdown';
 import { useRef, useState, type FormEvent } from 'react';
 import { api, newCommandKey } from '../../api/client';
 
@@ -74,21 +75,21 @@ export function DriveCreateForm({ warehouses, campaigns, items, itemScales, onSu
     <label><span>Tên đợt quyên góp *</span><input required maxLength={201} aria-invalid={title.length > 200} value={title} onChange={event => { setTitle(event.target.value); pending.current = null; }} />{title.length > 200 && <small className="field-error" role="alert">Tên đợt quyên góp không được vượt quá 200 ký tự.</small>}</label>
     <label><span>Mô tả *</span><textarea required maxLength={5001} aria-invalid={description.length > 5000} value={description} onChange={event => { setDescription(event.target.value); pending.current = null; }} />{description.length > 5000 && <small className="field-error" role="alert">Mô tả không được vượt quá 5.000 ký tự.</small>}</label>
     <div className="form-grid-2">
-    <label><span>Kho tiếp nhận *</span><select required value={warehouseId} onChange={event => { setWarehouseId(event.target.value); pending.current = null; }}>
+    <label><span>Kho tiếp nhận *</span><Dropdown required value={warehouseId} onChange={event => { setWarehouseId(event.target.value); pending.current = null; }}>
       <option value="">Chọn kho tiếp nhận</option>{warehouses.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-    </select></label>
-    <label><span>Chiến dịch (nếu có)</span><select value={campaignId} onChange={event => { setCampaignId(event.target.value); pending.current = null; }}>
+    </Dropdown></label>
+    <label><span>Chiến dịch (nếu có)</span><Dropdown value={campaignId} onChange={event => { setCampaignId(event.target.value); pending.current = null; }}>
       <option value="">Không gắn chiến dịch</option>{campaigns.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-    </select></label>
+    </Dropdown></label>
     </div>
     <fieldset className="drive-item-list"><legend>Vật phẩm cần tiếp nhận</legend>
       {lines.map((line, index) => <div className="drive-item-row" key={index}>
         <div className="drive-item-head"><strong>Vật phẩm {index + 1}</strong>
           {lines.length > 1 && <button className="button secondary small" type="button" onClick={() => { setLines(current => current.filter((_, i) => i !== index)); pending.current = null; }}>Xóa</button>}</div>
         <div className="drive-item-fields">
-        <label><span>Vật phẩm *</span><select required aria-invalid={Boolean(lineErrors[index].item)} value={line.item_id} onChange={event => updateLine(index, { item_id: event.target.value, target_quantity: '' })}>
+        <label><span>Vật phẩm *</span><Dropdown required aria-invalid={Boolean(lineErrors[index].item)} value={line.item_id} onChange={event => updateLine(index, { item_id: event.target.value, target_quantity: '' })}>
           <option value="">Chọn vật phẩm</option>{items.filter(option => option.value === line.item_id || !lines.some(other => other.item_id === option.value)).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-        </select>{line.item_id && lineErrors[index].item && <small className="field-error" role="alert">{lineErrors[index].item}</small>}</label>
+        </Dropdown>{line.item_id && lineErrors[index].item && <small className="field-error" role="alert">{lineErrors[index].item}</small>}</label>
         <label><span>Số lượng mục tiêu *</span><input required type="number" min="0" step={10 ** -Number(itemScales.find(item => item.value === line.item_id)?.label ?? 0)} aria-invalid={Boolean(line.target_quantity && lineErrors[index].quantity)} value={line.target_quantity} onChange={event => updateLine(index, { target_quantity: event.target.value })} />{line.target_quantity && lineErrors[index].quantity && <small className="field-error" role="alert">{lineErrors[index].quantity}</small>}</label>
         <label><span>Ghi chú tiếp nhận (nếu có)</span><input maxLength={501} aria-invalid={Boolean(lineErrors[index].note)} value={line.acceptance_note} onChange={event => updateLine(index, { acceptance_note: event.target.value })} />{lineErrors[index].note && <small className="field-error" role="alert">{lineErrors[index].note}</small>}</label>
         </div>

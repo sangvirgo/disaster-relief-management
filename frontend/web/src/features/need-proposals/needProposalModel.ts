@@ -156,3 +156,12 @@ export function proposalErrorMessage(error: unknown): string {
   }
   return error instanceof Error && error.message ? error.message : 'Thao tác chưa được xác nhận. Vui lòng thử lại.';
 }
+
+/** A missing collection route means the running Logistics API has not been updated with this screen. */
+export function proposalListErrorMessage(error: unknown): string {
+  if (typeof error === 'object' && error !== null && 'status' in error) {
+    if (error.status === 404) return 'Dịch vụ Logistics đang chạy chưa có API đề xuất từ SOS. Cần cập nhật dịch vụ để xem danh sách này.';
+    if (error.status === 403) return 'Tài khoản hiện tại chưa được cấp quyền xem đề xuất từ SOS trong phạm vi này.';
+  }
+  return proposalErrorMessage(error);
+}

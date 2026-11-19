@@ -3,3 +3,6 @@
 .warehouse-detail__heading h2 { margin: 0; }
 .warehouse-detail__heading p { margin: 6px 0 0; color: #52657b; }
 .warehouse-detail > .card { padding: 20px; }
+.warehouse-detail__location { border-left: 4px solid #2563eb; }
+.warehouse-detail__location h3 { margin: 0 0 8px; }
+.warehouse-detail__location p { margin: 0; font-size: 1.1rem; font-weight: 600; }

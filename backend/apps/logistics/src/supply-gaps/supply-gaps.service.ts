@@ -450,12 +450,13 @@ export class SupplyGapsService {
   }
 
   private async expireMissing(manager: EntityManager, warehouseId: string, keepItemIds: string[]): Promise<void> {
-    const expired = await manager.query(
+    const result = await manager.query(
       `UPDATE supply_gap SET status='EXPIRED', version=version+1, computed_at=now(), updated_at=now()
         WHERE warehouse_id=$1 AND status='OPEN' AND NOT (item_id = ANY($2::uuid[]))
         RETURNING id, severity`,
       [warehouseId, keepItemIds],
-    ) as Array<{ id: string; severity: GapSeverity }>;
+    ) as Array<{ id: string; severity: GapSeverity }> | [Array<{ id: string; severity: GapSeverity }>, number];
+    const expired = Array.isArray(result[0]) ? result[0] : result as Array<{ id: string; severity: GapSeverity }>;
     for (const row of expired) {
       await writeAudit(manager, null, 'SUPPLY_GAP_EXPIRED', row.id, { status: 'OPEN' }, { status: 'EXPIRED', severity: row.severity }, 'SUPPLY_GAP_RECOMPUTED');
     }

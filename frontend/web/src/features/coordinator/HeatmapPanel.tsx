@@ -1,3 +1,4 @@
+import { Dropdown } from '../../components/ui/Dropdown';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -528,10 +529,10 @@ export function HeatmapPanel({
       {!compact && <>
       <label className="heatmap-category-filter">
         <span>Loại sự cố</span>
-        <span className="heatmap-category-select-wrap"><select value={category} onChange={(event) => setCategory(event.target.value)} aria-label="Lọc bản đồ nhiệt theo loại sự cố">
+        <span className="heatmap-category-select-wrap"><Dropdown value={category} onChange={(event) => setCategory(event.target.value)} aria-label="Lọc bản đồ nhiệt theo loại sự cố">
           <option value="">Tất cả loại sự cố</option>
           {incidentCategories.map((code) => <option key={code} value={code}>{label(code)}</option>)}
-        </select></span>
+        </Dropdown></span>
       </label>
       <div className="heatmap-context" role="status">
         <span className="heatmap-context-dot" aria-hidden="true" />

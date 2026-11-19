@@ -1,3 +1,4 @@
+import { Dropdown } from './ui/Dropdown';
 import { useRef, useState, type FormEvent } from 'react';
 import { api, newCommandKey, type Service } from '../api/client';
 import { label, timeLabel } from '../i18n/labels';
@@ -121,7 +122,7 @@ export function RecoveryIssue({
           {kind === 'sos' ? (
             <label>
               <span>Lần liên hệ xác nhận <span className="required-mark" aria-hidden="true">*</span></span>
-              <select
+              <Dropdown
                 required
                 aria-invalid={Boolean(fieldTouched.basis && basisError)}
                 aria-describedby={fieldTouched.basis && basisError ? 'recovery-basis-error' : undefined}
@@ -139,7 +140,7 @@ export function RecoveryIssue({
                       {label(item.contact_target)} · {item.attempted_at ? timeLabel(item.attempted_at) : 'Đã liên hệ'}
                     </option>
                   ))}
-              </select>
+              </Dropdown>
               {fieldTouched.basis && basisError && <small className="field-error" id="recovery-basis-error" role="alert">{basisError}</small>}
             </label>
           ) : (
