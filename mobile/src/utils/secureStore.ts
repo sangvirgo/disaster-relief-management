@@ -6,15 +6,19 @@ import {
   DonationDeclarationPayload,
   DonationEvidenceReference,
   MissionProgressTarget,
+  RequestEvidenceReference,
+  RequestReportUpdatePayload,
+  RequestSupplementPayload,
 } from '../types/api';
 
 const KEYS = {
   ACCESS_TOKEN: 'c48_access_token',
   REFRESH_TOKEN: 'c48_refresh_token',
   USER_INFO: 'c48_user_info',
-  GUEST_TRACKING_SECRETS: 'c48_guest_tracking_secrets', // Map tracking_code -> secret
+  GUEST_TRACKING_SECRETS: 'c48_guest_tracking_secrets', // Legacy per-request create-retry secrets; never used for tracking.
   GUEST_DONATION_SECRETS: 'c48_guest_donation_secrets', // Map public_code -> secret
   GUEST_DONATION_EVIDENCE: 'c48_guest_donation_evidence', // Map donation ID -> evidence references
+  REQUEST_EVIDENCE: 'c48_request_evidence', // Local references to reporter-uploaded evidence IDs
   PENDING_SOS: 'c48_pending_sos_command',
   PENDING_PROXY_SOS: 'c48_pending_proxy_sos_command',
   PENDING_DONATION: 'c48_pending_donation_command',
@@ -188,7 +192,7 @@ export async function generateRandomSecret(): Promise<string> {
 
 export interface PendingSOSCommand {
   idempotencyKey: string;
-  trackingSecret: string;
+  trackingSecret?: string;
   payload: CreateSOSPayload;
 }
 
@@ -207,7 +211,8 @@ export interface PendingProxySOSCommand {
 
 export interface PendingSupplementCommand {
   requestId: string;
-  payload: { expected_version: number; description: string };
+  kind?: 'REPORT_UPDATE' | 'SUPPLEMENT';
+  payload: RequestReportUpdatePayload | RequestSupplementPayload;
   idempotencyKey: string;
 }
 
@@ -264,20 +269,28 @@ export const StorageService = {
     return data ? JSON.parse(data) : null;
   },
 
-  // === GUEST SOS TRACKING SECRETS ===
-  async saveGuestTrackingSecret(trackingCode: string, secret: string): Promise<void> {
-    const key = `${KEYS.GUEST_TRACKING_SECRETS}_${trackingCode.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-    await SecureStore.setItemAsync(key, secret);
-  },
-
-  async getSecretForTrackingCode(trackingCode: string): Promise<string | null> {
-    const key = `${KEYS.GUEST_TRACKING_SECRETS}_${trackingCode.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-    return SecureStore.getItemAsync(key);
-  },
-
-  async deleteGuestTrackingSecret(trackingCode: string): Promise<void> {
+  // Remove only legacy values for known codes; new requests keep their retry secret only until server ACK.
+  async deleteLegacyGuestTrackingSecret(trackingCode: string): Promise<void> {
     const key = `${KEYS.GUEST_TRACKING_SECRETS}_${trackingCode.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
     await SecureStore.deleteItemAsync(key);
+  },
+
+  async saveRequestEvidence(requestId: string, evidence: RequestEvidenceReference): Promise<void> {
+    const key = `${KEYS.REQUEST_EVIDENCE}_${requestId.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    const current = await readSecureJson<RequestEvidenceReference[]>(key);
+    const updated = [
+      evidence,
+      ...(Array.isArray(current) ? current.filter((item) => item.id !== evidence.id) : []),
+    ].slice(0, 5);
+    await saveSecureJson(key, updated);
+  },
+
+  async getRequestEvidence(requestId: string): Promise<RequestEvidenceReference[]> {
+    const key = `${KEYS.REQUEST_EVIDENCE}_${requestId.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    const evidence = await readSecureJson<RequestEvidenceReference[]>(key);
+    return Array.isArray(evidence)
+      ? evidence.filter((item) => item && typeof item.id === 'string' && item.state === 'READY')
+      : [];
   },
 
   async savePendingSOS(command: PendingSOSCommand): Promise<void> {
@@ -288,7 +301,7 @@ export const StorageService = {
     return readSecureJson<PendingSOSCommand>(KEYS.PENDING_SOS);
   },
 
-  async getOrCreatePendingSOS(payload: CreateSOSPayload): Promise<PendingSOSCommand> {
+  async getOrCreatePendingSOS(payload: CreateSOSPayload, guestCreate: boolean): Promise<PendingSOSCommand> {
     const existing = await this.getPendingSOS();
     if (existing) {
       if (!samePayload(existing.payload, payload)) {
@@ -298,7 +311,7 @@ export const StorageService = {
     }
     const command = {
       idempotencyKey: generateUUID(),
-      trackingSecret: await generateRandomSecret(),
+      ...(guestCreate ? { trackingSecret: await generateRandomSecret() } : {}),
       payload,
     };
     await this.savePendingSOS(command);
@@ -454,17 +467,32 @@ export const StorageService = {
 
   async getOrCreatePendingSupplement(
     requestId: string,
-    payload: { expected_version: number; description: string }
+    kind: 'REPORT_UPDATE' | 'SUPPLEMENT',
+    payload: RequestReportUpdatePayload | RequestSupplementPayload,
   ): Promise<PendingSupplementCommand> {
     const key = `${KEYS.PENDING_SUPPLEMENT}_${requestId.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
     const existing = await readSecureJson<PendingSupplementCommand>(key);
     if (existing) {
-      if (existing.requestId === requestId && existing.payload?.description === payload.description) return existing;
+      const existingFields = { ...existing.payload } as Record<string, unknown>;
+      const requestedFields = { ...payload } as Record<string, unknown>;
+      delete existingFields.expected_version;
+      delete requestedFields.expected_version;
+      if (
+        existing.requestId === requestId &&
+        samePayload(existingFields, requestedFields)
+      ) {
+        if (!existing.kind) {
+          existing.kind = kind;
+          await saveSecureJson(key, existing);
+        }
+        return existing;
+      }
       throw new Error('PENDING_SUPPLEMENT_MUST_BE_RESUMED');
     }
 
     const command: PendingSupplementCommand = {
       requestId,
+      kind,
       payload,
       idempotencyKey: generateUUID(),
     };

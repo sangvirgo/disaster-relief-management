@@ -88,7 +88,6 @@ export const CampaignsScreen: React.FC = () => {
   return (
     <ScreenContainer
       title="Chiến Dịch Cứu Trợ"
-      subtitle="Các chiến dịch cứu trợ quy mô lớn đang triển khai"
       onBack={() => goBackOrHome(router)}
       scrollable={false}
       headerRight={
@@ -126,9 +125,6 @@ export const CampaignsScreen: React.FC = () => {
         >
           <View style={styles.bannerBox}>
             <Text style={styles.bannerTitle}>CHIẾN DỊCH CỨU NẠN & TIẾP TẾ TOÀN DÂN</Text>
-            <Text style={styles.bannerDesc}>
-              Thông tin mục tiêu và thời gian được hiển thị theo dữ liệu chiến dịch đã công bố.
-            </Text>
             <TouchableOpacity
               style={styles.donationDrivesBtn}
               onPress={() => router.push('/donations')}
@@ -172,17 +168,6 @@ export const CampaignsScreen: React.FC = () => {
                   </View>
                 ) : null}
 
-                {/* HÀNG NÚT TÁC VỤ */}
-                <View style={styles.actionRow}>
-                  <TouchableOpacity
-                    style={styles.sosActionBtn}
-                    onPress={() => router.push('/create-sos')}
-                    activeOpacity={0.8}
-                  >
-                    <AlertTriangle size={16} color="#FFFFFF" />
-                    <Text style={styles.sosActionText}>Báo Cứu Nạn</Text>
-                  </TouchableOpacity>
-                </View>
               </View>
             );
           })}
@@ -245,11 +230,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: THEME.colors.primary.dark,
     marginBottom: 4,
-  },
-  bannerDesc: {
-    fontSize: 12,
-    color: THEME.colors.text.primary,
-    lineHeight: 18,
   },
   donationDrivesBtn: {
     flexDirection: 'row',
@@ -326,30 +306,6 @@ const styles = StyleSheet.create({
   dateText: {
     fontSize: 11,
     color: THEME.colors.text.muted,
-    marginLeft: 6,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    marginTop: 12,
-    gap: 10,
-  },
-  sosActionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: THEME.colors.emergency.main,
-    minHeight: 48,
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-  },
-  sosActionText: {
-    flexShrink: 1,
-    minWidth: 0,
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#FFFFFF',
     marginLeft: 6,
   },
 });

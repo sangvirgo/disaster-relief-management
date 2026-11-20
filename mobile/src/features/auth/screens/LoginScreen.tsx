@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   Alert,
   ActivityIndicator,
@@ -13,13 +12,13 @@ import { useRouter } from 'expo-router';
 import { goBackOrHome } from '../../../navigation/back';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
 import { FormFieldError } from '../../../components/common/FormFieldError';
-import { RequiredAsterisk } from '../../../components/common/RequiredAsterisk';
+import { CompactTextInput } from '../../../components/common/CompactTextInput';
 import { useAuthStore } from '../../../store/authStore';
 import { getApiErrorMessage, isApiErrorCode } from '../../../api/client';
 import { ResponseApi } from '../../../api/responseApi';
 import { THEME } from '../../../constants/theme';
 import { GoogleAuthError, useGoogleAuth } from '../googleAuth';
-import { User, Lock, ArrowRight, Eye, EyeOff, UserPlus } from 'lucide-react-native';
+import { ArrowRight, Eye, EyeOff, UserPlus } from 'lucide-react-native';
 
 type MobileActor = 'citizen' | 'team' | 'unsupported' | 'unavailable';
 
@@ -191,19 +190,16 @@ export const LoginScreen: React.FC = () => {
           />
         </View>
         <Text style={styles.brandTitle}>Reliva</Text>
-        <Text style={styles.title}>ĐĂNG NHẬP HỆ THỐNG</Text>
         <Text style={styles.subtitle}>
-          Dành cho Công dân quản lý tin báo cứu trợ & Đội cứu hộ / Tình nguyện viên tiếp nhận nhiệm vụ.
+          Đăng nhập với tài khoản công dân hoặc thành viên đội cứu hộ.
         </Text>
       </View>
 
       <View style={styles.card}>
         <View style={styles.inputGroup}>
-          <View style={styles.labelRow}>
-            <User size={16} color={THEME.colors.text.secondary} />
-            <Text style={styles.inputLabel}>Tên đăng nhập <RequiredAsterisk /></Text>
-          </View>
-          <TextInput
+          <CompactTextInput
+            label="Tên đăng nhập"
+            required
             style={styles.textInput}
             placeholder="Nhập tên đăng nhập..."
             placeholderTextColor={THEME.colors.text.muted}
@@ -226,13 +222,13 @@ export const LoginScreen: React.FC = () => {
         </View>
 
         <View style={styles.inputGroup}>
-          <View style={styles.labelRow}>
-            <Lock size={16} color={THEME.colors.text.secondary} />
-            <Text style={styles.inputLabel}>Mật khẩu <RequiredAsterisk /></Text>
-          </View>
           <View style={styles.passwordContainer}>
-            <TextInput
-              style={styles.passwordInput}
+            <CompactTextInput
+              label="Mật khẩu"
+              required
+              containerStyle={{ flex: 1, justifyContent: 'center' }}
+              outlined={false}
+              style={[styles.passwordInput, { flex: 0 }]}
               placeholder="Nhập mật khẩu..."
               placeholderTextColor={THEME.colors.text.muted}
               value={password}
@@ -309,14 +305,6 @@ export const LoginScreen: React.FC = () => {
         </View>
       </View>
 
-      <View style={styles.tipBox}>
-        <Text style={styles.tipHeader}>Gợi ý tài khoản kiểm thử (máy chủ thật):</Text>
-        <Text style={styles.tipText}>
-          • <Text style={{ fontWeight: '700' }}>Đội trưởng cứu hộ:</Text> <Text style={{ fontWeight: '700' }}>vol_leader1</Text> / Mật khẩu: <Text style={{ fontWeight: '700' }}>Password123!</Text>{'\n'}
-          • <Text style={{ fontWeight: '700' }}>Thành viên cứu hộ:</Text> <Text style={{ fontWeight: '700' }}>vol_member1</Text> / Mật khẩu: <Text style={{ fontWeight: '700' }}>Password123!</Text>{'\n'}
-          • <Text style={{ fontWeight: '700' }}>Công dân mẫu:</Text> <Text style={{ fontWeight: '700' }}>citizen1</Text> / Mật khẩu: <Text style={{ fontWeight: '700' }}>Password123!</Text> (hoặc bấm Đăng ký phía trên)
-        </Text>
-      </View>
     </ScreenContainer>
   );
 };
@@ -350,12 +338,6 @@ const styles = StyleSheet.create({
     color: THEME.colors.emergency.main,
     letterSpacing: 0.5,
     marginBottom: 2,
-  },
-  title: {
-    fontSize: THEME.typography.fontSizes.lg,
-    fontWeight: '800',
-    color: THEME.colors.text.primary,
-    letterSpacing: 0.5,
   },
   subtitle: {
     fontSize: THEME.typography.fontSizes.xs + 1,
@@ -477,25 +459,5 @@ const styles = StyleSheet.create({
     fontSize: THEME.typography.fontSizes.sm,
     fontWeight: '800',
     color: THEME.colors.primary.main,
-  },
-  tipBox: {
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    padding: 14,
-    borderRadius: 12,
-    marginTop: 18,
-    marginBottom: 24,
-  },
-  tipHeader: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: THEME.colors.text.primary,
-    marginBottom: 4,
-  },
-  tipText: {
-    fontSize: 11,
-    color: THEME.colors.text.secondary,
-    lineHeight: 18,
   },
 });

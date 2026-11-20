@@ -17,6 +17,7 @@ import { goBackOrHome } from '../../../navigation/back';
 import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
+import { CompactTextInput } from '../../../components/common/CompactTextInput';
 import { FormFieldError } from '../../../components/common/FormFieldError';
 import { RequiredAsterisk } from '../../../components/common/RequiredAsterisk';
 import { CopyableInfoModal } from '../../../components/common/CopyableInfoModal';
@@ -1141,7 +1142,6 @@ export const DonationScreen: React.FC = () => {
   return (
     <ScreenContainer
       title="Quyên Góp Cứu Trợ"
-      subtitle="Ủng hộ hiện vật trực tiếp & minh bạch"
       onBack={() => goBackOrHome(router)}
     >
       {/* THANH ĐIỀU HƯỚNG TAB */}
@@ -1233,10 +1233,12 @@ export const DonationScreen: React.FC = () => {
             <Text style={styles.searchSubtitle}>
               Nhập mã định danh bản khai để xem tiến độ kiểm đếm.
             </Text>
-            <Text style={styles.inputLabel}>Mã định danh bản khai <RequiredAsterisk /></Text>
             <View style={styles.searchRow}>
-              <TextInput
-                style={styles.searchInput}
+              <CompactTextInput
+                label="Mã định danh bản khai"
+                required
+                containerStyle={{ flex: 1 }}
+                style={[styles.searchInput, { flex: 0 }]}
                 placeholder="Nhập mã định danh bản khai"
                 placeholderTextColor={THEME.colors.text.muted}
                 value={searchCode}
@@ -1276,9 +1278,10 @@ export const DonationScreen: React.FC = () => {
             {canRecoverDonation ? (
               <View style={styles.recoveryBox}>
                 <Text style={styles.recoveryHint}>Để liên kết mã biên nhận công khai, cần mã khôi phục do kho tiếp nhận cấp.</Text>
-                  <Text style={styles.inputLabel}>Mã khôi phục <RequiredAsterisk /></Text>
-                <TextInput
-                  style={styles.searchInput}
+                <CompactTextInput
+                  label="Mã khôi phục"
+                  required
+                  style={[styles.searchInput, { flex: 0 }]}
                   placeholder="Mã khôi phục"
                   placeholderTextColor={THEME.colors.text.muted}
                   value={donationRecoveryCode}
@@ -1619,8 +1622,9 @@ export const DonationScreen: React.FC = () => {
             </Text>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Họ và tên người quyên góp <RequiredAsterisk /></Text>
-              <TextInput
+              <CompactTextInput
+                label="Họ và tên người quyên góp"
+                required
                 style={styles.textInput}
                 placeholder="Nguyễn Văn A"
                 placeholderTextColor={THEME.colors.text.muted}
@@ -1648,8 +1652,9 @@ export const DonationScreen: React.FC = () => {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Số điện thoại <RequiredAsterisk /></Text>
-              <TextInput
+              <CompactTextInput
+                label="Số điện thoại"
+                required
                 style={styles.textInput}
                 placeholder="0912 345 678"
                 placeholderTextColor={THEME.colors.text.muted}
@@ -1709,6 +1714,7 @@ export const DonationScreen: React.FC = () => {
                       </View>
                       <TextInput
                         style={styles.modalItemInput}
+                        accessibilityLabel={`Số lượng ${it.item_name || it.name} (${unit})`}
                         placeholder="0"
                         placeholderTextColor={THEME.colors.text.muted}
                         keyboardType="numeric"
@@ -1807,9 +1813,9 @@ export const DonationScreen: React.FC = () => {
               Nêu rõ chi tiết sai lệch số lượng kiểm đếm hoặc lý do từ chối để ban quản lý kho rà soát camera và hồ sơ:
             </Text>
 
-            <Text style={styles.inputLabel}>Lý do khiếu nại <RequiredAsterisk /></Text>
-
-            <TextInput
+            <CompactTextInput
+              label="Lý do khiếu nại"
+              required
               style={styles.disputeInput}
               placeholder="Ví dụ: Tôi đã giao 20 thùng mì Hảo Hảo nhưng biên nhận kiểm đếm ghi 15 thùng..."
               placeholderTextColor={THEME.colors.text.muted}
@@ -2308,7 +2314,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    height: 44,
+    height: 52,
     backgroundColor: THEME.colors.surface.background,
     borderWidth: 1,
     borderColor: THEME.colors.surface.border,

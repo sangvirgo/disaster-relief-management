@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  TextInput,
   Switch,
   Alert,
   ActivityIndicator,
@@ -16,6 +15,9 @@ import { useRouter } from 'expo-router';
 import { goBackOrHome } from '../../../navigation/back';
 import { queueTrackingCodeForNavigation } from '../../../navigation/trackingCodeHandoff';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
+import { CompactTextInput } from '../../../components/common/CompactTextInput';
+import { SingleChoicePicker } from '../../../components/common/SingleChoicePicker';
+import type { SingleChoiceOption } from '../../../components/common/SingleChoicePicker';
 import { FormFieldError } from '../../../components/common/FormFieldError';
 import { RequiredAsterisk } from '../../../components/common/RequiredAsterisk';
 import { useAuthStore } from '../../../store/authStore';
@@ -45,6 +47,15 @@ import {
 
 type SituationPickerMode = 'date' | 'time';
 
+const INCIDENT_CATEGORY_CODES: IncidentCategoryCode[] = [
+  'FLOOD', 'TRAPPED', 'LANDSLIDE', 'STORM', 'MEDICAL', 'FIRE', 'SUPPLY_SHORTAGE', 'OTHER',
+];
+const INCIDENT_CATEGORY_OPTIONS: SingleChoiceOption<IncidentCategoryCode>[] = INCIDENT_CATEGORY_CODES.map((value) => ({
+  value,
+  label: INCIDENT_CATEGORIES[value]?.label || value,
+  description: INCIDENT_CATEGORIES[value]?.desc,
+}));
+
 const formatLocalSituationDate = (value: string): string => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
@@ -68,6 +79,7 @@ export const ProxySOSScreen: React.FC = () => {
   const [declaredDanger, setDeclaredDanger] = useState(false);
   const [needsRescue, setNeedsRescue] = useState(true);
   const [needsRelief, setNeedsRelief] = useState(false);
+  const [reliefItemsText, setReliefItemsText] = useState<string>('');
   const [householdLng, setHouseholdLng] = useState<string>('');
   const [householdLat, setHouseholdLat] = useState<string>('');
   const [householdLocation, setHouseholdLocation] = useState<GeoLocation | null>(null);
@@ -145,6 +157,9 @@ export const ProxySOSScreen: React.FC = () => {
     ].filter(Boolean).join('\n');
     return combined.length > 2000 ? 'Mô tả và ghi chú địa chỉ không được vượt quá 2.000 ký tự.' : undefined;
   };
+  const reliefItemsError = (value: string) => value.length > 500
+    ? 'Mô tả nhu yếu phẩm không được vượt quá 500 ký tự.'
+    : undefined;
 
   useEffect(() => {
     let mounted = true;
@@ -161,6 +176,7 @@ export const ProxySOSScreen: React.FC = () => {
         setDeclaredDanger(Boolean(payload.reporter_declared_danger));
         setNeedsRescue(payload.needs_rescue ?? true);
         setNeedsRelief(Boolean(payload.needs_relief_supplies));
+        setReliefItemsText(payload.relief_items_text || '');
         setHouseholdLocation(payload.location);
         setHouseholdLng(String(payload.location.coordinates[0]));
         setHouseholdLat(String(payload.location.coordinates[1]));
@@ -216,6 +232,7 @@ export const ProxySOSScreen: React.FC = () => {
   const submitDisabled = isSubmitting || restoringPending || Boolean(descriptionError(description)) ||
     Boolean(relationshipError(relationship)) || Boolean(informationSourceError(informationSource)) ||
     Boolean(headcountError(peopleAffected)) || Boolean(vulnerableCountsError(childrenCount, elderlyCount, peopleAffected)) ||
+    Boolean(needsRelief && reliefItemsError(reliefItemsText)) ||
     Boolean(beneficiaryPhoneError(beneficiaryPhone)) || Boolean(alternateContactNameError(alternateContactName)) ||
     Boolean(beneficiaryPhoneError(alternateContactPhone)) || Boolean(situationTimeError(lastKnownSituationAt)) ||
     (!pendingCommand && (
@@ -245,6 +262,7 @@ export const ProxySOSScreen: React.FC = () => {
               setDeclaredDanger(false);
               setNeedsRescue(true);
               setNeedsRelief(false);
+              setReliefItemsText('');
               setHouseholdLng('');
               setHouseholdLat('');
               setHouseholdLocation(null);
@@ -273,7 +291,7 @@ export const ProxySOSScreen: React.FC = () => {
           <AlertCircle size={48} color={THEME.colors.primary.main} />
           <Text style={styles.authRequiredTitle}>YÊU CẦU ĐĂNG NHẬP TÀI KHOẢN</Text>
           <Text style={styles.authRequiredDesc}>
-            Theo quy định cứu hộ, chức năng báo cứu trợ từ xa (PROXY) yêu cầu xác thực tài khoản công dân để tránh báo tin giả mạo gây phân tán nguồn lực cứu hộ.
+            Hãy đăng nhập bằng tài khoản công dân để báo tin cho người thân.
           </Text>
           <TouchableOpacity
             style={styles.loginNowButton}
@@ -327,6 +345,9 @@ export const ProxySOSScreen: React.FC = () => {
       errors.alternateContactPhone = beneficiaryPhoneError(alternateContactPhone)!;
     }
     if (!pendingCommand && descriptionError(description)) errors.description = descriptionError(description)!;
+    if (!pendingCommand && needsRelief && reliefItemsError(reliefItemsText)) {
+      errors.reliefItemsText = reliefItemsError(reliefItemsText)!;
+    }
 
     setFormErrors(errors);
     if (Object.keys(errors).length > 0) {
@@ -344,6 +365,7 @@ export const ProxySOSScreen: React.FC = () => {
         reporter_declared_danger: declaredDanger,
         needs_rescue: needsRescue,
         needs_relief_supplies: needsRelief,
+        relief_items_text: needsRelief ? reliefItemsText.trim() || undefined : undefined,
         location: householdLocation!,
         relationship: normalizedRelationship,
         information_source: normalizedInformationSource,
@@ -392,7 +414,7 @@ export const ProxySOSScreen: React.FC = () => {
   return (
     <ScreenContainer
       title="Báo Cứu Trợ Người Thân"
-      subtitle="Báo hộ vị trí cho gia đình gặp nạn (PROXY)"
+      subtitle="Báo tin hiện trường cho người thân"
       onBack={() => goBackOrHome(router)}
     >
       {/* Banner khôi phục bản gửi cũ */}
@@ -456,8 +478,8 @@ export const ProxySOSScreen: React.FC = () => {
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Ghi chú địa chỉ cụ thể:</Text>
-          <TextInput
+          <CompactTextInput
+            label="Ghi chú địa chỉ cụ thể"
             style={styles.textInput}
             placeholder="Ví dụ: Thôn 2, Xã Tân An, Gần trạm y tế cũ..."
             placeholderTextColor={THEME.colors.text.muted}
@@ -471,8 +493,8 @@ export const ProxySOSScreen: React.FC = () => {
 
         <View style={styles.coordRow}>
           <View style={{ flex: 1, marginRight: 8 }}>
-            <Text style={styles.inputLabel}>Kinh độ (Longitude):</Text>
-            <TextInput
+            <CompactTextInput
+              label="Kinh độ"
               style={styles.textInput}
               value={householdLng}
               onChangeText={(value) => { setHouseholdLng(value); setHouseholdLocation(null); }}
@@ -480,8 +502,8 @@ export const ProxySOSScreen: React.FC = () => {
             />
           </View>
           <View style={{ flex: 1, marginLeft: 8 }}>
-            <Text style={styles.inputLabel}>Vĩ độ (Latitude):</Text>
-            <TextInput
+            <CompactTextInput
+              label="Vĩ độ"
               style={styles.textInput}
               value={householdLat}
               onChangeText={(value) => { setHouseholdLat(value); setHouseholdLocation(null); }}
@@ -585,8 +607,6 @@ export const ProxySOSScreen: React.FC = () => {
               />
             </View>
 
-            <Text style={styles.situationPickerHint}>Ngày giờ hiển thị theo múi giờ trên điện thoại.</Text>
-
             <View style={styles.situationPickerActions}>
               <TouchableOpacity
                 style={styles.situationPickerCancel}
@@ -610,24 +630,13 @@ export const ProxySOSScreen: React.FC = () => {
 
       {/* 2. CHỌN LOẠI THIÊN TAI / SỰ CỐ NGƯỜI THÂN ĐANG GẶP */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>LOẠI SỰ CỐ NGƯỜI THÂN ĐANG GẶP</Text>
-        <View style={styles.categoryGrid}>
-          {(['FLOOD', 'TRAPPED', 'LANDSLIDE', 'STORM', 'MEDICAL', 'FIRE', 'SUPPLY_SHORTAGE', 'OTHER'] as IncidentCategoryCode[]).map((cat) => {
-            const isSelected = selectedCategory === cat;
-            return (
-              <TouchableOpacity
-                key={cat}
-                style={[styles.categoryButton, isSelected && styles.categoryButtonActive]}
-                onPress={() => setSelectedCategory(cat)}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.categoryButtonText, isSelected && styles.categoryButtonTextActive]}>
-                  {INCIDENT_CATEGORIES[cat]?.label || cat}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+        <SingleChoicePicker
+          label="Loại sự cố người thân đang gặp"
+          value={selectedCategory}
+          options={INCIDENT_CATEGORY_OPTIONS}
+          onChange={setSelectedCategory}
+          required
+        />
       </View>
 
       {/* 3. MỐI QUAN HỆ & TÌNH TRẠNG LIÊN LẠC */}
@@ -638,8 +647,9 @@ export const ProxySOSScreen: React.FC = () => {
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Mối quan hệ với nạn nhân <RequiredAsterisk /></Text>
-          <TextInput
+          <CompactTextInput
+            label="Mối quan hệ với người cần hỗ trợ"
+            required
             style={styles.textInput}
             value={relationship}
             onChangeText={(value) => {
@@ -660,8 +670,9 @@ export const ProxySOSScreen: React.FC = () => {
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Nguồn nhận thông tin <RequiredAsterisk /></Text>
-          <TextInput
+          <CompactTextInput
+            label="Nguồn nhận thông tin"
+            required
             style={styles.textInput}
             value={informationSource}
             onChangeText={(value) => {
@@ -684,9 +695,10 @@ export const ProxySOSScreen: React.FC = () => {
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Thời điểm gần nhất biết tình hình <RequiredAsterisk /></Text>
           {Platform.OS === 'web' ? (
-            <TextInput
+            <CompactTextInput
+              label="Thời điểm gần nhất biết tình hình"
+              required
               style={styles.textInput}
               value={lastKnownSituationAt}
               onChangeText={(value) => {
@@ -714,23 +726,24 @@ export const ProxySOSScreen: React.FC = () => {
               accessibilityLabel="Chọn ngày giờ gần nhất biết tình hình"
             >
               <CalendarDays size={19} color={THEME.colors.primary.main} />
-              <Text style={[styles.situationDateValue, !lastKnownSituationAt && styles.situationDatePlaceholder]}>
-                {lastKnownSituationAt ? formatLocalSituationDate(lastKnownSituationAt) : 'Chạm để chọn ngày và giờ'}
-              </Text>
+              <View style={styles.situationDateTextGroup}>
+                <Text style={styles.situationDateLabel}>Thời điểm gần nhất biết tình hình <Text style={styles.requiredMark}>*</Text></Text>
+                <Text style={[styles.situationDateValue, !lastKnownSituationAt && styles.situationDatePlaceholder]}>
+                  {lastKnownSituationAt ? formatLocalSituationDate(lastKnownSituationAt) : 'Chạm để chọn ngày và giờ'}
+                </Text>
+              </View>
               <Clock size={18} color={THEME.colors.text.muted} />
             </TouchableOpacity>
           )}
-          <Text style={styles.fieldHint}>
-            {Platform.OS === 'web'
-              ? 'Nhập thời điểm theo định dạng UTC, kết thúc bằng Z.'
-              : 'Ngày giờ hiển thị theo giờ trên điện thoại và sẽ được chuẩn hóa UTC khi gửi.'}
-          </Text>
+          {Platform.OS === 'web' ? (
+            <Text style={styles.fieldHint}>Nhập thời điểm theo định dạng UTC, kết thúc bằng Z.</Text>
+          ) : null}
           <FormFieldError message={formErrors.lastKnownSituationAt} />
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Số người dự kiến trong nhà:</Text>
-          <TextInput
+          <CompactTextInput
+            label="Số người dự kiến trong nhà"
             style={styles.textInput}
             value={peopleAffected}
             onChangeText={(value) => {
@@ -750,8 +763,8 @@ export const ProxySOSScreen: React.FC = () => {
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Trẻ em:</Text>
-          <TextInput
+          <CompactTextInput
+            label="Trẻ em"
             style={styles.textInput}
             value={childrenCount}
             onChangeText={(value) => {
@@ -769,8 +782,8 @@ export const ProxySOSScreen: React.FC = () => {
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Người cao tuổi:</Text>
-          <TextInput
+          <CompactTextInput
+            label="Người cao tuổi"
             style={styles.textInput}
             value={elderlyCount}
             onChangeText={(value) => {
@@ -796,7 +809,6 @@ export const ProxySOSScreen: React.FC = () => {
         <View style={styles.switchRow}>
           <View style={{ flex: 1, paddingRight: 12 }}>
             <Text style={styles.inputLabel}>Cần đội cứu hộ</Text>
-            <Text style={styles.fieldHint}>Mặc định đã chọn cho yêu cầu báo hộ.</Text>
           </View>
           <Switch value={needsRescue} onValueChange={(value) => {
             setNeedsRescue(value);
@@ -809,7 +821,6 @@ export const ProxySOSScreen: React.FC = () => {
         <View style={styles.switchRow}>
           <View style={{ flex: 1, paddingRight: 12 }}>
             <Text style={styles.inputLabel}>Cần hàng cứu trợ</Text>
-            <Text style={styles.fieldHint}>Chọn thêm nếu hộ gia đình cần thực phẩm, nước hoặc vật tư.</Text>
           </View>
           <Switch value={needsRelief} onValueChange={(value) => {
             setNeedsRelief(value);
@@ -821,9 +832,31 @@ export const ProxySOSScreen: React.FC = () => {
         </View>
         <FormFieldError message={formErrors.needs} />
 
+        {needsRelief ? (
+          <View style={styles.inputGroup}>
+            <CompactTextInput
+              label="Nhu yếu phẩm cần hỗ trợ"
+              style={[styles.textInput, styles.textArea]}
+              value={reliefItemsText}
+              onChangeText={(value) => {
+                setReliefItemsText(value);
+                setFormErrors((current) => ({ ...current, reliefItemsText: reliefItemsError(value) }));
+              }}
+              placeholder="Ví dụ: nước sạch, thức ăn, thuốc men"
+              placeholderTextColor={THEME.colors.text.muted}
+              maxLength={501}
+              multiline
+              numberOfLines={3}
+              editable={!pendingCommand && !restoringPending}
+            />
+            <FormFieldError message={formErrors.reliefItemsText} />
+            <Text style={styles.fieldHint}>Chỉ mô tả loại hàng cần thiết; không nhập số lượng hàng hóa.</Text>
+          </View>
+        ) : null}
+
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Số điện thoại của người thân (nếu có):</Text>
-          <TextInput
+          <CompactTextInput
+            label="Số điện thoại của người thân"
             style={styles.textInput}
             placeholder="09xx xxx xxx"
             placeholderTextColor={THEME.colors.text.muted}
@@ -839,8 +872,8 @@ export const ProxySOSScreen: React.FC = () => {
         </View>
 
         <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Người liên hệ dự phòng (nếu có):</Text>
-          <TextInput
+          <CompactTextInput
+            label="Người liên hệ dự phòng"
             style={styles.textInput}
             placeholder="Họ tên người có thể cung cấp thêm thông tin"
             placeholderTextColor={THEME.colors.text.muted}
@@ -858,7 +891,8 @@ export const ProxySOSScreen: React.FC = () => {
             maxLength={201}
           />
           <FormFieldError message={formErrors.alternateContactName} />
-          <TextInput
+          <CompactTextInput
+            label="Số điện thoại người liên hệ dự phòng"
             style={[styles.textInput, { marginTop: 8 }]}
             placeholder="Số điện thoại người liên hệ dự phòng"
             placeholderTextColor={THEME.colors.text.muted}
@@ -900,7 +934,8 @@ export const ProxySOSScreen: React.FC = () => {
       {/* 3. MÔ TẢ TÌNH HÌNH */}
       <View style={styles.card}>
         <Text style={styles.cardTitle}>MÔ TẢ CHI TIẾT HIỆN TRƯỜNG</Text>
-        <TextInput
+        <CompactTextInput
+          label="Mô tả chi tiết hiện trường"
           style={[styles.textInput, styles.textArea]}
           placeholder="Mô tả đặc điểm ngôi nhà, dấu hiệu nhận biết, lương thực còn lại..."
           placeholderTextColor={THEME.colors.text.muted}
@@ -1111,7 +1146,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   situationDateButton: {
-    minHeight: 48,
+    minHeight: 58,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: THEME.colors.surface.background,
@@ -1120,12 +1155,22 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 12,
   },
-  situationDateValue: {
+  situationDateTextGroup: {
     flex: 1,
-    color: THEME.colors.text.primary,
-    fontSize: THEME.typography.fontSizes.sm,
-    fontWeight: '600',
     marginHorizontal: 10,
+  },
+  situationDateLabel: {
+    color: THEME.colors.text.secondary,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  requiredMark: {
+    color: THEME.colors.emergency.main,
+  },
+  situationDateValue: {
+    color: THEME.colors.text.primary,
+    fontSize: THEME.typography.fontSizes.xs + 1,
+    fontWeight: '600',
   },
   situationDatePlaceholder: {
     color: THEME.colors.text.muted,
@@ -1236,14 +1281,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-  },
-  situationPickerHint: {
-    color: THEME.colors.text.muted,
-    fontSize: THEME.typography.fontSizes.xs,
-    lineHeight: 17,
-    textAlign: 'center',
-    marginTop: 2,
-    marginBottom: 14,
   },
   situationPickerActions: {
     flexDirection: 'row',
@@ -1384,32 +1421,5 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: THEME.typography.fontSizes.sm,
     marginLeft: 8,
-  },
-  categoryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 10,
-  },
-  categoryButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: THEME.colors.surface.border,
-    backgroundColor: THEME.colors.surface.background,
-  },
-  categoryButtonActive: {
-    backgroundColor: THEME.colors.emergency.main,
-    borderColor: THEME.colors.emergency.main,
-  },
-  categoryButtonText: {
-    fontSize: THEME.typography.fontSizes.xs,
-    fontWeight: '600',
-    color: THEME.colors.text.secondary,
-  },
-  categoryButtonTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '700',
   },
 });

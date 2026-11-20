@@ -8,13 +8,12 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
-  TextInput,
   Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
+import { CompactTextInput } from '../../../components/common/CompactTextInput';
 import { FormFieldError } from '../../../components/common/FormFieldError';
-import { RequiredAsterisk } from '../../../components/common/RequiredAsterisk';
 import { CopyableInfoModal } from '../../../components/common/CopyableInfoModal';
 import { LocationPickerModal } from '../../../components/common/LocationPickerModal';
 import { TeamMembersSection } from '../components/TeamMembersSection';
@@ -870,8 +869,9 @@ export const TeamDashboardScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
             <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-              <Text style={styles.modalSubtitle}>Tên đội cứu hộ <RequiredAsterisk /></Text>
-              <TextInput
+              <CompactTextInput
+                label="Tên đội cứu hộ"
+                required
                 style={styles.modalInput}
                 value={teamNameDraft}
                 onChangeText={(value) => {

@@ -8,14 +8,13 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
-  TextInput,
   Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { goBackOrHome } from '../../../navigation/back';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
+import { CompactTextInput } from '../../../components/common/CompactTextInput';
 import { FormFieldError } from '../../../components/common/FormFieldError';
-import { RequiredAsterisk } from '../../../components/common/RequiredAsterisk';
 import { StatusBadge } from '../../../components/common/StatusBadge';
 import { ResponseApi } from '../../../api/responseApi';
 import { getApiErrorMessage } from '../../../api/client';
@@ -108,7 +107,7 @@ export const MyRequestsScreen: React.FC = () => {
     try {
       const claimed = await ResponseApi.claimRequest(code);
       try {
-        await StorageService.deleteGuestTrackingSecret(claimed.tracking_code || code);
+        await StorageService.deleteLegacyGuestTrackingSecret(claimed.tracking_code || code);
       } catch {
         // Claiming succeeded; a local cleanup failure must not change that result.
       }
@@ -172,7 +171,6 @@ export const MyRequestsScreen: React.FC = () => {
   return (
     <ScreenContainer
       title="Yêu Cầu Cứu Trợ Của Tôi"
-      subtitle="Danh sách các tin báo cứu nạn gắn với tài khoản của bạn"
       scrollable={false}
       onBack={() => goBackOrHome(router)}
     >
@@ -251,8 +249,9 @@ export const MyRequestsScreen: React.FC = () => {
             </Text>
 
             <View style={styles.modalInputGroup}>
-              <Text style={styles.modalInputLabel}>Mã tra cứu <RequiredAsterisk /></Text>
-              <TextInput
+              <CompactTextInput
+                label="Mã tra cứu"
+                required
                 style={styles.modalTextInput}
                 placeholder="Ví dụ: 9K8J7H6G5F"
                 placeholderTextColor={THEME.colors.text.muted}

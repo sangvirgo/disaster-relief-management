@@ -101,6 +101,7 @@ export interface CreateSOSPayload {
   reporter_declared_danger?: boolean;
   needs_rescue: boolean;
   needs_relief_supplies: boolean;
+  relief_items_text?: string | null;
   location: GeoLocation;
 }
 
@@ -145,6 +146,26 @@ export interface RequestTrackingDetail {
   can_supplement: boolean;
 }
 
+interface ReporterUpdateFields {
+  expected_version: number;
+  household_reference_note?: string | null;
+  people_affected?: number | null;
+  location?: GeoLocation;
+  reporter_declared_danger?: boolean;
+}
+
+export interface RequestSupplementPayload extends ReporterUpdateFields {
+  description?: string;
+}
+
+export interface RequestReportUpdatePayload extends ReporterUpdateFields {
+  description?: string | null;
+  children_count?: number | null;
+  elderly_count?: number | null;
+  needs_rescue?: boolean;
+  needs_relief_supplies?: boolean;
+}
+
 export interface MyRequestItem {
   id: string;
   tracking_code: string;
@@ -187,6 +208,15 @@ export interface MissionEvidenceItem {
   state: string;
   size_bytes: number;
   detected_mime: string;
+  checksum: string;
+  created_at: string;
+}
+
+export interface RequestEvidenceReference {
+  id: string;
+  state: 'READY';
+  size_bytes: number;
+  detected_mime: 'image/jpeg' | 'image/png' | 'video/mp4';
   checksum: string;
   created_at: string;
 }

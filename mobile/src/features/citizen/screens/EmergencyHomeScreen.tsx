@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, Modal, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Modal, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
+import { CompactTextInput } from '../../../components/common/CompactTextInput';
 import { FormFieldError } from '../../../components/common/FormFieldError';
 import { SOSButton } from '../../../components/common/SOSButton';
 import { THEME } from '../../../constants/theme';
@@ -242,7 +243,6 @@ export const EmergencyHomeScreen: React.FC = () => {
                     <Text style={styles.userRoleTagText}>{getUserRoleName()}</Text>
                   </View>
                 </View>
-                <Text style={styles.userSessionHint}>Đã sẵn sàng báo cứu trợ người thân</Text>
               </View>
             </View>
             <TouchableOpacity
@@ -395,7 +395,7 @@ export const EmergencyHomeScreen: React.FC = () => {
                 </View>
               )}
             </View>
-            <Text style={styles.modeDesc}>Dành cho người ở ngoài vùng lũ báo vị trí cho gia đình gặp nạn (PROXY).</Text>
+            <Text style={styles.modeDesc}>Dành cho người ở ngoài vùng lũ báo vị trí cho gia đình gặp nạn.</Text>
           </View>
           <ChevronRight size={20} color={THEME.colors.text.muted} />
         </TouchableOpacity>
@@ -410,8 +410,11 @@ export const EmergencyHomeScreen: React.FC = () => {
             : 'Nhập mã tra cứu gồm 10–16 ký tự được cấp khi gửi yêu cầu.'}
         </Text>
         <View style={styles.searchRow}>
-          <TextInput
-            style={styles.searchInput}
+          <CompactTextInput
+            label="Mã tra cứu"
+            required
+            containerStyle={{ flex: 1 }}
+            style={[styles.searchInput, { flex: 0 }]}
             placeholder="Ví dụ: AB12CD34EF"
             placeholderTextColor={THEME.colors.text.muted}
             value={trackingCode}
@@ -759,11 +762,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: THEME.colors.primary.main,
-  },
-  userSessionHint: {
-    fontSize: 11,
-    color: THEME.colors.text.secondary,
-    marginTop: 2,
   },
   logoutButton: {
     padding: 8,

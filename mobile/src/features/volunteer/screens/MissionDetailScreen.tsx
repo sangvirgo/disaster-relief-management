@@ -8,7 +8,6 @@ import {
   Alert,
   ActivityIndicator,
   Linking,
-  TextInput,
   Modal,
   Image,
 } from 'react-native';
@@ -16,8 +15,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { goBackOrHome } from '../../../navigation/back';
 import * as ImagePicker from 'expo-image-picker';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
+import { CompactTextInput } from '../../../components/common/CompactTextInput';
 import { FormFieldError } from '../../../components/common/FormFieldError';
-import { RequiredAsterisk } from '../../../components/common/RequiredAsterisk';
 import { StatusBadge } from '../../../components/common/StatusBadge';
 import { TimelineStep } from '../../../components/common/TimelineStep';
 import { ResponseApi } from '../../../api/responseApi';
@@ -895,7 +894,7 @@ export const MissionDetailScreen: React.FC = () => {
             <View style={{ flex: 1, marginLeft: 8 }}>
               <Text style={styles.roleNoticeTitle}>Chế độ xem nhiệm vụ</Text>
               <Text style={styles.roleNoticeText}>
-                Bạn có thể xem thông tin, tiến trình và minh chứng. Các thao tác chỉ hiển thị khi máy chủ xác nhận bạn là đội trưởng đang hoạt động của đội được giao.
+                Chỉ đội trưởng đang phụ trách mới có thể cập nhật nhiệm vụ.
               </Text>
             </View>
           </View>
@@ -908,10 +907,12 @@ export const MissionDetailScreen: React.FC = () => {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>{outcomeTitle}</Text>
             <Text style={styles.modalSubtitle}>
-              Ghi chú kết quả hoàn thành để trung tâm điều phối chốt hồ sơ <RequiredAsterisk />:
+              Mô tả kết quả thực tế để trung tâm điều phối cập nhật hồ sơ:
             </Text>
 
-            <TextInput
+            <CompactTextInput
+              label="Kết quả hoàn thành nhiệm vụ"
+              required
               style={styles.modalInput}
               placeholder="Mô tả kết quả, số người hoặc hàng hóa đã hỗ trợ và nơi bàn giao (nếu có)..."
               placeholderTextColor={THEME.colors.text.muted}
@@ -1009,9 +1010,9 @@ export const MissionDetailScreen: React.FC = () => {
             <Text style={styles.modalSubtitle}>
               Nêu rõ lý do để điều phối viên cập nhật phương án xử lý:
             </Text>
-            <Text style={styles.modalSubtitle}>Lý do từ chối hoặc trở ngại <RequiredAsterisk /></Text>
-
-            <TextInput
+            <CompactTextInput
+              label="Lý do từ chối hoặc trở ngại"
+              required
               style={styles.modalInput}
               placeholder="Ví dụ: Nước chảy quá xiết, sạt lở chia cắt đường không thể đưa ca nô vào..."
               placeholderTextColor={THEME.colors.text.muted}

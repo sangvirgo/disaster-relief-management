@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   Alert,
   ActivityIndicator,
@@ -12,7 +11,7 @@ import { useRouter } from 'expo-router';
 import { goBackOrHome } from '../../../navigation/back';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
 import { FormFieldError } from '../../../components/common/FormFieldError';
-import { RequiredAsterisk } from '../../../components/common/RequiredAsterisk';
+import { CompactTextInput } from '../../../components/common/CompactTextInput';
 import { IdentityApi } from '../../../api/identityApi';
 import { getApiErrorMessage } from '../../../api/client';
 import { useAuthStore } from '../../../store/authStore';
@@ -159,11 +158,14 @@ export const ChangePasswordScreen: React.FC = () => {
 
         {/* Mật khẩu hiện tại */}
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Mật khẩu hiện tại <RequiredAsterisk /></Text>
           <View style={styles.inputWrapper}>
             <Lock size={18} color={THEME.colors.text.secondary} style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
+            <CompactTextInput
+              label="Mật khẩu hiện tại"
+              required
+              containerStyle={{ flex: 1, height: '100%', justifyContent: 'center' }}
+              outlined={false}
+              style={[styles.input, { flex: 0 }]}
               placeholder="Nhập mật khẩu đang dùng"
               placeholderTextColor={THEME.colors.text.muted}
               secureTextEntry={!showCurrentPassword}
@@ -197,11 +199,14 @@ export const ChangePasswordScreen: React.FC = () => {
 
         {/* Mật khẩu mới */}
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Mật khẩu mới <RequiredAsterisk /></Text>
           <View style={styles.inputWrapper}>
             <Lock size={18} color={THEME.colors.text.secondary} style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
+            <CompactTextInput
+              label="Mật khẩu mới"
+              required
+              containerStyle={{ flex: 1, height: '100%', justifyContent: 'center' }}
+              outlined={false}
+              style={[styles.input, { flex: 0 }]}
               placeholder="Ít nhất 10 ký tự"
               placeholderTextColor={THEME.colors.text.muted}
               secureTextEntry={!showNewPassword}
@@ -235,11 +240,14 @@ export const ChangePasswordScreen: React.FC = () => {
 
         {/* Xác nhận mật khẩu mới */}
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Xác nhận mật khẩu mới <RequiredAsterisk /></Text>
           <View style={styles.inputWrapper}>
             <Lock size={18} color={THEME.colors.text.secondary} style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
+            <CompactTextInput
+              label="Xác nhận mật khẩu mới"
+              required
+              containerStyle={{ flex: 1, height: '100%', justifyContent: 'center' }}
+              outlined={false}
+              style={[styles.input, { flex: 0 }]}
               placeholder="Nhập lại mật khẩu mới"
               placeholderTextColor={THEME.colors.text.muted}
               secureTextEntry={!showConfirmPassword}
@@ -291,9 +299,6 @@ export const ChangePasswordScreen: React.FC = () => {
           <Link2 size={28} color={THEME.colors.primary.main} />
         </View>
         <Text style={styles.cardTitle}>LIÊN KẾT TÀI KHOẢN GOOGLE</Text>
-        <Text style={styles.cardSubtitle}>
-          Liên kết tài khoản Google để có thể đăng nhập nhanh chóng bằng xác thực một chạm an toàn.
-        </Text>
 
         <TouchableOpacity
           style={[styles.googleButton, (googleBusy || !googleReady) && styles.submitButtonDisabled]}

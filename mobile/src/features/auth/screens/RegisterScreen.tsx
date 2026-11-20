@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   Alert,
   ActivityIndicator,
@@ -13,14 +12,14 @@ import { useRouter } from 'expo-router';
 import { goBackOrHome } from '../../../navigation/back';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
 import { FormFieldError } from '../../../components/common/FormFieldError';
-import { RequiredAsterisk } from '../../../components/common/RequiredAsterisk';
+import { CompactTextInput } from '../../../components/common/CompactTextInput';
 import { useAuthStore } from '../../../store/authStore';
 import { IdentityApi } from '../../../api/identityApi';
 import { getApiErrorMessage, isApiErrorCode } from '../../../api/client';
 import { THEME } from '../../../constants/theme';
 import { isCommonPassword, isValidEmail } from '../../../utils/formValidation';
 import { generateUUID } from '../../../utils/secureStore';
-import { User, Lock, Eye, EyeOff, ShieldCheck, ArrowRight, UserCheck } from 'lucide-react-native';
+import { Eye, EyeOff, ShieldCheck, ArrowRight } from 'lucide-react-native';
 
 export const RegisterScreen: React.FC = () => {
   const router = useRouter();
@@ -238,11 +237,9 @@ export const RegisterScreen: React.FC = () => {
 
       {!challengeId ? <View style={styles.card}>
         <View style={styles.inputGroup}>
-          <View style={styles.labelRow}>
-            <User size={16} color={THEME.colors.text.secondary} />
-            <Text style={styles.inputLabel}>Email nhận mã xác minh <RequiredAsterisk /></Text>
-          </View>
-          <TextInput
+          <CompactTextInput
+            label="Email nhận mã xác minh"
+            required
             style={styles.textInput}
             placeholder="ban@example.com"
             placeholderTextColor={THEME.colors.text.muted}
@@ -260,16 +257,13 @@ export const RegisterScreen: React.FC = () => {
             maxLength={255}
           />
           <FormFieldError message={formErrors.email} />
-          <Text style={styles.helperText}>Tài khoản chỉ được kích hoạt sau khi xác minh email</Text>
         </View>
 
         {/* Họ và tên */}
         <View style={styles.inputGroup}>
-          <View style={styles.labelRow}>
-            <UserCheck size={16} color={THEME.colors.text.secondary} />
-            <Text style={styles.inputLabel}>Họ và tên / Tên hiển thị <RequiredAsterisk /></Text>
-          </View>
-          <TextInput
+          <CompactTextInput
+            label="Họ và tên / Tên hiển thị"
+            required
             style={styles.textInput}
             placeholder="Ví dụ: Nguyễn Văn An"
             placeholderTextColor={THEME.colors.text.muted}
@@ -285,16 +279,13 @@ export const RegisterScreen: React.FC = () => {
             maxLength={201}
           />
           <FormFieldError message={formErrors.displayName} />
-          <Text style={styles.helperText}>Tên sẽ hiển thị trên thông tin báo cứu trợ người thân</Text>
         </View>
 
         {/* Tên đăng nhập */}
         <View style={styles.inputGroup}>
-          <View style={styles.labelRow}>
-            <User size={16} color={THEME.colors.text.secondary} />
-            <Text style={styles.inputLabel}>Tên đăng nhập <RequiredAsterisk /></Text>
-          </View>
-          <TextInput
+          <CompactTextInput
+            label="Tên đăng nhập"
+            required
             style={styles.textInput}
             placeholder="Ví dụ: nguyenvanan123"
             placeholderTextColor={THEME.colors.text.muted}
@@ -318,19 +309,19 @@ export const RegisterScreen: React.FC = () => {
             maxLength={65}
           />
           <FormFieldError message={formErrors.username} />
-          <Text style={styles.helperText}>Từ 3-64 ký tự (chữ cái không dấu, số, dấu chấm, gạch ngang)</Text>
+          <Text style={styles.helperText}>3–64 ký tự: chữ không dấu, số, dấu chấm hoặc gạch ngang.</Text>
         </View>
 
         {/* Mật khẩu */}
         <View style={styles.inputGroup}>
-          <View style={styles.labelRow}>
-            <Lock size={16} color={THEME.colors.text.secondary} />
-            <Text style={styles.inputLabel}>Mật khẩu bảo mật <RequiredAsterisk /></Text>
-          </View>
           <View style={styles.passwordContainer}>
-            <TextInput
-              style={styles.passwordInput}
-              placeholder="Nhập tối thiểu 10 ký tự..."
+            <CompactTextInput
+              label="Mật khẩu bảo mật"
+              required
+              containerStyle={{ flex: 1, justifyContent: 'center' }}
+              outlined={false}
+              style={[styles.passwordInput, { flex: 0 }]}
+              placeholder="Nhập mật khẩu"
               placeholderTextColor={THEME.colors.text.muted}
               value={password}
               onChangeText={(value) => {
@@ -364,16 +355,14 @@ export const RegisterScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
           <FormFieldError message={formErrors.password} />
-          <Text style={styles.helperText}>Tiêu chuẩn bảo mật: Tối thiểu 10 ký tự (không dùng mật khẩu dễ đoán)</Text>
+          <Text style={styles.helperText}>Ít nhất 10 ký tự; tránh dùng mật khẩu dễ đoán.</Text>
         </View>
 
         {/* Xác nhận mật khẩu */}
         <View style={styles.inputGroup}>
-          <View style={styles.labelRow}>
-            <Lock size={16} color={THEME.colors.text.secondary} />
-            <Text style={styles.inputLabel}>Xác nhận mật khẩu <RequiredAsterisk /></Text>
-          </View>
-          <TextInput
+          <CompactTextInput
+            label="Xác nhận mật khẩu"
+            required
             style={styles.textInput}
             placeholder="Nhập lại mật khẩu..."
             placeholderTextColor={THEME.colors.text.muted}
@@ -434,8 +423,9 @@ export const RegisterScreen: React.FC = () => {
         </View>
       </View> : <View style={styles.card}>
         <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Mã xác minh email <RequiredAsterisk /></Text>
-          <TextInput
+          <CompactTextInput
+            label="Mã xác minh email"
+            required
             style={styles.textInput}
             placeholder="Nhập mã 6 chữ số"
             placeholderTextColor={THEME.colors.text.muted}

@@ -6,11 +6,13 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  TextInput,
   Modal,
   Image,
   Platform,
   ScrollView,
+  Linking,
+  Switch,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { goBackOrHome } from '../../../navigation/back';
@@ -18,15 +20,22 @@ import { consumeTrackingCodeForNavigation } from '../../../navigation/trackingCo
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
+import { CompactTextInput } from '../../../components/common/CompactTextInput';
 import { FormFieldError } from '../../../components/common/FormFieldError';
-import { RequiredAsterisk } from '../../../components/common/RequiredAsterisk';
 import { StatusBadge } from '../../../components/common/StatusBadge';
 import { TimelineStep } from '../../../components/common/TimelineStep';
+import { LocationPickerModal } from '../../../components/common/LocationPickerModal';
 import { ResponseApi } from '../../../api/responseApi';
-import { generateUUID, StorageService } from '../../../utils/secureStore';
+import { generateUUID, PendingSupplementCommand, StorageService } from '../../../utils/secureStore';
 import { getApiErrorMessage, isApiErrorCode } from '../../../api/client';
 import { useAuthStore } from '../../../store/authStore';
-import { RequestTrackingDetail } from '../../../types/api';
+import {
+  GeoLocation,
+  RequestReportUpdatePayload,
+  RequestSupplementPayload,
+  RequestTrackingDetail,
+  RequestEvidenceReference,
+} from '../../../types/api';
 import { TIMELINE_EVENT_LABELS } from '../../../constants/labels';
 import { THEME } from '../../../constants/theme';
 import {
@@ -48,9 +57,33 @@ import {
   Video,
   X,
   KeyRound,
+  MapPin,
+  Users,
+  AlertTriangle,
 } from 'lucide-react-native';
 
 const MAX_EVIDENCE_FILES_PER_REQUEST = 5;
+type OptionalBooleanChoice = 'UNCHANGED' | 'YES' | 'NO';
+
+function isUnverifiedRequestStatus(status: string): boolean {
+  return status === 'SUBMITTED' || status === 'VERIFYING';
+}
+
+function optionalCountError(value: string, label: string, allowZero: boolean): string | undefined {
+  const text = value.trim();
+  if (!text) return undefined;
+  const amount = Number(text);
+  if (!/^\d+$/.test(text) || !Number.isInteger(amount) || amount < (allowZero ? 0 : 1) || amount > 10000) {
+    return `${label} phải là số nguyên từ ${allowZero ? '0' : '1'} đến 10.000.`;
+  }
+  return undefined;
+}
+
+function booleanForChoice(choice: OptionalBooleanChoice): boolean | undefined {
+  if (choice === 'YES') return true;
+  if (choice === 'NO') return false;
+  return undefined;
+}
 
 export const SOSTrackingScreen: React.FC = () => {
   const router = useRouter();
@@ -69,14 +102,25 @@ export const SOSTrackingScreen: React.FC = () => {
   const [showSupplementModal, setShowSupplementModal] = useState<boolean>(false);
   const [supplementNote, setSupplementNote] = useState<string>('');
   const [supplementError, setSupplementError] = useState<string | undefined>();
+  const [householdReferenceNote, setHouseholdReferenceNote] = useState('');
+  const [supplementPeopleAffected, setSupplementPeopleAffected] = useState('');
+  const [supplementChildrenCount, setSupplementChildrenCount] = useState('');
+  const [supplementElderlyCount, setSupplementElderlyCount] = useState('');
+  const [supplementLocation, setSupplementLocation] = useState<GeoLocation | null>(null);
+  const [dangerChoice, setDangerChoice] = useState<OptionalBooleanChoice>('UNCHANGED');
+  const [needsRescueChoice, setNeedsRescueChoice] = useState<OptionalBooleanChoice>('UNCHANGED');
+  const [needsReliefChoice, setNeedsReliefChoice] = useState<OptionalBooleanChoice>('UNCHANGED');
+  const [pendingSupplementCommand, setPendingSupplementCommand] = useState<PendingSupplementCommand | null>(null);
+  const [showSupplementLocationPicker, setShowSupplementLocationPicker] = useState(false);
   const [selectedImages, setSelectedImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [isSubmittingSupplement, setIsSubmittingSupplement] = useState<boolean>(false);
-  const [uploadedEvidence, setUploadedEvidence] = useState<{ uri: string; type: 'image' | 'video'; name: string }[]>([]);
+  const [uploadedEvidence, setUploadedEvidence] = useState<RequestEvidenceReference[]>([]);
+  const [openingEvidenceId, setOpeningEvidenceId] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const initialFetchStarted = useRef(false);
   const evidenceIdempotencyKeys = useRef(new Map<string, string>());
 
-  // State cho Modal khôi phục mã tra cứu bị mất
+  // One-time coordinator-issued code for binding an unowned request to an account.
   const [showRecoveryModal, setShowRecoveryModal] = useState<boolean>(false);
   const [recoveryTrackingCode, setRecoveryTrackingCode] = useState<string>('');
   const [recoveryCode, setRecoveryCode] = useState<string>('');
@@ -85,7 +129,7 @@ export const SOSTrackingScreen: React.FC = () => {
 
   const addSelectedEvidence = (assets: ImagePicker.ImagePickerAsset[]) => {
     const existingUris = new Set(selectedImages.map((asset) => asset.uri));
-    const availableSlots = MAX_EVIDENCE_FILES_PER_REQUEST - selectedImages.length;
+    const availableSlots = Math.max(0, MAX_EVIDENCE_FILES_PER_REQUEST - uploadedEvidence.length - selectedImages.length);
     const acceptedAssets: ImagePicker.ImagePickerAsset[] = [];
     let unsupportedCount = 0;
     let oversizedCount = 0;
@@ -128,7 +172,7 @@ export const SOSTrackingScreen: React.FC = () => {
   };
 
   const pickImage = async () => {
-    const availableSlots = MAX_EVIDENCE_FILES_PER_REQUEST - selectedImages.length;
+    const availableSlots = Math.max(0, MAX_EVIDENCE_FILES_PER_REQUEST - uploadedEvidence.length - selectedImages.length);
     if (availableSlots <= 0) {
       Alert.alert('Đã đủ số tệp', `Mỗi hồ sơ chỉ đính kèm tối đa ${MAX_EVIDENCE_FILES_PER_REQUEST} tệp.`);
       return;
@@ -177,6 +221,7 @@ export const SOSTrackingScreen: React.FC = () => {
 
   const fetchTrackingData = useCallback(async (codeInput?: string) => {
     const normalizedCode = (codeInput ?? trackingCode).trim().toUpperCase();
+    setUploadedEvidence([]);
     setEventsCursor(undefined);
     setEventsMore(false);
     if (!normalizedCode) {
@@ -196,8 +241,17 @@ export const SOSTrackingScreen: React.FC = () => {
     try {
       setTrackingCode(normalizedCode);
       const result = await ResponseApi.trackRequest(normalizedCode);
+      try {
+        await StorageService.deleteLegacyGuestTrackingSecret(normalizedCode);
+      } catch {
+        // The tracking-code capability remains sufficient if legacy local cleanup fails.
+      }
       // The tracking summary returns newest first; render the timeline chronologically.
       setData({ ...result, timeline: [...result.timeline].reverse() });
+      const savedEvidence = result?.id
+        ? await StorageService.getRequestEvidence(result.id).catch(() => [])
+        : [];
+      setUploadedEvidence(savedEvidence);
 
       // Tải danh sách sự kiện chi tiết từ API chuyên biệt GET /requests/:id/events
       if (result?.id) {
@@ -216,6 +270,24 @@ export const SOSTrackingScreen: React.FC = () => {
       setLoading(false);
     }
   }, [trackingCode]);
+
+  const openUploadedEvidence = async (evidence: RequestEvidenceReference) => {
+    if (!data?.id || openingEvidenceId) return;
+
+    setOpeningEvidenceId(evidence.id);
+    try {
+      const download = await ResponseApi.getEvidenceDownloadUrl(evidence.id, data.tracking_code);
+      if (evidence.detected_mime === 'video/mp4') {
+        await Linking.openURL(download.url);
+      } else {
+        setPreviewImage(download.url);
+      }
+    } catch (error) {
+      Alert.alert('Không thể mở tệp', getApiErrorMessage(error, 'Vui lòng thử lại sau.'));
+    } finally {
+      setOpeningEvidenceId(null);
+    }
+  };
 
   const loadOlderEvents = async () => {
     if (!data?.id || !eventsMore || !eventsCursor || loadingOlderEvents) return;
@@ -244,21 +316,50 @@ export const SOSTrackingScreen: React.FC = () => {
     }
   }, [fetchTrackingData]);
 
+  const clearSupplementFields = () => {
+    setSupplementNote('');
+    setHouseholdReferenceNote('');
+    setSupplementPeopleAffected('');
+    setSupplementChildrenCount('');
+    setSupplementElderlyCount('');
+    setSupplementLocation(null);
+    setDangerChoice('UNCHANGED');
+    setNeedsRescueChoice('UNCHANGED');
+    setNeedsReliefChoice('UNCHANGED');
+  };
+
   const openSupplementModal = async () => {
     if (!data) return;
     setSupplementError(undefined);
     try {
       const pending = await StorageService.getPendingSupplement(data.id);
       if (pending) {
-        if (supplementNote.trim() && supplementNote.trim() !== pending.payload.description) {
-          Alert.alert(
-            'Có ghi chú đang chờ xác nhận',
-            'Để tránh gửi trùng hoặc mất thông tin, hãy tiếp tục ghi chú đã lưu trước.'
-          );
-          setSupplementNote(pending.payload.description);
-        } else if (!supplementNote.trim()) {
-          setSupplementNote(pending.payload.description);
-        }
+        const payload = pending.payload;
+        setPendingSupplementCommand({
+          ...pending,
+          kind: pending.kind || (isUnverifiedRequestStatus(data.status) ? 'REPORT_UPDATE' : 'SUPPLEMENT'),
+        });
+        setSupplementNote(payload.description || '');
+        setHouseholdReferenceNote(payload.household_reference_note || '');
+        setSupplementPeopleAffected(payload.people_affected == null ? '' : String(payload.people_affected));
+        setSupplementLocation(payload.location || null);
+        setDangerChoice(payload.reporter_declared_danger === undefined
+          ? 'UNCHANGED'
+          : payload.reporter_declared_danger ? 'YES' : 'NO');
+        setSupplementChildrenCount('children_count' in payload && payload.children_count != null
+          ? String(payload.children_count)
+          : '');
+        setSupplementElderlyCount('elderly_count' in payload && payload.elderly_count != null
+          ? String(payload.elderly_count)
+          : '');
+        setNeedsRescueChoice('needs_rescue' in payload && payload.needs_rescue !== undefined
+          ? payload.needs_rescue ? 'YES' : 'NO'
+          : 'UNCHANGED');
+        setNeedsReliefChoice('needs_relief_supplies' in payload && payload.needs_relief_supplies !== undefined
+          ? payload.needs_relief_supplies ? 'YES' : 'NO'
+          : 'UNCHANGED');
+      } else {
+        setPendingSupplementCommand(null);
       }
       setShowSupplementModal(true);
     } catch {
@@ -268,46 +369,105 @@ export const SOSTrackingScreen: React.FC = () => {
 
   const handleSupplementSubmit = async () => {
     const note = supplementNote.trim();
-    if (!note && selectedImages.length === 0) {
-      setSupplementError('Nhập ghi chú hoặc đính kèm ảnh/video hiện trường.');
-      return;
-    }
-    if (note.length > 2000) {
+    if (!pendingSupplementCommand && note.length > 2000) {
       setSupplementError('Ghi chú không được vượt quá 2.000 ký tự.');
       return;
     }
-    setSupplementError(undefined);
     if (!data) return;
 
+    const kind = pendingSupplementCommand?.kind || (isUnverifiedRequestStatus(data.status) ? 'REPORT_UPDATE' : 'SUPPLEMENT');
+    const isReportUpdate = kind === 'REPORT_UPDATE';
+    const peopleError = optionalCountError(supplementPeopleAffected, 'Số người bị ảnh hưởng', false);
+    const childrenError = isReportUpdate
+      ? optionalCountError(supplementChildrenCount, 'Số trẻ em', true)
+      : undefined;
+    const elderlyError = isReportUpdate
+      ? optionalCountError(supplementElderlyCount, 'Số người cao tuổi', true)
+      : undefined;
+    const referenceNote = householdReferenceNote.trim();
+    if (!pendingSupplementCommand && referenceNote.length > 500) {
+      setSupplementError('Ghi chú nhận diện hộ gia đình không được vượt quá 500 ký tự.');
+      return;
+    }
+    if (!pendingSupplementCommand && (peopleError || childrenError || elderlyError)) {
+      setSupplementError(peopleError || childrenError || elderlyError);
+      return;
+    }
+    const total = supplementPeopleAffected.trim() ? Number(supplementPeopleAffected) : null;
+    const vulnerableTotal = (supplementChildrenCount.trim() ? Number(supplementChildrenCount) : 0) +
+      (supplementElderlyCount.trim() ? Number(supplementElderlyCount) : 0);
+    if (!pendingSupplementCommand && isReportUpdate && total !== null && vulnerableTotal > total) {
+      setSupplementError('Tổng số trẻ em và người cao tuổi không được lớn hơn tổng số người bị ảnh hưởng.');
+      return;
+    }
+    if (!pendingSupplementCommand && isReportUpdate && needsRescueChoice === 'NO' && needsReliefChoice === 'NO') {
+      setSupplementError('Yêu cầu phải còn ít nhất một nhu cầu: cứu hộ hoặc hàng cứu trợ.');
+      return;
+    }
+
+    const peopleAffected = supplementPeopleAffected.trim() ? Number(supplementPeopleAffected) : undefined;
+    const childrenCount = supplementChildrenCount.trim() ? Number(supplementChildrenCount) : undefined;
+    const elderlyCount = supplementElderlyCount.trim() ? Number(supplementElderlyCount) : undefined;
+    const dangerValue = booleanForChoice(dangerChoice);
+    const needsRescueValue = booleanForChoice(needsRescueChoice);
+    const needsReliefValue = booleanForChoice(needsReliefChoice);
+    const hasStructuredUpdate = Boolean(
+      pendingSupplementCommand || referenceNote || peopleAffected !== undefined || supplementLocation || dangerValue !== undefined ||
+      (isReportUpdate && (
+        childrenCount !== undefined || elderlyCount !== undefined ||
+        needsRescueValue !== undefined || needsReliefValue !== undefined
+      ))
+    );
+    if (!note && !hasStructuredUpdate && selectedImages.length === 0) {
+      setSupplementError('Nhập thông tin cần cập nhật hoặc đính kèm ảnh/video hiện trường.');
+      return;
+    }
+    setSupplementError(undefined);
+
     const images = selectedImages;
-    let noteSent = false;
+    let updateSent = false;
     let uploadedCount = 0;
     setIsSubmittingSupplement(true);
     try {
-      // Ghi chú là lệnh có phiên bản; giữ nguyên payload và khóa để retry an toàn.
-      if (note) {
-        const payload = {
+      if (pendingSupplementCommand || note || hasStructuredUpdate) {
+        const commonFields = {
           expected_version: data.version,
-          description: note,
+          ...(note ? { description: note } : {}),
+          ...(referenceNote ? { household_reference_note: referenceNote } : {}),
+          ...(peopleAffected !== undefined ? { people_affected: peopleAffected } : {}),
+          ...(supplementLocation ? { location: supplementLocation } : {}),
+          ...(dangerValue !== undefined ? { reporter_declared_danger: dangerValue } : {}),
         };
-        const pending = await StorageService.getOrCreatePendingSupplement(data.id, payload);
-        if (data.status === 'SUBMITTED') {
+        const payload: RequestReportUpdatePayload | RequestSupplementPayload = pendingSupplementCommand?.payload || (isReportUpdate
+          ? {
+              ...commonFields,
+              ...(childrenCount !== undefined ? { children_count: childrenCount } : {}),
+              ...(elderlyCount !== undefined ? { elderly_count: elderlyCount } : {}),
+              ...(needsRescueValue !== undefined ? { needs_rescue: needsRescueValue } : {}),
+              ...(needsReliefValue !== undefined ? { needs_relief_supplies: needsReliefValue } : {}),
+            }
+          : commonFields);
+        const pending = await StorageService.getOrCreatePendingSupplement(data.id, kind, payload);
+        setPendingSupplementCommand(pending);
+        const pendingKind = pending.kind || kind;
+        if (pendingKind === 'REPORT_UPDATE') {
           await ResponseApi.updateReport(
             data.id,
-            pending.payload,
+            pending.payload as RequestReportUpdatePayload,
             trackingCode,
             pending.idempotencyKey
           );
         } else {
           await ResponseApi.supplementRequest(
             data.id,
-            pending.payload,
+            pending.payload as RequestSupplementPayload,
             trackingCode,
             pending.idempotencyKey
           );
         }
-        noteSent = true;
-        setSupplementNote('');
+        updateSent = true;
+        clearSupplementFields();
+        setPendingSupplementCommand(null);
         try {
           await StorageService.clearPendingSupplement(data.id);
         } catch {
@@ -334,12 +494,21 @@ export const SOSTrackingScreen: React.FC = () => {
         }
 
         try {
-          await ResponseApi.uploadEvidence(
+          const evidence = await ResponseApi.uploadEvidence(
             data.id,
             { uri, name: fileName, type },
             trackingCode,
             idempotencyKey
           );
+          try {
+            await StorageService.saveRequestEvidence(data.id, evidence);
+          } catch {
+            // The upload succeeded; keep the current screen usable if local caching fails.
+          }
+          setUploadedEvidence((current) => [
+            evidence,
+            ...current.filter((item) => item.id !== evidence.id),
+          ].slice(0, MAX_EVIDENCE_FILES_PER_REQUEST));
         } catch (uploadError) {
           if (isApiErrorCode(uploadError, 'STORAGE_UNAVAILABLE')) {
             // The backend records this attachment as FAILED; retry it with a fresh key.
@@ -350,10 +519,6 @@ export const SOSTrackingScreen: React.FC = () => {
 
         evidenceIdempotencyKeys.current.delete(key);
         uploadedCount += 1;
-        setUploadedEvidence((prev) => [
-          { uri, type: type === 'video/mp4' ? 'video' : 'image', name: fileName },
-          ...prev,
-        ]);
         setSelectedImages((current) => current.filter((asset) => asset.uri !== uri));
       }
 
@@ -362,23 +527,24 @@ export const SOSTrackingScreen: React.FC = () => {
       const evidenceMessage = images.length > 0
         ? `Đã tải lên ${uploadedCount} tệp bằng chứng hiện trường.`
         : '';
-      const successMessage = noteSent && evidenceMessage
-        ? `Đã gửi ghi chú. ${evidenceMessage}`
-        : noteSent
-          ? 'Đã gửi ghi chú hiện trường.'
+      const successMessage = updateSent && evidenceMessage
+        ? `Đã gửi thông tin cập nhật. ${evidenceMessage}`
+        : updateSent
+          ? 'Đã gửi thông tin cập nhật hiện trường.'
           : evidenceMessage;
       Alert.alert('Thành công', successMessage);
     } catch (err: any) {
       if (isApiErrorCode(err, 'VERSION_CONFLICT')) {
         try {
           await StorageService.clearPendingSupplement(data.id);
+          setPendingSupplementCommand(null);
         } catch {
-          // The next read will still expose the pending command for safe recovery.
+          // The state changes only after local cleanup succeeds.
         }
         await fetchTrackingData();
       }
       const localMessage = err instanceof Error && err.message === 'PENDING_SUPPLEMENT_MUST_BE_RESUMED'
-        ? 'Có ghi chú trước đang chờ xác nhận. Hãy mở lại phần bổ sung và gửi ghi chú đã lưu.'
+        ? 'Có thông tin cập nhật trước đang chờ xác nhận. Hãy mở lại phần bổ sung và gửi nội dung đã lưu.'
         : err instanceof Error && err.message === 'UNSUPPORTED_EVIDENCE_TYPE'
             ? 'Định dạng tệp chưa được hỗ trợ. Vui lòng chọn ảnh JPEG, PNG hoặc video MP4.'
           : err instanceof Error && err.message === 'EVIDENCE_FILE_TOO_LARGE'
@@ -387,7 +553,7 @@ export const SOSTrackingScreen: React.FC = () => {
               ? `Hồ sơ đã đạt giới hạn ${MAX_EVIDENCE_FILES_PER_REQUEST} tệp bằng chứng.`
             : null;
       const failureMessage = localMessage || getApiErrorMessage(err, 'Không thể gửi bổ sung thông tin.');
-      if (noteSent || uploadedCount > 0) {
+      if (updateSent || uploadedCount > 0) {
         await fetchTrackingData();
         const pendingCount = images.length - uploadedCount;
         const sentMessage = uploadedCount > 0
@@ -397,8 +563,8 @@ export const SOSTrackingScreen: React.FC = () => {
           ? `${pendingCount} tệp chưa gửi vẫn được giữ để bạn thử lại.`
           : 'Các tệp đã tải lên thành công.';
         Alert.alert(
-          noteSent ? 'Ghi chú đã được gửi' : 'Đã tải một phần bằng chứng',
-          `${noteSent ? 'Ghi chú đã được gửi. ' : ''}${sentMessage}${pendingMessage} ${failureMessage}`
+          updateSent ? 'Thông tin cập nhật đã được gửi' : 'Đã tải một phần bằng chứng',
+          `${updateSent ? 'Thông tin cập nhật đã được gửi. ' : ''}${sentMessage}${pendingMessage} ${failureMessage}`
         );
       } else {
         const retainedMessage = images.length > 0 ? ' Tệp đã chọn vẫn được giữ để bạn thử lại.' : '';
@@ -415,8 +581,8 @@ export const SOSTrackingScreen: React.FC = () => {
     const errors: Record<string, string> = {};
     if (!code) errors.trackingCode = 'Vui lòng nhập mã tra cứu.';
     else if (!isValidTrackingCode(code)) errors.trackingCode = 'Mã tra cứu phải gồm từ 10 đến 16 ký tự hợp lệ.';
-    if (!token) errors.recoveryCode = 'Vui lòng nhập mã khôi phục.';
-    else if (!isValidTrackingSecret(token)) errors.recoveryCode = 'Mã hỗ trợ phải gồm đúng 43 ký tự hợp lệ.';
+    if (!token) errors.recoveryCode = 'Vui lòng nhập mã gắn tài khoản.';
+    else if (!isValidTrackingSecret(token)) errors.recoveryCode = 'Mã gắn tài khoản phải gồm đúng 43 ký tự hợp lệ.';
     setRecoveryErrors(errors);
     if (Object.keys(errors).length > 0) {
       return;
@@ -424,7 +590,7 @@ export const SOSTrackingScreen: React.FC = () => {
     if (!isAuthenticated) {
       Alert.alert(
         'Yêu cầu đăng nhập',
-        'Bạn cần đăng nhập tài khoản trước khi thực hiện khôi phục để liên kết yêu cầu cứu trợ vào hồ sơ cá nhân.',
+        'Bạn cần đăng nhập trước khi gắn hồ sơ SOS vào tài khoản cá nhân.',
         [
           { text: 'Hủy', style: 'cancel' },
           { text: 'Đăng nhập', onPress: () => router.push('/login') },
@@ -437,17 +603,17 @@ export const SOSTrackingScreen: React.FC = () => {
     try {
       const result = await ResponseApi.recoverRequest(code, token);
       try {
-        await StorageService.deleteGuestTrackingSecret(result.tracking_code || code);
+        await StorageService.deleteLegacyGuestTrackingSecret(result.tracking_code || code);
       } catch {
         // Recovery succeeded; a local cleanup failure must not change that result.
       }
       setShowRecoveryModal(false);
       setRecoveryCode('');
       setTrackingCode(result.tracking_code || code);
-      Alert.alert('Thành công', 'Yêu cầu cứu trợ đã được khôi phục và liên kết thành công vào tài khoản của bạn.');
+      Alert.alert('Thành công', 'Hồ sơ SOS đã được gắn vào tài khoản của bạn.');
       await fetchTrackingData(result.tracking_code || code);
     } catch (err: any) {
-      Alert.alert('Không thể khôi phục', getApiErrorMessage(err, 'Mã khôi phục không hợp lệ hoặc đã hết hiệu lực.'));
+      Alert.alert('Không thể gắn hồ sơ SOS', getApiErrorMessage(err, 'Mã gắn tài khoản không hợp lệ hoặc đã hết hiệu lực.'));
     } finally {
       setIsRecovering(false);
     }
@@ -464,10 +630,51 @@ export const SOSTrackingScreen: React.FC = () => {
     }
   };
 
+  const isReportEditable = Boolean(
+    (data?.status && isUnverifiedRequestStatus(data.status)) || pendingSupplementCommand?.kind === 'REPORT_UPDATE'
+  );
+  const supplementalPeopleCount = supplementPeopleAffected.trim() ? Number(supplementPeopleAffected) : undefined;
+  const supplementalChildrenCount = supplementChildrenCount.trim() ? Number(supplementChildrenCount) : undefined;
+  const supplementalElderlyCount = supplementElderlyCount.trim() ? Number(supplementElderlyCount) : undefined;
+  const hasStructuredUpdate = Boolean(
+    pendingSupplementCommand || householdReferenceNote.trim() || supplementalPeopleCount !== undefined || supplementLocation ||
+    dangerChoice !== 'UNCHANGED' || (isReportEditable && (
+      supplementalChildrenCount !== undefined || supplementalElderlyCount !== undefined ||
+      needsRescueChoice !== 'UNCHANGED' || needsReliefChoice !== 'UNCHANGED'
+    ))
+  );
   const lookupDisabled = loading || trackingCode.length > TRACKING_CODE_MAX_LENGTH || !isValidTrackingCode(trackingCode);
-  const supplementSubmitDisabled = isSubmittingSupplement || (!supplementNote.trim() && selectedImages.length === 0) || supplementNote.length > 2000;
+  const supplementSubmitDisabled = isSubmittingSupplement ||
+    (!supplementNote.trim() && !hasStructuredUpdate && selectedImages.length === 0);
   const recoverySubmitDisabled = isRecovering || recoveryTrackingCode.length > TRACKING_CODE_MAX_LENGTH || recoveryCode.length > 43 ||
     !isValidTrackingCode(recoveryTrackingCode) || !isValidTrackingSecret(recoveryCode);
+  const renderChoiceSwitch = (
+    fieldLabel: string,
+    value: OptionalBooleanChoice,
+    onChange: (next: OptionalBooleanChoice) => void,
+    Icon: typeof AlertCircle,
+    iconColor: string,
+    emergencySwitch = false,
+  ) => (
+    <View style={styles.dangerToggleRow}>
+      <View style={styles.dangerLabelBox}>
+        <Icon size={20} color={iconColor} />
+        <View style={{ flex: 1, marginLeft: 8 }}>
+          <Text style={styles.dangerTitle}>{fieldLabel}</Text>
+        </View>
+      </View>
+      <Switch
+        value={value === 'YES'}
+        onValueChange={(enabled) => onChange(enabled ? 'YES' : 'NO')}
+        disabled={isSubmittingSupplement || Boolean(pendingSupplementCommand)}
+        trackColor={emergencySwitch ? { false: '#CBD5E1', true: THEME.colors.emergency.light } : undefined}
+        thumbColor={emergencySwitch ? (value === 'YES' ? THEME.colors.emergency.main : '#FFFFFF') : undefined}
+        accessibilityLabel={fieldLabel}
+        accessibilityState={{ checked: value === 'YES', disabled: isSubmittingSupplement || Boolean(pendingSupplementCommand) }}
+        accessibilityHint="Không chạm vào để giữ nguyên dữ kiện. Bật để chọn Có; tắt để chọn Không."
+      />
+    </View>
+  );
 
   return (
     <ScreenContainer
@@ -486,14 +693,15 @@ export const SOSTrackingScreen: React.FC = () => {
           {!isAuthenticated ? (
             <View style={styles.lookupNotice}>
               <Text style={styles.lookupNoticeText}>
-                Khách vãng lai chỉ cần nhập mã tra cứu đã nhận khi gửi SOS.
+                Để xem tiến độ, chỉ cần mã tra cứu đã nhận khi gửi SOS. Mã một lần chỉ dùng khi điều phối viên hỗ trợ gắn hồ sơ vào tài khoản.
               </Text>
             </View>
           ) : null}
-          <Text style={styles.inputLabel}>Mã tra cứu <RequiredAsterisk /></Text>
-          <TextInput
+          <CompactTextInput
+            label="Mã tra cứu"
+            required
             style={styles.lookupInput}
-            placeholder="Mã tra cứu"
+            placeholder="Nhập mã 10 ký tự"
             placeholderTextColor={THEME.colors.text.muted}
             value={trackingCode}
             onChangeText={(value) => {
@@ -533,7 +741,7 @@ export const SOSTrackingScreen: React.FC = () => {
             }}
           >
             <KeyRound size={16} color={THEME.colors.primary.main} style={{ marginRight: 6 }} />
-            <Text style={styles.recoveryLinkText}>Liên kết SOS vào tài khoản bằng mã hỗ trợ</Text>
+            <Text style={styles.recoveryLinkText}>Gắn hồ sơ SOS vào tài khoản</Text>
           </TouchableOpacity>
         </View>
       ) : loading ? (
@@ -557,7 +765,7 @@ export const SOSTrackingScreen: React.FC = () => {
             }}
           >
             <KeyRound size={16} color={THEME.colors.primary.main} style={{ marginRight: 6 }} />
-            <Text style={styles.recoveryLinkText}>Khôi phục quyền truy cập bằng mã hỗ trợ</Text>
+            <Text style={styles.recoveryLinkText}>Gắn hồ sơ SOS vào tài khoản</Text>
           </TouchableOpacity>
         </View>
       ) : data ? (
@@ -676,23 +884,38 @@ export const SOSTrackingScreen: React.FC = () => {
                 <Text style={styles.uploadedImagesTitle}>BẰNG CHỨNG ĐÃ TẢI LÊN ({uploadedEvidence.length})</Text>
               </View>
               <View style={styles.uploadedImagesList}>
-                {uploadedEvidence.map((evidence, index) => (
-                  evidence.type === 'video' ? (
-                    <View key={`${evidence.uri}-${index}`} style={styles.uploadedVideoWrapper}>
-                      <Video size={20} color={THEME.colors.primary.main} />
-                      <Text style={styles.uploadedVideoText}>Video MP4 đã tải lên</Text>
-                    </View>
-                  ) : (
+                {uploadedEvidence.map((evidence) => {
+                  const isVideo = evidence.detected_mime === 'video/mp4';
+                  const isOpening = openingEvidenceId === evidence.id;
+                  return (
                     <TouchableOpacity
-                      key={`${evidence.uri}-${index}`}
-                      style={styles.uploadedImageWrapper}
-                      onPress={() => setPreviewImage(evidence.uri)}
+                      key={evidence.id}
+                      style={styles.uploadedEvidenceRow}
+                      onPress={() => void openUploadedEvidence(evidence)}
+                      disabled={openingEvidenceId !== null}
                       activeOpacity={0.8}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Mở ${isVideo ? 'video' : 'ảnh'} bằng chứng đã tải lên`}
                     >
-                      <Image source={{ uri: evidence.uri }} style={styles.uploadedThumbnail} />
+                      {isOpening ? (
+                        <ActivityIndicator size="small" color={THEME.colors.primary.main} />
+                      ) : isVideo ? (
+                        <Video size={20} color={THEME.colors.primary.main} />
+                      ) : (
+                        <ImageIcon size={20} color={THEME.colors.primary.main} />
+                      )}
+                      <View style={styles.uploadedEvidenceTextBlock}>
+                        <Text style={styles.uploadedEvidenceTitle}>
+                          {isVideo ? 'Video MP4 hiện trường' : 'Ảnh hiện trường'}
+                        </Text>
+                        <Text style={styles.uploadedEvidenceMeta}>
+                          {new Date(evidence.created_at).toLocaleString('vi-VN')} · {(evidence.size_bytes / (1024 * 1024)).toFixed(1)} MB
+                        </Text>
+                      </View>
+                      <Text style={styles.uploadedEvidenceAction}>Mở</Text>
                     </TouchableOpacity>
-                  )
-                ))}
+                  );
+                })}
               </View>
             </View>
           )}
@@ -725,148 +948,330 @@ export const SOSTrackingScreen: React.FC = () => {
       ) : null}
 
       {/* MODAL BỔ SUNG THÔNG TIN */}
-      <Modal visible={showSupplementModal} transparent={true} animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>BỔ SUNG TÌNH HÌNH HIỆN TẠI</Text>
-            <Text style={styles.modalSubtitle}>
-              Thông tin sẽ được cập nhật trực tiếp đến điều phối viên phụ trách:
-            </Text>
-
-            <Text style={styles.inputLabel}>Ghi chú hiện trường (hoặc đính kèm ảnh/video) <RequiredAsterisk /></Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Ví dụ: Nước đã dâng thêm 30cm, pin sắp hết..."
-              placeholderTextColor={THEME.colors.text.muted}
-              value={supplementNote}
-              onChangeText={(value) => {
-                setSupplementNote(value);
-                setSupplementError(value.length > 2000
-                  ? 'Ghi chú không được vượt quá 2.000 ký tự.'
-                  : undefined);
-              }}
-              onBlur={() => {
-                if (!supplementNote.trim() && selectedImages.length === 0) setSupplementError('Ghi chú hoặc ảnh/video hiện trường là bắt buộc.');
-                else if (supplementNote.length > 2000) setSupplementError('Ghi chú không được vượt quá 2.000 ký tự.');
-              }}
-              multiline={true}
-              numberOfLines={4}
-              maxLength={2001}
-              editable={!isSubmittingSupplement}
-            />
-            <FormFieldError message={supplementError} />
-
-            {/* Đính kèm ảnh hiện trường */}
-            <View style={styles.imagePickerSection}>
-              <Text style={styles.imagePickerLabel}>Chọn tối đa {MAX_EVIDENCE_FILES_PER_REQUEST} ảnh/video bằng chứng hiện trường:</Text>
-              <View style={styles.imageButtonRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.pickImageBtn,
-                    (isSubmittingSupplement || selectedImages.length >= MAX_EVIDENCE_FILES_PER_REQUEST) && styles.disabledButton,
-                  ]}
-                  onPress={pickImage}
-                  activeOpacity={0.8}
-                  disabled={isSubmittingSupplement || selectedImages.length >= MAX_EVIDENCE_FILES_PER_REQUEST}
-                  accessibilityRole="button"
-                  accessibilityLabel="Chọn ảnh hoặc video từ thư viện"
-                >
-                  <ImageIcon size={16} color={THEME.colors.primary.main} style={{ marginRight: 4 }} />
-                  <Text style={styles.pickImageText}>Chọn ảnh/video</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.pickImageBtn, isSubmittingSupplement && styles.disabledButton]}
-                  onPress={takePhoto}
-                  activeOpacity={0.8}
-                  disabled={isSubmittingSupplement || selectedImages.length >= MAX_EVIDENCE_FILES_PER_REQUEST}
-                  accessibilityRole="button"
-                  accessibilityLabel="Chụp ảnh hiện trường"
-                >
-                  <Camera size={16} color={THEME.colors.primary.main} style={{ marginRight: 4 }} />
-                  <Text style={styles.pickImageText}>Chụp ảnh mới</Text>
-                </TouchableOpacity>
+      <Modal
+        visible={showSupplementModal}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => setShowSupplementModal(false)}
+      >
+        <ScreenContainer
+          title="Bổ sung hiện trường"
+          subtitle={
+            isReportEditable
+              ? 'Chỉ nhập mục cần thay đổi; phần để trống sẽ được giữ nguyên.'
+              : 'Điều phối viên sẽ rà soát thông tin mới; phần để trống sẽ được giữ nguyên.'
+          }
+          onBack={() => setShowSupplementModal(false)}
+          scrollable={false}
+        >
+          <KeyboardAvoidingView
+            style={styles.supplementPage}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          >
+            <ScrollView
+              style={styles.supplementFormScroll}
+              contentContainerStyle={styles.supplementFormContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.formCard}>
+                <View style={styles.supplementCardHeader}>
+                  <Text style={styles.supplementCardTitle}>DIỄN BIẾN HIỆN TRƯỜNG</Text>
+                </View>
+                <CompactTextInput
+                  label="Mô tả tình hình mới"
+                  containerStyle={styles.formField}
+                  style={styles.supplementNoteInput}
+                  placeholder="Ví dụ: Nước đã dâng thêm 30 cm, pin sắp hết..."
+                  placeholderTextColor={THEME.colors.text.muted}
+                  value={supplementNote}
+                  onChangeText={(value) => {
+                    setSupplementNote(value);
+                    setSupplementError(value.length > 2000
+                      ? 'Ghi chú không được vượt quá 2.000 ký tự.'
+                      : undefined);
+                  }}
+                  onBlur={() => {
+                    if (supplementNote.length > 2000) setSupplementError('Ghi chú không được vượt quá 2.000 ký tự.');
+                  }}
+                  multiline
+                  numberOfLines={4}
+                  maxLength={2001}
+                  editable={!isSubmittingSupplement && !pendingSupplementCommand}
+                />
               </View>
 
-              {selectedImages.length > 0 && (
-                <>
-                  <Text style={styles.selectedEvidenceCount}>
-                    Đã chọn {selectedImages.length}/{MAX_EVIDENCE_FILES_PER_REQUEST} tệp
-                  </Text>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.selectedEvidenceRow}
-                    accessibilityLabel="Các tệp bằng chứng đã chọn"
-                  >
-                    {selectedImages.map((asset) => (
-                      <View key={asset.uri} style={styles.previewContainer}>
-                        {asset.type === 'video' ? (
-                          <View style={styles.videoPreview}>
-                            <Video size={28} color={THEME.colors.primary.main} />
-                            <Text style={styles.videoPreviewText} numberOfLines={2}>
-                              {asset.fileName || 'Video MP4 đã chọn'}
-                            </Text>
-                          </View>
-                        ) : (
-                          <Image source={{ uri: asset.uri }} style={styles.previewImage} />
-                        )}
-                        <TouchableOpacity
-                          style={styles.removeImageBtn}
-                          onPress={() => {
-                            setSelectedImages((current) => current.filter((item) => item.uri !== asset.uri));
-                            if (!supplementNote.trim() && selectedImages.length === 1) {
-                              setSupplementError('Ghi chú hoặc ảnh/video hiện trường là bắt buộc.');
-                            }
-                          }}
-                          activeOpacity={0.8}
-                          disabled={isSubmittingSupplement}
-                          accessibilityRole="button"
-                          accessibilityLabel={`Xóa ${asset.fileName || 'tệp đã chọn'}`}
-                        >
-                          <X size={14} color="#FFFFFF" />
-                        </TouchableOpacity>
-                      </View>
-                    ))}
-                  </ScrollView>
-                </>
-              )}
-            </View>
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.modalCancelBtn}
-                onPress={() => setShowSupplementModal(false)}
-                disabled={isSubmittingSupplement}
-              >
-                <Text style={styles.modalCancelText}>Hủy Bỏ</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalSubmitBtn, supplementSubmitDisabled && { opacity: 0.6 }]}
-                onPress={handleSupplementSubmit}
-                disabled={supplementSubmitDisabled}
-              >
-                {isSubmittingSupplement ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.modalSubmitText}>Gửi Bổ Sung</Text>
+              <View style={styles.formCard}>
+                <View style={styles.supplementCardHeader}>
+                  <Users size={18} color={THEME.colors.text.secondary} />
+                  <Text style={styles.supplementCardTitle}>SỐ NGƯỜI CẦN HỖ TRỢ</Text>
+                </View>
+                <View style={styles.formField}>
+                  <CompactTextInput
+                    label="Tổng số người"
+                    style={styles.supplementModalInputSingle}
+                    placeholder="Nhập nếu cần cập nhật"
+                    placeholderTextColor={THEME.colors.text.muted}
+                    value={supplementPeopleAffected}
+                    onChangeText={setSupplementPeopleAffected}
+                    keyboardType="number-pad"
+                    maxLength={6}
+                    editable={!isSubmittingSupplement && !pendingSupplementCommand}
+                  />
+                </View>
+                {isReportEditable ? (
+                  <>
+                    <View style={styles.vulnerableCountGrid}>
+                      <CompactTextInput
+                        label="Trẻ em"
+                        containerStyle={styles.vulnerableCountField}
+                        style={styles.supplementModalInputSingle}
+                        placeholder="Cập nhật số lượng"
+                        placeholderTextColor={THEME.colors.text.muted}
+                        value={supplementChildrenCount}
+                        onChangeText={setSupplementChildrenCount}
+                        keyboardType="number-pad"
+                        maxLength={6}
+                        editable={!isSubmittingSupplement && !pendingSupplementCommand}
+                      />
+                      <CompactTextInput
+                        label="Người cao tuổi"
+                        containerStyle={styles.vulnerableCountField}
+                        style={styles.supplementModalInputSingle}
+                        placeholder="Cập nhật số lượng"
+                        placeholderTextColor={THEME.colors.text.muted}
+                        value={supplementElderlyCount}
+                        onChangeText={setSupplementElderlyCount}
+                        keyboardType="number-pad"
+                        maxLength={6}
+                        editable={!isSubmittingSupplement && !pendingSupplementCommand}
+                      />
+                    </View>
+                    {renderChoiceSwitch(
+                      'Cần đội cứu hộ',
+                      needsRescueChoice,
+                      setNeedsRescueChoice,
+                      AlertTriangle,
+                      THEME.colors.emergency.main,
+                    )}
+                    {renderChoiceSwitch(
+                      'Cần hàng cứu trợ',
+                      needsReliefChoice,
+                      setNeedsReliefChoice,
+                      AlertCircle,
+                      THEME.colors.primary.main,
+                    )}
+                  </>
+                ) : null}
+                {renderChoiceSwitch(
+                  'Nguy cơ đe dọa tính mạng',
+                  dangerChoice,
+                  setDangerChoice,
+                  AlertTriangle,
+                  THEME.colors.emergency.main,
+                  true,
                 )}
-              </TouchableOpacity>
+              </View>
+
+              <View style={styles.formCard}>
+                <View style={styles.supplementCardHeader}>
+                  <MapPin size={18} color={THEME.colors.text.secondary} />
+                  <Text style={styles.supplementCardTitle}>VỊ TRÍ HIỆN TRƯỜNG</Text>
+                </View>
+                <CompactTextInput
+                  label="Dấu mốc nhận diện hộ gia đình"
+                  containerStyle={styles.formField}
+                  style={styles.supplementModalInputSingle}
+                  placeholder="Ví dụ: cổng xanh cạnh trạm y tế, lối vào phía đông"
+                  placeholderTextColor={THEME.colors.text.muted}
+                  value={householdReferenceNote}
+                  onChangeText={(value) => {
+                    setHouseholdReferenceNote(value);
+                    setSupplementError(value.length > 500
+                      ? 'Ghi chú nhận diện hộ gia đình không được vượt quá 500 ký tự.'
+                      : undefined);
+                  }}
+                  maxLength={501}
+                  editable={!isSubmittingSupplement && !pendingSupplementCommand}
+                />
+                <View style={styles.supplementLocationRow}>
+                  <TouchableOpacity
+                    style={[styles.pickImageBtn, styles.supplementLocationButton]}
+                    onPress={() => {
+                      setShowSupplementModal(false);
+                      setShowSupplementLocationPicker(true);
+                    }}
+                    disabled={isSubmittingSupplement || Boolean(pendingSupplementCommand)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Chọn vị trí hiện trường mới trên bản đồ"
+                  >
+                    <MapPin size={16} color={THEME.colors.primary.main} style={{ marginRight: 4 }} />
+                    <Text style={styles.pickImageText}>Cập nhật vị trí trên bản đồ</Text>
+                  </TouchableOpacity>
+                  {supplementLocation ? (
+                    <TouchableOpacity
+                      onPress={() => setSupplementLocation(null)}
+                      disabled={isSubmittingSupplement || Boolean(pendingSupplementCommand)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Bỏ vị trí thay đổi"
+                    >
+                      <Text style={styles.clearLocationText}>Bỏ thay đổi vị trí</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+                {supplementLocation ? (
+                  <Text style={styles.supplementLocationText}>
+                    Vị trí mới: {supplementLocation.coordinates[1].toFixed(5)}, {supplementLocation.coordinates[0].toFixed(5)}
+                  </Text>
+                ) : null}
+              </View>
+
+              <View style={styles.formCard}>
+                <View style={styles.evidenceHeading}>
+                  <View style={[styles.supplementCardHeader, styles.evidenceCardHeader]}>
+                    <ImageIcon size={18} color={THEME.colors.text.secondary} />
+                    <Text style={styles.supplementCardTitle}>ẢNH/VIDEO HIỆN TRƯỜNG</Text>
+                  </View>
+                  <Text style={styles.evidenceLimit}>{MAX_EVIDENCE_FILES_PER_REQUEST} tệp tối đa</Text>
+                </View>
+                <View style={styles.imageButtonRow}>
+                  <TouchableOpacity
+                    style={[
+                      styles.pickImageBtn,
+                      (isSubmittingSupplement || selectedImages.length >= MAX_EVIDENCE_FILES_PER_REQUEST) && styles.disabledButton,
+                    ]}
+                    onPress={pickImage}
+                    activeOpacity={0.8}
+                    disabled={isSubmittingSupplement || selectedImages.length >= MAX_EVIDENCE_FILES_PER_REQUEST}
+                    accessibilityRole="button"
+                    accessibilityLabel="Chọn ảnh hoặc video từ thư viện"
+                  >
+                    <ImageIcon size={16} color={THEME.colors.primary.main} style={{ marginRight: 4 }} />
+                    <Text style={styles.pickImageText}>Chọn ảnh/video</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.pickImageBtn, isSubmittingSupplement && styles.disabledButton]}
+                    onPress={takePhoto}
+                    activeOpacity={0.8}
+                    disabled={isSubmittingSupplement || selectedImages.length >= MAX_EVIDENCE_FILES_PER_REQUEST}
+                    accessibilityRole="button"
+                    accessibilityLabel="Chụp ảnh hiện trường"
+                  >
+                    <Camera size={16} color={THEME.colors.primary.main} style={{ marginRight: 4 }} />
+                    <Text style={styles.pickImageText}>Chụp ảnh mới</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {selectedImages.length > 0 && (
+                  <>
+                    <Text style={styles.selectedEvidenceCount}>
+                      Đã chọn {selectedImages.length}/{MAX_EVIDENCE_FILES_PER_REQUEST} tệp
+                    </Text>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.selectedEvidenceRow}
+                      accessibilityLabel="Các tệp bằng chứng đã chọn"
+                    >
+                      {selectedImages.map((asset) => (
+                        <View key={asset.uri} style={styles.previewContainer}>
+                          {asset.type === 'video' ? (
+                            <View style={styles.videoPreview}>
+                              <Video size={28} color={THEME.colors.primary.main} />
+                              <Text style={styles.videoPreviewText} numberOfLines={2}>
+                                {asset.fileName || 'Video MP4 đã chọn'}
+                              </Text>
+                            </View>
+                          ) : (
+                            <Image source={{ uri: asset.uri }} style={styles.previewImage} />
+                          )}
+                          <TouchableOpacity
+                            style={styles.removeImageBtn}
+                            onPress={() => {
+                              setSelectedImages((current) => current.filter((item) => item.uri !== asset.uri));
+                              if (!supplementNote.trim() && selectedImages.length === 1) {
+                                setSupplementError('Nhập thông tin cần cập nhật hoặc đính kèm ảnh/video hiện trường.');
+                              }
+                            }}
+                            activeOpacity={0.8}
+                            disabled={isSubmittingSupplement}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Xóa ${asset.fileName || 'tệp đã chọn'}`}
+                          >
+                            <X size={14} color="#FFFFFF" />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </ScrollView>
+                  </>
+                )}
+              </View>
+            </ScrollView>
+
+            <View style={styles.supplementFooter}>
+              <View style={styles.supplementErrorContainer}>
+                <FormFieldError message={supplementError} />
+              </View>
+              <View style={styles.supplementModalActions}>
+                <TouchableOpacity
+                  style={styles.supplementModalCancelBtn}
+                  onPress={() => setShowSupplementModal(false)}
+                  disabled={isSubmittingSupplement}
+                >
+                  <Text style={styles.supplementModalCancelText}>Hủy</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.supplementModalSubmitBtn, supplementSubmitDisabled && { opacity: 0.6 }]}
+                  onPress={handleSupplementSubmit}
+                  disabled={supplementSubmitDisabled}
+                >
+                  {isSubmittingSupplement ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.supplementModalSubmitText}>Gửi cập nhật</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        </View>
+          </KeyboardAvoidingView>
+        </ScreenContainer>
       </Modal>
+
+      <LocationPickerModal
+        visible={showSupplementLocationPicker}
+        initialCoordinates={supplementLocation?.coordinates}
+        initialAddressNote={householdReferenceNote}
+        title="Cập nhật vị trí hiện trường"
+        confirmButtonText="Xác nhận vị trí mới"
+        onClose={() => {
+          setShowSupplementLocationPicker(false);
+          setShowSupplementModal(true);
+        }}
+        onConfirm={(coordinates, addressNote) => {
+          setSupplementLocation({
+            type: 'Point',
+            coordinates,
+            source: 'MANUAL_PIN',
+            captured_at: new Date().toISOString(),
+          });
+          if (addressNote !== undefined) setHouseholdReferenceNote(addressNote);
+          setShowSupplementLocationPicker(false);
+          setShowSupplementModal(true);
+        }}
+      />
 
       {/* MODAL KHÔI PHỤC MÃ TRA CỨU */}
       <Modal visible={showRecoveryModal} transparent={true} animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>KHÔI PHỤC QUYỀN TRUY CẬP</Text>
+            <Text style={styles.modalTitle}>GẮN HỒ SƠ SOS VÀO TÀI KHOẢN</Text>
             <Text style={styles.modalSubtitle}>
-              Nhập mã khôi phục được điều phối viên cấp để liên kết hồ sơ cứu nạn vào tài khoản đã đăng nhập của bạn:
+              Chỉ dùng mã một lần do điều phối viên cấp sau khi xác minh liên hệ để gắn hồ sơ chưa thuộc tài khoản này. Bạn vẫn có thể tra cứu tiến độ bằng mã tra cứu thông thường.
             </Text>
 
-            <Text style={styles.inputLabel}>MÃ TRA CỨU CỨU TRỢ (10 KÝ TỰ) <RequiredAsterisk /></Text>
-            <TextInput
+            <CompactTextInput
+              label="Mã hồ sơ cứu trợ"
+              required
               style={styles.modalInputSingle}
               placeholder="Ví dụ: AB12CD34EF"
               placeholderTextColor={THEME.colors.text.muted}
@@ -893,25 +1298,26 @@ export const SOSTrackingScreen: React.FC = () => {
             />
             <FormFieldError message={recoveryErrors.trackingCode} />
 
-            <Text style={styles.inputLabel}>MÃ HỖ TRỢ (43 KÝ TỰ) <RequiredAsterisk /></Text>
-            <TextInput
+            <CompactTextInput
+              label="Mã gắn hồ sơ vào tài khoản"
+              required
               style={styles.modalInputSingle}
-              placeholder="Mã một lần do điều phối viên cấp"
+              placeholder="Mã dùng một lần do điều phối viên cấp"
               placeholderTextColor={THEME.colors.text.muted}
               value={recoveryCode}
               onChangeText={(value) => {
                 setRecoveryCode(value);
                 setRecoveryErrors((current) => ({
                   ...current,
-                  recoveryCode: getTrackingSecretError(value, 'Mã hỗ trợ'),
+                  recoveryCode: getTrackingSecretError(value, 'Mã gắn tài khoản'),
                 }));
               }}
               onBlur={() => {
                 setRecoveryErrors((current) => ({
                   ...current,
                   recoveryCode: !recoveryCode.trim()
-                    ? 'Mã hỗ trợ là bắt buộc.'
-                    : getTrackingSecretError(recoveryCode, 'Mã hỗ trợ'),
+                    ? 'Mã gắn tài khoản là bắt buộc.'
+                    : getTrackingSecretError(recoveryCode, 'Mã gắn tài khoản'),
                 }));
               }}
               autoCapitalize="none"
@@ -937,7 +1343,7 @@ export const SOSTrackingScreen: React.FC = () => {
                 {isRecovering ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.modalSubmitText}>Xác Nhận Khôi Phục</Text>
+                  <Text style={styles.modalSubmitText}>Xác nhận gắn SOS</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -1225,6 +1631,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
+    maxHeight: '92%',
   },
   modalTitle: {
     fontSize: THEME.typography.fontSizes.base,
@@ -1237,28 +1644,193 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 12,
   },
-  modalInput: {
+  supplementPage: {
+    flex: 1,
+  },
+  supplementFormScroll: {
+    flex: 1,
+    minHeight: 0,
+  },
+  supplementFormContent: {
+    paddingBottom: 16,
+  },
+  formCard: {
+    backgroundColor: THEME.colors.surface.card,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: THEME.colors.surface.border,
+    ...THEME.shadows.sm,
+  },
+  supplementCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  supplementCardTitle: {
+    color: THEME.colors.text.secondary,
+    fontSize: THEME.typography.fontSizes.xs,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    flexShrink: 1,
+  },
+  formField: {
+    marginTop: 10,
+  },
+  supplementNoteInput: {
     backgroundColor: THEME.colors.surface.background,
     borderWidth: 1,
     borderColor: THEME.colors.surface.border,
     borderRadius: 10,
-    padding: 12,
-    minHeight: 100,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    minHeight: 80,
     textAlignVertical: 'top',
     fontSize: THEME.typography.fontSizes.sm,
     color: THEME.colors.text.primary,
+  },
+  modalInputSingle: {
+    backgroundColor: THEME.colors.surface.background,
+    borderWidth: 1,
+    borderColor: THEME.colors.surface.border,
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 8,
+    fontSize: THEME.typography.fontSizes.sm,
+    color: THEME.colors.text.primary,
+  },
+  supplementModalInputSingle: {
+    width: '100%',
+    minHeight: 56,
+    borderWidth: 1,
+    borderColor: THEME.colors.surface.border,
+    borderRadius: 12,
+    backgroundColor: THEME.colors.surface.background,
+    paddingHorizontal: 12,
+    fontSize: THEME.typography.fontSizes.sm,
+    fontWeight: '600',
+    color: THEME.colors.text.primary,
+  },
+  vulnerableCountGrid: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 10,
+  },
+  vulnerableCountField: {
+    flex: 1,
+    minWidth: 0,
+  },
+  peopleCountHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  peopleCountHeadingText: {
+    fontSize: THEME.typography.fontSizes.sm,
+    fontWeight: '700',
+    color: THEME.colors.text.primary,
+  },
+  dangerToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: THEME.colors.emergency.bg,
+    padding: 12,
+    borderRadius: 10,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: THEME.colors.emergency.border,
+  },
+  dangerLabelBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 10,
+  },
+  dangerTitle: {
+    fontSize: THEME.typography.fontSizes.xs + 1,
+    fontWeight: '700',
+    color: THEME.colors.emergency.dark,
+  },
+  evidenceHeading: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  evidenceCardHeader: {
+    flex: 1,
+    marginBottom: 0,
+  },
+  evidenceLimit: {
+    marginLeft: 8,
+    color: THEME.colors.text.muted,
+    fontSize: THEME.typography.fontSizes.xs,
+  },
+  supplementLocationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+  },
+  supplementLocationButton: {
+    minHeight: 44,
+  },
+  clearLocationText: {
+    color: THEME.colors.emergency.main,
+    fontSize: THEME.typography.fontSizes.xs,
+    fontWeight: '700',
+    paddingVertical: 8,
+  },
+  supplementLocationText: {
+    marginTop: 4,
+    color: THEME.colors.text.secondary,
+    fontSize: THEME.typography.fontSizes.xs,
   },
   modalActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     marginTop: 16,
   },
+  supplementFooter: {
+    backgroundColor: THEME.colors.surface.background,
+    paddingTop: 8,
+  },
+  supplementModalActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 8,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: THEME.colors.surface.border,
+  },
+  supplementErrorContainer: {
+    paddingHorizontal: 2,
+  },
   modalCancelBtn: {
     paddingHorizontal: 16,
     paddingVertical: 10,
     marginRight: 10,
   },
+  supplementModalCancelBtn: {
+    flex: 1,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: THEME.colors.surface.border,
+    borderRadius: 12,
+    backgroundColor: THEME.colors.surface.background,
+  },
   modalCancelText: {
+    fontSize: THEME.typography.fontSizes.sm,
+    color: THEME.colors.text.secondary,
+    fontWeight: '600',
+  },
+  supplementModalCancelText: {
     fontSize: THEME.typography.fontSizes.sm,
     color: THEME.colors.text.secondary,
     fontWeight: '600',
@@ -1269,22 +1841,30 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 10,
   },
+  supplementModalSubmitBtn: {
+    flex: 1,
+    minHeight: 52,
+    backgroundColor: THEME.colors.emergency.main,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    ...THEME.shadows.emergency,
+  },
   modalSubmitText: {
     color: '#FFFFFF',
     fontSize: THEME.typography.fontSizes.sm,
     fontWeight: '700',
   },
-  imagePickerSection: {
-    marginTop: 12,
-  },
-  imagePickerLabel: {
-    fontSize: 12,
+  supplementModalSubmitText: {
+    color: '#FFFFFF',
+    fontSize: THEME.typography.fontSizes.sm,
     fontWeight: '700',
-    color: THEME.colors.text.primary,
-    marginBottom: 6,
   },
   imageButtonRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   pickImageBtn: {
     flexDirection: 'row',
@@ -1292,10 +1872,10 @@ const styles = StyleSheet.create({
     backgroundColor: THEME.colors.primary.bg,
     borderWidth: 1,
     borderColor: THEME.colors.primary.border,
+    minHeight: 44,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: 8,
-    marginRight: 8,
   },
   disabledButton: {
     opacity: 0.5,
@@ -1380,37 +1960,35 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   uploadedImagesList: {
+    gap: 8,
+  },
+  uploadedEvidenceRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
     gap: 10,
-  },
-  uploadedImageWrapper: {
-    borderRadius: 10,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: THEME.colors.surface.border,
-  },
-  uploadedVideoWrapper: {
-    width: 92,
-    height: 76,
+    padding: 10,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: THEME.colors.surface.border,
     backgroundColor: THEME.colors.primary.bg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 6,
   },
-  uploadedVideoText: {
-    marginTop: 5,
-    fontSize: 9,
+  uploadedEvidenceTextBlock: {
+    flex: 1,
+  },
+  uploadedEvidenceTitle: {
+    fontSize: THEME.typography.fontSizes.sm,
+    fontWeight: '700',
+    color: THEME.colors.text.primary,
+  },
+  uploadedEvidenceMeta: {
+    marginTop: 2,
+    fontSize: THEME.typography.fontSizes.xs,
     color: THEME.colors.text.secondary,
-    textAlign: 'center',
   },
-  uploadedThumbnail: {
-    width: 76,
-    height: 76,
-    borderRadius: 8,
+  uploadedEvidenceAction: {
+    fontSize: THEME.typography.fontSizes.sm,
+    fontWeight: '700',
+    color: THEME.colors.primary.main,
   },
   imageViewerOverlay: {
     flex: 1,
@@ -1443,22 +2021,5 @@ const styles = StyleSheet.create({
     fontSize: THEME.typography.fontSizes.sm,
     color: THEME.colors.primary.main,
     fontWeight: '600',
-  },
-  inputLabel: {
-    fontSize: THEME.typography.fontSizes.xs,
-    fontWeight: '700',
-    color: THEME.colors.text.secondary,
-    marginTop: 12,
-    marginBottom: 4,
-    textTransform: 'uppercase',
-  },
-  modalInputSingle: {
-    backgroundColor: THEME.colors.surface.background,
-    borderWidth: 1,
-    borderColor: THEME.colors.surface.border,
-    borderRadius: 8,
-    padding: 10,
-    fontSize: THEME.typography.fontSizes.sm,
-    color: THEME.colors.text.primary,
   },
 });

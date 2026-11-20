@@ -149,3 +149,14 @@ Confirmed by reading code (not by running the app):
 - Touch target size (at least 44 px) for icon buttons and the SOS button.
 - Any English text, raw error code, or technical message shown to the user.
 - Double tap on submit or accept mission: duplicate requests prevented?
+
+## 10. Backend alignment follow-up (2026-11-20)
+
+Compared the mobile reporter and volunteer workflows with the current backend response contracts and source. The follow-up changes are limited to `mobile/`; no backend source or contract was changed.
+
+- Self SOS and proxy SOS now send the optional `relief_items_text` field only when relief supplies are requested, with the backend's 500-character limit.
+- Self SOS keeps an `X-Tracking-Secret` only for guest create retries. Tracking, event history, supplements, evidence uploads, and evidence downloads use the tracking code capability in `X-Tracking-Code`; legacy locally saved tracking secrets are removed after a successful lookup or account binding.
+- The tracking form now supports the reporter fields exposed by the contracts, including household reference, affected-person count, manual map location, and danger declaration. `SUBMITTED` and `VERIFYING` use the unverified report update route; later eligible states submit immutable reporter facts for review through the supplement route.
+- Reporter evidence upload responses are typed and the device stores only the returned evidence references, never the signed download URL. Opening an image or MP4 requests a fresh 60-second URL. Since there is no reporter-facing endpoint to list previously uploaded evidence, references can be reopened on the device that uploaded them; another device cannot discover those files through the current API.
+- The client counts locally known uploaded and selected evidence against the five-file per-request limit. The backend remains authoritative when files were added from another device.
+- Checks run for this follow-up: `npx tsc --noEmit` passed; `npx eslint .` passed with no errors and the existing `DateTimePicker` import warning in `ProxySOSScreen.tsx`; `git diff --check` passed. No mobile app runtime or API smoke was run.

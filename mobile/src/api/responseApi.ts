@@ -21,6 +21,9 @@ import {
   TeamMemberCandidate,
   TeamMembersPage,
   WeatherPointForecast,
+  RequestSupplementPayload,
+  RequestReportUpdatePayload,
+  RequestEvidenceReference,
 } from '../types/api';
 import { generateUUID } from '../utils/secureStore';
 
@@ -30,14 +33,13 @@ export const ResponseApi = {
   // 1. Gửi SOS cho bản thân / tại chỗ (Hỗ trợ Khách hoặc Đã đăng nhập)
   async createSelfSOS(
     payload: CreateSOSPayload,
-    trackingSecret: string,
+    trackingSecret: string | undefined,
     idempotencyKey: string
   ): Promise<CreateSOSResponse> {
+    const headers: Record<string, string> = { 'Idempotency-Key': idempotencyKey };
+    if (trackingSecret) headers['X-Tracking-Secret'] = trackingSecret;
     const response = await apiClient.post<CreateSOSResponse>('/response/requests', payload, {
-      headers: {
-        'Idempotency-Key': idempotencyKey,
-        'X-Tracking-Secret': trackingSecret,
-      },
+      headers,
     });
     return response.data;
   },
@@ -65,14 +67,7 @@ export const ResponseApi = {
   // Bổ sung thông tin cho yêu cầu cứu hộ đang xử lý
   async supplementRequest(
     requestId: string,
-    payload: {
-      expected_version: number;
-      description?: string;
-      household_reference_note?: string;
-      people_affected?: number | null;
-      location?: GeoLocation;
-      reporter_declared_danger?: boolean;
-    },
+    payload: RequestSupplementPayload,
     trackingCode?: string,
     idempotencyKey?: string
   ): Promise<any> {
@@ -89,21 +84,10 @@ export const ResponseApi = {
     return response.data;
   },
 
-  // Replace editable SOS facts before verification (PUT /requests/:id/report).
+  // Update supplied SOS facts before verification; omitted facts stay unchanged.
   async updateReport(
     requestId: string,
-    payload: {
-      expected_version: number;
-      description?: string | null;
-      household_reference_note?: string | null;
-      people_affected?: number | null;
-      children_count?: number | null;
-      elderly_count?: number | null;
-      location?: GeoLocation;
-      reporter_declared_danger?: boolean;
-      needs_rescue?: boolean;
-      needs_relief_supplies?: boolean;
-    },
+    payload: RequestReportUpdatePayload,
     trackingCode?: string,
     idempotencyKey?: string,
   ): Promise<{ id: string; version: number }> {
@@ -154,7 +138,7 @@ export const ResponseApi = {
     file: { uri: string; name: string; type: string },
     trackingCode?: string,
     idempotencyKey?: string
-  ): Promise<any> {
+  ): Promise<RequestEvidenceReference> {
     const formData = new FormData();
     formData.append('file', file as any);
 
@@ -164,7 +148,7 @@ export const ResponseApi = {
     };
     if (trackingCode) headers['X-Tracking-Code'] = trackingCode;
 
-    const response = await apiClient.post(`/response/requests/${requestId}/evidence`, formData, {
+    const response = await apiClient.post<RequestEvidenceReference>(`/response/requests/${requestId}/evidence`, formData, {
       headers,
       timeout: 120000,
     });

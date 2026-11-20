@@ -4,16 +4,19 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  TextInput,
   Switch,
   Alert,
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useAuthStore } from '../../../store/authStore';
 import { goBackOrHome } from '../../../navigation/back';
 import { queueTrackingCodeForNavigation } from '../../../navigation/trackingCodeHandoff';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
 import { FormFieldError } from '../../../components/common/FormFieldError';
+import { CompactTextInput } from '../../../components/common/CompactTextInput';
+import { SingleChoicePicker } from '../../../components/common/SingleChoicePicker';
+import type { SingleChoiceOption } from '../../../components/common/SingleChoicePicker';
 import { RequiredAsterisk } from '../../../components/common/RequiredAsterisk';
 import { useLocation } from '../../../hooks/useLocation';
 import { INCIDENT_CATEGORIES } from '../../../constants/labels';
@@ -31,8 +34,6 @@ import {
   MapPin,
   AlertTriangle,
   Users,
-  Phone,
-  FileText,
   Send,
   RefreshCw,
   Map,
@@ -41,8 +42,18 @@ import {
   AlertCircle,
 } from 'lucide-react-native';
 
+const INCIDENT_CATEGORY_CODES: IncidentCategoryCode[] = [
+  'FLOOD', 'TRAPPED', 'LANDSLIDE', 'STORM', 'MEDICAL', 'FIRE', 'SUPPLY_SHORTAGE', 'OTHER',
+];
+const INCIDENT_CATEGORY_OPTIONS: SingleChoiceOption<IncidentCategoryCode>[] = INCIDENT_CATEGORY_CODES.map((value) => ({
+  value,
+  label: INCIDENT_CATEGORIES[value]?.label || value,
+  description: INCIDENT_CATEGORIES[value]?.desc,
+}));
+
 export const CreateSOSScreen: React.FC = () => {
   const router = useRouter();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const {
     location,
     loading: locationLoading,
@@ -59,6 +70,7 @@ export const CreateSOSScreen: React.FC = () => {
   const [declaredDanger, setDeclaredDanger] = useState<boolean>(false);
   const [needsRescue, setNeedsRescue] = useState(true);
   const [needsRelief, setNeedsRelief] = useState(false);
+  const [reliefItemsText, setReliefItemsText] = useState('');
   const [reporterName, setReporterName] = useState<string>('');
   const [reporterPhone, setReporterPhone] = useState<string>('');
   const [description, setDescription] = useState<string>('');
@@ -151,6 +163,9 @@ export const CreateSOSScreen: React.FC = () => {
       ? 'Mô tả và ghi chú vị trí không được vượt quá 2.000 ký tự.'
       : undefined;
   };
+  const reliefItemsError = (value: string) => value.length > 500
+    ? 'Mô tả nhu yếu phẩm không được vượt quá 500 ký tự.'
+    : undefined;
 
   useEffect(() => {
     let mounted = true;
@@ -165,6 +180,7 @@ export const CreateSOSScreen: React.FC = () => {
         setDeclaredDanger(Boolean(pending.payload.reporter_declared_danger));
         setNeedsRescue(pending.payload.needs_rescue ?? true);
         setNeedsRelief(Boolean(pending.payload.needs_relief_supplies));
+        setReliefItemsText(pending.payload.relief_items_text || '');
         setReporterName(pending.payload.reporter_name || '');
         setReporterPhone(pending.payload.reporter_contact_phone || '');
         const savedDescription = pending.payload.description || '';
@@ -202,6 +218,7 @@ export const CreateSOSScreen: React.FC = () => {
     .filter(Boolean).join(' ');
   const submitDisabled = isSubmitting || restoringPending || Boolean(descriptionError(description)) ||
     Boolean(headcountError(peopleAffected)) || Boolean(vulnerableCountsError(childrenCount, elderlyCount, peopleAffected)) ||
+    Boolean(needsRelief && reliefItemsError(reliefItemsText)) ||
     Boolean(reporterPhoneError(reporterPhone)) ||
     (!pendingCommand && (!location || (!needsRescue && !needsRelief)));
 
@@ -225,6 +242,7 @@ export const CreateSOSScreen: React.FC = () => {
               setDeclaredDanger(false);
               setNeedsRescue(true);
               setNeedsRelief(false);
+              setReliefItemsText('');
               setReporterName('');
               setReporterPhone('');
               setDescription('');
@@ -258,6 +276,8 @@ export const CreateSOSScreen: React.FC = () => {
     if (!pendingCommand && phoneValidationError) errors.reporterPhone = phoneValidationError;
     const descriptionValidationError = descriptionError(description);
     if (!pendingCommand && descriptionValidationError) errors.description = descriptionValidationError;
+    const suppliesValidationError = needsRelief ? reliefItemsError(reliefItemsText) : undefined;
+    if (!pendingCommand && suppliesValidationError) errors.reliefItemsText = suppliesValidationError;
 
     setFormErrors(errors);
     if (Object.keys(errors).length > 0) {
@@ -277,11 +297,12 @@ export const CreateSOSScreen: React.FC = () => {
         reporter_declared_danger: declaredDanger,
         needs_rescue: needsRescue,
         needs_relief_supplies: needsRelief,
+        relief_items_text: needsRelief ? reliefItemsText.trim() || undefined : undefined,
         location: location!,
       };
 
-      // Ghi bền khóa idempotency và capability trước khi gửi để retry an toàn sau timeout.
-      const command = pendingCommand || await StorageService.getOrCreatePendingSOS(payload);
+      // Lưu khóa idempotency và bí mật retry chỉ cho khách trước khi gửi để xử lý timeout an toàn.
+      const command = pendingCommand || await StorageService.getOrCreatePendingSOS(payload, !isAuthenticated);
       setPendingCommand(command);
       const response = await ResponseApi.createSelfSOS(payload, command.trackingSecret, command.idempotencyKey);
 
@@ -492,35 +513,27 @@ export const CreateSOSScreen: React.FC = () => {
 
       {/* 2. CHỌN LOẠI THIÊN TAI / SỰ CỐ */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>LOẠI SỰ CỐ / THIÊN TAI ĐANG GẶP</Text>
-        <View style={styles.categoryGrid}>
-          {(['FLOOD', 'TRAPPED', 'LANDSLIDE', 'STORM', 'MEDICAL', 'FIRE', 'SUPPLY_SHORTAGE', 'OTHER'] as IncidentCategoryCode[]).map((cat) => {
-            const isSelected = selectedCategory === cat;
-            return (
-              <TouchableOpacity
-                key={cat}
-                style={[styles.categoryButton, isSelected && styles.categoryButtonActive]}
-                onPress={() => setSelectedCategory(cat)}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.categoryButtonText, isSelected && styles.categoryButtonTextActive]}>
-                  {INCIDENT_CATEGORIES[cat]?.label || cat}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+        <SingleChoicePicker
+          label="Loại sự cố / thiên tai đang gặp"
+          value={selectedCategory}
+          options={INCIDENT_CATEGORY_OPTIONS}
+          onChange={setSelectedCategory}
+          required
+        />
       </View>
 
       {/* 3. SỐ NGƯỜI CẦN CỨU & NGUY CƠ TÍNH MẠNG */}
       <View style={styles.card}>
-        <View style={styles.formRow}>
-          <View style={styles.labelWithIcon}>
-            <Users size={18} color={THEME.colors.text.secondary} />
-            <Text style={styles.inputLabel}>Số người cần cứu nạn:</Text>
-          </View>
-          <TextInput
-            style={styles.numberInput}
+        <View style={styles.peopleCountHeading}>
+          <Users size={18} color={THEME.colors.text.secondary} />
+          <Text style={styles.peopleCountHeadingText}>Số người cần cứu nạn</Text>
+        </View>
+        <View style={styles.peopleCountFields}>
+          <CompactTextInput
+            label="Tổng số người"
+            accessibilityLabel="Tổng số người cần cứu nạn"
+            containerStyle={styles.peopleCountTotalField}
+            style={styles.peopleCountInput}
             value={peopleAffected}
             onChangeText={(value) => {
               setPeopleAffected(value);
@@ -535,52 +548,46 @@ export const CreateSOSScreen: React.FC = () => {
             placeholder="Chưa rõ"
             placeholderTextColor={THEME.colors.text.muted}
           />
+          <View style={styles.peopleCountSubGrid}>
+            <CompactTextInput
+              label="Trẻ em"
+              accessibilityLabel="Số trẻ em cần cứu nạn"
+              containerStyle={styles.peopleCountSubField}
+              style={styles.peopleCountInput}
+              value={childrenCount}
+              onChangeText={(value) => {
+                setChildrenCount(value);
+                setFormErrors((current) => ({
+                  ...current,
+                  vulnerableCounts: vulnerableCountsError(value, elderlyCount, peopleAffected),
+                }));
+              }}
+              keyboardType="number-pad"
+              maxLength={6}
+              placeholder="Chưa rõ"
+              placeholderTextColor={THEME.colors.text.muted}
+            />
+            <CompactTextInput
+              label="Người cao tuổi"
+              accessibilityLabel="Số người cao tuổi cần cứu nạn"
+              containerStyle={styles.peopleCountSubField}
+              style={styles.peopleCountInput}
+              value={elderlyCount}
+              onChangeText={(value) => {
+                setElderlyCount(value);
+                setFormErrors((current) => ({
+                  ...current,
+                  vulnerableCounts: vulnerableCountsError(childrenCount, value, peopleAffected),
+                }));
+              }}
+              keyboardType="number-pad"
+              maxLength={6}
+              placeholder="Chưa rõ"
+              placeholderTextColor={THEME.colors.text.muted}
+            />
+          </View>
         </View>
         <FormFieldError message={formErrors.peopleAffected} />
-
-        <View style={styles.formRow}>
-          <View style={styles.labelWithIcon}>
-            <Users size={18} color={THEME.colors.text.secondary} />
-            <Text style={styles.inputLabel}>Trẻ em:</Text>
-          </View>
-          <TextInput
-            style={styles.numberInput}
-            value={childrenCount}
-            onChangeText={(value) => {
-              setChildrenCount(value);
-              setFormErrors((current) => ({
-                ...current,
-                vulnerableCounts: vulnerableCountsError(value, elderlyCount, peopleAffected),
-              }));
-            }}
-            keyboardType="number-pad"
-            maxLength={6}
-            placeholder="Chưa rõ"
-            placeholderTextColor={THEME.colors.text.muted}
-          />
-        </View>
-
-        <View style={styles.formRow}>
-          <View style={styles.labelWithIcon}>
-            <Users size={18} color={THEME.colors.text.secondary} />
-            <Text style={styles.inputLabel}>Người cao tuổi:</Text>
-          </View>
-          <TextInput
-            style={styles.numberInput}
-            value={elderlyCount}
-            onChangeText={(value) => {
-              setElderlyCount(value);
-              setFormErrors((current) => ({
-                ...current,
-                vulnerableCounts: vulnerableCountsError(childrenCount, value, peopleAffected),
-              }));
-            }}
-            keyboardType="number-pad"
-            maxLength={6}
-            placeholder="Chưa rõ"
-            placeholderTextColor={THEME.colors.text.muted}
-          />
-        </View>
         <FormFieldError message={formErrors.vulnerableCounts} />
 
         <Text style={styles.inputLabel}>Chọn ít nhất một nhu cầu hỗ trợ <RequiredAsterisk /></Text>
@@ -589,7 +596,6 @@ export const CreateSOSScreen: React.FC = () => {
             <AlertTriangle size={20} color={THEME.colors.emergency.main} />
             <View style={{ marginLeft: 8, flex: 1 }}>
               <Text style={styles.dangerTitle}>Cần đội cứu hộ</Text>
-              <Text style={styles.dangerSubtitle}>Đang được chọn mặc định</Text>
             </View>
           </View>
           <Switch value={needsRescue} onValueChange={(value) => {
@@ -606,7 +612,6 @@ export const CreateSOSScreen: React.FC = () => {
             <AlertCircle size={20} color={THEME.colors.primary.main} />
             <View style={{ marginLeft: 8, flex: 1 }}>
               <Text style={styles.dangerTitle}>Cần hàng cứu trợ</Text>
-              <Text style={styles.dangerSubtitle}>Chọn thêm nếu cần thực phẩm, nước hoặc vật tư</Text>
             </View>
           </View>
           <Switch value={needsRelief} onValueChange={(value) => {
@@ -618,6 +623,28 @@ export const CreateSOSScreen: React.FC = () => {
           }} />
         </View>
         <FormFieldError message={formErrors.needs} />
+
+        {needsRelief ? (
+          <View style={styles.inputGroup}>
+            <CompactTextInput
+              label="Nhu yếu phẩm cần hỗ trợ"
+              style={[styles.textInput, styles.textArea]}
+              value={reliefItemsText}
+              onChangeText={(value) => {
+                setReliefItemsText(value);
+                setFormErrors((current) => ({ ...current, reliefItemsText: reliefItemsError(value) }));
+              }}
+              placeholder="Ví dụ: nước sạch, thức ăn, thuốc men"
+              placeholderTextColor={THEME.colors.text.muted}
+              maxLength={501}
+              multiline
+              numberOfLines={3}
+              editable={!pendingCommand && !restoringPending}
+            />
+            <FormFieldError message={formErrors.reliefItemsText} />
+            <Text style={styles.fieldHint}>Chỉ mô tả loại hàng cần thiết; không nhập số lượng hàng hóa.</Text>
+          </View>
+        ) : null}
 
         {/* Nút bật cờ nguy hiểm tính mạng */}
         <View style={styles.dangerToggleRow}>
@@ -642,11 +669,8 @@ export const CreateSOSScreen: React.FC = () => {
         <Text style={styles.cardTitle}>THÔNG TIN LIÊN LẠC (NẾU CÒN SÓNG)</Text>
 
         <View style={styles.inputGroup}>
-          <View style={styles.labelWithIcon}>
-            <Phone size={16} color={THEME.colors.text.secondary} />
-            <Text style={styles.inputLabel}>Số điện thoại của bạn:</Text>
-          </View>
-          <TextInput
+          <CompactTextInput
+            label="Số điện thoại của bạn"
             style={styles.textInput}
             placeholder="0912 345 678"
             placeholderTextColor={THEME.colors.text.muted}
@@ -662,11 +686,8 @@ export const CreateSOSScreen: React.FC = () => {
         </View>
 
         <View style={styles.inputGroup}>
-          <View style={styles.labelWithIcon}>
-            <FileText size={16} color={THEME.colors.text.secondary} />
-            <Text style={styles.inputLabel}>Mô tả chi tiết tình hình:</Text>
-          </View>
-          <TextInput
+          <CompactTextInput
+            label="Mô tả chi tiết tình hình"
             style={[styles.textInput, styles.textArea]}
             placeholder="Ví dụ: Nước ngập ngang ngực, có 1 cụ già 80 tuổi và 1 trẻ nhỏ, đang ở trên gác xép..."
             placeholderTextColor={THEME.colors.text.muted}
@@ -980,43 +1001,29 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     marginLeft: 4,
   },
-  categoryGrid: {
+  peopleCountHeading: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
     gap: 8,
-    marginTop: 10,
   },
-  categoryButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: THEME.colors.surface.border,
-    backgroundColor: THEME.colors.surface.background,
-  },
-  categoryButtonActive: {
-    backgroundColor: THEME.colors.emergency.main,
-    borderColor: THEME.colors.emergency.main,
-  },
-  categoryButtonText: {
-    fontSize: THEME.typography.fontSizes.xs,
-    fontWeight: '600',
-    color: THEME.colors.text.secondary,
-  },
-  categoryButtonTextActive: {
-    color: '#FFFFFF',
+  peopleCountHeadingText: {
+    fontSize: THEME.typography.fontSizes.sm,
     fontWeight: '700',
+    color: THEME.colors.text.primary,
   },
-  formRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 6,
+  peopleCountFields: {
+    marginTop: 10,
+    gap: 10,
   },
-  labelWithIcon: {
+  peopleCountTotalField: {
+    width: '100%',
+  },
+  peopleCountSubGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
+    gap: 10,
+  },
+  peopleCountSubField: {
+    flex: 1,
   },
   inputLabel: {
     fontSize: THEME.typography.fontSizes.sm,
@@ -1024,15 +1031,20 @@ const styles = StyleSheet.create({
     color: THEME.colors.text.primary,
     marginLeft: 6,
   },
-  numberInput: {
-    width: 80,
-    height: 42,
+  fieldHint: {
+    fontSize: THEME.typography.fontSizes.xs,
+    color: THEME.colors.text.muted,
+    marginTop: 4,
+  },
+  peopleCountInput: {
+    width: '100%',
+    minHeight: 56,
     borderWidth: 1,
     borderColor: THEME.colors.surface.border,
-    borderRadius: 8,
-    textAlign: 'center',
-    fontSize: THEME.typography.fontSizes.base,
-    fontWeight: '700',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    fontSize: THEME.typography.fontSizes.sm,
+    fontWeight: '600',
     color: THEME.colors.text.primary,
     backgroundColor: THEME.colors.surface.background,
   },

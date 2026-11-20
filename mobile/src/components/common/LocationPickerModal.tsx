@@ -5,7 +5,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  TextInput,
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
@@ -16,6 +15,7 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import * as Location from "expo-location";
 import { THEME } from "../../constants/theme";
+import { CompactTextInput } from "./CompactTextInput";
 import { FormFieldError } from "./FormFieldError";
 import {
   formatPhotonProperties,
@@ -720,8 +720,11 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
         {!disableExternalGeocoding ? <View style={styles.searchSection}>
           <View style={styles.searchBar}>
             <Search size={18} color={THEME.colors.text.muted} />
-            <TextInput
-              style={styles.searchInput}
+            <CompactTextInput
+              label="Tìm địa điểm"
+              containerStyle={{ flex: 1 }}
+              outlined={false}
+              style={[styles.searchInput, { flex: 0 }]}
               placeholder="Tìm tên đường, xã, phường, địa điểm cứu nạn..."
               placeholderTextColor={THEME.colors.text.muted}
               value={searchQuery}
@@ -880,8 +883,8 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
         >
           <View style={styles.coordInputsRow}>
             <View style={styles.coordInputCol}>
-              <Text style={styles.fieldLabel}>Kinh độ (Longitude):</Text>
-              <TextInput
+              <CompactTextInput
+                label="Kinh độ"
                 style={styles.input}
                 value={lngInput}
                 onChangeText={(value) => {
@@ -896,8 +899,8 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
               />
             </View>
             <View style={styles.coordInputCol}>
-              <Text style={styles.fieldLabel}>Vĩ độ (Latitude):</Text>
-              <TextInput
+              <CompactTextInput
+                label="Vĩ độ"
                 style={styles.input}
                 value={latInput}
                 onChangeText={(value) => {
@@ -915,10 +918,8 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
             <FormFieldError message={coordinateError} />
 
           <View style={styles.noteInputGroup}>
-            <Text style={styles.fieldLabel}>
-              Mô tả vị trí / Ghi chú nhận biết (nếu có):
-            </Text>
-            <TextInput
+            <CompactTextInput
+              label="Mô tả vị trí / Ghi chú nhận biết"
               style={styles.input}
               value={addressNote}
               onChangeText={setAddressNote}
@@ -1002,7 +1003,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingLeft: 10,
     paddingRight: 4,
-    height: 44,
+    height: 52,
   },
   searchInput: {
     flex: 1,

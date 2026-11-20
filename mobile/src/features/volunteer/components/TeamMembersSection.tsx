@@ -8,12 +8,12 @@ import {
   Platform,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { ChevronDown, ChevronRight, Plus, RefreshCw, Search, UserMinus, Users, X } from 'lucide-react-native';
 import { ResponseApi } from '../../../api/responseApi';
+import { CompactTextInput } from '../../../components/common/CompactTextInput';
 import { getApiErrorMessage, isApiErrorCode, MobileApiError } from '../../../api/client';
 import type { TeamMember, TeamMemberCandidate, TeamMembersPage } from '../../../types/api';
 import { THEME } from '../../../constants/theme';
@@ -309,10 +309,6 @@ export const TeamMembersSection: React.FC<TeamMembersSectionProps> = ({
         </TouchableOpacity>
       </View>
 
-      {!loadingMembers && !membersError && members.length > 0 ? (
-        <Text style={styles.memberHint}>Chạm vào thành viên để xem thông tin.</Text>
-      ) : null}
-
       {loadingMembers ? (
         <View style={styles.stateRow}>
           <ActivityIndicator size="small" color={THEME.colors.primary.main} />
@@ -407,16 +403,19 @@ export const TeamMembersSection: React.FC<TeamMembersSectionProps> = ({
 
           <View style={styles.searchBox}>
             <Search size={18} color={THEME.colors.text.muted} />
-            <TextInput
+            <CompactTextInput
+              label="Tìm thành viên"
+              containerStyle={{ flex: 1 }}
+              outlined={false}
               value={query}
               onChangeText={handleQueryChange}
-              placeholder="Nhập ít nhất 2 ký tự"
+              placeholder="Nhập tên hoặc tên đăng nhập"
               placeholderTextColor={THEME.colors.text.muted}
               autoCapitalize="none"
               autoCorrect={false}
               returnKeyType="search"
               accessibilityLabel="Tìm tài khoản theo tên hoặc tên đăng nhập"
-              style={styles.searchInput}
+              style={[styles.searchInput, { flex: 0 }]}
             />
           </View>
 
@@ -562,7 +561,6 @@ const styles = StyleSheet.create({
   stateRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 10 },
   stateBlock: { alignItems: 'flex-start', paddingVertical: 8 },
   stateText: { color: THEME.colors.text.secondary, fontSize: 14, paddingVertical: 10 },
-  memberHint: { color: THEME.colors.text.muted, fontSize: 12, marginTop: -5, marginBottom: 8 },
   errorText: { color: THEME.colors.emergency.dark, fontSize: 14, flex: 1 },
   errorDiagnostic: { color: THEME.colors.text.muted, fontSize: 11, paddingTop: 5 },
   smallAction: { marginTop: 8, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, backgroundColor: THEME.colors.primary.bg },
