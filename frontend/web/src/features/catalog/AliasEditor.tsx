@@ -1,4 +1,4 @@
-import { useId, useState, type FormEvent } from 'react';
+import { useId, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { ApiError } from '../../api/client';
 import { forgetCommandKey, sendRetryableCommand } from '../../api/retryableCommand';
 import { Button } from '../../components/ui/Button';
@@ -26,8 +26,12 @@ export function AliasEditor({ item, onSaved, onStale }: {
   const [busy, setBusy] = useState(false);
   const changed = aliasListChanged(item.aliases, draft);
 
-  function add(event?: FormEvent) {
-    event?.preventDefault();
+  function add() {
+    if (!candidate.trim()) return;
+    if (/[;,]/u.test(candidate)) {
+      setInputError('Mỗi lần chỉ nhập một từ khóa. Nhấn Enter để thêm từ khóa tiếp theo.');
+      return;
+    }
     const result = addAlias(draft, candidate);
     setInputError(result.error ?? '');
     if (result.error) return;
@@ -39,6 +43,10 @@ export function AliasEditor({ item, onSaved, onStale }: {
   async function save(event: FormEvent) {
     event.preventDefault();
     setSaveError('');
+    if (candidate.trim()) {
+      setInputError('Nhấn Enter để thêm từ khóa đang nhập trước khi lưu.');
+      return;
+    }
     const problem = validateAliasList(draft);
     if (problem) return setSaveError(problem);
     if (!changed) return setSaveError('Chưa có thay đổi nào để lưu.');
@@ -62,8 +70,15 @@ export function AliasEditor({ item, onSaved, onStale }: {
   }
 
   const inputId = `${formId}-alias`;
+  const labelId = `${formId}-alias-label`;
   const helpId = `${formId}-help`;
   const errorId = `${formId}-error`;
+
+  function onCandidateKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
+    event.preventDefault();
+    add();
+  }
 
   return (
     <form className="alias-editor" onSubmit={(event) => void save(event)} noValidate>
@@ -71,30 +86,29 @@ export function AliasEditor({ item, onSaved, onStale }: {
         Từ khóa giúp hệ thống nhận ra vật phẩm, ví dụ: mì tôm, mì gói. Từ khóa chỉ dùng để nhận diện trong mô tả của người dân; không thay đổi số lượng hay tồn kho.
       </p>
 
-      <div className="alias-editor__add">
-        <label htmlFor={inputId}>
-          <span>Thêm từ khóa</span>
-          <input
-            id={inputId}
-            type="text"
-            value={candidate}
-            maxLength={ALIAS_MAX_LENGTH + 1}
-            autoComplete="off"
-            aria-describedby={inputError ? errorId : helpId}
-            aria-invalid={Boolean(inputError)}
-            placeholder="Nhập từ khóa rồi bấm Thêm"
-            onChange={(event) => { setCandidate(event.target.value); setInputError(''); }}
-            onKeyDown={(event) => { if (event.key === 'Enter') add(event); }}
-          />
-        </label>
-        <Button type="button" variant="secondary" onClick={() => add()} disabled={busy}>Thêm</Button>
+      <div className="alias-editor__field">
+        <span id={labelId} className="alias-editor__label">Từ khóa mới</span>
+        <input
+          id={inputId}
+          type="text"
+          value={candidate}
+          maxLength={ALIAS_MAX_LENGTH + 1}
+          autoComplete="off"
+          disabled={busy || draft.length >= ALIAS_MAX_COUNT}
+          aria-labelledby={labelId}
+          aria-describedby={inputError ? `${helpId} ${errorId}` : helpId}
+          aria-invalid={Boolean(inputError)}
+          placeholder="Nhập một từ khóa rồi nhấn Enter"
+          onChange={(event) => { setCandidate(event.target.value); setInputError(''); }}
+          onKeyDown={onCandidateKeyDown}
+        />
       </div>
       {inputError && <small id={errorId} className="field-error" role="alert">{inputError}</small>}
 
       <p className="muted alias-editor__count" aria-live="polite">{draft.length} / {ALIAS_MAX_COUNT} từ khóa</p>
 
       {draft.length > 0 ? (
-        <ul className="alias-chips" aria-label={`Từ khóa của ${item.name}`}>
+        <ul className="alias-chips alias-editor__list" aria-label={`Từ khóa của ${item.name}`}>
           {draft.map((alias) => (
             <li key={alias} className="alias-chip">
               <span>{alias}</span>
@@ -105,7 +119,7 @@ export function AliasEditor({ item, onSaved, onStale }: {
                 disabled={busy}
                 onClick={() => { setDraft((current) => removeAlias(current, alias)); setSaveError(''); }}
               >
-                Xóa
+                <span aria-hidden="true">×</span>
               </button>
             </li>
           ))}

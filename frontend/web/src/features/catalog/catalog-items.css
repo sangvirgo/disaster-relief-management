@@ -94,13 +94,14 @@
 .alias-chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   max-width: 100%;
-  padding: 2px 4px 2px 10px;
-  border: 1px solid var(--border, #d9dee5);
-  border-radius: 999px;
-  background: var(--surface-muted, #f4f6f8);
-  font-size: 0.9rem;
+  padding: 4px 4px 4px 12px;
+  border: 1px solid var(--color-primary-border);
+  border-radius: 10px;
+  background: var(--color-primary-bg);
+  color: var(--color-text-primary);
+  font-size: 14px;
 }
 
 .alias-chip span {
@@ -109,15 +110,17 @@
 
 .alias-chip__remove {
   min-height: 32px;
-  min-width: 44px;
-  padding: 0 8px;
+  min-width: 32px;
+  padding: 0;
   border: 0;
-  border-radius: 999px;
+  border-radius: 7px;
   background: transparent;
-  color: inherit;
-  font: inherit;
+  color: var(--color-text-secondary);
+  font: 600 20px/1 var(--font-family);
   cursor: pointer;
 }
+
+.alias-chip__remove:hover { background: #dce9ff; color: var(--color-text-primary); }
 
 .alias-chip__remove:focus-visible {
   outline: 2px solid currentColor;
@@ -126,30 +129,44 @@
 
 .alias-editor {
   display: grid;
-  gap: 12px;
+  gap: 16px;
   min-width: 0;
 }
 
 .alias-editor__help {
   margin: 0;
+  line-height: 1.5;
 }
 
-.alias-editor__add {
+.alias-editor__field {
   display: grid;
   gap: 8px;
-  grid-template-columns: minmax(0, 1fr);
-  align-items: end;
-}
-
-.alias-editor__add label {
-  display: grid;
-  gap: 4px;
-}
-
-.alias-editor__add input {
-  width: 100%;
   min-width: 0;
 }
+
+.alias-editor__label {
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 20px;
+}
+
+.alias-editor__field input {
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 1px solid var(--color-surface-divider);
+  border-radius: 10px;
+  background: var(--color-surface-card);
+  color: var(--color-text-primary);
+  box-sizing: border-box;
+}
+
+.alias-editor__field input::placeholder { color: var(--color-text-muted); }
+.alias-editor__field input:focus { border-color: var(--color-primary); }
+.alias-editor__field input:disabled { background: var(--color-surface-subtle); }
+.alias-editor__list { gap: 8px; }
 
 .alias-editor__count,
 .alias-editor__actions {
@@ -159,8 +176,5 @@
 @media (min-width: 720px) {
   .catalog-items__list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .alias-editor__add {
-    grid-template-columns: minmax(0, 1fr) auto;
   }
 }
