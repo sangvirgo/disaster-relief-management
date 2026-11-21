@@ -183,6 +183,13 @@
     \caption{#2}\label{#3}
   \end{figure}%
 }
+\newcommand{\webscreenshot}[3]{%
+  \begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth,height=0.31\textheight,keepaspectratio]{#1}
+    \caption{#2}\label{#3}
+  \end{figure}%
+}
 
 % Danh mục tài liệu tham khảo theo Mẫu 10: đánh số 1., 2., ... và chia nhóm theo loại tài liệu.
 \makeatletter
@@ -1302,58 +1309,42 @@ Sơ đồ ERD được tách theo từng dịch vụ và từng nhóm nghiệp v
 \end{figure}
 
 \chapter{THIẾT KẾ GIAO DIỆN WEB}\label{ch:web}
-\section{Đăng nhập và điều hướng theo quyền}
-\subsection{Giao diện đăng nhập Web}
+Giao diện Web được tổ chức theo quyền của từng vai trò trong cùng một luồng xử lý: người dân gửi và theo dõi SOS; điều phối viên xác minh, ưu tiên và giao nhiệm vụ; đội cứu hộ tiếp nhận, cập nhật tiến độ; quản lý vận hành xem nhu cầu vật tư; quản trị viên quản lý tài khoản. Các ảnh được chụp từ phiên bản Web hiện tại với dữ liệu minh họa. Đề xuất của AI chỉ hỗ trợ người phụ trách xem xét, không tự xác minh SOS, điều đội hay phê duyệt vật tư.
+
+\section{Người dân: gửi và theo dõi SOS}
 \begin{figure}[H]
   \centering
-  \includegraphics[width=.57\textwidth,height=.55\textheight,keepaspectratio]{images/web-login.png}
-  \caption{Giao diện đăng nhập Web}\label{fig:web-login}
+  \includegraphics[width=\textwidth,height=.61\textheight,keepaspectratio]{images/web-citizen-sos-full-2026.png}
+  \caption{Toàn bộ biểu mẫu gửi SOS trên Web}\label{fig:web-citizen-sos}
 \end{figure}
-\clearpage
-\section{Giao diện người dân}
-\subsection{Giao diện gửi yêu cầu SOS}
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=.95\textwidth,height=.72\textheight,keepaspectratio]{images/web-citizen-sos.png}
-  \caption{Giao diện gửi yêu cầu SOS trên Web}\label{fig:web-sos}
-\end{figure}
-\clearpage
-\subsection{Giao diện đợt quyên góp hiện vật}
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=.94\textwidth,height=.43\textheight,keepaspectratio]{images/web-donation-drive.png}
-  \caption{Giao diện đợt quyên góp hiện vật trên Web}\label{fig:web-drive}
-\end{figure}
-\clearpage
-\section{Giao diện nghiệp vụ theo vai trò}
-\subsection{Giao diện hàng đợi SOS của điều phối viên}
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=.94\textwidth,height=.49\textheight,keepaspectratio]{images/web-coordinator-queue.png}
-  \caption{Giao diện hàng đợi SOS của điều phối viên}\label{fig:web-coordinator}
-\end{figure}
-\clearpage
-\subsection{Giao diện nhiệm vụ của đội trưởng cứu hộ}
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=.90\textwidth,height=.45\textheight,keepaspectratio]{images/web-volunteer-missions.png}
-  \caption{Giao diện nhiệm vụ của đội trưởng cứu hộ trên Web}\label{fig:web-volunteer}
-\end{figure}
-\clearpage
-\subsection{Giao diện bảng tồn kho cứu trợ}
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=.94\textwidth,height=.49\textheight,keepaspectratio]{images/web-operations-stock.png}
-  \caption{Giao diện bảng tồn kho cứu trợ trên Web}\label{fig:web-stock}
-\end{figure}
-\clearpage
-\subsection{Giao diện quản lý tài khoản}
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=.94\textwidth,height=.49\textheight,keepaspectratio]{images/web-admin-users.png}
-  \caption{Giao diện quản lý tài khoản trên Web}\label{fig:web-admin}
-\end{figure}
-\clearpage
+Biểu mẫu gồm vị trí, tình huống, số người, thông tin liên hệ và loại hỗ trợ. Sau khi xác nhận một điểm trên bản đồ, người dân xem dự báo mưa tại đó. Mã SOS và dòng thời gian giúp theo dõi tiến độ xử lý.
+\webscreenshot{images/web-citizen-rain-point-2026.png}{Điểm được chọn trên bản đồ với lượng mưa và gió dự báo}{fig:web-citizen-rain}
+\webscreenshot{images/web-citizen-tracking-2026.png}{Dòng thời gian theo dõi yêu cầu SOS của người dân}{fig:web-citizen-tracking}
+
+\section{Điều phối viên: xác minh và điều phối}
+Hàng đợi tập trung các SOS theo trạng thái và mức ưu tiên để điều phối viên kiểm tra thông tin trước khi ra quyết định. Chi tiết yêu cầu hiển thị tín hiệu ưu tiên và phần giải thích của AI; người phụ trách vẫn phải xác minh, chọn ưu tiên và quyết định giao đội. Bản đồ thể hiện vị trí các SOS và vùng chiến dịch, đồng thời gợi ý các cụm SOS gần nhau để người phụ trách cân nhắc mở chiến dịch. Bảng thống kê giúp theo dõi số yêu cầu quá hạn xác minh và nhiệm vụ cần xử lý.
+\webscreenshot{images/web-coordinator-sos-queue-2026.png}{Hàng đợi SOS với trạng thái và tín hiệu ưu tiên}{fig:web-coordinator-queue}
+\webscreenshot{images/web-coordinator-ai-priority-2026.png}{Chi tiết SOS với đề xuất ưu tiên và giải thích của AI}{fig:web-coordinator-ai}
+\webscreenshot{images/web-coordinator-campaign-map-2026.png}{Bản đồ chiến dịch và phân bố các yêu cầu SOS}{fig:web-coordinator-map}
+\webscreenshot{images/web-coordinator-cluster-suggestion-2026.png}{Gợi ý cụm SOS gần nhau để điều phối viên xem xét tạo chiến dịch}{fig:web-coordinator-cluster}
+\webscreenshot{images/web-coordinator-dashboard-2026.png}{Chỉ số ứng cứu và các yêu cầu cần theo dõi}{fig:web-coordinator-dashboard}
+
+\section{Đội trưởng cứu hộ: nhiệm vụ và năng lực đội}
+Nhiệm vụ được đề nghị cho đội trưởng kèm thông tin hiện trường để đội xem xét nhận hoặc từ chối. Hồ sơ đội thể hiện kỹ năng và trạng thái sẵn sàng, giúp điều phối viên chọn đội phù hợp. Đội trưởng có thể tìm và thêm thành viên vào đội theo quyền được cấp; các bước thực hiện nhiệm vụ tiếp tục được cập nhật về hệ thống để người dân theo dõi.
+\webscreenshot{images/web-leader-mission-offer-2026.png}{Nhiệm vụ được đề nghị cho đội trưởng cứu hộ}{fig:web-leader-mission}
+\webscreenshot{images/web-leader-team-skills-2026.png}{Hồ sơ đội cứu hộ với kỹ năng và trạng thái sẵn sàng}{fig:web-leader-skills}
+\webscreenshot{images/web-leader-add-member-2026.png}{Hộp thoại tìm và thêm thành viên đội cứu hộ}{fig:web-leader-member}
+
+\section{Quản lý vận hành: nhu cầu vật tư và điểm hỗ trợ}
+Từ thông tin SOS, quản lý vận hành có thể xem gợi ý nhu cầu vật tư và định lượng trước khi chấp thuận hoặc bác bỏ. Bản đồ hỗ trợ quan sát kho, vùng phục vụ và đợt quyên góp; khi chọn một kho, hệ thống hiển thị tồn thực tế và lượng khả dụng. Nếu nhu cầu đã duyệt vượt nguồn hàng tại kho, phần đề xuất nêu rõ số còn thiếu và căn cứ để người quản lý cân nhắc tạo đợt quyên góp. Việc phân bổ vật tư vẫn do con người quyết định theo số liệu tồn kho và phạm vi chiến dịch.
+\webscreenshot{images/web-operations-ai-needs-2026.png}{Gợi ý nhu cầu vật tư từ SOS để quản lý vận hành xem xét}{fig:web-operations-ai}
+\webscreenshot{images/web-operations-warehouse-map-2026.png}{Bản đồ kho, đợt quyên góp và thao tác thêm địa điểm}{fig:web-operations-map}
+\webscreenshot{images/web-operations-warehouse-stock-map-2026.png}{Tồn thực tế và lượng khả dụng của kho được chọn trên bản đồ}{fig:web-operations-stock-map}
+\webscreenshot{images/web-operations-shortage-proposal-2026.png}{Căn cứ đề xuất bổ sung vật tư và dự thảo đợt quyên góp}{fig:web-operations-shortage}
+
+\section{Quản trị viên: tài khoản và quyền truy cập}
+Quản trị viên tra cứu tài khoản, trạng thái và vai trò để quản lý quyền truy cập của các nhóm tham gia cứu trợ. Màn hình này phục vụ quản trị hệ thống; các quyết định nghiệp vụ SOS và vật tư thuộc những vai trò phụ trách tương ứng.
+\webscreenshot{images/web-admin-users-2026.png}{Danh sách tài khoản và vai trò trong trang quản trị}{fig:web-admin-users}
 
 \chapter{THIẾT KẾ ỨNG DỤNG DI ĐỘNG}\label{ch:mobile}
 \section{Mục tiêu và cấu trúc ứng dụng}
