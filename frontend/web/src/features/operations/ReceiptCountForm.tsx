@@ -1,11 +1,13 @@
 import { Dropdown } from '../../components/ui/Dropdown';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { api, newCommandKey } from '../../api/client';
+import { api, newCommandKey, upload } from '../../api/client';
 import { fetchAll } from '../../api/fetchAll';
+import { evidenceFileError } from '../../i18n/evidence';
 
 type Item = { id: string; name: string; unit: { display_name: string; scale: number } };
 type Drive = { items: { item_id: string; item_name: string; unit_name: string; scale: number }[] };
 type Line = {
+  outside?: boolean;
   item_id: string;
   counted_quantity: string;
   accepted_quantity: string;
@@ -29,6 +31,7 @@ type Existing = { lines?: (Partial<Line> & { item_name?: string; unit_name?: str
 
 export function ReceiptCountForm({
   receiptId,
+  deliveryId,
   create,
   driveId,
   version,
@@ -38,6 +41,7 @@ export function ReceiptCountForm({
   onSuccess,
 }: {
   receiptId: string;
+  deliveryId: string;
   /** When there is no receipt yet, it is created from this delivery and warehouse right before the first count is sent. */
   create?: { deliveryId: string; warehouseId: string };
   driveId: string;
@@ -68,10 +72,11 @@ export function ReceiptCountForm({
       : [empty()]
   );
   const [note, setNote] = useState('');
-  const [advanced, setAdvanced] = useState(false);
+  const [advanced, setAdvanced] = useState(Boolean(existing?.lines?.some(line => Number(line.held_quantity) > 0 || Number(line.rejected_quantity) > 0 || line.condition_note || line.expiry_date)));
   const [error, setError] = useState('');
   const [itemsError, setItemsError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [evidence, setEvidence] = useState<File | null>(null);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [attempted, setAttempted] = useState(false);
   const key = useRef<string | null>(null);
@@ -131,7 +136,7 @@ export function ReceiptCountForm({
     fetchAll<Drive & { id: string }>('logistics', '/donation-drives')
       .then(drives => { if (!live) return; const drive = drives.find(candidate => candidate.id === driveId);
         if (!drive) throw new Error('Không tìm thấy đợt quyên góp của biên nhận trong phạm vi được cấp quyền.');
-        if (!existing?.lines?.length && !heldRelease) setLines(drive.items.map(item => ({ ...empty(), item_id: item.item_id })));
+        if (!existing?.lines?.length && !heldRelease) setLines((confirm ? drive.items : drive.items.slice(0, 1)).map(item => ({ ...empty(), item_id: item.item_id })));
         setDriveItems(drive.items.map(item => ({
         id: item.item_id, name: item.item_name,
         unit: { display_name: item.unit_name, scale: Number(item.scale) },
@@ -164,7 +169,7 @@ export function ReceiptCountForm({
   async function submit(event: FormEvent) {
     event.preventDefault();
     setAttempted(true);
-    if (hasInvalidFields) return;
+    if (hasInvalidFields || (evidence && evidenceFileError(evidence))) return;
     setError('');
     setBusy(true);
     try {
@@ -178,6 +183,11 @@ export function ReceiptCountForm({
         });
         targetReceipt = created.id;
         targetVersion = Number(created.version);
+      }
+      if (evidence) {
+        await upload('logistics', `/public/donations/${encodeURIComponent(deliveryId)}/evidence`, evidence, {
+          idempotencyKey: `${key.current}-evidence`,
+        });
       }
       const result = await api<{ confirmation?: { matched: boolean; mismatched_items: string[] } }>('logistics', `/donation-receipts/${encodeURIComponent(targetReceipt)}/${confirm ? 'confirmations' : 'counts'}`, {
         method: 'POST',
@@ -205,7 +215,6 @@ export function ReceiptCountForm({
       setBusy(false);
     }
   }
-  const simple = !advanced && !heldRelease;
   return (
     <form className="form-stack command-form" onSubmit={submit} noValidate>
       <h3>{heldRelease ? 'Kiểm tra lại hàng tạm giữ' : confirm ? 'Xác nhận kiểm đếm độc lập' : 'Gửi kết quả kiểm đếm'}</h3>
@@ -217,68 +226,45 @@ export function ReceiptCountForm({
         </p>
       )}
       {!driveLoading && !driveItems.length && <button className="button secondary" type="button" onClick={() => { setItemsError(''); setDriveRevision(current => current + 1); }}>Tải lại vật phẩm của đợt</button>}
-      {!simple && !heldRelease && <button className="button secondary" type="button" aria-expanded={allowUnexpected} onClick={() => { setAllowUnexpected(current => !current); setItemsError(''); }}>
-        {allowUnexpected ? 'Ẩn vật phẩm ngoài đợt' : 'Có vật phẩm thực tế ngoài đợt quyên góp?'}
-      </button>}
+      {!heldRelease && !allowUnexpected && <button className="button secondary" type="button" onClick={() => {
+        setAllowUnexpected(true);
+        setAdvanced(true);
+        setLines(current => [...current, { ...empty(), outside: true }]);
+        setItemsError('');
+        key.current = null;
+      }}>Có vật phẩm thực tế ngoài đợt quyên góp?</button>}
       {allowUnexpected && !heldRelease && <p className="notice warning">Chỉ chọn vật phẩm ngoài đợt khi hàng thực tế được bàn giao khác danh sách của đợt. Dòng này sẽ được đánh dấu để người duyệt rà soát.</p>}
-      {simple && lines.map((line, index) => {
-        const item = items.find((candidate) => candidate.id === line.item_id);
-        return (
-          <label key={index} style={{ display: 'grid', gridTemplateColumns: '1fr 160px', gap: '12px', alignItems: 'center' }}>
-            <span>{item ? `${item.name} (${item.unit.display_name})` : 'Vật phẩm'}</span>
-            <input type="number" min="0" step="any" inputMode="decimal" placeholder="Số đếm được" value={line.counted_quantity}
-              aria-invalid={Boolean(fieldErrors[`${index}.counted_quantity`] && (attempted || touched[`${index}.counted_quantity`]))}
-              onChange={(event) => edit(index, 'counted_quantity', event.target.value)} />
-            {(attempted || touched[`${index}.counted_quantity`]) && (fieldErrors[`${index}.counted_quantity`] || fieldErrors[`${index}.accepted_quantity`]) &&
-              <small className="field-error" role="alert" style={{ gridColumn: '1 / -1' }}>{fieldErrors[`${index}.counted_quantity`] || fieldErrors[`${index}.accepted_quantity`]}</small>}
-          </label>
-        );
-      })}
       {!heldRelease && <button className="button secondary" type="button" aria-expanded={advanced} onClick={() => setAdvanced((value) => !value)}>
         {advanced ? 'Thu gọn' : 'Có hàng lỗi, giữ lại hoặc cần ghi chú?'}
       </button>}
-      {!simple && lines.map((line, index) => (
+      {lines.map((line, index) => (
         <fieldset className="candidate count-line" key={index}>
           <legend>Vật phẩm {index + 1}</legend>
           <label>
-            Vật phẩm trong đợt quyên góp
+            {line.outside ? 'Vật phẩm thực tế ngoài đợt quyên góp' : 'Vật phẩm trong đợt quyên góp'}
             <Dropdown
               disabled={heldRelease}
               value={items.some((item) => item.id === line.item_id) ? line.item_id : ''}
               onChange={(event) => edit(index, 'item_id', event.target.value)}
             >
               <option value="">Chọn vật phẩm</option>
-              {items.map((item) => (
+              {items.filter(item => (item.id === line.item_id || !lines.some(other => other.item_id === item.id)) && (!line.outside || !driveItems.some(driveItem => driveItem.id === item.id))).map((item) => (
                 <option value={item.id} key={item.id}>
                   {item.name} · {item.unit.display_name}{!driveItems.some(driveItem => driveItem.id === item.id) ? ' · ngoài đợt' : ''}
                 </option>
               ))}
             </Dropdown>
           </label>
-          {(allowUnexpected || heldRelease) && <label>
-            <span>Mã vật phẩm <span className="required-mark" aria-hidden="true">*</span></span>
-            <input
-              required
-              readOnly={heldRelease}
-              maxLength={37}
-              aria-invalid={Boolean(showFieldError(`${index}.item_id`, line.item_id) && fieldErrors[`${index}.item_id`])}
-              value={line.item_id}
-              onChange={(event) => edit(index, 'item_id', event.target.value)}
-              onBlur={() => setTouched((current) => ({ ...current, [`${index}.item_id`]: true }))}
-              placeholder="Mã vật phẩm trong danh mục"
-            />
-            {showFieldError(`${index}.item_id`, line.item_id) && fieldErrors[`${index}.item_id`] && <small className="field-error" role="alert">{fieldErrors[`${index}.item_id`]}</small>}
-          </label>}
-          {!allowUnexpected && !heldRelease && showFieldError(`${index}.item_id`, line.item_id) && fieldErrors[`${index}.item_id`] && <small className="field-error" role="alert">{fieldErrors[`${index}.item_id`]}</small>}
+          {showFieldError(`${index}.item_id`, line.item_id) && fieldErrors[`${index}.item_id`] && <small className="field-error" role="alert">{fieldErrors[`${index}.item_id`]}</small>}
           <div className="form-grid">
-            {(
+            {(advanced || heldRelease ? (
               [
                 ['counted_quantity', 'Đã đếm'],
                 ['accepted_quantity', 'Tiếp nhận'],
                 ['held_quantity', 'Tạm giữ'],
                 ['rejected_quantity', 'Từ chối'],
               ] as const
-            ).map(([field, title]) => (
+            ) : [['counted_quantity', 'Đã đếm']] as const).map(([field, title]) => (
               <label key={field}>
                 <span>{title} <span className="required-mark" aria-hidden="true">*</span></span>
                 <input
@@ -296,7 +282,7 @@ export function ReceiptCountForm({
               </label>
             ))}
           </div>
-          <label>
+          {(advanced || heldRelease) && <label>
             Ghi chú tình trạng
             <input
               maxLength={1001}
@@ -306,15 +292,15 @@ export function ReceiptCountForm({
               onBlur={() => setTouched((current) => ({ ...current, [`${index}.condition_note`]: true }))}
             />
             {showFieldError(`${index}.condition_note`, line.condition_note) && fieldErrors[`${index}.condition_note`] && <small className="field-error" role="alert">{fieldErrors[`${index}.condition_note`]}</small>}
-          </label>
-          <label>
+          </label>}
+          {(advanced || heldRelease) && <label>
             Hạn sử dụng nếu có
             <input
               type="date"
               value={line.expiry_date}
               onChange={(event) => edit(index, 'expiry_date', event.target.value)}
             />
-          </label>
+          </label>}
           {!heldRelease && lines.length > 1 && (
             <button
               className="button secondary"
@@ -329,19 +315,20 @@ export function ReceiptCountForm({
           )}
         </fieldset>
       ))}
-      {!simple && !heldRelease && lines.length < 50 && (
+      {!heldRelease && lines.length < (allowUnexpected ? items.length : driveItems.length) && (
         <button
           className="button secondary"
           type="button"
           onClick={() => {
-            setLines([...lines, empty()]);
+            const nextItem = allowUnexpected ? undefined : driveItems.find(item => !lines.some(line => line.item_id === item.id));
+            setLines([...lines, { ...empty(), item_id: nextItem?.id || '', outside: allowUnexpected }]);
             key.current = null;
           }}
         >
           Thêm vật phẩm
         </button>
       )}
-      {!simple && <label>
+      {(advanced || heldRelease) && <label>
         Ghi chú chung
         <textarea
           maxLength={1001}
@@ -356,12 +343,17 @@ export function ReceiptCountForm({
         />
         {showFieldError('note', note) && fieldErrors.note && <small className="field-error" role="alert">{fieldErrors.note}</small>}
       </label>}
+      {!heldRelease && <label>
+        <span>Kèm minh chứng (không bắt buộc)</span>
+        <input type="file" accept="image/jpeg,image/png,video/mp4" onChange={event => { setEvidence(event.target.files?.[0] || null); key.current = null; }} />
+        {evidence && evidenceFileError(evidence) && <small className="field-error" role="alert">{evidenceFileError(evidence)}</small>}
+      </label>}
       {error && (
         <p className="notice error" role="alert">
           {error}
         </p>
       )}
-      <button className="button" disabled={busy || driveLoading || !driveItems.length || hasInvalidFields}>
+      <button className="button" disabled={busy || driveLoading || !driveItems.length || hasInvalidFields || Boolean(evidence && evidenceFileError(evidence))}>
         {busy ? 'Đang gửi…' : confirm ? 'Gửi xác nhận' : 'Gửi kết quả đếm'}
       </button>
     </form>

@@ -80,6 +80,8 @@ export function LocationPicker({
   selectOnPick = false,
   closeOnSelect = false,
   hideMap = false,
+  hideToggle = false,
+  toggleLabel,
   overlay,
   weather,
 }: {
@@ -92,6 +94,8 @@ export function LocationPicker({
   closeOnSelect?: boolean;
   /** Keep the address search panel while another map owns point selection. */
   hideMap?: boolean;
+  hideToggle?: boolean;
+  toggleLabel?: string;
   overlay?: LocationOverlay;
   /** Forecast at the confirmed SOS location, supplied by the form's weather request. */
   weather?: LocationWeather | null;
@@ -711,16 +715,16 @@ export function LocationPicker({
 
   return (
     <div className="location-picker">
-      <button
+      {!hideToggle && <button
         type="button"
         className="button secondary"
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
       >
-        {open
+        {toggleLabel && !open ? toggleLabel : open
           ? hideMap ? 'Ẩn tìm địa chỉ' : 'Ẩn bản đồ chọn vị trí'
           : hideMap ? 'Tìm địa chỉ' : 'Tìm địa chỉ và chọn trên bản đồ'}
-      </button>
+      </button>}
 
       {open && (
         <div className="location-map-panel">

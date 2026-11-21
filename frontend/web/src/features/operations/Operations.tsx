@@ -12,7 +12,6 @@ import { formatQuantity } from '../../i18n/quantity';
 import { NeedReasonChips, NeedSourceBadge } from '../supply-gaps/SupplyBadges';
 import { HandoffDetail } from './HandoffDetail';
 import { ReceiptCountForm } from './ReceiptCountForm';
-import { ReceiptEvidenceUpload } from './ReceiptEvidenceUpload';
 import { operationRecordKey } from './recordKey';
 import { RecoveryIssue } from '../../components/RecoveryIssue';
 import { DetailSurface } from '../../components/DetailSurface';
@@ -477,7 +476,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
         {page === 'assets' && asset === 'warehouses' && <WarehouseMapManager
           canManage={rights.has('OPERATIONS_MANAGER')} canManageDrives={rights.has('OPERATIONS_MANAGER') || rights.has('COORDINATOR')}
           warehouseOptions={warehouseOptions} campaigns={references.campaigns || []} items={references.items || []} itemScales={references.itemScales || []}
-          refreshKey={revision} onCreateWarehouse={() => { setSelected(null); setDetail(null); setShowCreate(true); }} onChanged={() => setRevision((value) => value + 1)} />}
+          refreshKey={revision} onChanged={() => setRevision((value) => value + 1)} />}
         {page === 'review' && (
           <div className="tabs">
             <button
@@ -512,6 +511,9 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 ))}
               </div>
             )}
+            {(receiptCampaign || receiptWarehouse || receiptStatus) && (
+              <div className="receipt-filter-actions"><button type="button" className="button secondary clear-receipt-filters" onClick={() => { setReceiptCampaign(''); setReceiptWarehouse(''); setReceiptStatus(''); setCursor(''); setSelected(null); }}>Xóa bộ lọc</button></div>
+            )}
             {([
               ['Chiến dịch', receiptCampaign, setReceiptCampaign, 'Tất cả chiến dịch',
                 Object.entries(seenFilters.campaigns).map(([value, label]) => ({ value, label }))],
@@ -530,9 +532,6 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 </Dropdown>
               </label>
             ))}
-            {(receiptCampaign || receiptWarehouse || receiptStatus) && (
-              <button type="button" className="button secondary" style={{ alignSelf: 'end' }} onClick={() => { setReceiptCampaign(''); setReceiptWarehouse(''); setReceiptStatus(''); setCursor(''); setSelected(null); }}>Xóa bộ lọc</button>
-            )}
           </div>
         )}
         {page === 'reports' && (
@@ -892,7 +891,14 @@ export function Operations({ page, user }: { page: string; user: Me }) {
               command({ title: 'Ngừng sử dụng', service: 'logistics', path: `/${asset}/${id}/deactivate`, version,
                 warning: 'Ngừng sử dụng tài sản hoặc địa điểm này? Các phiếu đang liên quan có thể cần xử lý trước.' })}
             </div>
-            <div hidden={(page !== 'drives' && !inlineActions && detailTab !== 'details') || (page === 'review' && status === 'PENDING_REVIEW')} role={page === 'drives' ? undefined : 'tabpanel'} aria-labelledby={page === 'drives' ? undefined : 'operations-detail-tab-details'}>
+            <div hidden={page !== 'drives' && !inlineActions && detailTab !== 'details'} role={page === 'drives' ? undefined : 'tabpanel'} aria-labelledby={page === 'drives' || inlineActions ? undefined : 'operations-detail-tab-details'}>
+            {inlineActions && <div className="receipt-detail-summary">
+              <h3>Thông tin đóng góp</h3>
+              <p><strong>Đợt quyên góp:</strong> {string(detail.drive_title) || string(selected.drive_title) || 'Chưa rõ'}</p>
+              <p><strong>Người đóng góp:</strong> {string(detail.donor_name) || string(selected.donor_name) || 'Chưa rõ'}</p>
+              <p><strong>Kho tiếp nhận:</strong> {string(detail.warehouse_name) || string(selected.warehouse_name) || 'Chưa rõ'}</p>
+              <p><strong>Trạng thái:</strong> {label(status)}</p>
+            </div>}
             {page === 'drives' && <section aria-label="Vật phẩm cần tiếp nhận">
               <h3>Vật phẩm cần tiếp nhận</h3>
               {driveItems.length > 0 ? <>
@@ -1041,6 +1047,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 <ReceiptCountForm
                   key={`first-${selected.id}`}
                   receiptId=""
+                  deliveryId={selected.id}
                   create={{ deliveryId: selected.id, warehouseId: string(selected.intake_warehouse_id) }}
                   driveId={string(selected.drive_id)}
                   driveTitle={string(selected.drive_title)}
@@ -1070,6 +1077,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                   <ReceiptCountForm
                     key={receiptId + version}
                     receiptId={receiptId}
+                    deliveryId={string(selected.id)}
                     driveId={string(detail.drive_id)}
                     driveTitle={string(detail.drive_title)}
                     version={version}
@@ -1096,6 +1104,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                   <ReceiptCountForm
                     key={`confirm-${receiptId}-${version}`}
                     receiptId={receiptId}
+                    deliveryId={string(selected.id)}
                     driveId={string(detail.drive_id)}
                     driveTitle={string(detail.drive_title)}
                     version={version}
@@ -1104,11 +1113,6 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                     onSuccess={done}
                   />
                 )}
-              {canCount && selected?.id && !['REJECTED', 'CANCELLED', 'POSTED'].includes(string(selected.status)) && (
-                <details><summary>Đính kèm minh chứng (không bắt buộc)</summary>
-                  <ReceiptEvidenceUpload key={`evidence-${selected.id}`} deliveryId={selected.id} />
-                </details>
-              )}
               {page === 'review' &&
                 receiptId &&
                 count &&
@@ -1416,34 +1420,6 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           page === 'needs' &&
           (rights.has('OPERATIONS_MANAGER') || rights.has('COORDINATOR')) &&
           command(needCreate)}
-        {!selected &&
-          page === 'assets' &&
-          rights.has('OPERATIONS_MANAGER') &&
-          command({
-            hideTitle: true,
-            title: 'Thêm kho',
-            service: 'logistics',
-            path: '/warehouses',
-            fields:
-                  [
-                      { name: 'name', label: 'Tên kho', required: true, maxLength: 200 },
-                      { name: 'location', label: 'Vị trí kho và vùng phục vụ', type: 'service-area', radiusFieldName: 'service_radius_m', addressFieldName: 'address_note', radiusRange: { min: 500, max: 200_000 } },
-                      { name: 'address_note', label: 'Địa chỉ', maxLength: 500, visibleFor: (values) => Boolean(values.location), hintFor: () => 'Có thể chỉnh lại địa chỉ gần đúng sau khi chọn điểm.' },
-                      { name: 'service_radius_m', label: 'Bán kính phục vụ (mét)', type: 'number', integer: true, min: 500, max: 200_000, visibleFor: (values) => Boolean(values.location) },
-                    ],
-            build:
-                  (values) => ({
-                      name: values.name,
-                      ...(values.address_note?.trim() ? { address_note: values.address_note.trim() } : {}),
-                      // Location and radius are sent together or not at all (the form enforces the pair).
-                      ...(values.location
-                        ? {
-                            location: { type: 'Point', coordinates: values.location.split(',').map(Number) },
-                            service_radius_m: Number(values.service_radius_m),
-                          }
-                        : {}),
-                    }),
-          })}
         {!selected &&
           page === 'distribution' &&
           rights.has('OPERATIONS_MANAGER') &&

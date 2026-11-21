@@ -101,10 +101,10 @@ function IntakeReview({ user }: { user: Me }) {
   const current = step === 'review' && !canReview ? 'intake' : step;
   const tabs: Array<[(typeof intakeSteps)[number], string]> = [
     ['supply', 'Nhu cầu và quyên góp'],
-    ['intake', 'Tiếp nhận'],
+    ...(roles(user).has('OPERATIONS_MANAGER') ? [['intake', 'Tiếp nhận'] as [(typeof intakeSteps)[number], string]] : []),
     ...(canReview ? [['review', 'Duyệt và khiếu nại'] as [(typeof intakeSteps)[number], string]] : []),
     ['distribution', 'Phân phối vật tư'],
-    ['pickup', 'Phiếu lấy hàng'],
+    ...(roles(user).has('VOLUNTEER') ? [['pickup', 'Phiếu lấy hàng'] as [(typeof intakeSteps)[number], string]] : []),
   ];
   return (
     <div>

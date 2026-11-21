@@ -140,6 +140,7 @@ export function Donations({ user }: { user: Me | null }) {
   const [loading, setLoading] = useState(false);
   const [created, setCreated] = useState<Declaration | null>(null);
   const [createdSecret, setCreatedSecret] = useState('');
+  useEffect(() => { if (created) requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'instant' })); }, [created]);
   const [trackId, setTrackId] = useState('');
   const trackIdInput = useRef<HTMLInputElement>(null);
   const [ownedSearch, setOwnedSearch] = useState('');
@@ -377,6 +378,8 @@ export function Donations({ user }: { user: Me | null }) {
         }
       );
       setCreated(result);
+      setShowDeclaration(false);
+      window.scrollTo({ top: 0, behavior: 'instant' });
       rememberDonation(result, selected.title);
       if (user) setOwnedRevision((current) => current + 1);
       setCreatedSecret(command.secret);
@@ -840,14 +843,6 @@ export function Donations({ user }: { user: Me | null }) {
           Trạng thái: {label(created.status)}. Vật phẩm chưa được ghi vào tồn kho cho đến khi kiểm
           đếm và duyệt.
         </p>
-        {createdSecret && (
-          <div className="notice warning">
-            <p>Định danh phía trên đã đủ để tra cứu tiến độ. Mã này chỉ dùng khi khách cần gửi khiếu nại hoặc minh chứng.</p>
-            <strong>Hãy lưu mã bảo mật ngay:</strong>
-            <div className="secret">{createdSecret}</div>
-            <p>Mã này chỉ hiển thị một lần; ứng dụng không lưu trên trình duyệt.</p>
-          </div>
-        )}
         <form
           className="form-stack command-form"
           onSubmit={attachCreated}

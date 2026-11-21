@@ -122,10 +122,10 @@ export function DriveCreateForm({ warehouses, campaigns, items, itemScales, onSu
     </div>
     <fieldset className="drive-location-field"><legend>Điểm quyên góp trên bản đồ *</legend>
       <small className="muted">Chọn nơi người dân mang hàng đến. Vòng tròn trên bản đồ là vùng phục vụ của kho; điểm phải nằm trong vòng đó. Người quyên góp sẽ được gợi ý đợt gần họ nhất.</small>
-      <LocationPicker value={location} initiallyOpen={Boolean(warehouseId) && !location}
+      <LocationPicker value={location} initiallyOpen={Boolean(warehouseId) && !location} toggleLabel={location ? 'Đổi điểm quyên góp' : undefined}
         overlay={area ? { areas: [{ id: 'warehouse-area', label: `Vùng phục vụ ${area.name}`, latitude: area.latitude, longitude: area.longitude, radiusM: area.radiusM }] } : undefined}
         onSelect={(point, address) => { setLocation(point); if (point && address && !locationNote) setLocationNote(address); pending.current = null; setError(''); }} />
-      {location && <small>Vị trí đã chọn: {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}</small>}
+      {location && <small>Đã chọn điểm quyên góp trên bản đồ.</small>}
       {warehouseId && locationError && <small className="field-error" role="alert">{locationError}</small>}
       <label><span>Chỉ dẫn tìm điểm (nếu có)</span><input maxLength={501} value={locationNote} onChange={event => { setLocationNote(event.target.value); pending.current = null; }} placeholder="Ví dụ: cổng chính nhà văn hóa, sảnh tầng 1" /></label>
     </fieldset>
@@ -138,7 +138,7 @@ export function DriveCreateForm({ warehouses, campaigns, items, itemScales, onSu
         <div className="drive-item-head"><strong>Vật phẩm {index + 1}</strong>
           {lines.length > 1 && <button className="button secondary small" type="button" onClick={() => { setLines(current => current.filter((_, i) => i !== index)); pending.current = null; }}>Xóa</button>}</div>
         <div className="drive-item-fields">
-        <label><span>Vật phẩm *</span><Dropdown required aria-invalid={Boolean(lineErrors[index].item)} value={line.item_id} onChange={event => updateLine(index, { item_id: event.target.value, target_quantity: '' })}>
+        <label><Dropdown required aria-label="Vật phẩm" aria-invalid={Boolean(lineErrors[index].item)} value={line.item_id} onChange={event => updateLine(index, { item_id: event.target.value, target_quantity: '' })}>
           <option value="">Chọn vật phẩm</option>{items.filter(option => option.value === line.item_id || !lines.some(other => other.item_id === option.value)).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
         </Dropdown>{line.item_id && lineErrors[index].item && <small className="field-error" role="alert">{lineErrors[index].item}</small>}</label>
         <label><span>Số lượng mục tiêu *</span><input required type="number" min="0" step={10 ** -Number(itemScales.find(item => item.value === line.item_id)?.label ?? 0)} aria-invalid={Boolean(line.target_quantity && lineErrors[index].quantity)} value={line.target_quantity} onChange={event => updateLine(index, { target_quantity: event.target.value })} />{line.target_quantity && lineErrors[index].quantity && <small className="field-error" role="alert">{lineErrors[index].quantity}</small>}</label>

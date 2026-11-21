@@ -207,7 +207,7 @@ export function CommandForm({
       if (center && field.addressFieldName) {
         if (address !== undefined) addressValue = address.slice(0, 500);
         else if (sameCenter) addressValue = current[field.addressFieldName] || '';
-        else addressValue = `Tọa độ: ${center.latitude.toFixed(6)}, ${center.longitude.toFixed(6)}`;
+        else addressValue = '';
       }
       return {
         ...current,
@@ -411,7 +411,7 @@ export function CommandForm({
           return (
           <div key={field.name} className="form-stack service-area-field" role="group" aria-invalid={Boolean(inlineError)} aria-describedby={describedBy}>
             <strong>{field.label}</strong>
-            <small className="muted">Tìm địa chỉ hoặc chạm bản đồ để chọn tâm vùng. Vị trí được áp dụng ngay; kéo ghim để đổi tâm và kéo tay nắm trên vòng tròn để chỉnh bán kính.</small>
+            <small className="muted">Chạm bản đồ để chọn tâm vùng. Kéo ghim để đổi tâm và kéo tay nắm trên vòng tròn để chỉnh bán kính. Địa chỉ gần đúng được điền vào ô bên dưới và có thể chỉnh lại.</small>
             <LocationPicker
               value={centre}
               onAddressResolved={(point, address) => {
@@ -429,6 +429,7 @@ export function CommandForm({
               selectOnPick
               closeOnSelect
               hideMap
+              hideToggle
               onSelect={(point, address) => updateServiceArea(field, point, point ? (radiusValue > 0 ? radiusValue : 5_000) : null, address)}
             />
             <CampaignAreaMap
@@ -446,9 +447,6 @@ export function CommandForm({
               <button type="button" className="button secondary" disabled={!centre && !values[field.radiusFieldName || '']}
                 onClick={() => updateServiceArea(field, null, null)}>Xóa vùng phục vụ</button>
             </div>}
-            {centre && (
-              <small>Tâm vùng: {centre.latitude.toFixed(6)}, {centre.longitude.toFixed(6)}</small>
-            )}
             {inlineError && (
               <small className="field-error" id={errorId(field)} role="alert">{inlineError}</small>
             )}

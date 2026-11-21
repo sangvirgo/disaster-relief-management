@@ -1663,10 +1663,12 @@
 .warehouse-drive__head p { margin: 4px 0; }
 .donation-nearby-map { height: 320px; width: 100%; border-radius: 12px; margin: 10px 0; }
 
-.warehouse-manager__layout { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(340px, 1fr); gap: 16px; align-items: start; }
+.warehouse-manager__layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
 .warehouse-manager__map { position: sticky; top: 12px; }
-.warehouse-manager__map .warehouse-coverage__map { height: min(76vh, 760px); min-height: 460px; }
-.warehouse-manager__side { display: grid; gap: 10px; min-width: 0; }
+.warehouse-manager__map .warehouse-coverage__map { height: min(82vh, 920px); min-height: 620px; }
+.warehouse-manager__side { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 12px; min-width: 0; }
+.warehouse-manager__side > .warehouse-manager__summary { grid-column: 1 / -1; }
+.warehouse-manager__side > .warehouse-card.is-selected { grid-column: 1 / -1; }
 .warehouse-manager__summary { margin: 0; font-weight: 600; }
 .warehouse-card { display: grid; gap: 8px; padding: 12px; border: 1px solid #dbe3ef; border-radius: 12px; background: #fff; }
 .warehouse-card.is-selected { border-color: #2563eb; box-shadow: 0 0 0 2px #2563eb26; }
@@ -1684,12 +1686,14 @@
 .warehouse-drive-pin span { display: grid; place-items: center; width: 28px; height: 28px; border: 2px solid #fff; border-radius: 50%; color: #fff; font-size: 14px; box-shadow: 0 2px 8px #0f172a55; }
 .warehouse-coverage__overlay--error { background: #fef2f2; color: #b91c1c; }
 .warehouse-map-toolbar { flex-wrap: wrap; justify-content: flex-end; }
-@media (max-width: 1100px) { .warehouse-manager__layout { grid-template-columns: 1fr; } .warehouse-manager__map { position: static; } }
+@media (max-width: 1100px) { .warehouse-manager__map { position: static; } }
 
-.warehouse-manager__layout { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(340px, 1fr); gap: 16px; align-items: start; }
+.warehouse-manager__layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
 .warehouse-manager__map { position: sticky; top: 12px; }
-.warehouse-manager__map .warehouse-coverage__map { height: min(76vh, 760px); min-height: 460px; }
-.warehouse-manager__side { display: grid; gap: 10px; min-width: 0; }
+.warehouse-manager__map .warehouse-coverage__map { height: min(82vh, 920px); min-height: 620px; }
+.warehouse-manager__side { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 12px; min-width: 0; }
+.warehouse-manager__side > .warehouse-manager__summary { grid-column: 1 / -1; }
+.warehouse-manager__side > .warehouse-card.is-selected { grid-column: 1 / -1; }
 .warehouse-manager__summary { margin: 0; font-weight: 600; }
 .warehouse-card { display: grid; gap: 8px; padding: 12px; border: 1px solid #dbe3ef; border-radius: 12px; background: #fff; }
 .warehouse-card.is-selected { border-color: #2563eb; box-shadow: 0 0 0 2px #2563eb26; }
@@ -1707,10 +1711,53 @@
 .warehouse-drive-pin span { display: grid; place-items: center; width: 28px; height: 28px; border: 2px solid #fff; border-radius: 50%; color: #fff; font-size: 14px; box-shadow: 0 2px 8px #0f172a55; }
 .warehouse-coverage__overlay--error { background: #fef2f2; color: #b91c1c; }
 .warehouse-map-toolbar { flex-wrap: wrap; justify-content: flex-end; }
-@media (max-width: 1100px) { .warehouse-manager__layout { grid-template-columns: 1fr; } .warehouse-manager__map { position: static; } }
+@media (max-width: 1100px) { .warehouse-manager__map { position: static; } }
 .campaign-flag-pin span { display: grid; place-items: center; width: 22px; height: 22px; border: 2px solid #fff; border-radius: 6px; color: #fff; font-size: 12px; box-shadow: 0 2px 6px #0f172a55; }
 .legend-dot--campaign { background: #ea580c; border-radius: 5px; }
 .warehouse-map-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 8px; background: #fff; box-shadow: 0 2px 8px #0f172a26; font-size: 13px; font-weight: 600; cursor: pointer; }
 .warehouse-card__served { font-size: 13px; }
-.warehouse-map-banner { position: absolute; z-index: 1000; top: 12px; left: 12px; max-width: min(60%, 420px); padding: 8px 12px; border-radius: 10px; background: #1d4ed8; color: #fff; font-weight: 600; box-shadow: 0 4px 14px #0f172a40; }
-.drive-location-field { display: grid; gap: 8px; }
+.warehouse-map-banner { position: absolute; z-index: 1000; top: 120px; left: 12px; max-width: min(60%, 420px); padding: 8px 12px; border-radius: 10px; background: #1d4ed8; color: #fff; font-weight: 600; box-shadow: 0 4px 14px #0f172a40; }
+.drive-location-field { display: grid; gap: 4px; }
+.drive-location-field .location-picker { margin-top: 0; }
+.warehouse-map-pin svg { display: block; width: 44px; height: 44px; overflow: visible; filter: drop-shadow(0 2px 5px #0f172a66); }
+.warehouse-icon-bg { fill: #fff; stroke: #17212f; stroke-width: 2; }
+.warehouse-icon-lines { fill: none; stroke: #303030; stroke-width: 2.3; stroke-linecap: round; stroke-linejoin: round; }
+.warehouse-icon-wheel { fill: #fff; }
+.warehouse-map-pin .is-selected .warehouse-icon-bg { stroke: #2563eb; stroke-width: 4; }
+.warehouse-map-pin:hover svg { filter: drop-shadow(0 3px 6px #0f172a88); transform: translateY(-2px); }
+.warehouse-draft-pin { cursor: move; touch-action: none; }
+.legend-warehouse-icon, .legend-warehouse-icon svg { display: inline-block; width: 20px; height: 20px; flex: none; vertical-align: middle; }
+.warehouse-radius-handle span { display: grid; place-items: center; width: 32px; height: 32px; border: 2px solid #1d4ed8; border-radius: 50%; background: #fff; color: #1d4ed8; font-size: 18px; font-weight: 800; box-shadow: 0 2px 10px #0f172a55; cursor: ew-resize; touch-action: none; }
+.warehouse-map-hover { position: absolute; z-index: 1001; right: 10px; bottom: 60px; box-sizing: border-box; width: min(430px, calc(100% - 20px)); max-height: min(54vh, 520px); overflow-y: auto; padding: 14px; border: 1px solid #cbd9ed; border-radius: 14px; background: #fff; box-shadow: 0 14px 36px #0f172a44; pointer-events: none; }
+.warehouse-map-hover button, .warehouse-map-hover a, .warehouse-map-hover input, .warehouse-map-hover .warehouse-map-hover__table-wrap { pointer-events: auto; }
+.warehouse-map-hover--draft { z-index: 1100; max-height: none; overflow: visible; padding: 8px; pointer-events: auto; }
+.warehouse-map-hover__actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.warehouse-map-hover__actions .button { min-height: 34px; padding: 5px 9px; font-size: 12px; }
+.warehouse-map-hover__heading, .warehouse-map-editor__heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.warehouse-map-hover__heading strong, .warehouse-map-editor__heading strong { font-size: 16px; line-height: 22px; }
+.warehouse-map-hover p { margin: 6px 0 10px; font-size: 13px; }
+.warehouse-map-hover__heading .button, .warehouse-map-editor__heading .button { min-width: 32px; min-height: 30px; padding: 2px 8px; }
+.warehouse-map-hover__table-wrap { overflow-x: auto; }
+.warehouse-map-hover__table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.warehouse-map-hover__table th, .warehouse-map-hover__table td { padding: 7px 5px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
+.warehouse-map-hover__table th:first-child { min-width: 125px; }
+.warehouse-map-hover .pager { margin: 10px 0 0; }
+.warehouse-map-editor { display: flex; align-items: end; gap: 5px; }
+.warehouse-map-editor__name { display: grid; flex: 1; min-width: 0; gap: 2px; font-size: 12px; font-weight: 700; }
+.warehouse-map-editor input:not([type='checkbox']) { box-sizing: border-box; width: 100%; min-height: 36px; padding: 6px 8px; border: 1px solid #cbd9ed; border-radius: 7px; background: #fff; color: var(--color-text-primary); font: inherit; }
+.warehouse-map-editor__confirm, .warehouse-map-editor__cancel { flex: none; width: 36px; height: 36px; border: 0; border-radius: 8px; color: #fff; font-size: 22px; font-weight: 700; cursor: pointer; }
+.warehouse-map-editor__confirm { background: #16a34a; }
+.warehouse-map-editor__confirm:disabled { background: #86cfa0; cursor: not-allowed; }
+.warehouse-map-editor__cancel { background: #64748b; }
+.warehouse-map-editor small { color: var(--color-text-secondary); }
+.warehouse-map-editor__checkbox { display: flex !important; align-items: center; gap: 8px; }
+.warehouse-map-editor__checkbox input { width: 18px; height: 18px; margin: 0; }
+.warehouse-map-editor__actions { display: flex; justify-content: flex-end; gap: 8px; }
+@media (max-width: 700px) { .warehouse-manager__map .warehouse-coverage__map { min-height: 540px; } .warehouse-map-hover { bottom: 48px; max-height: 58vh; } }
+.command-checkbox { display: flex !important; flex-direction: row; align-items: center; gap: 10px; }
+.command-checkbox input[type='checkbox'] { width: 20px; height: 20px; flex: none; margin: 0; }
+.receipt-filter-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; margin: -4px 0 -8px; }
+.clear-receipt-filters { width: auto; min-height: 36px; padding: 6px 12px; font-size: 13px; }
+.receipt-detail-summary { padding: 12px 16px; border: 1px solid var(--color-surface-border); border-radius: 12px; background: var(--color-surface-subtle); }
+.receipt-detail-summary h3 { margin: 0 0 8px; }
+.receipt-detail-summary p { margin: 5px 0; }
