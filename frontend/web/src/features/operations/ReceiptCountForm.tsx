@@ -29,20 +29,25 @@ type Existing = { lines?: (Partial<Line> & { item_name?: string; unit_name?: str
 
 export function ReceiptCountForm({
   receiptId,
+  create,
   driveId,
-  driveTitle,
   version,
   existing,
   heldRelease = false,
+  confirm,
   onSuccess,
 }: {
   receiptId: string;
+  /** When there is no receipt yet, it is created from this delivery and warehouse right before the first count is sent. */
+  create?: { deliveryId: string; warehouseId: string };
   driveId: string;
   driveTitle: string;
   version: number;
   existing: Existing;
   heldRelease?: boolean;
-  onSuccess: () => void;
+  /** Independent second count: the figures are compared with the recorded count and a match approves the receipt. */
+  confirm?: { countRevision: number; declarationRevision: number };
+  onSuccess: (result?: { confirmation?: { matched: boolean; posted?: boolean; mismatched_items: string[] } }) => void;
 }) {
   const [driveItems, setDriveItems] = useState<Item[]>([]);
   const [catalogItems, setCatalogItems] = useState<Item[]>([]);
@@ -63,6 +68,7 @@ export function ReceiptCountForm({
       : [empty()]
   );
   const [note, setNote] = useState('');
+  const [advanced, setAdvanced] = useState(false);
   const [error, setError] = useState('');
   const [itemsError, setItemsError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -125,6 +131,7 @@ export function ReceiptCountForm({
     fetchAll<Drive & { id: string }>('logistics', '/donation-drives')
       .then(drives => { if (!live) return; const drive = drives.find(candidate => candidate.id === driveId);
         if (!drive) throw new Error('Không tìm thấy đợt quyên góp của biên nhận trong phạm vi được cấp quyền.');
+        if (!existing?.lines?.length && !heldRelease) setLines(drive.items.map(item => ({ ...empty(), item_id: item.item_id })));
         setDriveItems(drive.items.map(item => ({
         id: item.item_id, name: item.item_name,
         unit: { display_name: item.unit_name, scale: Number(item.scale) },
@@ -143,7 +150,13 @@ export function ReceiptCountForm({
   }, [allowUnexpected]);
   function edit(index: number, field: keyof Line, value: string) {
     setLines((current) =>
-      current.map((line, position) => (position === index ? { ...line, [field]: value } : line))
+      current.map((line, position) => {
+        if (position !== index) return line;
+        const next = { ...line, [field]: value };
+        // Typical case: everything counted is accepted. Keep accepted in step until the user edits the split.
+        if (field === 'counted_quantity' && !heldRelease && !touched[`${index}.accepted_quantity`] && Number(line.held_quantity || 0) === 0 && Number(line.rejected_quantity || 0) === 0) next.accepted_quantity = value;
+        return next;
+      })
     );
     setTouched((current) => ({ ...current, [`${index}.${field}`]: true }));
     key.current = null;
@@ -156,11 +169,22 @@ export function ReceiptCountForm({
     setBusy(true);
     try {
       key.current ||= newCommandKey();
-      await api('logistics', `/donation-receipts/${encodeURIComponent(receiptId)}/counts`, {
+      let targetReceipt = receiptId;
+      let targetVersion = version;
+      if (create && !receiptId) {
+        const created = await api<{ id: string; version: number }>('logistics', '/donation-receipts', {
+          method: 'POST', idempotencyKey: `${key.current}-receipt`,
+          body: { delivery_id: create.deliveryId, warehouse_id: create.warehouseId },
+        });
+        targetReceipt = created.id;
+        targetVersion = Number(created.version);
+      }
+      const result = await api<{ confirmation?: { matched: boolean; mismatched_items: string[] } }>('logistics', `/donation-receipts/${encodeURIComponent(targetReceipt)}/${confirm ? 'confirmations' : 'counts'}`, {
         method: 'POST',
         idempotencyKey: key.current,
         body: {
-          expected_version: version,
+          expected_version: targetVersion,
+          ...(confirm ? { count_revision: confirm.countRevision, declaration_revision: confirm.declarationRevision } : {}),
           lines: lines.map((line) => ({
             item_id: line.item_id.trim(),
             counted_quantity: line.counted_quantity,
@@ -170,23 +194,22 @@ export function ReceiptCountForm({
             ...(line.condition_note.trim() ? { condition_note: line.condition_note.trim() } : {}),
             ...(line.expiry_date ? { expiry_date: line.expiry_date } : {}),
           })),
-          ...(note.trim() ? { note: note.trim() } : {}),
+          ...(note.trim() && !confirm ? { note: note.trim() } : {}),
         },
       });
       key.current = null;
-      onSuccess();
+      onSuccess(result);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Chưa xác nhận được kết quả kiểm đếm.');
     } finally {
       setBusy(false);
     }
   }
+  const simple = !advanced && !heldRelease;
   return (
     <form className="form-stack command-form" onSubmit={submit} noValidate>
-      <h3>{heldRelease ? 'Kiểm tra lại hàng tạm giữ' : 'Gửi kết quả kiểm đếm'}</h3>
-      <p>
-        {heldRelease ? 'Giữ nguyên vật phẩm, số đã đếm và số từ chối. Chỉ tăng phần tiếp nhận và giảm tương ứng phần tạm giữ; người khác phải duyệt độc lập trước khi nhập bổ sung.' : `Chọn vật phẩm thuộc đợt “${driveTitle || 'quyên góp'}” và ghi số lượng thực tế. Người khác sẽ duyệt độc lập.`}
-      </p>
+      <h3>{heldRelease ? 'Kiểm tra lại hàng tạm giữ' : confirm ? 'Xác nhận kiểm đếm độc lập' : 'Gửi kết quả kiểm đếm'}</h3>
+      <p>{confirm ? 'Tự đếm hàng thực tế rồi nhập số đếm được. Nếu khớp lần đếm trước, biên nhận được duyệt và ghi sổ ngay.' : heldRelease ? 'Chỉ tăng phần tiếp nhận và giảm tương ứng phần tạm giữ.' : 'Nhập số lượng đếm được cho từng vật phẩm.'}</p>
       {driveLoading && <p role="status">Đang tải vật phẩm của đợt quyên góp…</p>}
       {itemsError && (
         <p className="notice error" role="alert">
@@ -194,11 +217,27 @@ export function ReceiptCountForm({
         </p>
       )}
       {!driveLoading && !driveItems.length && <button className="button secondary" type="button" onClick={() => { setItemsError(''); setDriveRevision(current => current + 1); }}>Tải lại vật phẩm của đợt</button>}
-      {!heldRelease && <button className="button secondary" type="button" aria-expanded={allowUnexpected} onClick={() => { setAllowUnexpected(current => !current); setItemsError(''); }}>
+      {!simple && !heldRelease && <button className="button secondary" type="button" aria-expanded={allowUnexpected} onClick={() => { setAllowUnexpected(current => !current); setItemsError(''); }}>
         {allowUnexpected ? 'Ẩn vật phẩm ngoài đợt' : 'Có vật phẩm thực tế ngoài đợt quyên góp?'}
       </button>}
       {allowUnexpected && !heldRelease && <p className="notice warning">Chỉ chọn vật phẩm ngoài đợt khi hàng thực tế được bàn giao khác danh sách của đợt. Dòng này sẽ được đánh dấu để người duyệt rà soát.</p>}
-      {lines.map((line, index) => (
+      {simple && lines.map((line, index) => {
+        const item = items.find((candidate) => candidate.id === line.item_id);
+        return (
+          <label key={index} style={{ display: 'grid', gridTemplateColumns: '1fr 160px', gap: '12px', alignItems: 'center' }}>
+            <span>{item ? `${item.name} (${item.unit.display_name})` : 'Vật phẩm'}</span>
+            <input type="number" min="0" step="any" inputMode="decimal" placeholder="Số đếm được" value={line.counted_quantity}
+              aria-invalid={Boolean(fieldErrors[`${index}.counted_quantity`] && (attempted || touched[`${index}.counted_quantity`]))}
+              onChange={(event) => edit(index, 'counted_quantity', event.target.value)} />
+            {(attempted || touched[`${index}.counted_quantity`]) && (fieldErrors[`${index}.counted_quantity`] || fieldErrors[`${index}.accepted_quantity`]) &&
+              <small className="field-error" role="alert" style={{ gridColumn: '1 / -1' }}>{fieldErrors[`${index}.counted_quantity`] || fieldErrors[`${index}.accepted_quantity`]}</small>}
+          </label>
+        );
+      })}
+      {!heldRelease && <button className="button secondary" type="button" aria-expanded={advanced} onClick={() => setAdvanced((value) => !value)}>
+        {advanced ? 'Thu gọn' : 'Có hàng lỗi, giữ lại hoặc cần ghi chú?'}
+      </button>}
+      {!simple && lines.map((line, index) => (
         <fieldset className="candidate count-line" key={index}>
           <legend>Vật phẩm {index + 1}</legend>
           <label>
@@ -290,7 +329,7 @@ export function ReceiptCountForm({
           )}
         </fieldset>
       ))}
-      {!heldRelease && lines.length < 50 && (
+      {!simple && !heldRelease && lines.length < 50 && (
         <button
           className="button secondary"
           type="button"
@@ -302,7 +341,7 @@ export function ReceiptCountForm({
           Thêm vật phẩm
         </button>
       )}
-      <label>
+      {!simple && <label>
         Ghi chú chung
         <textarea
           maxLength={1001}
@@ -316,14 +355,14 @@ export function ReceiptCountForm({
           onBlur={() => setTouched((current) => ({ ...current, note: true }))}
         />
         {showFieldError('note', note) && fieldErrors.note && <small className="field-error" role="alert">{fieldErrors.note}</small>}
-      </label>
+      </label>}
       {error && (
         <p className="notice error" role="alert">
           {error}
         </p>
       )}
       <button className="button" disabled={busy || driveLoading || !driveItems.length || hasInvalidFields}>
-        {busy ? 'Đang gửi kết quả…' : 'Gửi kiểm đếm để duyệt'}
+        {busy ? 'Đang gửi…' : confirm ? 'Gửi xác nhận' : 'Gửi kết quả đếm'}
       </button>
     </form>
   );

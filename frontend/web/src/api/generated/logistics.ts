@@ -1972,6 +1972,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/donation-receipts/{id}/confirmations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * DonationReceiptsController.confirm
+         * @description Route exported from backend/apps/logistics/src/receipts/donation-receipts.controller.ts#DonationReceiptsController.confirm. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
+         */
+        post: operations["logisticsDonationReceiptsConfirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -11828,6 +11848,44 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ErrorEnvelope"];
                 };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsDonationReceiptsConfirm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success response; see docs/backend/04-logistics-api.md for the documented response shape. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Documented error response; clients branch on the stable code. */
             401: {

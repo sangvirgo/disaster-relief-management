@@ -28,13 +28,16 @@ export class DonationReceiptsQueriesService {
     const session = await this.sessions.require(request);
     const permissions: Permission[] = ['DONATION_INTAKE', 'DONATION_REVIEW'];
     const filters = { route: 'logistics.donation-deliveries', user_id: session.userId, grants: session.grants,
-      drive_id: query.drive_id ?? null, status: query.status ?? null };
+      drive_id: query.drive_id ?? null, campaign_id: query.campaign_id ?? null,
+      warehouse_id: query.warehouse_id ?? null, status: query.status ?? null };
     const cursor = query.cursor ? decodeKeysetCursor(query.cursor, filters) : null;
     if (cursor && !validTimeCursor(cursor)) throw new AppError('CURSOR_INVALID', { status: 400 });
 
     const values: unknown[] = [];
     const conditions = [driveScopeSql(session.grants, values, permissions, 'd')];
     if (query.drive_id) conditions.push(`d.id=$${values.push(query.drive_id)}`);
+    if (query.campaign_id) conditions.push(`d.campaign_id=$${values.push(query.campaign_id)}`);
+    if (query.warehouse_id) conditions.push(`d.intake_warehouse_id=$${values.push(query.warehouse_id)}`);
     if (query.status) conditions.push(`dd.status=$${values.push(query.status)}`);
     if (cursor) {
       values.push(cursor.sort[0], cursor.id);
@@ -43,7 +46,7 @@ export class DonationReceiptsQueriesService {
     const limit = query.limit ?? 50;
     values.push(limit + 1);
     const rows = await this.dataSource.query(
-      `SELECT dd.id,dd.drive_id,d.title AS drive_title,dd.public_code,dd.donor_name,
+      `SELECT dd.id,dd.drive_id,d.title AS drive_title,d.campaign_id,d.intake_warehouse_id,w.name AS warehouse_name,dd.public_code,dd.donor_name,
               dd.donor_phone,dd.status,dd.version,r.id AS receipt_id,
               dd.created_at,to_char(dd.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_at
          FROM donation_delivery dd JOIN donation_drive d ON d.id=dd.drive_id

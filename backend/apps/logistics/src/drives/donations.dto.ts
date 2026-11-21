@@ -61,6 +61,12 @@ export class DonationPageQueryDto {
   @IsOptional() @IsUUID('all')
   drive_id?: string;
 
+  @IsOptional() @IsUUID('all')
+  campaign_id?: string;
+
+  @IsOptional() @IsUUID('all')
+  warehouse_id?: string;
+
   @IsOptional() @IsIn(['DECLARED', 'COUNTING', 'PENDING_REVIEW', 'APPROVED', 'POSTED', 'REJECTED', 'CANCELLED'])
   status?: string;
 

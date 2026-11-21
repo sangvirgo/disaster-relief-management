@@ -59,6 +59,20 @@ export class RecordReceiptCountDto {
   note?: string;
 }
 
+export class ConfirmReceiptCountDto {
+  @IsInt() @Min(1)
+  expected_version!: number;
+
+  @IsInt() @Min(1)
+  count_revision!: number;
+
+  @IsInt() @Min(1)
+  declaration_revision!: number;
+
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(50) @ValidateNested({ each: true }) @Type(() => ReceiptCountLineDto)
+  lines!: ReceiptCountLineDto[];
+}
+
 export class ReviewDonationReceiptDto {
   @IsInt() @Min(1)
   expected_version!: number;

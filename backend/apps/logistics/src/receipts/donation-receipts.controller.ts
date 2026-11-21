@@ -5,7 +5,7 @@ import type { Request, Response } from 'express';
 import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotency.interceptor';
 import {
   CreateDonationReceiptDto, DonationDisputePageQueryDto,
-  PostDonationReceiptDto, RecordReceiptCountDto, ReleaseHeldDonationDto, ResolveDonationDisputeDto,
+  ConfirmReceiptCountDto, PostDonationReceiptDto, RecordReceiptCountDto, ReleaseHeldDonationDto, ResolveDonationDisputeDto,
   ReviewDonationReceiptDto,
 } from './donation-receipts.dto';
 import { DonationPageQueryDto } from '../drives/donations.dto';
@@ -55,6 +55,21 @@ export class DonationReceiptsController {
   ) {
     noStore(response);
     const result = await this.receipts.recordCount(id, dto, request);
+    replay(response, result.replay);
+    return result.value;
+  }
+
+  @Post('donation-receipts/:id/confirmations')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(IdempotencyKeyInterceptor)
+  async confirm(
+    @Param('id', new ParseUUIDPipe({ version: 'all' })) id: string,
+    @Body() dto: ConfirmReceiptCountDto,
+    @Req() request: ReceiptCommandRequest,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    noStore(response);
+    const result = await this.receipts.confirmCount(id, dto, request);
     replay(response, result.replay);
     return result.value;
   }

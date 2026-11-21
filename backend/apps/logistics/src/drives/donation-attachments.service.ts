@@ -86,7 +86,7 @@ export class DonationAttachmentsService {
   ): Promise<IdempotentResult<Record<string, unknown>>> {
     const session = await this.optionalSession(request);
     const delivery = await this.findDelivery(this.dataSource, deliveryId);
-    this.assertDonorAccess(delivery, session, secret);
+    this.assertUploadAccess(delivery, session, secret);
     const capabilityHash = donationCapabilityHash(secret, this.secretConfig);
     if (!request.idempotencyKey) throw new AppError('IDEMPOTENCY_KEY_INVALID', { status: 400 });
     const scopeKey = session ? `user:${session.userId}` : `donation-capability:${deliveryId}:${capabilityHash}`;
@@ -106,7 +106,7 @@ export class DonationAttachmentsService {
       },
       reserve: async (manager, file) => {
         const lockedDelivery = await this.findDelivery(manager, deliveryId, true);
-        this.assertDonorAccess(lockedDelivery, session, secret);
+        this.assertUploadAccess(lockedDelivery, session, secret);
         if (disputeId) await this.assertDisputeOwner(manager, disputeId, deliveryId);
         await this.reserveOwnerQuota(manager, deliveryId, file.size);
         const id = randomUUID();
@@ -212,6 +212,13 @@ export class DonationAttachmentsService {
 
   private async optionalSession(request: Request): Promise<AuthenticatedLogisticsSession | null> {
     return hasCredential(request) ? this.sessions.require(request) : null;
+  }
+
+  /** Donors use their account or secret; warehouse staff and reviewers may attach counting evidence to a delivery in scope. */
+  private assertUploadAccess(delivery: DeliveryRow, session: AuthenticatedLogisticsSession | null, secret: string | undefined): void {
+    if (session && (hasPermission(session.grants, 'DONATION_INTAKE', { campaignId: delivery.campaign_id }) ||
+      hasPermission(session.grants, 'DONATION_REVIEW', { campaignId: delivery.campaign_id }))) return;
+    this.assertDonorAccess(delivery, session, secret);
   }
 
   private assertDonorAccess(delivery: DeliveryRow, session: AuthenticatedLogisticsSession | null, secret: string | undefined): void {

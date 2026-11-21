@@ -12,6 +12,7 @@ import { formatQuantity } from '../../i18n/quantity';
 import { NeedReasonChips, NeedSourceBadge } from '../supply-gaps/SupplyBadges';
 import { HandoffDetail } from './HandoffDetail';
 import { ReceiptCountForm } from './ReceiptCountForm';
+import { ReceiptEvidenceUpload } from './ReceiptEvidenceUpload';
 import { operationRecordKey } from './recordKey';
 import { RecoveryIssue } from '../../components/RecoveryIssue';
 import { DetailSurface } from '../../components/DetailSurface';
@@ -113,6 +114,11 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   const [report, setReport] = useUrlView('view', reportViews, 'stock-summary');
   const [warehouse, setWarehouse] = useState(() => readReportFilters(user.id).warehouse || '');
   const [campaign, setCampaign] = useState(() => readReportFilters(user.id).campaign || '');
+  const [receiptCampaign, setReceiptCampaign] = useState('');
+  const [receiptWarehouse, setReceiptWarehouse] = useState('');
+  const [receiptStatus, setReceiptStatus] = useState('');
+  useEffect(() => { setReceiptStatus(page === 'review' ? 'PENDING_REVIEW' : ''); setCursor(''); }, [page]);
+  const [seenFilters, setSeenFilters] = useState<{ campaigns: Record<string, string>; warehouses: Record<string, string> }>({ campaigns: {}, warehouses: {} });
   const initialReportFilters = useRef({ warehouse: false });
   const [items, setItems] = useState<Row[]>([]);
   const [cursor, setCursor, prevPage, pageIndex] = useCursorNav<string>('');
@@ -145,6 +151,19 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   const [commitmentsError, setCommitmentsError] = useState('');
   const [commitmentsLoading, setCommitmentsLoading] = useState(false);
   const [references, setReferences] = useState<ReferenceOptions>({});
+  useEffect(() => {
+    if (page !== 'intake' && page !== 'review') return;
+    setSeenFilters((current) => {
+      const next = { campaigns: { ...current.campaigns }, warehouses: { ...current.warehouses } };
+      for (const item of items) {
+        const campaignId = string(item.campaign_id);
+        if (campaignId) next.campaigns[campaignId] = (references.campaignNames || []).find((option) => option.value === campaignId)?.label || `Chiến dịch …${campaignId.slice(-6)}`;
+        const warehouseId = string(item.intake_warehouse_id);
+        if (warehouseId) next.warehouses[warehouseId] = string(item.warehouse_name) || `Kho …${warehouseId.slice(-6)}`;
+      }
+      return JSON.stringify(next) === JSON.stringify(current) ? current : next;
+    });
+  }, [items, page, references.campaignNames]);
   useEffect(() => {
     const cached = referenceCache.get(user.id);
     if (revision === 0 && cached && cached.expiresAt > Date.now()) {
@@ -276,6 +295,11 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   if ((page === 'stock' || (page === 'reports' && report === 'stock-summary')) && warehouse)
     params.set('warehouse_id', warehouse);
   if (cursor) params.set('cursor', cursor);
+  if (page === 'intake' || (page === 'review' && reviewTab === 'receipts')) {
+    if (receiptCampaign) params.set('campaign_id', receiptCampaign);
+    if (receiptWarehouse) params.set('warehouse_id', receiptWarehouse);
+    if (receiptStatus) params.set('status', receiptStatus);
+  }
   if (page === 'reports' && report === 'reconciliation' && warehouse)
     params.set('warehouse_id', warehouse);
   if (page === 'reports' && report === 'fulfillment' && campaign) {
@@ -396,6 +420,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
       : distributionPages.has(page) ? distributionActionAvailable
         : page === 'intake' ? rights.has('OPERATIONS_MANAGER')
           : page === 'review' ? rights.has('REVIEWER') : false;
+  const inlineActions = page === 'intake' || page === 'review';
   const stockDetail = page === 'stock' || (page === 'reports' && report === 'stock-summary');
   const needScale = number((detail?.unit as Row | undefined)?.scale);
   const needStep = 10 ** -(needScale ?? 0);
@@ -406,6 +431,8 @@ export function Operations({ page, user }: { page: string; user: Me }) {
       ? string(selected?.receipt_id)
       : '';
   const count = detail?.count as Row | null | undefined;
+  const canCount = (page === 'intake' && rights.has('OPERATIONS_MANAGER')) ||
+    (page === 'review' && reviewTab === 'receipts' && rights.has('REVIEWER'));
   const needCreate: CommandSpec = {
     title: 'Ghi nhận nhu cầu',
     hideTitle: true,
@@ -473,6 +500,39 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             >
               Khiếu nại
             </button>
+          </div>
+        )}
+        {(page === 'intake' || (page === 'review' && reviewTab === 'receipts')) && (
+          <div className="filter-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', margin: '12px 0' }}>
+            {page === 'review' && (
+              <div className="tabs" style={{ gridColumn: '1 / -1', margin: 0 }} role="group" aria-label="Việc cần làm">
+                {([['DECLARED', 'Cần đếm'], ['PENDING_REVIEW', 'Cần xác nhận'], ['', 'Tất cả']] as const).map(([value, title]) => (
+                  <button key={value} type="button" className={receiptStatus === value ? 'active' : ''}
+                    onClick={() => { setReceiptStatus(value); setCursor(''); setSelected(null); setDetail(null); }}>{title}</button>
+                ))}
+              </div>
+            )}
+            {([
+              ['Chiến dịch', receiptCampaign, setReceiptCampaign, 'Tất cả chiến dịch',
+                Object.entries(seenFilters.campaigns).map(([value, label]) => ({ value, label }))],
+              ['Kho', receiptWarehouse, setReceiptWarehouse, 'Tất cả kho',
+                Object.entries(seenFilters.warehouses).map(([value, label]) => ({ value, label }))],
+              ...(page === 'review' ? [] : [['Trạng thái', receiptStatus, setReceiptStatus, 'Tất cả trạng thái', ([
+                ['DECLARED', 'Đã khai báo'], ['COUNTING', 'Đang kiểm đếm'], ['PENDING_REVIEW', 'Chờ duyệt kiểm đếm'],
+                ['APPROVED', 'Đã duyệt'], ['POSTED', 'Đã ghi sổ'], ['REJECTED', 'Bị từ chối'],
+              ]).map(([value, title]) => ({ value, label: title }))] as const]),
+            ] as const).map(([title, value, setValue, placeholder, options]) => (
+              <label className="filter" key={title}>
+                {title}
+                <Dropdown value={value} onChange={(event) => { setValue(event.target.value); setCursor(''); setSelected(null); setDetail(null); }}>
+                  <option value="">{placeholder}</option>
+                  {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </Dropdown>
+              </label>
+            ))}
+            {(receiptCampaign || receiptWarehouse || receiptStatus) && (
+              <button type="button" className="button secondary" style={{ alignSelf: 'end' }} onClick={() => { setReceiptCampaign(''); setReceiptWarehouse(''); setReceiptStatus(''); setCursor(''); setSelected(null); }}>Xóa bộ lọc</button>
+            )}
           </div>
         )}
         {page === 'reports' && (
@@ -635,17 +695,20 @@ export function Operations({ page, user }: { page: string; user: Me }) {
       {page === 'distribution' && commitmentsError && <p role="alert" className="notice error">{commitmentsError} Hãy tải lại trước khi lập phiếu hỗ trợ SOS.</p>}
       {(selected || showCreate) && <DetailSurface key={selected?.id || 'create'} className={`operations-detail-transition operations-management-dialog ${page === 'drives' && selected ? 'drive-detail-dialog' : ''} ${distributionPages.has(page) && !showCreate ? 'distribution-detail-panel' : ''}`} heading={selected ? recordTitle(page, selected) : createTitle} modal open={Boolean(selected) || showCreate} onClose={() => { setSelected(null); setDetail(null); setShowCreate(false); }} label={selected ? `Chi tiết ${recordTitle(page, selected)}` : createTitle}>
         {selected && !detail && <p role="status">Đang tải chi tiết…</p>}
-        {selected && detail && !['stock', 'assets', 'drives'].includes(page) && <Tabs items={[
+        {selected && inlineActions && <p style={{ margin: '0 0 12px' }}>
+          {string(selected.drive_title) || 'Đợt quyên góp'}{selected.donor_name ? ` · ${string(selected.donor_name)}` : ''}{selected.warehouse_name ? ` · ${string(selected.warehouse_name)}` : ''} · <StatusBadge status={string(selected.status)} />
+        </p>}
+        {selected && detail && !['stock', 'assets', 'drives'].includes(page) && !inlineActions && <Tabs items={[
           { id: 'overview', label: 'Thông tin' },
           { id: 'details', label: page === 'reports' ? 'Số liệu' : page === 'needs' ? 'Cam kết xuất kho' : page === 'drives' ? 'Vật phẩm tiếp nhận' : 'Chi tiết' },
-          ...(showActionsTab ? [{ id: 'actions', label: 'Thao tác' }] : []),
+          ...(showActionsTab && !inlineActions ? [{ id: 'actions', label: 'Thao tác' }] : []),
           ...(distributionPages.has(page) ? [{ id: 'handoff', label: 'Bàn giao' }] : []),
         ]} value={detailTab} onChange={setDetailTab} ariaLabel="Nội dung bản ghi" idBase="operations-detail" />}
-        {selected && <div id="operations-detail-tabpanel">
+        {selected && <div id="operations-detail-tabpanel" style={page === 'review' ? { display: 'flex', flexDirection: 'column' } : undefined}>
         {distributionPages.has(page) && selected.id && <div hidden={detailTab !== 'handoff'} role="tabpanel" aria-labelledby="operations-detail-tab-handoff"><HandoffDetail key={selected.id + (lastHandoff?.distributionId === selected.id ? lastHandoff.id : '')} distributionId={selected.id} initialId={lastHandoff?.distributionId === selected.id ? lastHandoff.id : undefined} canReview={rights.has('REVIEWER') || rights.has('OPERATIONS_MANAGER')} userId={user.id} onChanged={() => setRevision((value) => value + 1)} /></div>}
         {detail && (
           <>
-            <div hidden={page === 'drives' || detailTab !== 'overview'} role="tabpanel" aria-labelledby="operations-detail-tab-overview">
+            <div hidden={page === 'drives' || inlineActions || detailTab !== 'overview'} role="tabpanel" aria-labelledby="operations-detail-tab-overview">
             <div className="detail-grid">
               {page === 'drives' && <>
                 <p><strong>Tên đợt quyên góp</strong><span className="detail-value">{string(detail.title) || 'Chưa có tên'}</span></p>
@@ -829,7 +892,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
               command({ title: 'Ngừng sử dụng', service: 'logistics', path: `/${asset}/${id}/deactivate`, version,
                 warning: 'Ngừng sử dụng tài sản hoặc địa điểm này? Các phiếu đang liên quan có thể cần xử lý trước.' })}
             </div>
-            <div hidden={page !== 'drives' && detailTab !== 'details'} role={page === 'drives' ? undefined : 'tabpanel'} aria-labelledby={page === 'drives' ? undefined : 'operations-detail-tab-details'}>
+            <div hidden={(page !== 'drives' && !inlineActions && detailTab !== 'details') || (page === 'review' && status === 'PENDING_REVIEW')} role={page === 'drives' ? undefined : 'tabpanel'} aria-labelledby={page === 'drives' ? undefined : 'operations-detail-tab-details'}>
             {page === 'drives' && <section aria-label="Vật phẩm cần tiếp nhận">
               <h3>Vật phẩm cần tiếp nhận</h3>
               {driveItems.length > 0 ? <>
@@ -932,7 +995,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             )}
             {!['drives', 'needs', 'reports', 'distribution', 'handoff', 'intake', 'review'].includes(page) && !Array.isArray(detail.lines) && !count && <p className="muted">Thông tin chi tiết của bản ghi được hiển thị trong tab Thông tin.</p>}
             </div>
-            <div hidden={page === 'drives' ? !showActionsTab : detailTab !== 'actions'} role={page === 'drives' ? undefined : 'tabpanel'} aria-labelledby={page === 'drives' ? undefined : 'operations-detail-tab-actions'}>
+            <div style={page === 'review' ? { order: -1 } : undefined} hidden={page === 'drives' || inlineActions ? !showActionsTab : detailTab !== 'actions'} role={page === 'drives' || inlineActions ? undefined : 'tabpanel'} aria-labelledby={page === 'drives' || inlineActions ? undefined : 'operations-detail-tab-actions'}>
             <div className="action-grid">
               {page === 'drives' &&
                 id &&
@@ -974,30 +1037,18 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                     warning: 'Tiếp tục tiếp nhận đóng góp?',
                   })
                 ) : null)}
-              {page === 'intake' &&
-                selected?.id &&
-                !selected.receipt_id &&
-                rights.has('OPERATIONS_MANAGER') &&
-                command({
-                  title: 'Lập biên nhận',
-                  service: 'logistics',
-                  path: '/donation-receipts',
-                  fields: [(() => {
-                    const warehouseId = references.driveWarehouses?.find(
-                      (drive) => drive.value === selected.drive_id
-                    )?.label;
-                    const field = referenceField('warehouse_id', 'Kho tiếp nhận', 'warehouses', true);
-                    return warehouseId ? {
-                      ...field,
-                      initialValue: warehouseId,
-                      options: field.options?.filter((option) => option.value === warehouseId),
-                    } : field;
-                  })()],
-                  build: (values) => ({
-                    delivery_id: selected.id,
-                    warehouse_id: values.warehouse_id,
-                  }),
-                })}
+              {canCount && selected?.id && !selected.receipt_id && selected.status === 'DECLARED' && (
+                <ReceiptCountForm
+                  key={`first-${selected.id}`}
+                  receiptId=""
+                  create={{ deliveryId: selected.id, warehouseId: string(selected.intake_warehouse_id) }}
+                  driveId={string(selected.drive_id)}
+                  driveTitle={string(selected.drive_title)}
+                  version={0}
+                  existing={null}
+                  onSuccess={done}
+                />
+              )}
               {page === 'intake' &&
                 selected?.id &&
                 selected.version != null &&
@@ -1010,10 +1061,10 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                     kind="donation"
                   />
                 )}
-              {page === 'intake' &&
+              {canCount &&
                 receiptId &&
                 version != null &&
-                rights.has('OPERATIONS_MANAGER') &&
+                (page === 'intake' || status === 'COUNTING') &&
                 !['REJECTED', 'CANCELLED'].includes(status) &&
                 (status !== 'POSTED' || (Array.isArray(count?.lines) && (count.lines as Row[]).some(line => Number(line.held_quantity) > 0))) && (
                   <ReceiptCountForm
@@ -1040,6 +1091,24 @@ export function Operations({ page, user }: { page: string; user: Me }) {
               {page === 'intake' && receiptId && ['REJECTED', 'CANCELLED'].includes(status) && (
                 <p className="notice">Đóng góp đã {status === 'REJECTED' ? 'bị từ chối' : 'hủy'}, không thể gửi kiểm đếm mới hoặc ghi sổ.</p>
               )}
+              {page === 'review' && reviewTab === 'receipts' && receiptId && count && version != null &&
+                status === 'PENDING_REVIEW' && rights.has('REVIEWER') && !detail.review && (
+                  <ReceiptCountForm
+                    key={`confirm-${receiptId}-${version}`}
+                    receiptId={receiptId}
+                    driveId={string(detail.drive_id)}
+                    driveTitle={string(detail.drive_title)}
+                    version={version}
+                    existing={null}
+                    confirm={{ countRevision: Number(count.revision), declarationRevision: Number(count.declaration_revision) }}
+                    onSuccess={done}
+                  />
+                )}
+              {canCount && selected?.id && !['REJECTED', 'CANCELLED', 'POSTED'].includes(string(selected.status)) && (
+                <details><summary>Đính kèm minh chứng (không bắt buộc)</summary>
+                  <ReceiptEvidenceUpload key={`evidence-${selected.id}`} deliveryId={selected.id} />
+                </details>
+              )}
               {page === 'review' &&
                 receiptId &&
                 count &&
@@ -1047,7 +1116,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 (['PENDING_REVIEW', 'APPROVED'].includes(status) || (status === 'POSTED' && !detail.review)) &&
                 rights.has('REVIEWER') && (
                   <>
-                    {(status === 'PENDING_REVIEW' || status === 'POSTED') && command({
+                    {(status === 'PENDING_REVIEW' || status === 'POSTED') && <details><summary>Từ chối hoặc yêu cầu đếm lại</summary>{command({
                       title: 'Duyệt kiểm đếm',
                       service: 'logistics',
                       path: `/donation-receipts/${receiptId}/review`,
@@ -1073,7 +1142,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                         reason: values.reason,
                       }),
                       warning: 'Xác nhận quyết định duyệt độc lập cho phiên bản hiện tại?',
-                    })}
+                    })}</details>}
                     {status === 'APPROVED' &&
                       command({
                         title: 'Ghi sổ tiếp nhận',

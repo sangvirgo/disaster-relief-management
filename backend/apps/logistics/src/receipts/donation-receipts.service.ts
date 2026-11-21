@@ -5,11 +5,12 @@ import type { DataSource, EntityManager } from 'typeorm';
 import { AppError } from '@c48/technical/errors/errors';
 import { canonicalRequestHash, IdempotencyService, IdempotentResult, ResourceRef } from '@c48/technical/idempotency/idempotency';
 import { LogisticsSessionService } from '../auth/logistics-session.service';
+import { hasPermission } from '@c48/identity-contracts/permissions';
 import { requireWarehousePermission, hasWarehouseScope } from '../stock/stock.scope';
 import { decimalFromUnits } from '../common/quantity';
 import {
   CreateDonationReceiptDto, RecordReceiptCountDto, ReleaseHeldDonationDto, ResolveDonationDisputeDto,
-  ReviewDonationReceiptDto, PostDonationReceiptDto, ReceiptCountLineDto,
+  ReviewDonationReceiptDto, PostDonationReceiptDto, ReceiptCountLineDto, ConfirmReceiptCountDto,
 } from './donation-receipts.dto';
 import {
   assertHeldReleaseConserved, assertUniqueCountItems, ReceiptLineFacts, receiptQuantityUnits, validateCountSplit,
@@ -54,6 +55,31 @@ function requireReceiptPermission(
 ): void {
   if (!hasWarehouseScope(grants, scope)) throw new AppError('NOT_FOUND', { status: 404 });
   requireWarehousePermission(grants, permission, scope);
+}
+
+/** Counting is open to warehouse staff and to reviewers; independence is still enforced by the review guards. */
+function requireCountPermission(grants: Parameters<typeof hasWarehouseScope>[0], scope: Pick<ReceiptContext, 'campaign_id'>): void {
+  if (!hasWarehouseScope(grants, scope)) throw new AppError('NOT_FOUND', { status: 404 });
+  if (!hasPermission(grants, 'DONATION_INTAKE', { campaignId: scope.campaign_id })) {
+    requireWarehousePermission(grants, 'DONATION_REVIEW', scope);
+  }
+}
+
+function compareCounts(
+  recorded: ReadonlyArray<ReceiptLineFacts & { unit_scale: number }>,
+  confirmed: readonly ReceiptCountLineDto[],
+  scales: Map<string, number>,
+): string[] {
+  const fields = ['counted_quantity', 'accepted_quantity', 'held_quantity', 'rejected_quantity'] as const;
+  const byItem = new Map(recorded.map((line) => [line.item_id, line]));
+  const different = new Set<string>();
+  for (const line of confirmed) {
+    const first = byItem.get(line.item_id);
+    const scale = scales.get(line.item_id) ?? first?.unit_scale ?? 0;
+    if (!first || fields.some((field) => receiptQuantityUnits(first[field], scale) !== receiptQuantityUnits(line[field], scale))) different.add(line.item_id);
+  }
+  for (const line of recorded) if (!confirmed.some((candidate) => candidate.item_id === line.item_id)) different.add(line.item_id);
+  return [...different];
 }
 
 function expectVersion(actual: number | string, expected: number): void {
@@ -102,7 +128,7 @@ export class DonationReceiptsService {
   async recordCount(id: string, dto: RecordReceiptCountDto, request: ReceiptRequest): Promise<IdempotentResult<Record<string, unknown>>> {
     const session = await this.sessions.require(request);
     const receipt = await this.receiptContext(this.dataSource, id);
-    requireReceiptPermission(session.grants, 'DONATION_INTAKE', receipt);
+    requireCountPermission(session.grants, receipt);
     const itemIds = assertUniqueCountItems(dto.lines);
     const scales = await this.itemScales(this.dataSource, itemIds);
     this.validateLines(dto.lines, scales);
@@ -119,7 +145,7 @@ export class DonationReceiptsService {
       requestHash: canonicalRequestHash({ receipt_id: id, dto }),
       execute: async (manager) => {
         const current = await this.receiptContext(manager, id, true);
-        requireReceiptPermission(session.grants, 'DONATION_INTAKE', current);
+        requireCountPermission(session.grants, current);
         expectVersion(current.version, dto.expected_version);
         if (['REJECTED', 'CANCELLED'].includes(current.delivery_status)) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
         const currentScales = await this.itemScales(manager, itemIds);
@@ -206,6 +232,68 @@ export class DonationReceiptsService {
     });
   }
 
+  /**
+   * Second, independent count by a reviewer who did not count the receipt. Matching figures record an APPROVE review;
+   * any difference records REQUEST_RECOUNT so the goods are counted again. The confirmer's figures are kept in the audit log.
+   */
+  async confirmCount(id: string, dto: ConfirmReceiptCountDto, request: ReceiptRequest): Promise<IdempotentResult<Record<string, unknown>>> {
+    const session = await this.sessions.require(request);
+    const receipt = await this.receiptContext(this.dataSource, id);
+    requireReceiptPermission(session.grants, 'DONATION_REVIEW', receipt);
+    const itemIds = assertUniqueCountItems(dto.lines);
+    this.validateLines(dto.lines, await this.itemScales(this.dataSource, itemIds));
+
+    return this.idempotency.execute(this.dataSource, {
+      scopeKey: `user:${session.userId}`,
+      command: 'logistics.donation-receipts.confirmations',
+      key: key(request),
+      requestHash: canonicalRequestHash({ receipt_id: id, dto }),
+      execute: async (manager) => {
+        const current = await this.receiptContext(manager, id, true);
+        requireReceiptPermission(session.grants, 'DONATION_REVIEW', current);
+        expectVersion(current.version, dto.expected_version);
+        if (current.delivery_status !== 'PENDING_REVIEW') throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
+        const revisions = await this.currentRevisions(manager, id, current.delivery_id);
+        if (revisions.count !== dto.count_revision || revisions.declaration !== dto.declaration_revision) {
+          throw new AppError('STALE_REVISION', { status: 409 });
+        }
+        const prior = await manager.query(
+          'SELECT 1 FROM receipt_review WHERE receipt_id=$1 AND count_revision=$2 AND declaration_revision=$3 LIMIT 1',
+          [id, revisions.count, revisions.declaration],
+        ) as unknown[];
+        if (prior.length) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
+        const counted = await manager.query(
+          'SELECT 1 FROM receipt_count WHERE receipt_id=$1 AND counted_by_user_id=$2 LIMIT 1', [id, session.userId],
+        ) as unknown[];
+        if (counted.length) throw new AppError('SELF_REVIEW_FORBIDDEN', { status: 403 });
+
+        const scales = await this.itemScales(manager, itemIds);
+        this.validateLines(dto.lines, scales);
+        const recorded = await this.countLines(manager, id, revisions.count);
+        const mismatches = compareCounts(recorded, dto.lines, scales);
+        const matched = mismatches.length === 0;
+        const reason = matched
+          ? 'Hai lần kiểm đếm độc lập trùng khớp; đã duyệt và ghi sổ.'
+          : `Hai lần kiểm đếm độc lập không khớp ở ${mismatches.length} vật phẩm; cần đếm lại.`;
+        await manager.query(
+          `INSERT INTO receipt_review (receipt_id,delivery_id,count_revision,declaration_revision,reviewer_user_id,decision,reason)
+           VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+          [id, current.delivery_id, revisions.count, revisions.declaration, session.userId, matched ? 'APPROVE' : 'REQUEST_RECOUNT', reason],
+        );
+        await this.setDeliveryStatus(manager, current.delivery_id, matched ? 'APPROVED' : 'COUNTING');
+        await this.advanceReceiptVersion(manager, id, dto.expected_version);
+        if (matched) await this.notifyReceiptDifference(manager, current, revisions.count, revisions.declaration);
+        await this.audit(manager, session.userId, 'DONATION_COUNT_CONFIRMED', 'donation_receipt', id,
+          { version: Number(current.version) }, { version: Number(current.version) + 1, count_revision: revisions.count,
+            declaration_revision: revisions.declaration, matched, mismatched_items: mismatches, confirmation_lines: dto.lines }, reason);
+        if (matched) await this.postApproved(manager, current, dto.expected_version + 1, session.userId);
+        return { status: 200, value: { ...(await readReceiptView(manager, id)).value, confirmation: { matched, posted: matched, mismatched_items: mismatches } },
+          resource: { type: 'donation_receipt', id } };
+      },
+      replay: async (manager, resource) => this.replayReceipt(manager, resource),
+    });
+  }
+
   async post(id: string, dto: PostDonationReceiptDto, request: ReceiptRequest): Promise<IdempotentResult<Record<string, unknown>>> {
     const session = await this.sessions.require(request);
     const receipt = await this.receiptContext(this.dataSource, id);
@@ -222,20 +310,26 @@ export class DonationReceiptsService {
         if (current.delivery_status === 'POSTED') throw new AppError('ALREADY_POSTED', { status: 409 });
         expectVersion(current.version, dto.expected_version);
         if (current.delivery_status !== 'APPROVED') throw new AppError('RECEIPT_NOT_APPROVED', { status: 409 });
-        const revisions = await this.currentRevisions(manager, id, current.delivery_id);
-        await this.assertApproved(manager, id, current.delivery_id, revisions);
-        await this.assertNeverCounted(manager, id, session.userId);
-        const lines = await this.acceptedLines(manager, id, revisions.count);
-        await this.postAccepted(manager, id, current.warehouse_id, lines, session.userId, revisions.count);
-        await this.setDeliveryStatus(manager, current.delivery_id, 'POSTED');
-        await this.advanceReceiptVersion(manager, id, dto.expected_version);
-        await this.audit(manager, session.userId, 'DONATION_RECEIPT_POSTED', 'donation_receipt', id,
-          { version: Number(current.version), delivery_status: current.delivery_status }, { version: Number(current.version) + 1, count_revision: revisions.count });
-        await this.notifyDonor(manager, current.donor_user_id, id, 1, 'DONATION_RECEIPT_POSTED', 'Hàng quyên góp đã được ghi nhận vào kho.');
+        await this.postApproved(manager, current, dto.expected_version, session.userId);
         return { status: 200, value: (await readReceiptView(manager, id)).value, resource: { type: 'donation_receipt', id } };
       },
       replay: async (manager, resource) => this.replayReceipt(manager, resource),
     });
+  }
+
+  /** Posts an APPROVED receipt to stock; shared by the explicit post step and by an auto-approving confirmation. */
+  private async postApproved(manager: EntityManager, current: ReceiptContext, expectedVersion: number, userId: string): Promise<void> {
+    const id = current.id;
+    const revisions = await this.currentRevisions(manager, id, current.delivery_id);
+    await this.assertApproved(manager, id, current.delivery_id, revisions);
+    await this.assertNeverCounted(manager, id, userId);
+    const lines = await this.acceptedLines(manager, id, revisions.count);
+    await this.postAccepted(manager, id, current.warehouse_id, lines, userId, revisions.count);
+    await this.setDeliveryStatus(manager, current.delivery_id, 'POSTED');
+    await this.advanceReceiptVersion(manager, id, expectedVersion);
+    await this.audit(manager, userId, 'DONATION_RECEIPT_POSTED', 'donation_receipt', id,
+      { version: expectedVersion, delivery_status: 'APPROVED' }, { version: expectedVersion + 1, count_revision: revisions.count });
+    await this.notifyDonor(manager, current.donor_user_id, id, 1, 'DONATION_RECEIPT_POSTED', 'Hàng quyên góp đã được ghi nhận vào kho.');
   }
 
   async releaseHeld(id: string, dto: ReleaseHeldDonationDto, request: ReceiptRequest): Promise<IdempotentResult<Record<string, unknown>>> {
@@ -326,7 +420,7 @@ export class DonationReceiptsService {
       throw new AppError('VALIDATION_FAILED', { status: 400 });
     }
     if (!hasWarehouseScope(grants, delivery)) throw new AppError('NOT_FOUND', { status: 404 });
-    requireWarehousePermission(grants, 'DONATION_INTAKE', delivery);
+    requireCountPermission(grants, delivery);
   }
 
   private async deliveryForCreate(query: Pick<DataSource | EntityManager, 'query'>, deliveryId: string, warehouseId: string, lock = false): Promise<DeliveryCreateContext> {

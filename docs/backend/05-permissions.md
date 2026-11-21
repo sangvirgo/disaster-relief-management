@@ -34,7 +34,7 @@ Roles are a code catalog. The current role set has six codes: `ADMIN`, `COORDINA
 | `REPORT_READ` (Logistics aggregates) |  |  | ● | ● |  | ● |
 | `CATALOG_MANAGE`, `ASSET_MANAGE` (items, warehouses; SYSTEM scope only) |  |  |  | ● |  |  |
 | `DONATION_INTAKE` (count received goods) |  |  |  | ● |  |  |
-| `DONATION_REVIEW` (approve and post receipts) |  |  |  |  | ● |  |
+| `DONATION_REVIEW` (approve and post receipts; may also create receipts, count, confirm a count independently and attach counting evidence — user decision 2026-11-21) |  |  |  |  | ● |  |
 | `NEED_MANAGE` (define, reduce or cancel need) |  |  | ● | ● |  |  |
 | `NEED_ESTIMATE_CONFIRM` (generate SOS need estimates, confirm or edit them, and read the manager proposal queue `GET /need-proposals`) |  |  |  | ● |  |  |
 | `NEED_NORM_MANAGE` (need norm table; system scope) |  |  |  | ● |  |  |
