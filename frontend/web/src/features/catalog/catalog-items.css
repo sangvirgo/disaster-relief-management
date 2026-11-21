@@ -1,4 +1,4 @@
-/* Item catalog and alias editor. Single column on phones; the item card grid widens from 720px. */
+/* Item catalog and alias editor. */
 .catalog-items {
   display: grid;
   gap: 16px;
@@ -8,6 +8,45 @@
 .catalog-items__header p.muted {
   margin: 4px 0 12px;
 }
+
+.catalog-items__table-card { min-width: 0; }
+.catalog-items__table { min-width: 760px; }
+.catalog-items__table th, .catalog-items__table td { vertical-align: middle; }
+.catalog-items__pager, .catalog-item-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.catalog-items__pager { justify-content: flex-end; margin-top: 16px; }
+.catalog-items__pager > span { margin-right: auto; color: var(--color-text-secondary); }
+.catalog-item-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 12px 0 18px; }
+.catalog-item-facts > div { min-width: 0; padding: 10px 12px; border-radius: 10px; background: var(--color-surface-subtle); }
+.catalog-item-facts dt { color: var(--color-text-secondary); font-size: 12px; }
+.catalog-item-facts dd { margin: 4px 0 0; font-weight: 600; overflow-wrap: anywhere; }
+.catalog-item-dialog__actions { margin-top: 16px; }
+@media (max-width: 600px) { .catalog-item-facts { grid-template-columns: 1fr; } }
+
+.catalog-items__actions { width: 56px; text-align: right; }
+.catalog-item-menu-trigger {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border: 1px solid var(--color-surface-border);
+  border-radius: 50%; background: var(--color-surface-subtle);
+  color: var(--color-text-primary); font: 700 22px/1 var(--font-family); cursor: pointer;
+}
+.catalog-item-menu-trigger:hover, .catalog-item-menu-trigger[aria-expanded='true'] { background: var(--color-primary-bg); }
+.catalog-item-menu-trigger:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.catalog-item-menu {
+  position: fixed; z-index: 20000; display: grid; width: 208px; padding: 5px;
+  border: 1px solid var(--color-surface-border); border-radius: 10px;
+  background: var(--color-surface-card); box-shadow: 0 10px 24px #172b4d30;
+}
+.catalog-item-menu button {
+  width: 100%; min-height: 44px; padding: 8px 12px; border: 0; border-radius: 7px;
+  background: transparent; color: var(--color-text-primary); font: inherit; text-align: left; cursor: pointer;
+}
+.catalog-item-menu button:hover, .catalog-item-menu button:focus-visible { background: var(--color-primary-bg); outline: none; }
+.catalog-item-menu .catalog-item-menu__danger { color: #b42318; }
 
 .catalog-items__list {
   display: grid;

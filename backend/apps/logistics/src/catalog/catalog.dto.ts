@@ -61,8 +61,11 @@ export class UpdateItemAliasesDto {
   @Type(() => Number) @IsInt() @Min(1)
   expected_version!: number;
 
-  @IsArray() @ArrayMaxSize(20)
-  aliases!: string[];
+  @IsOptional() @IsString() @MaxLength(200) @Matches(/\S/u)
+  name?: string;
+
+  @IsOptional() @IsArray() @ArrayMaxSize(20)
+  aliases?: string[];
 }
 
 export class DeactivateItemDto {

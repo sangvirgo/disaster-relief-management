@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query, Req, Res, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query, Req, Res, UseInterceptors } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotency.interceptor';
 import { CatalogService } from './catalog.service';
@@ -85,6 +85,21 @@ export class CatalogController {
   ) {
     noStore(response);
     const result = await this.catalog.deactivateItem(id, dto, request);
+    replay(response, result.replay);
+    return result.value;
+  }
+
+  @Delete('items/:id')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(IdempotencyKeyInterceptor)
+  async deleteItem(
+    @Param('id', new ParseUUIDPipe({ version: 'all' })) id: string,
+    @Body() dto: DeactivateItemDto,
+    @Req() request: LogisticsRequest,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    noStore(response);
+    const result = await this.catalog.deleteItem(id, dto, request);
     replay(response, result.replay);
     return result.value;
   }

@@ -87,6 +87,7 @@ Every error the API can return has one row here. The implementation loads this t
 | `TOO_MANY_CELLS` | 400 | Response | Vùng bản đồ hoặc khoảng thời gian quá lớn. Vui lòng thu hẹp bộ lọc. |
 | **Logistics — catalog / stock** | | | |
 | `ITEM_NAME_TAKEN` | 409 | Logistics | Tên mặt hàng đã tồn tại. |
+| `ITEM_IN_USE` | 409 | Logistics | Vật phẩm đã được sử dụng nên không thể xóa; dữ liệu lịch sử được giữ nguyên. |
 | `VEHICLE_IDENTIFIER_TAKEN` | 409 | Logistics | Biển số hoặc mã phương tiện đã tồn tại. |
 | `POINT_INACTIVE` | 409 | Logistics | Điểm cứu trợ đã ngừng hoạt động. |
 | `VEHICLE_INACTIVE` | 409 | Logistics | Phương tiện đã ngừng hoạt động. |

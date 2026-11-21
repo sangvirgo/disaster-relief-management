@@ -836,7 +836,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                   <th scope="col">Đội cứu hộ</th>
                   <th scope="col">Tình trạng đội</th>
                   <th scope="col">Vị trí gần nhất</th>
-                  <th scope="col">Thao tác</th>
+                  <th scope="col" aria-label="Tùy chọn" />
                 </tr>
               </thead>
               <tbody>

@@ -13,6 +13,7 @@ import { AddPickupCloseout1795737600000 } from './migrations/AddPickupCloseout17
 import { GrantCampaignWarehouseAccess1795824000000 } from './migrations/GrantCampaignWarehouseAccess1795824000000';
 import { AddNeedExtractionLog1795910400000 } from './migrations/AddNeedExtractionLog1795910400000';
 import { RepairLegacyNeedEstimateSchema1795996800000 } from './migrations/RepairLegacyNeedEstimateSchema1795996800000';
+import { AllowUnusedItemDeletion1796083200000 } from './migrations/AllowUnusedItemDeletion1796083200000';
 
 export default new DataSource(postgresOptions([
   InitialLogistics1710000000000,
@@ -27,4 +28,5 @@ export default new DataSource(postgresOptions([
   GrantCampaignWarehouseAccess1795824000000,
   AddNeedExtractionLog1795910400000,
   RepairLegacyNeedEstimateSchema1795996800000,
+  AllowUnusedItemDeletion1796083200000,
 ], 'logistics'));

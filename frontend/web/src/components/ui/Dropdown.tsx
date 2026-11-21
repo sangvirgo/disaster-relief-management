@@ -26,6 +26,7 @@ function readOptions(children: ReactNode): Option[] {
 export function Dropdown({ children, value, onChange, onBlur, required, className = '', disabled, ...rest }: Props) {
   const options = readOptions(children);
   const selected = options.find((option) => option.value === String(value)) ?? options[0];
+  const menuOptions = required ? options.filter((option) => option.value !== '') : options;
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -37,27 +38,47 @@ export function Dropdown({ children, value, onChange, onBlur, required, classNam
     if (!open) return;
     const positionList = () => {
       const rect = trigger.current?.getBoundingClientRect();
-      if (!rect) return;
-      const zoom = Number.parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
-      const below = window.innerHeight - rect.bottom - 12;
-      const above = rect.top - 12;
-      const openAbove = below < 220 && above > below;
-      const maxHeight = Math.max(80, Math.min(260, openAbove ? above : below));
-      setPlacement({
-        top: (openAbove ? Math.max(8, rect.top - maxHeight - 5) : rect.bottom + 5) / zoom,
-        left: Math.max(8, Math.min(rect.left, window.innerWidth - rect.width - 8)) / zoom,
-        width: Math.min(rect.width, window.innerWidth - 16) / zoom,
-        maxHeight: maxHeight / zoom,
+      const menu = list.current;
+      if (!rect || !menu || !trigger.current) return;
+      const dialog = trigger.current?.closest('dialog');
+      const bounds = dialog?.getBoundingClientRect();
+      // Measure the rendered portal. Fixed positioning inside an animated, scrolling
+      // dialog has a different origin from fixed positioning in the page body.
+      const scale = rect.width / trigger.current.offsetWidth || 1;
+      const menuRect = menu.getBoundingClientRect();
+      const topEdge = Math.max(8, bounds?.top ?? 8);
+      const bottomEdge = Math.min(window.innerHeight - 8, bounds?.bottom ?? window.innerHeight - 8);
+      const below = bottomEdge - rect.bottom - 5;
+      const above = rect.top - topEdge - 5;
+      const fullHeight = Math.min(260, menu.scrollHeight * scale);
+      const openAbove = below < fullHeight && above > below;
+      const maxHeight = Math.max(0, Math.min(260, openAbove ? above : below));
+      const visibleHeight = Math.min(fullHeight, maxHeight);
+      const top = openAbove ? rect.top - visibleHeight - 5 : rect.bottom + 5;
+      const left = Math.max(bounds?.left ?? 8, Math.min(rect.left, (bounds?.right ?? window.innerWidth - 8) - rect.width));
+      setPlacement((current) => {
+        const next = {
+          top: current.top + (top - menuRect.top) / scale,
+          left: current.left + (left - menuRect.left) / scale,
+          width: rect.width / scale,
+          maxHeight: maxHeight / scale,
+        };
+        return Math.abs(next.top - current.top) < 0.5 && Math.abs(next.left - current.left) < 0.5 &&
+          Math.abs(next.width - current.width) < 0.5 && Math.abs(next.maxHeight - current.maxHeight) < 0.5
+          ? current : next;
       });
     };
     positionList();
     window.addEventListener('resize', positionList);
     window.addEventListener('scroll', positionList, true);
+    const dialog = trigger.current?.closest('dialog');
+    dialog?.addEventListener('animationend', positionList);
     return () => {
       window.removeEventListener('resize', positionList);
       window.removeEventListener('scroll', positionList, true);
+      dialog?.removeEventListener('animationend', positionList);
     };
-  }, [open]);
+  }, [open, placement]);
 
   useEffect(() => {
     if (!open) return;
@@ -118,7 +139,7 @@ export function Dropdown({ children, value, onChange, onBlur, required, classNam
       onKeyDown={onKeyDown} onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null) && !root.current?.contains(event.relatedTarget as Node | null)) setOpen(false);
       }}>
-      {options.map((option, index) => <button key={`${option.value}-${index}`} type="button" role="option"
+      {menuOptions.map((option, index) => <button key={`${option.value}-${index}`} type="button" role="option"
         aria-selected={option.value === String(value)} disabled={option.disabled}
         className={`ui-dropdown__option ${option.value === String(value) ? 'is-selected' : ''}`}
         onClick={() => choose(option)}>{option.label}</button>)}

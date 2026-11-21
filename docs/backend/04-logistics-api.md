@@ -13,8 +13,9 @@ Schema: [schema/logistics.sql](schema/logistics.sql). Conventions: [00](00-setup
 |---|---|
 | `GET /item-types` · `GET /units` · `GET /items?type=&status=&query=&cursor=` | Vietnamese display names; `unit.scale` included |
 | `POST /item-types` · `POST /units` · `POST /items` (Idem) | `{ item_type_code, unit_code, name, aliases? }`; `ITEM_NAME_TAKEN` 409 (per unit). Unit/type/code immutable after use. `aliases` (≤ 20 entries, 1..60 characters, NFC) feed text matching only |
-| `PATCH /items/{id}` (Ver) | `{ expected_version, aliases }` replaces the alias list; `VERSION_CONFLICT` 409. Name, unit and type are not editable here |
+| `PATCH /items/{id}` (Ver) | `{ expected_version, name?, aliases? }` updates the name and/or replaces the alias list; at least one is required. `VERSION_CONFLICT` 409; duplicate name per unit returns `ITEM_NAME_TAKEN` 409. Unit and type remain immutable to preserve stock history |
 | `POST /items/{id}/deactivate` | blocked only for new use; history kept |
+| `DELETE /items/{id}` (Ver) | `{ expected_version }`; deletes only an item with no referencing business records. Used items return `ITEM_IN_USE` 409 and must be deactivated instead |
 | `POST /warehouses` · `PATCH /warehouses/{id}` · `POST …/deactivate` | `{ name, address_note?, location?, location_public?, service_radius_m? }`; `location` (GeoJSON Point, lng/lat) and `service_radius_m` (1–200000 m) are set or cleared together (`VALIDATION_FAILED` with `WAREHOUSE_SERVICE_AREA_PAIR_REQUIRED` otherwise); shared warehouse operations require SYSTEM scope |
 | `POST /relief-points` · `PATCH` · `deactivate` | location required; inactive point cannot be chosen for a new need/distribution (`POINT_INACTIVE`) |
 | `POST /vehicles` · `PATCH` · `deactivate` | `{ identifier, vehicle_type, capacity?, capacity_unit? }`; shared vehicle operations require SYSTEM scope; `VEHICLE_IDENTIFIER_TAKEN` |
@@ -207,7 +208,7 @@ A category whose quantity rounds to zero is omitted and reported in `skipped` wi
 
 **Reason codes** (stable English codes, Vietnamese copy in one place, `need-reasons.ts`): `NORM_BY_GROUP`, `NORM_PER_N_PEOPLE`, `NORM_PER_REQUEST`, `DEFAULT_ITEM_USED`, `ROUNDED_UP_TO_UNIT_SCALE`, `NORM_NOT_FOUND` and `QUANTITY_ZERO` (skipped categories), and `QUANTITY_FAR_ABOVE_ESTIMATE`. The retired days and modifier codes are gone.
 
-**Item aliases** (`item.aliases text[]`, at most 20 entries of 1..60 characters, NFC, trimmed): alternative names such as "mì tôm" for "Mì gói". They are read and written by the catalog (`POST /items` takes an optional `aliases`; `PATCH /items/{id}` with `{ expected_version, aliases }` replaces the list; `CATALOG_MANAGE`). Matching is pure (`item-aliases.ts`): `normalizeAlias` removes diacritics, maps đ to d, lowercases and collapses spaces, and `matchAliases` returns item ids whose alias occurs as a whole phrase. It is the fallback for AI extraction only; aliases never set a quantity, a stock line or a need.
+**Item aliases** (`item.aliases text[]`, at most 20 entries of 1..60 characters, NFC, trimmed): alternative names such as "mì tôm" for "Mì gói". They are read and written by the catalog (`POST /items` takes an optional `aliases`; `PATCH /items/{id}` with `{ expected_version, name?, aliases? }` changes the name and/or replaces the list; `CATALOG_MANAGE`). Matching is pure (`item-aliases.ts`): `normalizeAlias` removes diacritics, maps đ to d, lowercases and collapses spaces, and `matchAliases` returns item ids whose alias occurs as a whole phrase. It is the fallback for AI extraction only; aliases never set a quantity, a stock line or a need.
 
 **`QUANTITY_FAR_ABOVE_ESTIMATE`** is computed on read, never stored. It applies to a live `DECLARED` line whose requested quantity is strictly greater than 3 times the estimated quantity of the latest estimate for the same item in the same cycle, including cancelled or confirmed estimates. A declared line with no earlier estimate is not flagged.
 

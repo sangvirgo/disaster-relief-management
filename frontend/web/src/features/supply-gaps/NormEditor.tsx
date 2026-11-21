@@ -103,14 +103,14 @@ export function NormEditor({ user }: { user: Me }) {
           emptyLabel: 'Không đặt vật phẩm mặc định',
           options: defaultItemOptions(norm, items),
           initialValue: norm.default_item_id ?? '',
-          hintFor: () => 'Vật phẩm này được dùng khi người dân không nêu rõ hàng cần. Chỉ chọn vật phẩm đang hoạt động cùng nhóm.',
+          hintFor: () => 'Dùng khi người dân chưa nêu rõ hàng cần; chỉ chọn vật phẩm đang dùng cùng nhóm.',
         },
         {
           name: 'in_default_bundle',
           label: 'Thuộc gói mặc định',
           type: 'checkbox',
           initialValue: norm.in_default_bundle ? 'true' : 'false',
-          hintFor: () => 'Nếu bật, nhóm hàng này được đưa vào danh sách mặc định khi người dân không nêu rõ hàng cần.',
+          hintFor: () => 'Bật để đưa nhóm hàng vào danh sách mặc định khi người dân chưa nêu rõ hàng cần.',
         },
         { name: 'active', label: 'Trạng thái áp dụng', type: 'select', required: true, options: [...normActiveOptions], initialValue: norm.active ? 'true' : 'false' },
       ],
@@ -148,7 +148,7 @@ export function NormEditor({ user }: { user: Me }) {
                 <th scope="col">Định mức</th>
                 <th scope="col">Gói mặc định</th>
                 <th scope="col">Trạng thái</th>
-                <th scope="col">Thao tác</th>
+                <th scope="col" aria-label="Tùy chọn" />
               </tr>
             </thead>
             <tbody>
@@ -177,7 +177,7 @@ export function NormEditor({ user }: { user: Me }) {
         </div>
       )}
       {editing && (
-        <DetailSurface key={editing.id} modal open onClose={() => setEditing(null)} label={`Sửa định mức ${labelFor(normCategoryLabels, editing.category, 'nhóm khác')}`} heading={`Sửa định mức ${labelFor(normCategoryLabels, editing.category, 'nhóm khác')}`} className="campaign-management-dialog">
+        <DetailSurface key={editing.id} modal open onClose={() => setEditing(null)} label={`Sửa định mức ${labelFor(normCategoryLabels, editing.category, 'nhóm khác')}`} heading={`Sửa định mức ${labelFor(normCategoryLabels, editing.category, 'nhóm khác')}`} className="campaign-management-dialog norm-editor-dialog">
           <CommandForm
             key={`${editing.id}-${editing.version}`}
             spec={normSpec(editing)}

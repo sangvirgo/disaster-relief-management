@@ -700,3 +700,4 @@ GRANT INSERT (id, warehouse_id, item_id) ON stock_balance TO c48_logistics_app;
 -- Retention/cleanup jobs.
 GRANT DELETE ON idempotency_record, notice TO c48_logistics_app;   -- retention cleanup
 GRANT DELETE ON distribution_line, drive_item TO c48_logistics_app;  -- 'replace lines / items as a set' commands; distribution_line_guard still refuses it once the distribution leaves DRAFT
+GRANT DELETE ON item TO c48_logistics_app; -- only unreferenced catalog rows; foreign keys retain business history

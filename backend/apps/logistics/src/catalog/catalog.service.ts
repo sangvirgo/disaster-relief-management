@@ -202,24 +202,31 @@ export class CatalogService {
     });
   }
 
-  /** Replaces the alias list of one item. Aliases only widen text matching; they never change stock or need quantities. */
+  /** Corrects catalog text without changing the unit/type used by stock history. */
   async updateItemAliases(itemId: string, dto: UpdateItemAliasesDto, request: LogisticsRequest): Promise<IdempotentResult<Record<string, unknown>>> {
     const session = await this.sessions.require(request);
     requireCatalogManage(session);
-    const aliases = cleanItemAliases(dto.aliases);
+    if ((dto.name === undefined && dto.aliases === undefined) || dto.name === null || dto.aliases === null) {
+      throw new AppError('VALIDATION_FAILED', { status: 400 });
+    }
+    const name = dto.name === undefined ? undefined : cleanText(dto.name, 200);
+    const aliases = dto.aliases === undefined ? undefined : cleanItemAliases(dto.aliases);
     return this.idempotency.execute(this.dataSource, {
       scopeKey: `user:${session.userId}`,
       command: 'logistics.items.aliases',
       key: key(request),
-      requestHash: canonicalRequestHash({ item_id: itemId, expected_version: dto.expected_version, aliases }),
+      requestHash: canonicalRequestHash({ item_id: itemId, expected_version: dto.expected_version, name, aliases }),
+      databaseErrorMappings: { unique: { item_name_unit_uq: 'ITEM_NAME_TAKEN' } },
       execute: async (manager) => {
         const rows = await manager.query('SELECT version FROM item WHERE id = $1 FOR UPDATE', [itemId]) as Array<{ version: number }>;
         const before = rows[0];
         if (!before) throw new AppError('NOT_FOUND', { status: 404 });
         if (Number(before.version) !== dto.expected_version) throw new AppError('VERSION_CONFLICT', { status: 409 });
         const [updated] = await manager.query(
-          `UPDATE item SET aliases = $2::text[], version = version + 1 WHERE id = $1 AND version = $3 RETURNING id`,
-          [itemId, aliases, dto.expected_version],
+          name === undefined
+            ? `UPDATE item SET aliases = $2::text[], version = version + 1 WHERE id = $1 AND version = $3 RETURNING id`
+            : `UPDATE item SET name = $2, aliases = COALESCE($3::text[], aliases), version = version + 1 WHERE id = $1 AND version = $4 RETURNING id`,
+          name === undefined ? [itemId, aliases, dto.expected_version] : [itemId, name, aliases ?? null, dto.expected_version],
         ) as [Array<{ id: string }>, number];
         if (!updated[0]) throw new AppError('VERSION_CONFLICT', { status: 409 });
         return { status: 200, value: await readItem(manager, itemId), resource: { type: 'item', id: itemId } };
@@ -257,6 +264,33 @@ export class CatalogService {
         if (!resource || resource.type !== 'item') throw new AppError('INTERNAL_ERROR', { status: 500 });
         return readItem(manager, resource.id);
       },
+    });
+  }
+
+  /** Hard deletion is permitted only while no business row references the item. */
+  async deleteItem(itemId: string, dto: DeactivateItemDto, request: LogisticsRequest): Promise<IdempotentResult<Record<string, unknown>>> {
+    const session = await this.sessions.require(request);
+    requireCatalogManage(session);
+    return this.idempotency.execute(this.dataSource, {
+      scopeKey: `user:${session.userId}`,
+      command: 'logistics.items.delete',
+      key: key(request),
+      requestHash: canonicalRequestHash({ item_id: itemId, ...dto }),
+      execute: async (manager) => {
+        const rows = await manager.query('SELECT version FROM item WHERE id = $1 FOR UPDATE', [itemId]) as Array<{ version: number }>;
+        if (!rows[0]) throw new AppError('NOT_FOUND', { status: 404 });
+        if (Number(rows[0].version) !== dto.expected_version) throw new AppError('VERSION_CONFLICT', { status: 409 });
+        try {
+          await manager.query('DELETE FROM item WHERE id = $1', [itemId]);
+        } catch (cause) {
+          if (cause && typeof cause === 'object' && 'code' in cause && cause.code === '23503') {
+            throw new AppError('ITEM_IN_USE', { status: 409, cause });
+          }
+          throw cause;
+        }
+        return { status: 200, value: { id: itemId, deleted: true }, resource: null };
+      },
+      replay: async () => ({ id: itemId, deleted: true }),
     });
   }
 
