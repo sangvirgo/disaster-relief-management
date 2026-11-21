@@ -12,6 +12,7 @@ import {
   Image,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { goBackOrHome } from '../../../navigation/back';
 import * as ImagePicker from 'expo-image-picker';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
@@ -60,6 +61,7 @@ type MissionTransitionResult =
 
 export const MissionDetailScreen: React.FC = () => {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const currentUserId = useAuthStore((state) => state.user?.id);
   const networkInfo = useNetInfo();
   const isNetworkAvailable = networkInfo.isConnected !== false && networkInfo.isInternetReachable !== false;
@@ -904,7 +906,7 @@ export const MissionDetailScreen: React.FC = () => {
       {/* MODAL HOÀN THÀNH NHIỆM VỤ */}
       <Modal visible={showCompleteModal} transparent={true} animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { paddingBottom: 20 + insets.bottom }]}>
             <Text style={styles.modalTitle}>{outcomeTitle}</Text>
             <Text style={styles.modalSubtitle}>
               Mô tả kết quả thực tế để trung tâm điều phối cập nhật hồ sơ:
@@ -1003,7 +1005,7 @@ export const MissionDetailScreen: React.FC = () => {
       {/* MODAL TỪ CHỐI / BÁO THẤT BẠI */}
       <Modal visible={showDeclineModal} transparent={true} animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { paddingBottom: 20 + insets.bottom }]}>
             <Text style={[styles.modalTitle, { color: THEME.colors.emergency.main }]}>
               LÝ DO TỪ CHỐI / TRỞ NGẠI
             </Text>
