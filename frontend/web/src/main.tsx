@@ -1476,11 +1476,11 @@ function normalizeSubview(url: URL, workspace: Workspace, page: string, user: Me
     && (intakeSteps as readonly string[]).includes(url.searchParams.get('step') || ''))
     && !(workspace === 'operations' && page === 'intake' && ['distribution', 'pickup'].includes(url.searchParams.get('step') || ''))) url.searchParams.delete('step');
   const sosId = url.searchParams.get('sos_id');
-  if (!(workspace === 'coordinator' && ['queue', 'verify', 'triage', 'assign'].includes(page)
+  if (!(workspace === 'coordinator' && ['campaigns', 'queue', 'verify', 'triage', 'assign'].includes(page)
     && sosId && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(sosId))) {
     url.searchParams.delete('sos_id');
     url.searchParams.delete('sos_tab');
-  } else if (!['review', 'dispatch', 'ai', 'history'].includes(url.searchParams.get('sos_tab') || '')) {
+  } else if (!['overview', 'review', 'dispatch', 'ai', 'history'].includes(url.searchParams.get('sos_tab') || '')) {
     url.searchParams.delete('sos_tab');
   }
   if (!(workspace === 'operations' && page === 'assets' && url.searchParams.get('view') === 'warehouses' && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(url.searchParams.get('warehouse_id') || ''))) {

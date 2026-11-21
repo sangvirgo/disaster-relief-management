@@ -26,6 +26,26 @@
 .sos-summary__wide { grid-column: 1 / -1; }
 .sos-summary__facts dt { font: 600 var(--text-caption) var(--font-family); color: var(--color-text-muted); }
 .sos-summary__facts dd { margin: 0; font: 500 var(--text-body) var(--font-family); color: var(--color-text-primary); overflow-wrap: anywhere; }
+.sos-profile { min-width: 0; padding: var(--space-4); border: 1px solid var(--color-primary-border); border-left: 4px solid var(--color-primary); border-radius: var(--radius-md); background: var(--color-primary-bg); }
+.sos-profile__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); margin-bottom: var(--space-3); }
+.sos-profile h3 { margin: 0; font: 700 var(--text-subtitle) var(--font-family); }
+.sos-profile__badges { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.sos-profile__unprioritized { color: var(--color-text-muted); font: 500 var(--text-caption) var(--font-family); }
+.sos-profile__description { margin: 0 0 var(--space-3); line-height: 1.45; overflow-wrap: anywhere; }
+.sos-profile__facts { display: grid; gap: 0; margin: 0; border-top: 1px solid var(--color-primary-border); }
+.sos-profile__facts > div { display: grid; grid-template-columns: minmax(100px, 27%) minmax(0, 1fr); gap: var(--space-2); padding: 8px 0; border-bottom: 1px solid var(--color-primary-border); }
+.sos-profile__facts dt { color: var(--color-text-secondary); font: 600 var(--text-caption) var(--font-family); }
+.sos-profile__facts dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.sos-profile__duplicate, .sos-profile__note { margin: var(--space-4) 0 0; }
+.sos-detail-content .sos-ai-card { margin: 0; }
+.sos-ai-card__review { border-top: 1px solid var(--color-primary-border); padding-top: var(--space-3); }
+.sos-ai-card__review > summary { cursor: pointer; color: var(--color-primary-dark); font-weight: 700; }
+.sos-ai-card__review > summary:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 3px; }
+.sos-ai-card__review-content { padding-top: var(--space-3); }
+.sos-ai-review-result { margin: 0; padding-top: var(--space-2); border-top: 1px solid var(--color-primary-border); color: var(--color-text-secondary); }
+.sos-ai-card__review .ai-review-note { display: grid; gap: var(--space-2); }
+.sos-ai-card__review .action-grid { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
+.sos-ai-card__review .action-grid .button { flex: 1 1 160px; white-space: normal; }
 .sos-start-verification { width: min(100%, 240px); align-self: start; }
 .sos-start-verification .command-form { margin: 0; padding: 0; border: 0; }
 .sos-start-verification .command-form > .button { width: 100%; min-height: 44px; height: 44px; padding: 8px 14px; }
@@ -62,6 +82,7 @@
 .sos-ai-resubmit .button { width: 100%; white-space: normal; }
 .sos-ai-resubmit small { color: var(--color-text-muted); font: 400 var(--text-caption) var(--font-family); }
 @media (max-width: 720px) { .sos-decision__scores { grid-template-columns: 1fr 1fr; } .sos-decision__aistatus { grid-column: 1 / -1; } .sos-summary__facts { grid-template-columns: 1fr; } .sos-decision__actions { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 480px) { .sos-profile__facts > div { grid-template-columns: minmax(0, 1fr); gap: 2px; } }
 
 /* secondary action buttons and folds: flat, hairline separated */
 .coordinator-detail-surface .sos-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; }

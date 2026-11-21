@@ -4,7 +4,7 @@ import { label, timeLabel } from '../../i18n/labels';
 import { Card } from '../../components/ui/Card';
 import { WeatherChart, type WeatherHourly } from '../../components/WeatherChart';
 
-type PointWeather = {
+export type PointWeather = {
   attribution: string;
   disclaimer: string;
   stale: boolean;
@@ -21,7 +21,10 @@ const DEBOUNCE_MS = 600;
 const rank = { WATCH: 1, WARNING: 2, SEVERE: 3 } as const;
 
 /** Weather for the place the person chose on the SOS form; it never guesses where they are. */
-export function SosWeatherAlerts({ point }: { point: { latitude: number; longitude: number } | null }) {
+export function SosWeatherAlerts({ point, onWeatherChange }: {
+  point: { latitude: number; longitude: number } | null;
+  onWeatherChange?: (weather: PointWeather | null) => void;
+}) {
   const [data, setData] = useState<PointWeather | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<'none' | 'unavailable' | 'outside'>('none');
@@ -30,6 +33,7 @@ export function SosWeatherAlerts({ point }: { point: { latitude: number; longitu
 
   useEffect(() => {
     setData(null);
+    onWeatherChange?.(null);
     setError('none');
     if (latitude === undefined || longitude === undefined || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
       setLoading(false);
@@ -42,7 +46,7 @@ export function SosWeatherAlerts({ point }: { point: { latitude: number; longitu
       setLoading(true);
       try {
         const result = await api<PointWeather>('response', `/weather/at?${query}`, { credentials: 'omit' });
-        if (active) { setData(result); setError('none'); }
+        if (active) { setData(result); onWeatherChange?.(result); setError('none'); }
       } catch (cause) {
         if (active) setError(cause instanceof ApiError && cause.status === 400 ? 'outside' : 'unavailable');
       } finally {
@@ -52,7 +56,7 @@ export function SosWeatherAlerts({ point }: { point: { latitude: number; longitu
     const first = window.setTimeout(() => { void refresh(); }, DEBOUNCE_MS);
     const timer = window.setInterval(() => { void refresh(); }, REFRESH_INTERVAL_MS);
     return () => { active = false; window.clearTimeout(first); window.clearInterval(timer); };
-  }, [latitude, longitude]);
+  }, [latitude, longitude, onWeatherChange]);
 
   if (!point) return null;
 

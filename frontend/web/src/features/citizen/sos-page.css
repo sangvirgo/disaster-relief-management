@@ -217,6 +217,12 @@
 .rain-control small, .rain-legend { padding: 4px 10px; border-radius: 8px; background: #ffffffee; color: var(--color-text-secondary); font-size: 12px; line-height: 16px; }
 .rain-legend { display: grid; grid-template-columns: repeat(3, auto); gap: 2px 10px; }
 .rain-legend i { grid-column: 1 / -1; height: 8px; border-radius: 4px; background: linear-gradient(90deg, #9bd3ff, #2f8cf0, #1646c8, #7a2fd0); }
+.sos-form .location-weather-overlay { position: absolute; z-index: 800; top: 82px; left: 12px; display: grid; gap: 4px; width: min(190px, calc(100% - 24px)); padding: 8px 10px; border: 1px solid #b9d2ea; border-radius: 10px; background: #ffffffed; color: #183b5b; box-shadow: 0 4px 16px #17365724; pointer-events: none; }
+.sos-form .location-weather-overlay__item { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.sos-form .location-weather-overlay__icon { display: grid; flex: 0 0 26px; place-items: center; font-size: 19px; }
+.sos-form .location-weather-overlay__item span:last-child { display: grid; min-width: 0; }
+.sos-form .location-weather-overlay__item strong { font-size: 13px; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.sos-form .location-weather-overlay__item small, .sos-form .location-weather-overlay__stale { color: #516c84; font-size: 11px; line-height: 1.2; }
 
 .sos-field-help {
   display: block;

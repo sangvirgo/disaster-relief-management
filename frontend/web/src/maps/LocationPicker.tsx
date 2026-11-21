@@ -65,6 +65,13 @@ export type LocationOverlay = {
   areas?: { id: string; label: string; latitude: number; longitude: number; radiusM: number }[];
 };
 
+export type LocationWeather = {
+  rain24hMm: number;
+  peakRain1hMm: number;
+  maxGustKmh: number;
+  stale: boolean;
+};
+
 export function LocationPicker({
   value,
   onSelect,
@@ -74,6 +81,7 @@ export function LocationPicker({
   closeOnSelect = false,
   hideMap = false,
   overlay,
+  weather,
 }: {
   value: Point | null;
   onSelect: (point: Point | null, address?: string) => void;
@@ -85,6 +93,8 @@ export function LocationPicker({
   /** Keep the address search panel while another map owns point selection. */
   hideMap?: boolean;
   overlay?: LocationOverlay;
+  /** Forecast at the confirmed SOS location, supplied by the form's weather request. */
+  weather?: LocationWeather | null;
 }) {
   const [open, setOpen] = useState(initiallyOpen);
   const activeGoogleKey = envApiKey;
@@ -808,6 +818,21 @@ export function LocationPicker({
           {mapEngine === 'google' && <div ref={googleSearchRef} className="location-search" />}
 
           {!hideMap && <div className="location-map-wrap">
+            {value && weather && <div className="location-weather-overlay" role="status" aria-label="Dự báo thời tiết tại vị trí đã xác nhận">
+              <div className="location-weather-overlay__item">
+                <span className="location-weather-overlay__icon" aria-hidden="true">💨</span>
+                <span><strong>{weather.maxGustKmh.toFixed(1)} km/h</strong><small>Gió giật tối đa</small></span>
+              </div>
+              <div className="location-weather-overlay__item">
+                <span className="location-weather-overlay__icon" aria-hidden="true">🌧️</span>
+                <span><strong>{weather.rain24hMm.toFixed(1)} mm</strong><small>Mưa dự báo 24 giờ</small></span>
+              </div>
+              <div className="location-weather-overlay__item">
+                <span className="location-weather-overlay__icon" aria-hidden="true">☔</span>
+                <span><strong>{weather.peakRain1hMm.toFixed(1)} mm/giờ</strong><small>Cường độ cao nhất</small></span>
+              </div>
+              {weather.stale && <small className="location-weather-overlay__stale">Dữ liệu có thể đã cũ</small>}
+            </div>}
             {mapEngine === 'osm' && (
               <div className="rain-control">
                 <button type="button" className={rainOn ? 'active' : ''} aria-pressed={rainOn} onClick={() => setRainOn(!rainOn)}>

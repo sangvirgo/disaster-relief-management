@@ -7,7 +7,7 @@ import { me } from '../../auth/session';
 import type { components as ResponseComponents } from '../../api/generated/response';
 import { requestStatusLabel, timeLabel } from '../../i18n/labels';
 import { LocationPicker } from '../../maps/LocationPicker';
-import { SosWeatherAlerts } from './SosWeatherAlerts';
+import { SosWeatherAlerts, type PointWeather } from './SosWeatherAlerts';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { clearSosDraft, readSosDraft, writeSosDraft, type SosDraft } from './sosDraft';
@@ -76,6 +76,7 @@ export function SosForm({
   const [reliefItems, setReliefItems] = useState(initialDraft?.reliefItems ?? '');
   const [longitude, setLongitude] = useState(initialDraft?.longitude ?? '');
   const [latitude, setLatitude] = useState(initialDraft?.latitude ?? '');
+  const [mapWeather, setMapWeather] = useState<PointWeather | null>(null);
   const [source, setSource] = useState<'MANUAL_PIN' | 'GPS'>('MANUAL_PIN');
   const [accuracy, setAccuracy] = useState<number | null>(null);
   const [captured, setCaptured] = useState<string | null>(null);
@@ -121,6 +122,7 @@ export function SosForm({
     setElderly(''); setName(''); setPhone(''); setBeneficiaryPhone('');
     setAlternateName(''); setAlternatePhone(''); setDanger(false); setNeedsRescue(true);
     setNeedsRelief(false); setReliefItems(''); setLongitude(''); setLatitude(''); setSource('MANUAL_PIN');
+    setMapWeather(null);
     setAccuracy(null); setCaptured(null); setRelationship(''); setInformationSource('');
     setSituationAt(''); setContactability('UNKNOWN'); setProxyContactsOpen(false);
     setError(''); setFieldError(null); setTouched({}); setAttempted(false);
@@ -140,6 +142,7 @@ export function SosForm({
         setTouched((current) => ({ ...current, location: true }));
         setLongitude(String(coords.longitude));
         setLatitude(String(coords.latitude));
+        setMapWeather(null);
         setAccuracy(coords.accuracy);
         setCaptured(new Date(timestamp).toISOString());
         setSource('GPS');
@@ -157,6 +160,7 @@ export function SosForm({
     setTouched((current) => ({ ...current, location: true }));
     setLongitude(point ? String(point.longitude) : '');
     setLatitude(point ? String(point.latitude) : '');
+    setMapWeather(null);
     setSource('MANUAL_PIN');
     setAccuracy(null);
     setCaptured(null);
@@ -383,10 +387,16 @@ export function SosForm({
               initiallyOpen
               value={longitude && latitude ? { longitude: Number(longitude), latitude: Number(latitude) } : null}
               onSelect={chooseMapPoint}
+              weather={mapWeather ? {
+                rain24hMm: mapWeather.rain_24h_mm,
+                peakRain1hMm: mapWeather.peak_rain_1h_mm,
+                maxGustKmh: mapWeather.max_gust_kmh,
+                stale: mapWeather.stale,
+              } : null}
             />
             {longitude && latitude && <p className="sos-selected-coordinates">Vị trí đã chọn: {Number(latitude).toFixed(5)}, {Number(longitude).toFixed(5)}</p>}
             {longitude && latitude && Number.isFinite(Number(longitude)) && Number.isFinite(Number(latitude)) && (
-              <SosWeatherAlerts point={{ longitude: Number(longitude), latitude: Number(latitude) }} />
+              <SosWeatherAlerts point={{ longitude: Number(longitude), latitude: Number(latitude) }} onWeatherChange={setMapWeather} />
             )}
           </Card>
         </div>
