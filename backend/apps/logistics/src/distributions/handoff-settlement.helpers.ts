@@ -1,7 +1,7 @@
 import type { EntityManager } from 'typeorm';
 import { AppError } from '@c48/technical/errors/errors';
 import { decimalFromUnits, quantityUnits } from '../common/quantity';
-import { DistributionHandoffKind, HandoffSourceStage, SettlementType, handoffSettlementType } from './distributions.helpers';
+import { DistributionHandoffKind, SettlementType, handoffSettlementType } from './distributions.helpers';
 
 export interface DistributionHandoffLineContext {
   id: string;
@@ -10,12 +10,10 @@ export interface DistributionHandoffLineContext {
   unit_scale: number;
   quantity: string;
   in_transit_quantity: string;
-  at_point_quantity: string;
   warehouse_id: string;
   commitment_id: string | null;
   relief_need_id: string | null;
   cycle_id: string | null;
-  delivery_target_kind: 'FINAL_RECIPIENT' | 'RELIEF_POINT' | null;
 }
 
 export function orderHandoffLines(
@@ -55,9 +53,8 @@ export async function readDistributionHandoffLines(
 ): Promise<DistributionHandoffLineContext[]> {
   const rows = await manager.query(
     `SELECT dl.id,dl.distribution_id,dl.item_id,u.scale AS unit_scale,dl.quantity::text,
-            dl.in_transit_quantity::text,dl.at_point_quantity::text,d.warehouse_id,
-            cm.id AS commitment_id,cm.relief_need_id,n.cycle_id,
-            CASE WHEN n.designated_point_id IS NULL THEN 'FINAL_RECIPIENT' ELSE 'RELIEF_POINT' END AS delivery_target_kind
+            dl.in_transit_quantity::text,d.warehouse_id,
+            cm.id AS commitment_id,cm.relief_need_id,n.cycle_id
        FROM distribution_line dl JOIN distribution d ON d.id=dl.distribution_id
        JOIN item i ON i.id=dl.item_id JOIN unit u ON u.code=i.unit_code
        LEFT JOIN commitment cm ON cm.id=dl.commitment_id
@@ -72,19 +69,16 @@ export async function readDistributionHandoffLines(
 export function eligibleSettlement(
   line: DistributionHandoffLineContext,
   handoffKind: DistributionHandoffKind,
-  sourceStage: HandoffSourceStage,
 ): SettlementType | null {
-  if (!line.commitment_id || !line.delivery_target_kind) return null;
-  return handoffSettlementType(line.delivery_target_kind, handoffKind, sourceStage);
+  return line.commitment_id ? handoffSettlementType(handoffKind) : null;
 }
 
 export async function lockSettlementCommitments(
   manager: Pick<EntityManager, 'query'>,
   lines: readonly DistributionHandoffLineContext[],
   handoffKind: DistributionHandoffKind,
-  sourceStage: HandoffSourceStage,
 ): Promise<SettlementCommitment[]> {
-  const eligibleLines = lines.filter((line) => eligibleSettlement(line, handoffKind, sourceStage) !== null);
+  const eligibleLines = lines.filter((line) => eligibleSettlement(line, handoffKind) !== null);
   const commitmentIds = [...new Set(eligibleLines.flatMap((line) => line.commitment_id ? [line.commitment_id] : []))].sort();
   if (commitmentIds.length === 0) return [];
   const contexts = await manager.query(

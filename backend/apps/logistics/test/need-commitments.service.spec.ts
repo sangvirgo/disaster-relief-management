@@ -25,7 +25,7 @@ const need = {
    campaign_id: null, item_id: itemId,
   item_name: 'Nước uống', unit_code: 'L', unit_name: 'Lít', unit_scale: 2,
   original_quantity: '3.00', requested_quantity: '3.00', cancelled_remaining: null,
-  designated_point_id: null, status: 'OPEN', version: 1, created_at: new Date('2026-10-12T12:00:00.000Z'),
+  status: 'OPEN', version: 1, created_at: new Date('2026-10-12T12:00:00.000Z'),
 };
 
 type Commitment = {

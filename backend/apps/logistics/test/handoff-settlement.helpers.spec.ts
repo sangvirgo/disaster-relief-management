@@ -7,7 +7,6 @@ const line = (id: string, item_id: string) => ({
   unit_scale: 2,
   quantity: '1.00',
   in_transit_quantity: '1.00',
-  at_point_quantity: '0.00',
   warehouse_id: 'warehouse-1',
   commitment_id: null,
   relief_need_id: null,

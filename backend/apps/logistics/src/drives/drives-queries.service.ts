@@ -24,8 +24,10 @@ interface PublicDriveRow extends Record<string, unknown> {
   warehouse_name: string;
   address_note: string | null;
   location_public: boolean;
+  drive_located?: boolean;
   longitude: number | string | null;
   latitude: number | string | null;
+  distance_m?: number | string | null;
 }
 
 interface DriveItemRow extends Record<string, unknown> {
@@ -44,7 +46,7 @@ function validCursor(cursor: ReturnType<typeof decodeKeysetCursor>): boolean {
 }
 
 function publicDrive(row: PublicDriveRow, items: DriveItemRow[]): Record<string, unknown> {
-  const location = row.location_public && row.longitude !== null && row.longitude !== undefined &&
+  const location = (row.location_public || row.drive_located) && row.longitude !== null && row.longitude !== undefined &&
     row.latitude !== null && row.latitude !== undefined
     ? { type: 'Point', coordinates: [Number(row.longitude), Number(row.latitude)] }
     : null;
@@ -58,6 +60,7 @@ function publicDrive(row: PublicDriveRow, items: DriveItemRow[]): Record<string,
     opens_at: iso(row.opens_at),
     closes_at: iso(row.closes_at),
     intake_location: { warehouse_name: row.warehouse_name, address_note: row.address_note, location },
+    ...(row.distance_m !== undefined ? { distance_m: row.distance_m === null ? null : Number(row.distance_m) } : {}),
     items: items.map(({ drive_id: _driveId, ...item }) => item),
     created_at: new Date(row.created_at).toISOString(),
   };
@@ -70,7 +73,44 @@ export class DriveQueriesService {
     private readonly sessions: LogisticsSessionService,
   ) {}
 
+  /** Nearest-first listing for a donor who shared a position. Warehouses that hide their location sort last, with no distance. */
+  private async publicNearest(query: DrivePageQueryDto, lat: number, lng: number): Promise<Record<string, unknown>> {
+    const filters = { route: 'logistics.public-donation-drives.nearest', lat: lat.toFixed(4), lng: lng.toFixed(4) };
+    const cursor = query.cursor ? decodeKeysetCursor(query.cursor, filters) : null;
+    if (cursor && !(cursor.sort.length === 1 && typeof cursor.sort[0] === 'string' && /^\d{1,13}$/u.test(cursor.sort[0]) &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(cursor.id))) {
+      throw new AppError('CURSOR_INVALID', { status: 400 });
+    }
+    const values: unknown[] = [lng, lat];
+    const after = cursor ? (values.push(cursor.sort[0], cursor.id), `WHERE (q.sort_key,q.id)>($3::bigint,$4::uuid)`) : '';
+    const limit = query.limit ?? 50;
+    values.push(limit + 1);
+    const rows = await this.dataSource.query(
+      `SELECT * FROM (
+         SELECT ${publicDriveColumns},
+                CASE WHEN d.location IS NOT NULL OR (w.location_public AND w.location IS NOT NULL)
+                     THEN round(ST_Distance(COALESCE(d.location, w.location), ST_SetSRID(ST_MakePoint($1,$2),4326)::geography))::bigint END AS distance_m,
+                COALESCE(CASE WHEN d.location IS NOT NULL OR (w.location_public AND w.location IS NOT NULL)
+                     THEN round(ST_Distance(COALESCE(d.location, w.location), ST_SetSRID(ST_MakePoint($1,$2),4326)::geography))::bigint END, 9999999999999) AS sort_key
+           FROM donation_drive d JOIN warehouse w ON w.id=d.intake_warehouse_id
+          WHERE d.status='OPEN' AND (d.closes_at IS NULL OR d.closes_at > now())
+       ) q ${after} ORDER BY q.sort_key,q.id LIMIT $${values.length}`,
+      values,
+    ) as Array<PublicDriveRow & { sort_key: string }>;
+    const drives = rows.slice(0, limit);
+    const grouped = await this.items(drives.map((row) => row.id));
+    const more = rows.length > limit;
+    const last = drives.at(-1);
+    return {
+      items: drives.map((row) => publicDrive(row, grouped.get(row.id) ?? [])),
+      more,
+      ...(more && last ? { cursor: encodeKeysetCursor([String(last.sort_key)], last.id, filters) } : {}),
+      generated_at: new Date().toISOString(),
+    };
+  }
+
   async publicList(query: DrivePageQueryDto): Promise<Record<string, unknown>> {
+    if (query.lat !== undefined && query.lng !== undefined) return this.publicNearest(query, query.lat, query.lng);
     const filters = { route: 'logistics.public-donation-drives' };
     const cursor = query.cursor ? decodeKeysetCursor(query.cursor, filters) : null;
     if (cursor && !validCursor(cursor)) throw new AppError('CURSOR_INVALID', { status: 400 });
@@ -120,7 +160,8 @@ export class DriveQueriesService {
     values.push(limit + 1);
     const rows = await this.dataSource.query(
       `SELECT d.id,d.intake_warehouse_id,d.campaign_id,d.campaign_status,d.campaign_status_at,d.status,d.title,d.description,
-              d.opens_at,d.closes_at,d.version,d.created_at,
+              d.opens_at,d.closes_at,d.version,d.created_at,d.location_note,
+              ST_X(d.location::geometry)::float8 AS longitude,ST_Y(d.location::geometry)::float8 AS latitude,
               to_char(d.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at
          FROM donation_drive d JOIN warehouse w ON w.id=d.intake_warehouse_id WHERE ${conditions.join(' AND ')}
         ORDER BY d.created_at DESC,d.id DESC LIMIT $${values.length}`,
@@ -131,8 +172,9 @@ export class DriveQueriesService {
     const more = rows.length > limit;
     const last = items.at(-1);
     return {
-      items: items.map((row) => ({
+      items: items.map(({ longitude, latitude, ...row }) => ({
         ...row,
+        location: longitude == null || latitude == null ? null : { type: 'Point', coordinates: [Number(longitude), Number(latitude)] },
         opens_at: iso(row.opens_at as Date | string | null),
         closes_at: iso(row.closes_at as Date | string | null),
         campaign_status_at: iso((row.campaign_status_at as Date | string | null | undefined) ?? null),
@@ -183,6 +225,8 @@ export class DriveQueriesService {
 
 const publicDriveColumns = `d.id,d.campaign_status,d.campaign_status_at,d.status,d.title,d.description,d.opens_at,d.closes_at,d.created_at,
   to_char(d.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at,
-  w.name AS warehouse_name,w.address_note,w.location_public,
-  CASE WHEN w.location_public THEN ST_X(w.location::geometry)::float8 ELSE NULL END AS longitude,
-  CASE WHEN w.location_public THEN ST_Y(w.location::geometry)::float8 ELSE NULL END AS latitude`;
+  w.name AS warehouse_name,COALESCE(d.location_note,w.address_note) AS address_note,w.location_public,(d.location IS NOT NULL) AS drive_located,
+  CASE WHEN d.location IS NOT NULL THEN ST_X(d.location::geometry)::float8
+       WHEN w.location_public THEN ST_X(w.location::geometry)::float8 ELSE NULL END AS longitude,
+  CASE WHEN d.location IS NOT NULL THEN ST_Y(d.location::geometry)::float8
+       WHEN w.location_public THEN ST_Y(w.location::geometry)::float8 ELSE NULL END AS latitude`;

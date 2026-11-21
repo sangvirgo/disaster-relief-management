@@ -88,14 +88,12 @@ Every error the API can return has one row here. The implementation loads this t
 | **Logistics — catalog / stock** | | | |
 | `ITEM_NAME_TAKEN` | 409 | Logistics | Tên mặt hàng đã tồn tại. |
 | `ITEM_IN_USE` | 409 | Logistics | Vật phẩm đã được sử dụng nên không thể xóa; dữ liệu lịch sử được giữ nguyên. |
-| `VEHICLE_IDENTIFIER_TAKEN` | 409 | Logistics | Biển số hoặc mã phương tiện đã tồn tại. |
-| `POINT_INACTIVE` | 409 | Logistics | Điểm cứu trợ đã ngừng hoạt động. |
-| `VEHICLE_INACTIVE` | 409 | Logistics | Phương tiện đã ngừng hoạt động. |
 | `QUANTITY_SCALE_INVALID` | 400 | Logistics | Số lượng có quá nhiều chữ số thập phân so với đơn vị tính. |
 | `INSUFFICIENT_STOCK` | 409 | Logistics | Không đủ hàng tồn kho khả dụng. |
 | `ADJUSTMENT_VIOLATES_RESERVED` | 409 | Logistics | Điều chỉnh làm tồn kho thấp hơn lượng đã giữ chỗ. |
 | **Logistics — donations** | | | |
 | `DRIVE_NOT_OPEN` | 409 | Logistics | Đợt quyên góp hiện không nhận hàng. |
+| `DRIVE_LOCATION_OUTSIDE_AREA` | 409 | Logistics | Vị trí điểm quyên góp phải nằm trong vùng phục vụ của kho. |
 | `ITEM_NOT_ON_DRIVE` | 400 | Logistics | Mặt hàng không nằm trong danh sách của đợt quyên góp. |
 | `DONATION_SECRET_INVALID` | 400 | Logistics | Mã bảo mật quyên góp không hợp lệ. |
 | `DONATION_SECRET_IN_USE` | 409 | Logistics | Không thể sử dụng mã bảo mật này. Vui lòng tạo mã khác. |

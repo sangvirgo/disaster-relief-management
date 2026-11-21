@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
+import { AssetPointDto } from '../assets/assets.dto';
 import {
-  ArrayMaxSize, ArrayMinSize, IsArray, IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID,
+  ArrayMaxSize, ArrayMinSize, IsArray, IsDateString, IsIn, IsInt, IsNumber, IsObject, IsOptional, IsString, IsUUID,
   Matches, Max, MaxLength, Min, MinLength, ValidateIf, ValidateNested,
 } from 'class-validator';
 
@@ -15,6 +16,13 @@ export class DrivePageQueryDto {
 
   @IsOptional() @IsIn(['DRAFT', 'OPEN', 'PAUSED', 'CLOSED'])
   status?: 'DRAFT' | 'OPEN' | 'PAUSED' | 'CLOSED';
+
+  /** Public list only: the caller's position. When both are present, drives are ordered nearest first. */
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(-90) @Max(90)
+  lat?: number;
+
+  @IsOptional() @Type(() => Number) @IsNumber() @Min(-180) @Max(180)
+  lng?: number;
 }
 
 export class DriveItemDto {
@@ -38,6 +46,13 @@ export class CreateDriveDto {
   @IsUUID('all')
   intake_warehouse_id!: string;
 
+  /** Drop-off point inside the warehouse's service area (the web form always sends it). */
+  @IsOptional() @IsObject() @ValidateNested() @Type(() => AssetPointDto)
+  location?: AssetPointDto;
+
+  @IsOptional() @IsString() @MaxLength(500)
+  location_note?: string | null;
+
   @IsOptional() @IsUUID('all')
   campaign_id?: string;
 
@@ -60,6 +75,13 @@ export class PatchDriveDto {
 
   @IsOptional() @IsString() @MaxLength(5000)
   description?: string | null;
+
+  /** Drop-off point; must lie inside the intake warehouse's service area. Null clears it. */
+  @ValidateIf((_object, value) => value !== undefined && value !== null) @IsObject() @ValidateNested() @Type(() => AssetPointDto)
+  location?: AssetPointDto | null;
+
+  @IsOptional() @IsString() @MaxLength(500)
+  location_note?: string | null;
 
   @ValidateIf((_object, value) => value !== undefined && value !== null) @IsUUID('all')
   campaign_id?: string | null;

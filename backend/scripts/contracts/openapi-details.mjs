@@ -553,17 +553,11 @@ const logisticsDetails = {
   logisticsPickupTicketsReviewCloseout: { request: request(versionBody({
     decision: { type: 'string', enum: ['APPROVE', 'REJECT'] }, note: { type: 'string', maxLength: 1000 },
   }, ['decision'])) },
-  logisticsAssetsCreateReliefPoint: { request: request(object({ name: text, contact_note: text, operating_note: text, location: object({ type: { type: 'string', const: 'Point' }, coordinates: { type: 'array', minItems: 2, maxItems: 2, items: { type: 'number' } } }) }, ['name', 'location'])) },
-  logisticsAssetsPatchReliefPoint: { request: request(versionBody({ name: text, contact_note: text, operating_note: text, location: object({ type: { type: 'string', const: 'Point' }, coordinates: { type: 'array', minItems: 2, maxItems: 2, items: { type: 'number' } } }) })) },
-  logisticsAssetsDeactivateReliefPoint: { request: request(object({ expected_version: version }, ['expected_version'])) },
-  logisticsAssetsCreateVehicle: { request: request(object({ identifier: text, vehicle_type: text, capacity: { anyOf: [quantity, { type: 'null' }] }, capacity_unit: { anyOf: [text, { type: 'null' }] } }, ['identifier', 'vehicle_type'])) },
-  logisticsAssetsPatchVehicle: { request: request(versionBody({ identifier: text, vehicle_type: text, capacity: { anyOf: [quantity, { type: 'null' }] }, capacity_unit: { anyOf: [text, { type: 'null' }] } })) },
-  logisticsAssetsDeactivateVehicle: { request: request(object({ expected_version: version }, ['expected_version'])) },
   logisticsStockOpening: { request: request(object({ warehouse_id: id, lines: item({ item_id: id, quantity }, ['item_id', 'quantity']), note: text }, ['warehouse_id', 'lines', 'note'])) },
   logisticsStockCreateAdjustment: { request: request(object({ balance_id: id, delta_on_hand: quantity, reason: text, compensates_movement_id: id }, ['balance_id', 'delta_on_hand', 'reason'])) },
   logisticsStockReviewAdjustment: { request: request(object({ decision: { type: 'string', enum: ['APPROVE', 'REJECT'] }, note: text }, ['decision'])) },
-  logisticsDrivesCreate: { request: request(object({ title: text, description: text, intake_warehouse_id: id, campaign_id: id, opens_at: dateTime, closes_at: dateTime, items: item({ item_id: id, target_quantity: quantity, acceptance_note: text }, ['item_id', 'target_quantity']) }, ['title', 'description', 'intake_warehouse_id', 'items'])) },
-  logisticsDrivesPatch: { request: request(versionBody({ title: text, description: text, intake_warehouse_id: id, campaign_id: id, opens_at: dateTime, closes_at: dateTime, items: item({ item_id: id, target_quantity: quantity, acceptance_note: text }, ['item_id', 'target_quantity']) })) },
+  logisticsDrivesCreate: { request: request(object({ title: text, description: text, intake_warehouse_id: id, location: point, location_note: text, campaign_id: id, opens_at: dateTime, closes_at: dateTime, items: item({ item_id: id, target_quantity: quantity, acceptance_note: text }, ['item_id', 'target_quantity']) }, ['title', 'description', 'intake_warehouse_id', 'items'])) },
+  logisticsDrivesPatch: { request: request(versionBody({ title: text, description: text, intake_warehouse_id: id, location: point, location_note: text, campaign_id: id, opens_at: dateTime, closes_at: dateTime, items: item({ item_id: id, target_quantity: quantity, acceptance_note: text }, ['item_id', 'target_quantity']) })) },
   logisticsDrivesOpen: { request: request(object({ expected_version: version }, ['expected_version'])) },
   logisticsDrivesPause: { request: request(object({ expected_version: version, reason: text }, ['expected_version', 'reason'])) },
   logisticsDrivesResume: { request: request(object({ expected_version: version }, ['expected_version'])) },
@@ -628,7 +622,7 @@ const logisticsDetails = {
     response: response(object({ id, status: text, delivery_id: id, resolution_note: text, opened_at: dateTime, resolved_at: dateTime })),
   },
   logisticsNeedsCreate: {
-    request: request(object({ request_id: id, work_cycle: integer(), item_id: id, quantity, delivery_target_kind: { type: 'string', enum: ['FINAL_RECIPIENT'] }, designated_point_id: id, reason: text }, ['request_id', 'work_cycle', 'item_id', 'quantity'])),
+    request: request(object({ request_id: id, work_cycle: integer(), item_id: id, quantity, reason: text }, ['request_id', 'work_cycle', 'item_id', 'quantity'])),
     response: response(object({
       id,
       cycle_id: id,
@@ -644,12 +638,10 @@ const logisticsDetails = {
       original_quantity: quantity,
       requested_quantity: quantity,
       cancelled_remaining: { anyOf: [quantity, { type: 'null' }] },
-      delivery_target_kind: { type: 'string', enum: ['FINAL_RECIPIENT', 'RELIEF_POINT'] },
-      designated_point_id: { anyOf: [id, { type: 'null' }] },
       status: { type: 'string', enum: ['OPEN', 'PARTIALLY_FULFILLED', 'FULFILLED', 'CANCELLED'] },
       version,
       created_at: dateTime,
-    }, ['id', 'cycle_id', 'request_id', 'work_cycle', 'campaign_id', 'item_id', 'item', 'original_quantity', 'requested_quantity', 'cancelled_remaining', 'delivery_target_kind', 'designated_point_id', 'status', 'version', 'created_at']), 'Created need projection returned by the needs query mapper.'),
+    }, ['id', 'cycle_id', 'request_id', 'work_cycle', 'campaign_id', 'item_id', 'item', 'original_quantity', 'requested_quantity', 'cancelled_remaining', 'status', 'version', 'created_at']), 'Created need projection returned by the needs query mapper.'),
   },
   logisticsNeedsIncrease: { request: request(object({ expected_version: version, quantity, reason: text }, ['expected_version', 'quantity', 'reason'])) },
   logisticsNeedsReduce: { request: request(object({ expected_version: version, quantity, reason: text }, ['expected_version', 'quantity', 'reason'])) },
@@ -696,18 +688,18 @@ const logisticsDetails = {
   logisticsFulfillmentCyclesFreeze: { request: request(object({ intent_id: id }, ['intent_id'])) },
   logisticsFulfillmentCyclesUnseal: { request: request(object({ intent_id: id }, ['intent_id'])) },
   logisticsFulfillmentCyclesSeal: { request: request(object({ intent_id: id, outcome_basis: { type: 'string', enum: ['RESCUE_COMPLETED', 'SUPPLY_ONLY', 'NO_ACTION_REQUIRED'] } }, ['intent_id', 'outcome_basis'])) },
-  logisticsDistributionsCreate: { request: request(object({ warehouse_id: id, relief_point_id: id, vehicle_id: id, campaign_id: id, purpose: { type: 'string', enum: ['REQUEST_AID', 'CAMPAIGN_DISTRIBUTION', 'POINT_REPLENISHMENT'] }, lines: item({ item_id: id, quantity, commitment_id: id }, ['item_id', 'quantity']) }, ['warehouse_id', 'purpose', 'lines'])) },
+  logisticsDistributionsCreate: { request: request(object({ warehouse_id: id, campaign_id: id, purpose: { type: 'string', enum: ['REQUEST_AID', 'CAMPAIGN_DISTRIBUTION'] }, lines: item({ item_id: id, quantity, commitment_id: id }, ['item_id', 'quantity']) }, ['warehouse_id', 'purpose', 'lines'])) },
   logisticsDistributionsReplaceLines: { request: request(object({ expected_version: version, lines: item({ item_id: id, quantity, commitment_id: id }, ['item_id', 'quantity']) }, ['expected_version', 'lines'])) },
   logisticsDistributionsApprove: { request: request(object({ expected_version: version }, ['expected_version'])) },
   logisticsDistributionsDispatch: { request: request(object({ expected_version: version }, ['expected_version'])) },
   logisticsDistributionsCancel: { request: request(object({ expected_version: version }, ['expected_version'])) },
   logisticsDistributionsReconcile: { request: request(object({ expected_version: version }, ['expected_version'])) },
-  logisticsDistributionsCreateHandoff: { request: request(object({ handoff_kind: { type: 'string', enum: ['DIRECT_HOUSEHOLD', 'POINT_RECEIPT', 'HOUSEHOLD_HANDOUT', 'RETURN', 'LOSS'] }, source_stage: { type: 'string', enum: ['IN_TRANSIT', 'AT_POINT'] }, receiver_user_id: id, receiver_label: text, confirmation_basis: text, occurred_at: dateTime, lines: item({ distribution_line_id: id, quantity }, ['distribution_line_id', 'quantity']) }, ['handoff_kind', 'confirmation_basis', 'occurred_at', 'lines'])) },
+  logisticsDistributionsCreateHandoff: { request: request(object({ handoff_kind: { type: 'string', enum: ['DIRECT_HOUSEHOLD', 'RETURN', 'LOSS'] }, source_stage: { type: 'string', enum: ['IN_TRANSIT'] }, receiver_user_id: id, receiver_label: text, confirmation_basis: text, occurred_at: dateTime, lines: item({ distribution_line_id: id, quantity }, ['distribution_line_id', 'quantity']) }, ['handoff_kind', 'confirmation_basis', 'occurred_at', 'lines'])) },
   logisticsDistributionsHandoffDetail: {
-    description: 'Requires an authenticated session and matching warehouse scope. DIRECT_HOUSEHOLD, POINT_RECEIPT, and HOUSEHOLD_HANDOUT require HANDOFF_RECORD; RETURN requires DONATION_INTAKE or DISTRIBUTION_DISPATCH; LOSS requires HANDOFF_RECORD or LOSS_APPROVE. Missing permission returns 403 FORBIDDEN; out-of-scope access returns 404 NOT_FOUND. See docs/backend/04-logistics-api.md for the response shape.',
+    description: 'Requires an authenticated session and matching warehouse scope. DIRECT_HOUSEHOLD requires HANDOFF_RECORD; RETURN requires DONATION_INTAKE or DISTRIBUTION_DISPATCH; LOSS requires HANDOFF_RECORD or LOSS_APPROVE. Missing permission returns 403 FORBIDDEN; out-of-scope access returns 404 NOT_FOUND. See docs/backend/04-logistics-api.md for the response shape.',
   },
   logisticsDistributionsUploadHandoffEvidence: {
-    description: 'Requires an authenticated session. The handoff must belong to the path distribution and be in the caller\'s current warehouse scope; missing, mismatched, or out-of-scope records return 404 NOT_FOUND. DIRECT_HOUSEHOLD, POINT_RECEIPT, HOUSEHOLD_HANDOUT, and LOSS require HANDOFF_RECORD; RETURN requires DONATION_INTAKE or DISTRIBUTION_DISPATCH. Missing authentication returns 401 UNAUTHENTICATED; an in-scope caller without the required permission returns 403 FORBIDDEN. LOSS_APPROVE alone does not permit upload. Accepts one multipart file named file and requires Idempotency-Key; returns READY private evidence metadata.',
+    description: 'Requires an authenticated session. The handoff must belong to the path distribution and be in the caller\'s current warehouse scope; missing, mismatched, or out-of-scope records return 404 NOT_FOUND. DIRECT_HOUSEHOLD and LOSS require HANDOFF_RECORD; RETURN requires DONATION_INTAKE or DISTRIBUTION_DISPATCH. Missing authentication returns 401 UNAUTHENTICATED; an in-scope caller without the required permission returns 403 FORBIDDEN. LOSS_APPROVE alone does not permit upload. Accepts one multipart file named file and requires Idempotency-Key; returns READY private evidence metadata.',
     parameters: [{ name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string', format: 'uuid' } }],
     request: {
       required: true,
@@ -740,18 +732,17 @@ const catalogItemSchema = object({
 });
 const distributionLineSchema = object({
   id, item_id: id, item_name: text, unit: object({ code: text, scale: integer() }),
-  commitment_id: nullableValue(id), delivery_target_kind: nullableValue(text),
-  quantity, dispatched: quantity, received: quantity, handed_out: quantity, returned: quantity, lost: quantity,
-  pending_loss_count: integer(), in_transit: quantity, at_point: quantity,
+  commitment_id: nullableValue(id),
+  quantity, dispatched: quantity, handed_out: quantity, returned: quantity, lost: quantity,
+  pending_loss_count: integer(), in_transit: quantity,
 });
 const distributionViewSchema = object({
   id, warehouse_id: id,
-  relief_point_id: nullableValue(id), vehicle_id: nullableValue(id), campaign_id: nullableValue(id),
+  campaign_id: nullableValue(id),
   purpose: text, status: text, preparer_user_id: id, approver_user_id: nullableValue(id),
   approved_version: nullableValue(integer()), dispatch_actor_user_id: nullableValue(id),
   dispatched_at: nullableValue(dateTime), reconciled_at: nullableValue(dateTime), created_at: dateTime,
   version,
-  vehicle_capacity_exceeded: { type: 'boolean', description: 'Warning only; exceeding capacity does not block preparation or dispatch.' },
   lines: array(distributionLineSchema),
 });
 const handoffViewSchema = object({
@@ -782,8 +773,7 @@ const needValueSchema = object({
   id, cycle_id: id, request_id: id, work_cycle: integer(),
   campaign_id: nullableValue(id), item_id: id, item: needItemSchema, original_quantity: quantity,
   requested_quantity: quantity, cancelled_remaining: nullableValue(quantity),
-  delivery_target_kind: { type: 'string', enum: ['FINAL_RECIPIENT', 'RELIEF_POINT'] },
-  designated_point_id: nullableValue(id), status: text, version, created_at: dateTime,
+  status: text, version, created_at: dateTime,
 });
 const needSummarySchema = object({
   id, item: object({ id, name: text }), unit: catalogUnitSchema, original: quantity, requested: quantity,
@@ -807,12 +797,14 @@ const publicDriveViewSchema = object({
   campaign_status: nullableValue(text), campaign_status_at: nullableValue(dateTime),
   opens_at: nullableValue(dateTime), closes_at: nullableValue(dateTime),
   intake_location: object({ warehouse_name: text, address_note: nullableValue(text), location: nullableValue(point) }),
+  distance_m: { anyOf: [integer(), { type: 'null' }], description: 'Only when lat and lng are sent; measured to the drive drop-off point, or to the warehouse when it publishes its location; null when neither is public.' },
   items: array(driveItemSchema), created_at: dateTime,
 });
 const driveValueSchema = object({
   id, intake_warehouse_id: id, campaign_id: nullableValue(id),
   campaign_status: nullableValue(text), campaign_status_at: nullableValue(dateTime), status: text,
   title: text, description: nullableValue(text), opens_at: nullableValue(dateTime), closes_at: nullableValue(dateTime),
+  location: nullableValue(point), location_note: nullableValue(text),
   version, created_at: dateTime, items: array(driveCommandItemSchema),
 });
 const assetCommonProperties = {
@@ -821,12 +813,6 @@ const assetCommonProperties = {
 };
 const warehouseCommandSchema = object({
   ...assetCommonProperties, name: text, location: nullableValue(point), location_public: boolean(), service_radius_m: nullableValue(integer()), address_note: nullableValue(text),
-});
-const reliefPointCommandSchema = object({
-  ...assetCommonProperties, name: text, location: point, contact_note: nullableValue(text), operating_note: nullableValue(text),
-});
-const vehicleCommandSchema = object({
-  ...assetCommonProperties, identifier: text, vehicle_type: text, capacity: nullableValue(quantity), capacity_unit: nullableValue(text),
 });
 const campaignWarehouseViewSchema = object({
   campaign_id: id,
@@ -966,16 +952,6 @@ const sharedLogisticsResponses = {
   logisticsDrivesPause: driveValueSchema,
   logisticsDrivesResume: driveValueSchema,
   logisticsDrivesClose: driveValueSchema,
-  logisticsAssetsReliefPointDetail: object({
-    id,
-    status: text,
-    version,
-    created_at: dateTime,
-    name: text,
-    location: object({ type: { type: 'string', const: 'Point' }, coordinates: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 } }, ['type', 'coordinates']),
-    contact_note: { anyOf: [text, { type: 'null' }] },
-    operating_note: { anyOf: [text, { type: 'null' }] },
-  }),
   logisticsAssetsWarehouses: page({
     id,
     status: { type: 'string', enum: ['ACTIVE', 'INACTIVE'] },
@@ -985,24 +961,7 @@ const sharedLogisticsResponses = {
     location: { anyOf: [point, { type: 'null' }] },
     location_public: boolean(),
   }),
-  logisticsAssetsReliefPoints: page({
-    id,
-    status: { type: 'string', enum: ['ACTIVE', 'INACTIVE'] },
-    version,
-    created_at: dateTime,
-    name: text,
-    location: point,
-  }),
-  logisticsAssetsVehicles: page({
-    id,
-    status: { type: 'string', enum: ['ACTIVE', 'INACTIVE'] },
-    version,
-    created_at: dateTime,
-    identifier: text,
-    vehicle_type: text,
-    capacity: { anyOf: [text, { type: 'null' }] },
-    capacity_unit: { anyOf: [text, { type: 'null' }] },
-  }),
+  logisticsAssetsWarehouseDetail: warehouseCommandSchema,
   logisticsAssetsCreateWarehouse: warehouseCommandSchema,
   logisticsAssetsPatchWarehouse: warehouseCommandSchema,
   logisticsAssetsDeactivateWarehouse: warehouseCommandSchema,
@@ -1025,12 +984,6 @@ const sharedLogisticsResponses = {
   logisticsPickupTicketsSaveCloseout: closeoutViewSchema,
   logisticsPickupTicketsSubmitCloseout: closeoutViewSchema,
   logisticsPickupTicketsReviewCloseout: closeoutViewSchema,
-  logisticsAssetsCreateReliefPoint: reliefPointCommandSchema,
-  logisticsAssetsPatchReliefPoint: reliefPointCommandSchema,
-  logisticsAssetsDeactivateReliefPoint: reliefPointCommandSchema,
-  logisticsAssetsCreateVehicle: vehicleCommandSchema,
-  logisticsAssetsPatchVehicle: vehicleCommandSchema,
-  logisticsAssetsDeactivateVehicle: vehicleCommandSchema,
   logisticsDonationsTrack: object({
     id,
     public_code: text,
@@ -1120,7 +1073,7 @@ const sharedLogisticsResponses = {
   }),
   logisticsReportsReconciliationSummary: page({
     item: object({ id, name: text }), unit: catalogUnitSchema, intake_accepted: quantity, posted_movements: quantity,
-    posted_reserved_movements: quantity, reserved: quantity, issued_in_transit: quantity, at_point: quantity,
+    posted_reserved_movements: quantity, reserved: quantity, issued_in_transit: quantity,
     delivered: quantity, returned: quantity, lost: quantity,
     flags: object({ balance_mismatch: boolean(), commitment_counter_mismatch: boolean() }),
   }),
@@ -1133,8 +1086,7 @@ const logisticsQueries = {
   logisticsAuditList: ['entity_type', 'entity_id', 'cursor', 'limit'],
   logisticsCatalogItemTypes: ['cursor', 'limit'], logisticsCatalogUnits: ['cursor', 'limit'],
   logisticsCatalogItems: ['type', 'status', 'query', 'cursor', 'limit'], logisticsAssetsWarehouses: ['status', 'cursor', 'limit'],
-  logisticsAssetsVehicles: ['status', 'cursor', 'limit'], logisticsAssetsReliefPoints: ['status', 'cursor', 'limit'],
-  logisticsDrivesList: ['status', 'cursor', 'limit'], logisticsDrivesPublicList: ['cursor', 'limit'],
+  logisticsDrivesList: ['status', 'cursor', 'limit'], logisticsDrivesPublicList: ['lat', 'lng', 'cursor', 'limit'],
   logisticsSupplyGapsList: ['status', 'warehouse_id', 'cursor', 'limit'],
   logisticsPickupTicketsList: ['mission_id', 'status', 'cursor', 'limit'],
   logisticsDonationReceiptsDeliveries: ['drive_id', 'status', 'cursor', 'limit'], logisticsDonationReceiptsDisputes: ['status', 'cursor', 'limit'],
@@ -1158,6 +1110,10 @@ const logisticsQueryConstraints = {
 };
 
 const logisticsQuerySchemas = {
+  logisticsDrivesPublicList: {
+    lat: { type: 'number', minimum: -90, maximum: 90, description: 'Caller latitude; with lng, orders drives nearest first.' },
+    lng: { type: 'number', minimum: -180, maximum: 180, description: 'Caller longitude; with lat, orders drives nearest first.' },
+  },
   logisticsAuditList: {
     entity_type: { type: 'string', minLength: 2, maxLength: 64, pattern: '^[a-z][a-z0-9_]{1,63}$' },
     entity_id: { type: 'string', maxLength: 200 },
@@ -1239,8 +1195,7 @@ const routeErrorCodes = {
   logisticsCatalogCreateItem: ['ITEM_NAME_TAKEN', 'VALIDATION_FAILED'],
   logisticsCatalogUpdateItemAliases: ['VALIDATION_FAILED', 'VERSION_CONFLICT', 'ITEM_NAME_TAKEN', 'NOT_FOUND'],
   logisticsCatalogDeleteItem: ['VALIDATION_FAILED', 'VERSION_CONFLICT', 'ITEM_IN_USE', 'NOT_FOUND'],
-  logisticsAssetsCreateVehicle: ['VEHICLE_IDENTIFIER_TAKEN'],
-  logisticsNeedsCreate: ['QUANTITY_SCALE_INVALID', 'CYCLE_FROZEN', 'CYCLE_SEALED', 'VALIDATION_FAILED', 'NEED_EXISTS', 'POINT_INACTIVE'],
+  logisticsNeedsCreate: ['QUANTITY_SCALE_INVALID', 'CYCLE_FROZEN', 'CYCLE_SEALED', 'VALIDATION_FAILED', 'NEED_EXISTS'],
   logisticsNeedsEstimate: ['VALIDATION_FAILED', 'NEED_NORM_NOT_FOUND', 'NEED_ITEM_REQUIRED', 'NEED_ITEM_TYPE_MISMATCH', 'NEED_ALREADY_DECLARED', 'NEED_RELIEF_NOT_REQUESTED', 'NEED_PEOPLE_MISSING', 'NEED_EXISTS', 'NOT_FOUND', 'CYCLE_FROZEN', 'CYCLE_SEALED', 'STATE_TRANSITION_INVALID', 'REQUEST_NOT_VERIFIED', 'RESPONSE_UNAVAILABLE'],
   logisticsNeedsConfirm: ['VALIDATION_FAILED', 'NEED_NOT_ESTIMATED', 'NEED_ITEM_TYPE_MISMATCH', 'NEED_EXISTS', 'NOT_FOUND', 'CYCLE_FROZEN', 'CYCLE_SEALED', 'STATE_TRANSITION_INVALID', 'VERSION_CONFLICT', 'BELOW_PROTECTED_QUANTITY', 'QUANTITY_SCALE_INVALID'],
   logisticsNeedsUpdateNorm: ['VALIDATION_FAILED', 'VERSION_CONFLICT', 'NOT_FOUND', 'NEED_NORM_SHAPE_INVALID', 'NEED_DEFAULT_ITEM_INVALID'],
@@ -1252,7 +1207,7 @@ const routeErrorCodes = {
   logisticsFulfillmentCyclesFreeze: ['CYCLE_FROZEN', 'CYCLE_SEALED', 'STATE_TRANSITION_INVALID'],
   logisticsFulfillmentCyclesSeal: ['CYCLE_NOT_SETTLED', 'UNSETTLED_ISSUED_GOODS', 'CYCLE_FROZEN', 'CYCLE_SEALED', 'STATE_TRANSITION_INVALID'],
   logisticsFulfillmentCyclesUnseal: ['CYCLE_SEALED', 'STATE_TRANSITION_INVALID'],
-  logisticsDrivesCreate: ['QUANTITY_SCALE_INVALID', 'CAMPAIGN_NOT_ACTIVE', 'RESPONSE_UNAVAILABLE'],
+  logisticsDrivesCreate: ['QUANTITY_SCALE_INVALID', 'CAMPAIGN_NOT_ACTIVE', 'RESPONSE_UNAVAILABLE', 'DRIVE_LOCATION_OUTSIDE_AREA'],
   logisticsCampaignWarehousesList: ['CAMPAIGN_NOT_ACTIVE', 'RESPONSE_UNAVAILABLE'],
   logisticsCampaignWarehousesSetPrimary: ['VALIDATION_FAILED', 'NOT_FOUND', 'CAMPAIGN_NOT_ACTIVE', 'RESPONSE_UNAVAILABLE', 'CAMPAIGN_AREA_MISSING', 'WAREHOUSE_NOT_ELIGIBLE', 'VERSION_CONFLICT'],
   logisticsCampaignWarehousesReevaluate: ['CAMPAIGN_NOT_ACTIVE', 'RESPONSE_UNAVAILABLE'],
@@ -1272,7 +1227,7 @@ const routeErrorCodes = {
   logisticsPickupTicketsSaveCloseout: ['VALIDATION_FAILED', 'NOT_FOUND', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID', 'CLOSEOUT_LINES_INVALID', 'CLOSEOUT_INVARIANT_VIOLATED', 'CLOSEOUT_RETIRE_REASON_REQUIRED', 'ITEM_NOT_RETURNABLE', 'PICKUP_LEDGER_MISMATCH', 'QUANTITY_SCALE_INVALID', 'FORBIDDEN', 'IDEMPOTENCY_KEY_INVALID'],
   logisticsPickupTicketsSubmitCloseout: ['VALIDATION_FAILED', 'NOT_FOUND', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID', 'CLOSEOUT_LINES_INVALID', 'CLOSEOUT_INVARIANT_VIOLATED', 'PICKUP_LEDGER_MISMATCH', 'FORBIDDEN', 'IDEMPOTENCY_KEY_INVALID'],
   logisticsPickupTicketsReviewCloseout: ['VALIDATION_FAILED', 'NOT_FOUND', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID', 'SELF_REVIEW_FORBIDDEN', 'SELF_HANDOFF_FORBIDDEN', 'CLOSEOUT_STALE', 'CLOSEOUT_INVARIANT_VIOLATED', 'ITEM_NOT_RETURNABLE', 'PICKUP_LEDGER_MISMATCH', 'HANDOFF_EXCEEDS_BALANCE', 'FORBIDDEN', 'IDEMPOTENCY_KEY_INVALID'],
-  logisticsDrivesPatch: ['QUANTITY_SCALE_INVALID', 'CAMPAIGN_NOT_ACTIVE', 'VALIDATION_FAILED', 'RESPONSE_UNAVAILABLE', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
+  logisticsDrivesPatch: ['DRIVE_LOCATION_OUTSIDE_AREA', 'QUANTITY_SCALE_INVALID', 'CAMPAIGN_NOT_ACTIVE', 'VALIDATION_FAILED', 'RESPONSE_UNAVAILABLE', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
   logisticsDrivesOpen: ['CAMPAIGN_NOT_ACTIVE', 'RESPONSE_UNAVAILABLE', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
   logisticsDrivesPause: ['VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
   logisticsDrivesResume: ['CAMPAIGN_NOT_ACTIVE', 'RESPONSE_UNAVAILABLE', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
@@ -1294,17 +1249,12 @@ const routeErrorCodes = {
   logisticsDonationReceiptsReleaseHeld: ['STALE_REVISION', 'RECEIPT_NOT_APPROVED', 'VERSION_CONFLICT'],
   logisticsCatalogDeactivateItem: ['VERSION_CONFLICT'],
   logisticsStockReviewAdjustment: ['ADJUSTMENT_VIOLATES_RESERVED', 'STATE_TRANSITION_INVALID'],
-  logisticsAssetsCreateReliefPoint: ['POINT_INACTIVE'],
-  logisticsAssetsPatchReliefPoint: ['VERSION_CONFLICT'],
-  logisticsAssetsDeactivateReliefPoint: ['VERSION_CONFLICT'],
-  logisticsAssetsPatchVehicle: ['VERSION_CONFLICT'],
-  logisticsAssetsDeactivateVehicle: ['VERSION_CONFLICT'],
   logisticsAssetsPatchWarehouse: ['VERSION_CONFLICT'],
   logisticsAssetsDeactivateWarehouse: ['VERSION_CONFLICT'],
-  logisticsDistributionsCreate: ['QUANTITY_SCALE_INVALID', 'POINT_INACTIVE', 'VEHICLE_INACTIVE', 'LINE_ITEM_MISMATCH', 'VALIDATION_FAILED', 'RESPONSE_UNAVAILABLE', 'CAMPAIGN_PAUSED', 'CAMPAIGN_NOT_ACTIVE'],
+  logisticsDistributionsCreate: ['QUANTITY_SCALE_INVALID', 'LINE_ITEM_MISMATCH', 'VALIDATION_FAILED', 'RESPONSE_UNAVAILABLE', 'CAMPAIGN_PAUSED', 'CAMPAIGN_NOT_ACTIVE'],
   logisticsDistributionsReplaceLines: ['QUANTITY_SCALE_INVALID', 'VERSION_CONFLICT', 'ALREADY_DISPATCHED', 'STATE_TRANSITION_INVALID'],
   logisticsDistributionsApprove: ['SELF_APPROVAL_FORBIDDEN', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
-  logisticsDistributionsDispatch: ['APPROVAL_STALE', 'INSUFFICIENT_STOCK', 'POINT_INACTIVE', 'VEHICLE_INACTIVE', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
+  logisticsDistributionsDispatch: ['APPROVAL_STALE', 'INSUFFICIENT_STOCK', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
   logisticsDistributionsCancel: ['ALREADY_DISPATCHED', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
   logisticsDistributionsCreateHandoff: ['QUANTITY_SCALE_INVALID', 'HANDOFF_EXCEEDS_BALANCE', 'HANDOFF_KIND_INVALID', 'SETTLEMENT_EXCEEDS_ISSUED', 'STATE_TRANSITION_INVALID', 'SELF_HANDOFF_FORBIDDEN'],
   logisticsDistributionsHandoffDetail: ['NOT_FOUND', 'UNAUTHENTICATED', 'FORBIDDEN'],

@@ -59,7 +59,10 @@ function prepareSql(
     ['-- @include demo campaigns', 'seed-campaigns.sql'],
     ['-- @include demo expansion', 'seed-expansion-' + service + '.sql'],
   ]) {
-    if (source.includes(marker)) source = source.replace(marker, readFileSync(resolve('seed', include), 'utf8'));
+    if (source.includes(marker)) {
+      const included = readFileSync(resolve('seed', include), 'utf8');
+      source = source.replace(marker, () => included);
+    }
   }
   if (source.includes('{{donation_capability_hash}}')) {
     source = source.replaceAll('{{donation_capability_hash}}', demoDonationCapabilityHash(process.env.SECRET_HASH_PEPPER_DONATION ?? ''));

@@ -126,7 +126,7 @@ async function lockNeed(manager: Pick<EntityManager, 'query'>, needId: string, c
     `SELECT n.id,n.cycle_id,c.request_id,c.work_cycle,c.campaign_id,
             n.item_id,i.name AS item_name,u.code AS unit_code,u.display_name AS unit_name,u.scale AS unit_scale,
             n.original_quantity::text,n.requested_quantity::text,n.cancelled_remaining::text,
-            n.designated_point_id,n.status,n.source,n.estimate_basis,n.version,n.created_at
+            n.status,n.source,n.estimate_basis,n.version,n.created_at
        FROM relief_need n JOIN fulfillment_cycle c ON c.id=n.cycle_id
        JOIN item i ON i.id=n.item_id JOIN unit u ON u.code=i.unit_code
       WHERE n.id=$1 AND n.cycle_id=$2 FOR UPDATE OF n`,

@@ -4,40 +4,28 @@ import { lockDistributionAssets } from '../src/distributions/distribution-assets
 
 const distribution = {
   warehouse_id: 'warehouse-1',
-
-  relief_point_id: 'point-1',
-  vehicle_id: 'vehicle-1',
 };
 
-function assetManager(inactiveAsset?: 'warehouse' | 'relief_point' | 'vehicle') {
+function assetManager(inactiveWarehouse = false) {
   const query = jest.fn(async (sql: string) => {
-    if (sql.includes('FROM warehouse')) {
-      return [{  status: inactiveAsset === 'warehouse' ? 'INACTIVE' : 'ACTIVE' }];
-    }
-    if (sql.includes('FROM relief_point')) {
-      return [{  status: inactiveAsset === 'relief_point' ? 'INACTIVE' : 'ACTIVE' }];
-    }
-    return [{  status: inactiveAsset === 'vehicle' ? 'INACTIVE' : 'ACTIVE' }];
+    if (sql.includes('FROM warehouse')) return [{ status: inactiveWarehouse ? 'INACTIVE' : 'ACTIVE' }];
+    return [];
   });
   return { manager: { query } as unknown as EntityManager, query };
 }
 
 describe('lockDistributionAssets', () => {
-  it('locks each referenced asset while dispatch validates current status', async () => {
+  it('locks the warehouse while dispatch validates its current status', async () => {
     const { manager, query } = assetManager();
 
     await lockDistributionAssets(manager, distribution);
 
-    expect(query.mock.calls.map(([sql]) => sql)).toEqual([
-      expect.stringMatching(/FROM warehouse .*FOR SHARE/u),
-      expect.stringMatching(/FROM relief_point .*FOR SHARE/u),
-      expect.stringMatching(/FROM vehicle .*FOR SHARE/u),
-    ]);
+    expect(query.mock.calls.map(([sql]) => sql)).toEqual([expect.stringMatching(/FROM warehouse .*FOR SHARE/u)]);
   });
 
-  it('rejects a relief point that became inactive before dispatch acquired its lock', async () => {
-    const { manager } = assetManager('relief_point');
+  it('rejects a warehouse that became inactive before dispatch acquired its lock', async () => {
+    const { manager } = assetManager(true);
 
-    await expect(lockDistributionAssets(manager, distribution)).rejects.toMatchObject({ code: 'POINT_INACTIVE' });
+    await expect(lockDistributionAssets(manager, distribution)).rejects.toMatchObject({ code: 'STATE_TRANSITION_INVALID' });
   });
 });

@@ -343,7 +343,6 @@ export class PickupTicketsService {
          FROM relief_need n JOIN fulfillment_cycle c ON c.id=n.cycle_id
          JOIN item i ON i.id=n.item_id JOIN unit u ON u.code=i.unit_code
         WHERE c.request_id=$1 AND c.work_cycle=$2 AND n.source IN ('DECLARED','CONFIRMED') AND n.status = ANY($3::text[])
-          AND n.designated_point_id IS NULL
         ORDER BY n.id`,
       [mission.request_id, mission.work_cycle, liveNeedStatuses],
     ) as LiveNeedRow[];
@@ -352,15 +351,14 @@ export class PickupTicketsService {
 
   private async reservableNeed(manager: EntityManager, needId: string): Promise<LiveNeedRow | null> {
     const rows = await manager.query(
-      `SELECT n.id AS relief_need_id,n.item_id,n.requested_quantity::text,u.scale AS unit_scale,n.status,n.source,n.designated_point_id,
+      `SELECT n.id AS relief_need_id,n.item_id,n.requested_quantity::text,u.scale AS unit_scale,n.status,n.source,
               COALESCE((SELECT SUM(cm.quantity-cm.released_quantity-cm.returned_quantity-cm.lost_quantity)::text
                           FROM commitment cm WHERE cm.relief_need_id=n.id),'0') AS committed
          FROM relief_need n JOIN item i ON i.id=n.item_id JOIN unit u ON u.code=i.unit_code WHERE n.id=$1`,
       [needId],
-    ) as Array<LiveNeedRow & { status: string; source: string; designated_point_id: string | null }>;
+    ) as Array<LiveNeedRow & { status: string; source: string }>;
     const row = rows[0];
-    // Relief-point needs are not part of the final-recipient pickup flow in Step 6a; they are skipped, not failed.
-    if (!row || !liveNeedStatuses.includes(row.status) || row.source === 'ESTIMATED' || row.designated_point_id !== null) return null;
+    if (!row || !liveNeedStatuses.includes(row.status) || row.source === 'ESTIMATED') return null;
     return row;
   }
 

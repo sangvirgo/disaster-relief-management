@@ -24,8 +24,6 @@ function distribution(overrides: Partial<DistributionContext> = {}): Record<stri
     id: 'distribution-1',
     warehouse_id: 'warehouse-1',
     warehouse_status: 'ACTIVE',
-    relief_point_id: null,
-    relief_point_status: null,
     campaign_id: null,
     status: 'DISPATCHED',
     preparer_user_id: 'preparer-1',

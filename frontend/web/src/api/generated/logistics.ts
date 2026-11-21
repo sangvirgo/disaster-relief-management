@@ -1024,74 +1024,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/relief-points": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * AssetsController.reliefPoints
-         * @description Route exported from backend/apps/logistics/src/assets/assets.controller.ts#AssetsController.reliefPoints. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        get: operations["logisticsAssetsReliefPoints"];
-        put?: never;
-        /**
-         * AssetsController.createReliefPoint
-         * @description Route exported from backend/apps/logistics/src/assets/assets.controller.ts#AssetsController.createReliefPoint. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        post: operations["logisticsAssetsCreateReliefPoint"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/relief-points/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * AssetsController.reliefPointDetail
-         * @description Route exported from backend/apps/logistics/src/assets/assets.controller.ts#AssetsController.reliefPointDetail. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        get: operations["logisticsAssetsReliefPointDetail"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * AssetsController.patchReliefPoint
-         * @description Route exported from backend/apps/logistics/src/assets/assets.controller.ts#AssetsController.patchReliefPoint. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        patch: operations["logisticsAssetsPatchReliefPoint"];
-        trace?: never;
-    };
-    "/relief-points/{id}/deactivate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * AssetsController.deactivateReliefPoint
-         * @description Route exported from backend/apps/logistics/src/assets/assets.controller.ts#AssetsController.deactivateReliefPoint. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        post: operations["logisticsAssetsDeactivateReliefPoint"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/reports/fulfillment": {
         parameters: {
             query?: never;
@@ -1280,70 +1212,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/vehicles": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * AssetsController.vehicles
-         * @description Route exported from backend/apps/logistics/src/assets/assets.controller.ts#AssetsController.vehicles. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        get: operations["logisticsAssetsVehicles"];
-        put?: never;
-        /**
-         * AssetsController.createVehicle
-         * @description Route exported from backend/apps/logistics/src/assets/assets.controller.ts#AssetsController.createVehicle. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        post: operations["logisticsAssetsCreateVehicle"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/vehicles/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * AssetsController.patchVehicle
-         * @description Route exported from backend/apps/logistics/src/assets/assets.controller.ts#AssetsController.patchVehicle. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        patch: operations["logisticsAssetsPatchVehicle"];
-        trace?: never;
-    };
-    "/vehicles/{id}/deactivate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * AssetsController.deactivateVehicle
-         * @description Route exported from backend/apps/logistics/src/assets/assets.controller.ts#AssetsController.deactivateVehicle. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        post: operations["logisticsAssetsDeactivateVehicle"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/warehouses": {
         parameters: {
             query?: never;
@@ -1375,7 +1243,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * AssetsController.warehouseDetail
+         * @description Route exported from backend/apps/logistics/src/assets/assets.controller.ts#AssetsController.warehouseDetail. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
+         */
+        get: operations["logisticsAssetsWarehouseDetail"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1517,7 +1389,7 @@ export interface paths {
         };
         /**
          * DistributionsController.handoffDetail
-         * @description Requires an authenticated session and matching warehouse scope. DIRECT_HOUSEHOLD, POINT_RECEIPT, and HOUSEHOLD_HANDOUT require HANDOFF_RECORD; RETURN requires DONATION_INTAKE or DISTRIBUTION_DISPATCH; LOSS requires HANDOFF_RECORD or LOSS_APPROVE. Missing permission returns 403 FORBIDDEN; out-of-scope access returns 404 NOT_FOUND. See docs/backend/04-logistics-api.md for the response shape.
+         * @description Requires an authenticated session and matching warehouse scope. DIRECT_HOUSEHOLD requires HANDOFF_RECORD; RETURN requires DONATION_INTAKE or DISTRIBUTION_DISPATCH; LOSS requires HANDOFF_RECORD or LOSS_APPROVE. Missing permission returns 403 FORBIDDEN; out-of-scope access returns 404 NOT_FOUND. See docs/backend/04-logistics-api.md for the response shape.
          */
         get: operations["logisticsDistributionsHandoffDetail"];
         put?: never;
@@ -1539,7 +1411,7 @@ export interface paths {
         put?: never;
         /**
          * DistributionsController.uploadHandoffEvidence
-         * @description Requires an authenticated session. The handoff must belong to the path distribution and be in the caller's current warehouse scope; missing, mismatched, or out-of-scope records return 404 NOT_FOUND. DIRECT_HOUSEHOLD, POINT_RECEIPT, HOUSEHOLD_HANDOUT, and LOSS require HANDOFF_RECORD; RETURN requires DONATION_INTAKE or DISTRIBUTION_DISPATCH. Missing authentication returns 401 UNAUTHENTICATED; an in-scope caller without the required permission returns 403 FORBIDDEN. LOSS_APPROVE alone does not permit upload. Accepts one multipart file named file and requires Idempotency-Key; returns READY private evidence metadata.
+         * @description Requires an authenticated session. The handoff must belong to the path distribution and be in the caller's current warehouse scope; missing, mismatched, or out-of-scope records return 404 NOT_FOUND. DIRECT_HOUSEHOLD and LOSS require HANDOFF_RECORD; RETURN requires DONATION_INTAKE or DISTRIBUTION_DISPATCH. Missing authentication returns 401 UNAUTHENTICATED; an in-scope caller without the required permission returns 403 FORBIDDEN. LOSS_APPROVE alone does not permit upload. Accepts one multipart file named file and requires Idempotency-Key; returns READY private evidence metadata.
          */
         post: operations["logisticsDistributionsUploadHandoffEvidence"];
         delete?: never;
@@ -2066,12 +1938,16 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * CatalogController.deleteItem
+         * @description Deletes an unreferenced item. Foreign keys preserve all items used by stock, needs, donations, distributions, or norms. Requires CATALOG_MANAGE (OPERATIONS_MANAGER, system scope).
+         */
+        delete: operations["logisticsCatalogDeleteItem"];
         options?: never;
         head?: never;
         /**
          * CatalogController.updateItemAliases
-         * @description Replaces the alias list of one item (aliases only widen text matching; they never change stock or need quantities). Requires CATALOG_MANAGE (OPERATIONS_MANAGER, system scope).
+         * @description Corrects an item name and/or replaces its aliases. Type and unit remain immutable to preserve stock history. Requires CATALOG_MANAGE (OPERATIONS_MANAGER, system scope).
          */
         patch: operations["logisticsCatalogUpdateItemAliases"];
         trace?: never;
@@ -2246,8 +2122,6 @@ export interface operations {
                             id?: string;
                             /** Format: uuid */
                             warehouse_id?: string;
-                            relief_point_id?: string | null;
-                            vehicle_id?: string | null;
                             campaign_id?: string | null;
                             purpose?: string;
                             status?: string;
@@ -2261,8 +2135,6 @@ export interface operations {
                             /** Format: date-time */
                             created_at?: string;
                             version?: number;
-                            /** @description Warning only; exceeding capacity does not block preparation or dispatch. */
-                            vehicle_capacity_exceeded?: boolean;
                             lines?: {
                                 /** Format: uuid */
                                 id?: string;
@@ -2274,13 +2146,10 @@ export interface operations {
                                     scale?: number;
                                 };
                                 commitment_id?: string | null;
-                                delivery_target_kind?: string | null;
                                 /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                                 quantity?: string;
                                 /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                                 dispatched?: string;
-                                /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                                received?: string;
                                 /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                                 handed_out?: string;
                                 /** @description Decimal quantity encoded as a string and validated against the unit scale. */
@@ -2290,8 +2159,6 @@ export interface operations {
                                 pending_loss_count?: number;
                                 /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                                 in_transit?: string;
-                                /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                                at_point?: string;
                             }[];
                         }[];
                         more?: boolean;
@@ -2341,13 +2208,9 @@ export interface operations {
                     /** Format: uuid */
                     warehouse_id: string;
                     /** Format: uuid */
-                    relief_point_id?: string;
-                    /** Format: uuid */
-                    vehicle_id?: string;
-                    /** Format: uuid */
                     campaign_id?: string;
                     /** @enum {string} */
-                    purpose: "REQUEST_AID" | "CAMPAIGN_DISTRIBUTION" | "POINT_REPLENISHMENT";
+                    purpose: "REQUEST_AID" | "CAMPAIGN_DISTRIBUTION";
                     lines: {
                         /** Format: uuid */
                         item_id: string;
@@ -2371,8 +2234,6 @@ export interface operations {
                         id?: string;
                         /** Format: uuid */
                         warehouse_id?: string;
-                        relief_point_id?: string | null;
-                        vehicle_id?: string | null;
                         campaign_id?: string | null;
                         purpose?: string;
                         status?: string;
@@ -2386,8 +2247,6 @@ export interface operations {
                         /** Format: date-time */
                         created_at?: string;
                         version?: number;
-                        /** @description Warning only; exceeding capacity does not block preparation or dispatch. */
-                        vehicle_capacity_exceeded?: boolean;
                         lines?: {
                             /** Format: uuid */
                             id?: string;
@@ -2399,13 +2258,10 @@ export interface operations {
                                 scale?: number;
                             };
                             commitment_id?: string | null;
-                            delivery_target_kind?: string | null;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             quantity?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             dispatched?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            received?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             handed_out?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
@@ -2415,8 +2271,6 @@ export interface operations {
                             pending_loss_count?: number;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             in_transit?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            at_point?: string;
                         }[];
                     };
                 };
@@ -2490,8 +2344,6 @@ export interface operations {
                         id?: string;
                         /** Format: uuid */
                         warehouse_id?: string;
-                        relief_point_id?: string | null;
-                        vehicle_id?: string | null;
                         campaign_id?: string | null;
                         purpose?: string;
                         status?: string;
@@ -2505,8 +2357,6 @@ export interface operations {
                         /** Format: date-time */
                         created_at?: string;
                         version?: number;
-                        /** @description Warning only; exceeding capacity does not block preparation or dispatch. */
-                        vehicle_capacity_exceeded?: boolean;
                         lines?: {
                             /** Format: uuid */
                             id?: string;
@@ -2518,13 +2368,10 @@ export interface operations {
                                 scale?: number;
                             };
                             commitment_id?: string | null;
-                            delivery_target_kind?: string | null;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             quantity?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             dispatched?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            received?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             handed_out?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
@@ -2534,8 +2381,6 @@ export interface operations {
                             pending_loss_count?: number;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             in_transit?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            at_point?: string;
                         }[];
                     };
                 };
@@ -2588,8 +2433,6 @@ export interface operations {
                         id?: string;
                         /** Format: uuid */
                         warehouse_id?: string;
-                        relief_point_id?: string | null;
-                        vehicle_id?: string | null;
                         campaign_id?: string | null;
                         purpose?: string;
                         status?: string;
@@ -2603,8 +2446,6 @@ export interface operations {
                         /** Format: date-time */
                         created_at?: string;
                         version?: number;
-                        /** @description Warning only; exceeding capacity does not block preparation or dispatch. */
-                        vehicle_capacity_exceeded?: boolean;
                         lines?: {
                             /** Format: uuid */
                             id?: string;
@@ -2616,13 +2457,10 @@ export interface operations {
                                 scale?: number;
                             };
                             commitment_id?: string | null;
-                            delivery_target_kind?: string | null;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             quantity?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             dispatched?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            received?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             handed_out?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
@@ -2632,8 +2470,6 @@ export interface operations {
                             pending_loss_count?: number;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             in_transit?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            at_point?: string;
                         }[];
                     };
                 };
@@ -2695,8 +2531,6 @@ export interface operations {
                         id?: string;
                         /** Format: uuid */
                         warehouse_id?: string;
-                        relief_point_id?: string | null;
-                        vehicle_id?: string | null;
                         campaign_id?: string | null;
                         purpose?: string;
                         status?: string;
@@ -2710,8 +2544,6 @@ export interface operations {
                         /** Format: date-time */
                         created_at?: string;
                         version?: number;
-                        /** @description Warning only; exceeding capacity does not block preparation or dispatch. */
-                        vehicle_capacity_exceeded?: boolean;
                         lines?: {
                             /** Format: uuid */
                             id?: string;
@@ -2723,13 +2555,10 @@ export interface operations {
                                 scale?: number;
                             };
                             commitment_id?: string | null;
-                            delivery_target_kind?: string | null;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             quantity?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             dispatched?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            received?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             handed_out?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
@@ -2739,8 +2568,6 @@ export interface operations {
                             pending_loss_count?: number;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             in_transit?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            at_point?: string;
                         }[];
                     };
                 };
@@ -2802,8 +2629,6 @@ export interface operations {
                         id?: string;
                         /** Format: uuid */
                         warehouse_id?: string;
-                        relief_point_id?: string | null;
-                        vehicle_id?: string | null;
                         campaign_id?: string | null;
                         purpose?: string;
                         status?: string;
@@ -2817,8 +2642,6 @@ export interface operations {
                         /** Format: date-time */
                         created_at?: string;
                         version?: number;
-                        /** @description Warning only; exceeding capacity does not block preparation or dispatch. */
-                        vehicle_capacity_exceeded?: boolean;
                         lines?: {
                             /** Format: uuid */
                             id?: string;
@@ -2830,13 +2653,10 @@ export interface operations {
                                 scale?: number;
                             };
                             commitment_id?: string | null;
-                            delivery_target_kind?: string | null;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             quantity?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             dispatched?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            received?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             handed_out?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
@@ -2846,8 +2666,6 @@ export interface operations {
                             pending_loss_count?: number;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             in_transit?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            at_point?: string;
                         }[];
                     };
                 };
@@ -2894,9 +2712,9 @@ export interface operations {
             content: {
                 "application/json": {
                     /** @enum {string} */
-                    handoff_kind: "DIRECT_HOUSEHOLD" | "POINT_RECEIPT" | "HOUSEHOLD_HANDOUT" | "RETURN" | "LOSS";
+                    handoff_kind: "DIRECT_HOUSEHOLD" | "RETURN" | "LOSS";
                     /** @enum {string} */
-                    source_stage?: "IN_TRANSIT" | "AT_POINT";
+                    source_stage?: "IN_TRANSIT";
                     /** Format: uuid */
                     receiver_user_id?: string;
                     receiver_label?: string;
@@ -3123,8 +2941,6 @@ export interface operations {
                         id?: string;
                         /** Format: uuid */
                         warehouse_id?: string;
-                        relief_point_id?: string | null;
-                        vehicle_id?: string | null;
                         campaign_id?: string | null;
                         purpose?: string;
                         status?: string;
@@ -3138,8 +2954,6 @@ export interface operations {
                         /** Format: date-time */
                         created_at?: string;
                         version?: number;
-                        /** @description Warning only; exceeding capacity does not block preparation or dispatch. */
-                        vehicle_capacity_exceeded?: boolean;
                         lines?: {
                             /** Format: uuid */
                             id?: string;
@@ -3151,13 +2965,10 @@ export interface operations {
                                 scale?: number;
                             };
                             commitment_id?: string | null;
-                            delivery_target_kind?: string | null;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             quantity?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             dispatched?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            received?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             handed_out?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
@@ -3167,8 +2978,6 @@ export interface operations {
                             pending_loss_count?: number;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             in_transit?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            at_point?: string;
                         }[];
                     };
                 };
@@ -3239,8 +3048,6 @@ export interface operations {
                         id?: string;
                         /** Format: uuid */
                         warehouse_id?: string;
-                        relief_point_id?: string | null;
-                        vehicle_id?: string | null;
                         campaign_id?: string | null;
                         purpose?: string;
                         status?: string;
@@ -3254,8 +3061,6 @@ export interface operations {
                         /** Format: date-time */
                         created_at?: string;
                         version?: number;
-                        /** @description Warning only; exceeding capacity does not block preparation or dispatch. */
-                        vehicle_capacity_exceeded?: boolean;
                         lines?: {
                             /** Format: uuid */
                             id?: string;
@@ -3267,13 +3072,10 @@ export interface operations {
                                 scale?: number;
                             };
                             commitment_id?: string | null;
-                            delivery_target_kind?: string | null;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             quantity?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             dispatched?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            received?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             handed_out?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
@@ -3283,8 +3085,6 @@ export interface operations {
                             pending_loss_count?: number;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             in_transit?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            at_point?: string;
                         }[];
                     };
                 };
@@ -3355,8 +3155,6 @@ export interface operations {
                         id?: string;
                         /** Format: uuid */
                         warehouse_id?: string;
-                        relief_point_id?: string | null;
-                        vehicle_id?: string | null;
                         campaign_id?: string | null;
                         purpose?: string;
                         status?: string;
@@ -3370,8 +3168,6 @@ export interface operations {
                         /** Format: date-time */
                         created_at?: string;
                         version?: number;
-                        /** @description Warning only; exceeding capacity does not block preparation or dispatch. */
-                        vehicle_capacity_exceeded?: boolean;
                         lines?: {
                             /** Format: uuid */
                             id?: string;
@@ -3383,13 +3179,10 @@ export interface operations {
                                 scale?: number;
                             };
                             commitment_id?: string | null;
-                            delivery_target_kind?: string | null;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             quantity?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             dispatched?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            received?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             handed_out?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
@@ -3399,8 +3192,6 @@ export interface operations {
                             pending_loss_count?: number;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             in_transit?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            at_point?: string;
                         }[];
                     };
                 };
@@ -3790,6 +3581,12 @@ export interface operations {
                             description?: string | null;
                             opens_at?: string | null;
                             closes_at?: string | null;
+                            location?: {
+                                /** @constant */
+                                type: "Point";
+                                coordinates: number[];
+                            } | null;
+                            location_note?: string | null;
                             version?: number;
                             /** Format: date-time */
                             created_at?: string;
@@ -3859,6 +3656,12 @@ export interface operations {
                     description: string;
                     /** Format: uuid */
                     intake_warehouse_id: string;
+                    location?: {
+                        /** @constant */
+                        type: "Point";
+                        coordinates: number[];
+                    };
+                    location_note?: string;
                     /** Format: uuid */
                     campaign_id?: string;
                     /** Format: date-time */
@@ -3895,6 +3698,12 @@ export interface operations {
                         description?: string | null;
                         opens_at?: string | null;
                         closes_at?: string | null;
+                        location?: {
+                            /** @constant */
+                            type: "Point";
+                            coordinates: number[];
+                        } | null;
+                        location_note?: string | null;
                         version?: number;
                         /** Format: date-time */
                         created_at?: string;
@@ -3977,6 +3786,12 @@ export interface operations {
                     description?: string;
                     /** Format: uuid */
                     intake_warehouse_id?: string;
+                    location?: {
+                        /** @constant */
+                        type: "Point";
+                        coordinates: number[];
+                    };
+                    location_note?: string;
                     /** Format: uuid */
                     campaign_id?: string;
                     /** Format: date-time */
@@ -4013,6 +3828,12 @@ export interface operations {
                         description?: string | null;
                         opens_at?: string | null;
                         closes_at?: string | null;
+                        location?: {
+                            /** @constant */
+                            type: "Point";
+                            coordinates: number[];
+                        } | null;
+                        location_note?: string | null;
                         version?: number;
                         /** Format: date-time */
                         created_at?: string;
@@ -4115,6 +3936,12 @@ export interface operations {
                         description?: string | null;
                         opens_at?: string | null;
                         closes_at?: string | null;
+                        location?: {
+                            /** @constant */
+                            type: "Point";
+                            coordinates: number[];
+                        } | null;
+                        location_note?: string | null;
                         version?: number;
                         /** Format: date-time */
                         created_at?: string;
@@ -4198,6 +4025,12 @@ export interface operations {
                         description?: string | null;
                         opens_at?: string | null;
                         closes_at?: string | null;
+                        location?: {
+                            /** @constant */
+                            type: "Point";
+                            coordinates: number[];
+                        } | null;
+                        location_note?: string | null;
                         version?: number;
                         /** Format: date-time */
                         created_at?: string;
@@ -4291,6 +4124,12 @@ export interface operations {
                         description?: string | null;
                         opens_at?: string | null;
                         closes_at?: string | null;
+                        location?: {
+                            /** @constant */
+                            type: "Point";
+                            coordinates: number[];
+                        } | null;
+                        location_note?: string | null;
                         version?: number;
                         /** Format: date-time */
                         created_at?: string;
@@ -4374,6 +4213,12 @@ export interface operations {
                         description?: string | null;
                         opens_at?: string | null;
                         closes_at?: string | null;
+                        location?: {
+                            /** @constant */
+                            type: "Point";
+                            coordinates: number[];
+                        } | null;
+                        location_note?: string | null;
                         version?: number;
                         /** Format: date-time */
                         created_at?: string;
@@ -5864,10 +5709,6 @@ export interface operations {
                     item_id: string;
                     /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                     quantity: string;
-                    /** @enum {string} */
-                    delivery_target_kind?: "FINAL_RECIPIENT";
-                    /** Format: uuid */
-                    designated_point_id?: string;
                     reason?: string;
                 };
             };
@@ -5905,9 +5746,6 @@ export interface operations {
                         /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                         requested_quantity: string;
                         cancelled_remaining: string | null;
-                        /** @enum {string} */
-                        delivery_target_kind: "FINAL_RECIPIENT" | "RELIEF_POINT";
-                        designated_point_id: string | null;
                         /** @enum {string} */
                         status: "OPEN" | "PARTIALLY_FULFILLED" | "FULFILLED" | "CANCELLED";
                         version: number;
@@ -6004,9 +5842,6 @@ export interface operations {
                         /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                         requested_quantity?: string;
                         cancelled_remaining?: string | null;
-                        /** @enum {string} */
-                        delivery_target_kind?: "FINAL_RECIPIENT" | "RELIEF_POINT";
-                        designated_point_id?: string | null;
                         status?: string;
                         version?: number;
                         /** Format: date-time */
@@ -6264,9 +6099,6 @@ export interface operations {
                         /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                         requested_quantity?: string;
                         cancelled_remaining?: string | null;
-                        /** @enum {string} */
-                        delivery_target_kind?: "FINAL_RECIPIENT" | "RELIEF_POINT";
-                        designated_point_id?: string | null;
                         status?: string;
                         version?: number;
                         /** Format: date-time */
@@ -6364,9 +6196,6 @@ export interface operations {
                         /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                         requested_quantity?: string;
                         cancelled_remaining?: string | null;
-                        /** @enum {string} */
-                        delivery_target_kind?: "FINAL_RECIPIENT" | "RELIEF_POINT";
-                        designated_point_id?: string | null;
                         status?: string;
                         version?: number;
                         /** Format: date-time */
@@ -6415,6 +6244,8 @@ export interface operations {
     logisticsDrivesPublicList: {
         parameters: {
             query?: {
+                lat?: number;
+                lng?: number;
                 cursor?: string;
                 limit?: number;
             };
@@ -6450,6 +6281,8 @@ export interface operations {
                                     coordinates: number[];
                                 } | null;
                             };
+                            /** @description Only when lat and lng are sent; measured to the drive drop-off point, or to the warehouse when it publishes its location; null when neither is public. */
+                            distance_m?: number | null;
                             items?: {
                                 /** Format: uuid */
                                 item_id?: string;
@@ -6521,6 +6354,8 @@ export interface operations {
                                 coordinates: number[];
                             } | null;
                         };
+                        /** @description Only when lat and lng are sent; measured to the drive drop-off point, or to the warehouse when it publishes its location; null when neither is public. */
+                        distance_m?: number | null;
                         items?: {
                             /** Format: uuid */
                             item_id?: string;
@@ -7055,8 +6890,6 @@ export interface operations {
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             issued_in_transit?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            at_point?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             delivered?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             returned?: string;
@@ -7092,356 +6925,6 @@ export interface operations {
             };
             /** @description Documented error response; clients branch on the stable code. */
             403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    logisticsAssetsReliefPoints: {
-        parameters: {
-            query?: {
-                status?: string;
-                cursor?: string;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        items?: {
-                            /** Format: uuid */
-                            id?: string;
-                            /** @enum {string} */
-                            status?: "ACTIVE" | "INACTIVE";
-                            version?: number;
-                            /** Format: date-time */
-                            created_at?: string;
-                            name?: string;
-                            location?: {
-                                /** @constant */
-                                type: "Point";
-                                coordinates: number[];
-                            };
-                        }[];
-                        more?: boolean;
-                        cursor?: string;
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    logisticsAssetsCreateReliefPoint: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    name: string;
-                    contact_note?: string;
-                    operating_note?: string;
-                    location: {
-                        /** @constant */
-                        type?: "Point";
-                        coordinates?: number[];
-                    };
-                };
-            };
-        };
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id?: string;
-                        /** @enum {string} */
-                        status?: "ACTIVE" | "INACTIVE";
-                        version?: number;
-                        /** Format: date-time */
-                        created_at?: string;
-                        name?: string;
-                        location?: {
-                            /** @constant */
-                            type: "Point";
-                            coordinates: number[];
-                        };
-                        contact_note?: string | null;
-                        operating_note?: string | null;
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    logisticsAssetsReliefPointDetail: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id?: string;
-                        status?: string;
-                        version?: number;
-                        /** Format: date-time */
-                        created_at?: string;
-                        name?: string;
-                        location?: {
-                            /** @constant */
-                            type: "Point";
-                            coordinates: number[];
-                        };
-                        contact_note?: string | null;
-                        operating_note?: string | null;
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    logisticsAssetsPatchReliefPoint: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    expected_version: number;
-                    name?: string;
-                    contact_note?: string;
-                    operating_note?: string;
-                    location?: {
-                        /** @constant */
-                        type?: "Point";
-                        coordinates?: number[];
-                    };
-                };
-            };
-        };
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id?: string;
-                        /** @enum {string} */
-                        status?: "ACTIVE" | "INACTIVE";
-                        version?: number;
-                        /** Format: date-time */
-                        created_at?: string;
-                        name?: string;
-                        location?: {
-                            /** @constant */
-                            type: "Point";
-                            coordinates: number[];
-                        };
-                        contact_note?: string | null;
-                        operating_note?: string | null;
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    logisticsAssetsDeactivateReliefPoint: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    expected_version: number;
-                };
-            };
-        };
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id?: string;
-                        /** @enum {string} */
-                        status?: "ACTIVE" | "INACTIVE";
-                        version?: number;
-                        /** Format: date-time */
-                        created_at?: string;
-                        name?: string;
-                        location?: {
-                            /** @constant */
-                            type: "Point";
-                            coordinates: number[];
-                        };
-                        contact_note?: string | null;
-                        operating_note?: string | null;
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -8262,279 +7745,6 @@ export interface operations {
             };
         };
     };
-    logisticsAssetsVehicles: {
-        parameters: {
-            query?: {
-                status?: string;
-                cursor?: string;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        items?: {
-                            /** Format: uuid */
-                            id?: string;
-                            /** @enum {string} */
-                            status?: "ACTIVE" | "INACTIVE";
-                            version?: number;
-                            /** Format: date-time */
-                            created_at?: string;
-                            identifier?: string;
-                            vehicle_type?: string;
-                            capacity?: string | null;
-                            capacity_unit?: string | null;
-                        }[];
-                        more?: boolean;
-                        cursor?: string;
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    logisticsAssetsCreateVehicle: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    identifier: string;
-                    vehicle_type: string;
-                    capacity?: string | null;
-                    capacity_unit?: string | null;
-                };
-            };
-        };
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id?: string;
-                        /** @enum {string} */
-                        status?: "ACTIVE" | "INACTIVE";
-                        version?: number;
-                        /** Format: date-time */
-                        created_at?: string;
-                        identifier?: string;
-                        vehicle_type?: string;
-                        capacity?: string | null;
-                        capacity_unit?: string | null;
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    logisticsAssetsPatchVehicle: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    expected_version: number;
-                    identifier?: string;
-                    vehicle_type?: string;
-                    capacity?: string | null;
-                    capacity_unit?: string | null;
-                };
-            };
-        };
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id?: string;
-                        /** @enum {string} */
-                        status?: "ACTIVE" | "INACTIVE";
-                        version?: number;
-                        /** Format: date-time */
-                        created_at?: string;
-                        identifier?: string;
-                        vehicle_type?: string;
-                        capacity?: string | null;
-                        capacity_unit?: string | null;
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    logisticsAssetsDeactivateVehicle: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    expected_version: number;
-                };
-            };
-        };
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id?: string;
-                        /** @enum {string} */
-                        status?: "ACTIVE" | "INACTIVE";
-                        version?: number;
-                        /** Format: date-time */
-                        created_at?: string;
-                        identifier?: string;
-                        vehicle_type?: string;
-                        capacity?: string | null;
-                        capacity_unit?: string | null;
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
     logisticsAssetsWarehouses: {
         parameters: {
             query?: {
@@ -8630,6 +7840,63 @@ export interface operations {
         responses: {
             /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id?: string;
+                        /** @enum {string} */
+                        status?: "ACTIVE" | "INACTIVE";
+                        version?: number;
+                        /** Format: date-time */
+                        created_at?: string;
+                        name?: string;
+                        location?: {
+                            /** @constant */
+                            type: "Point";
+                            coordinates: number[];
+                        } | null;
+                        location_public?: boolean;
+                        service_radius_m?: number | null;
+                        address_note?: string | null;
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsAssetsWarehouseDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -12297,6 +11564,83 @@ export interface operations {
             };
         };
     };
+    logisticsCatalogDeleteItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expected_version: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        deleted: boolean;
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
     logisticsCatalogUpdateItemAliases: {
         parameters: {
             query?: never;
@@ -12310,8 +11654,9 @@ export interface operations {
             content: {
                 "application/json": {
                     expected_version: number;
-                    aliases: string[];
-                };
+                    name?: string;
+                    aliases?: string[];
+                } | unknown | unknown;
             };
         };
         responses: {

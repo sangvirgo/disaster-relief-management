@@ -6,7 +6,7 @@
 -- Cross-service ids (fixed, shared with seed-identity.sql / seed-response.sql):
 --   ORG_COORD 00000000-0000-4000-8000-000000000001   CAMPAIGN_ACTIVE ...0000000000c1   REQUEST_AID ...0000000000f5 (work_cycle 1)
 --   users: coord1 ...102, ops_mgr ...105, ops_seed ...112, reviewer1 ...108, reviewer2 ...109
--- Local ids use the prefix 00000000-0000-4000-8000-0000000 + a 5-hex suffix (a1xxx items, a2xxx warehouses, a3xxx points, a4xxx vehicles,
+-- Local ids use the prefix 00000000-0000-4000-8000-0000000 + a 5-hex suffix (a1xxx items, a2xxx warehouses,
 -- a5xxx balances, a6xxx drives, a7xxx deliveries, a8xxx receipts, a9xxx disputes, b1xxx needs, b2xxx commitments, b3xxx distributions,
 -- b4xxx distribution lines, b5xxx handoffs, b6xxx handoff lines, b7xxx cycle, b8xxx adjustment).
 BEGIN;
@@ -60,18 +60,6 @@ INSERT INTO warehouse (id, name, address_note, location, location_public, servic
    'Số 10 đường Mẫu, khu A (dữ liệu giả lập)', ST_GeogFromText('SRID=4326;POINT(106.6300 10.8200)'), true, 20000),
   ('00000000-0000-4000-8000-0000000a2002', 'Kho B',
    'Số 25 đường Thử nghiệm, khu B (dữ liệu giả lập)', ST_GeogFromText('SRID=4326;POINT(108.2000 16.0700)'), false, 30000);
-
-INSERT INTO relief_point (id, name, contact_note, operating_note, location, status) VALUES
-  ('00000000-0000-4000-8000-0000000a3001', 'Điểm cứu trợ Trường tiểu học Mẫu',
-   'Liên hệ qua điều phối viên, số giả lập 0900000201', 'Mở cửa 07:00 đến 19:00', ST_GeogFromText('SRID=4326;POINT(106.6450 10.8300)'), 'ACTIVE'),
-  ('00000000-0000-4000-8000-0000000a3002', 'Điểm cứu trợ Nhà văn hóa Thử nghiệm',
-   'Liên hệ qua điều phối viên, số giả lập 0900000202', 'Mở cửa 08:00 đến 18:00', ST_GeogFromText('SRID=4326;POINT(108.2100 16.0600)'), 'ACTIVE'),
-  ('00000000-0000-4000-8000-0000000a3003', 'Điểm cứu trợ cũ (đã ngừng hoạt động)',
-   NULL, 'Tạm đóng do ngập sâu', ST_GeogFromText('SRID=4326;POINT(106.6100 10.8100)'), 'INACTIVE');
-
-INSERT INTO vehicle (id, identifier, vehicle_type, capacity, capacity_unit) VALUES
-  ('00000000-0000-4000-8000-0000000a4001', '51D-000.01', 'Xe tải 1,5 tấn', 1500.000, 'KG'),
-  ('00000000-0000-4000-8000-0000000a4002', '43C-000.02', 'Xe bán tải', NULL, NULL);
 
 -- ---------- zero balances first (warehouse A: a5a01..a5a08, warehouse B: a5b01..a5b08; item order as in the item table) ----------
 INSERT INTO stock_balance (id, warehouse_id, item_id)
@@ -203,9 +191,9 @@ INSERT INTO stock_movement (balance_id, movement_type, delta_on_hand, delta_rese
   ('00000000-0000-4000-8000-0000000a5a03', 'RESERVE', 0, 12, '00000000-0000-4000-8000-0000000b2003', 'RESERVE:00000000-0000-4000-8000-0000000b2003', '00000000-0000-4000-8000-000000000105', now() - interval '4 days');
 
 -- Distribution 1 (REQUEST_AID, direct to a household): preparer ops_seed, approver reviewer1, dispatcher ops_mgr, recorder ops_seed (recorder != dispatcher).
-INSERT INTO distribution (id, warehouse_id, vehicle_id, campaign_id, purpose, status, preparer_user_id, created_at) VALUES
+INSERT INTO distribution (id, warehouse_id, campaign_id, purpose, status, preparer_user_id, created_at) VALUES
   ('00000000-0000-4000-8000-0000000b3001', '00000000-0000-4000-8000-0000000a2001',
-   '00000000-0000-4000-8000-0000000a4001', '00000000-0000-4000-8000-0000000000c1', 'REQUEST_AID', 'DRAFT',
+   '00000000-0000-4000-8000-0000000000c1', 'REQUEST_AID', 'DRAFT',
    '00000000-0000-4000-8000-000000000112', now() - interval '3 days 20 hours');
 INSERT INTO distribution_line (id, distribution_id, warehouse_id, item_id, commitment_id, quantity) VALUES
   ('00000000-0000-4000-8000-0000000b4001', '00000000-0000-4000-8000-0000000b3001', '00000000-0000-4000-8000-0000000a2001', '00000000-0000-4000-8000-0000000a1005', '00000000-0000-4000-8000-0000000b2001', 12),
@@ -230,14 +218,14 @@ INSERT INTO issued_line_settlement (handoff_line_id, commitment_id, settlement_t
   ('00000000-0000-4000-8000-0000000b6001', '00000000-0000-4000-8000-0000000b2001', 'DELIVERED', now() - interval '3 days 17 hours'),
   ('00000000-0000-4000-8000-0000000b6002', '00000000-0000-4000-8000-0000000b2003', 'DELIVERED', now() - interval '3 days 17 hours');
 
--- Distribution 2 (plan TC-DIST-02; preparer ops_mgr, approver reviewer2, dispatcher ops_seed, recorder ops_mgr): issue 55 mì gói to a relief point; point receipt 50, loss 5 pending (no loss review row),
--- handout 35 => 15 held at the point; the 5 under pending loss stay in transit (excluded from custody arithmetic until reviewed).
-INSERT INTO distribution (id, warehouse_id, relief_point_id, vehicle_id, campaign_id, purpose, status, preparer_user_id, created_at) VALUES
+-- Distribution 2 (plan TC-DIST-02; preparer ops_mgr, approver reviewer2, dispatcher ops_seed, recorder ops_mgr): issue 55 mì gói for a campaign distribution; direct household handoff 50,
+-- loss 5 pending (no loss review row) => the 5 under pending loss stay in transit (excluded from custody arithmetic until reviewed).
+INSERT INTO distribution (id, warehouse_id, campaign_id, purpose, status, preparer_user_id, created_at) VALUES
   ('00000000-0000-4000-8000-0000000b3002', '00000000-0000-4000-8000-0000000a2001',
-   '00000000-0000-4000-8000-0000000a3001', '00000000-0000-4000-8000-0000000a4001', '00000000-0000-4000-8000-0000000000c1', 'POINT_REPLENISHMENT', 'DRAFT',
+   '00000000-0000-4000-8000-0000000000c1', 'CAMPAIGN_DISTRIBUTION', 'DRAFT',
    '00000000-0000-4000-8000-000000000105', now() - interval '2 days 20 hours');
-INSERT INTO distribution_line (id, distribution_id, warehouse_id, item_id, quantity, in_transit_quantity, at_point_quantity) VALUES
-  ('00000000-0000-4000-8000-0000000b4003', '00000000-0000-4000-8000-0000000b3002', '00000000-0000-4000-8000-0000000a2001', '00000000-0000-4000-8000-0000000a1002', 55, 5, 15);
+INSERT INTO distribution_line (id, distribution_id, warehouse_id, item_id, quantity, in_transit_quantity) VALUES
+  ('00000000-0000-4000-8000-0000000b4003', '00000000-0000-4000-8000-0000000b3002', '00000000-0000-4000-8000-0000000a2001', '00000000-0000-4000-8000-0000000a1002', 55, 5);
 UPDATE distribution SET status = 'DISPATCHED',
   approver_user_id = '00000000-0000-4000-8000-000000000109', approved_version = version, approved_at = now() - interval '2 days 19 hours',
   dispatch_actor_user_id = '00000000-0000-4000-8000-000000000112', dispatched_at = now() - interval '2 days 18 hours'
@@ -249,15 +237,12 @@ INSERT INTO stock_movement (balance_id, movement_type, delta_on_hand, delta_rese
   ('00000000-0000-4000-8000-0000000a5a02', 'ISSUE', -55, -55, '00000000-0000-4000-8000-0000000b4003', 'ISSUE:DL:00000000-0000-4000-8000-0000000b4003', '00000000-0000-4000-8000-000000000112', now() - interval '2 days 18 hours');
 
 INSERT INTO handoff_record (id, distribution_id, handoff_kind, source_stage, receiver_label, recorder_user_id, confirmation_basis, occurred_at, created_at) VALUES
-  ('00000000-0000-4000-8000-0000000b5002', '00000000-0000-4000-8000-0000000b3002', 'POINT_RECEIPT',    NULL,         'Điểm cứu trợ Trường tiểu học Mẫu',
-   '00000000-0000-4000-8000-000000000105', 'Trưởng điểm ký nhận 50 gói, ghi chú thiếu 5 gói', now() - interval '2 days 12 hours', now() - interval '2 days 12 hours'),
-  ('00000000-0000-4000-8000-0000000b5003', '00000000-0000-4000-8000-0000000b3002', 'HOUSEHOLD_HANDOUT', NULL,         'Danh sách 35 hộ nhận tại điểm (giả lập)',
-   '00000000-0000-4000-8000-000000000105', 'Sổ phát có chữ ký từng hộ', now() - interval '2 days', now() - interval '2 days'),
+  ('00000000-0000-4000-8000-0000000b5002', '00000000-0000-4000-8000-0000000b3002', 'DIRECT_HOUSEHOLD', NULL,         'Danh sách 50 hộ nhận trực tiếp (giả lập)',
+   '00000000-0000-4000-8000-000000000105', 'Sổ phát có chữ ký từng hộ', now() - interval '2 days 12 hours', now() - interval '2 days 12 hours'),
   ('00000000-0000-4000-8000-0000000b5004', '00000000-0000-4000-8000-0000000b3002', 'LOSS',              'IN_TRANSIT', NULL,
    '00000000-0000-4000-8000-000000000105', 'Biên bản thiếu 5 gói khi vận chuyển, chờ xác minh độc lập', now() - interval '2 days 11 hours', now() - interval '2 days 11 hours');
 INSERT INTO handoff_line (id, handoff_id, distribution_id, distribution_line_id, quantity) VALUES
   ('00000000-0000-4000-8000-0000000b6003', '00000000-0000-4000-8000-0000000b5002', '00000000-0000-4000-8000-0000000b3002', '00000000-0000-4000-8000-0000000b4003', 50),
-  ('00000000-0000-4000-8000-0000000b6004', '00000000-0000-4000-8000-0000000b5003', '00000000-0000-4000-8000-0000000b3002', '00000000-0000-4000-8000-0000000b4003', 35),
   ('00000000-0000-4000-8000-0000000b6005', '00000000-0000-4000-8000-0000000b5004', '00000000-0000-4000-8000-0000000b3002', '00000000-0000-4000-8000-0000000b4003', 5);
 
 -- Distribution 3: CAMPAIGN_DISTRIBUTION still DRAFT (warehouse B, no commitment, no stock effect yet).
@@ -278,7 +263,7 @@ INSERT INTO notice (id, recipient_user_id, source_id, source_version, notice_typ
   ('00000000-0000-4000-8000-0000000d1001', '00000000-0000-4000-8000-000000000105', '00000000-0000-4000-8000-0000000b8001', 1, 'STOCK_ADJUSTMENT_PENDING',
    '{"title": "Có yêu cầu điều chỉnh tồn kho chờ duyệt", "message": "Kho trung tâm A: giảm 3 gói Mì gói do ẩm mốc."}'::jsonb, now() - interval '1 hour'),
   ('00000000-0000-4000-8000-0000000d1002', '00000000-0000-4000-8000-000000000105', '00000000-0000-4000-8000-0000000b5004', 1, 'LOSS_REVIEW_PENDING',
-   '{"title": "Có biên bản thất thoát chờ xác minh", "message": "Phiếu phân phối tại Điểm cứu trợ Trường tiểu học Mẫu ghi thiếu 5 gói Mì gói."}'::jsonb, now() - interval '2 days 11 hours'),
+   '{"title": "Có biên bản thất thoát chờ xác minh", "message": "Phiếu phân phối theo chiến dịch ghi thiếu 5 gói Mì gói."}'::jsonb, now() - interval '2 days 11 hours'),
   ('00000000-0000-4000-8000-0000000d1003', '00000000-0000-4000-8000-000000000105', '00000000-0000-4000-8000-0000000a7004', 1, 'DONATION_PENDING_REVIEW',
    '{"title": "Có phiếu tiếp nhận chờ duyệt", "message": "Phiếu GD7K2M04 đã được kiểm đếm và đang chờ người duyệt độc lập."}'::jsonb, now() - interval '2 hours'),
   ('00000000-0000-4000-8000-0000000d1004', '00000000-0000-4000-8000-000000000105', '00000000-0000-4000-8000-0000000a9001', 1, 'DONATION_DISPUTE_OPENED',
@@ -327,9 +312,9 @@ BEGIN
     FROM relief_need n2 LEFT JOIN commitment c ON c.relief_need_id = n2.id WHERE n2.id = '00000000-0000-4000-8000-0000000b1002' GROUP BY n2.id;
   IF v <> 0 THEN RAISE EXCEPTION 'seed assertion failed: N2 cancelled_remaining does not equal requested - delivered'; END IF;
 
-  -- point distribution counters: 50 received, 35 handed out, 15 at the point, 5 pending loss still in transit
-  SELECT count(*) INTO n FROM distribution_line l WHERE l.id = '00000000-0000-4000-8000-0000000b4003' AND l.at_point_quantity = 15 AND l.in_transit_quantity = 5;
-  IF n <> 1 THEN RAISE EXCEPTION 'seed assertion failed: point distribution custody counters'; END IF;
+  -- campaign distribution counters: 50 handed to households, 5 pending loss still in transit
+  SELECT count(*) INTO n FROM distribution_line l WHERE l.id = '00000000-0000-4000-8000-0000000b4003' AND l.in_transit_quantity = 5;
+  IF n <> 1 THEN RAISE EXCEPTION 'seed assertion failed: campaign distribution custody counters'; END IF;
   IF EXISTS (SELECT 1 FROM handoff_loss_review WHERE handoff_id = '00000000-0000-4000-8000-0000000b5004') THEN
     RAISE EXCEPTION 'seed assertion failed: the demo LOSS handoff must stay pending';
   END IF;

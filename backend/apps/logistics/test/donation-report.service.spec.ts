@@ -48,8 +48,7 @@ describe('DonationReportService', () => {
     const sql = String(query.mock.calls[0]?.[0]);
     expect(sql).toContain(targetFilter);
     expect(sql).toContain(finalDistributionHandoffPredicate);
-    expect(finalDistributionHandoffPredicate).toContain("handoff.handoff_kind='HOUSEHOLD_HANDOUT'");
-    expect(finalDistributionHandoffPredicate).not.toContain('POINT_RECEIPT');
+    expect(finalDistributionHandoffPredicate).toBe("handoff.handoff_kind='DIRECT_HOUSEHOLD'");
     expect(sql).not.toContain('donation_drive');
   });
 

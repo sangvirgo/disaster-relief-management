@@ -86,7 +86,7 @@ function setup(options: {
         return [{
           id, cycle_id: cycleId, request_id: requestId, work_cycle: 1, campaign_id: null, item_id: waterItemId,
           item_name: 'Nước', unit_code: 'LIT', unit_name: 'Lít', unit_scale: 3, original_quantity: '30.000',
-          requested_quantity: '30.000', cancelled_remaining: null, designated_point_id: null, status: 'OPEN',
+          requested_quantity: '30.000', cancelled_remaining: null, status: 'OPEN',
           source: 'ESTIMATED', estimate_basis: null, version: 1, created_at: new Date('2026-11-18T00:00:00.000Z'),
         }];
       }

@@ -38,7 +38,7 @@ const roles = [
   'REVIEWER',
   'ADMIN',
 ];
-const systemOperationsWarning = 'Phạm vi toàn hệ thống cho quản lý vận hành: người này sẽ điều khiển TẤT CẢ chiến dịch (tiếp nhận, phân phối, bàn giao và đối soát), cùng danh mục, điểm cứu trợ và nhu cầu vật tư. Chỉ chọn khi thật sự cần; nên chọn phạm vi chiến dịch.';
+const systemOperationsWarning = 'Phạm vi toàn hệ thống cho quản lý vận hành: người này sẽ điều khiển TẤT CẢ chiến dịch (tiếp nhận, phân phối, bàn giao và đối soát), cùng danh mục, kho và nhu cầu vật tư. Chỉ chọn khi thật sự cần; nên chọn phạm vi chiến dịch.';
 const types: Record<string, string> = {
   app_user: 'Người dùng',
   role_grant: 'Quyền truy cập',

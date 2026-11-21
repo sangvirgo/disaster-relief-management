@@ -43,7 +43,6 @@ export interface NeedRow extends Record<string, unknown>, NeedScope {
   original_quantity: string;
   requested_quantity: string;
   cancelled_remaining: string | null;
-  designated_point_id: string | null;
   status: 'OPEN' | 'PARTIALLY_FULFILLED' | 'FULFILLED' | 'CANCELLED';
   source: NeedSource;
   estimate_basis: NeedEstimateBasis | null;
@@ -125,8 +124,6 @@ export function needValue(row: NeedRow): Record<string, unknown> {
     original_quantity: row.original_quantity,
     requested_quantity: row.requested_quantity,
     cancelled_remaining: row.cancelled_remaining,
-    delivery_target_kind: row.designated_point_id === null ? 'FINAL_RECIPIENT' : 'RELIEF_POINT',
-    designated_point_id: row.designated_point_id,
     status: row.status,
     version: Number(row.version),
     created_at: createdAt.toISOString(),
@@ -143,7 +140,7 @@ export async function readNeed(manager: Pick<EntityManager, 'query'>, id: string
     `SELECT n.id,n.cycle_id,c.request_id,c.work_cycle,c.campaign_id,
             n.item_id,i.name AS item_name,u.code AS unit_code,u.display_name AS unit_name,u.scale AS unit_scale,
             n.original_quantity::text,n.requested_quantity::text,n.cancelled_remaining::text,
-            n.designated_point_id,n.status,n.source,n.estimate_basis,n.version,n.created_at,
+            n.status,n.source,n.estimate_basis,n.version,n.created_at,
             ${referenceEstimateSql} AS reference_estimate_quantity
        FROM relief_need n JOIN fulfillment_cycle c ON c.id=n.cycle_id
        JOIN item i ON i.id=n.item_id JOIN unit u ON u.code=i.unit_code

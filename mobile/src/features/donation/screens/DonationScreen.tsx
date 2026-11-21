@@ -16,6 +16,7 @@ import { useRouter } from 'expo-router';
 import { goBackOrHome } from '../../../navigation/back';
 import * as ImagePicker from 'expo-image-picker';
 import * as Clipboard from 'expo-clipboard';
+import * as Location from 'expo-location';
 import { ScreenContainer } from '../../../components/common/ScreenContainer';
 import { CompactTextInput } from '../../../components/common/CompactTextInput';
 import { FormFieldError } from '../../../components/common/FormFieldError';
@@ -170,6 +171,10 @@ export const DonationScreen: React.FC = () => {
   const [drives, setDrives] = useState<DonationDrive[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [drivesError, setDrivesError] = useState<string | null>(null);
+  const positionRef = useRef<{ lat: number; lng: number } | null>(null);
+  const [nearbyActive, setNearbyActive] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [locationMessage, setLocationMessage] = useState<string | null>(null);
   const [driveCursor, setDriveCursor] = useState<string | undefined>();
   const [moreDrives, setMoreDrives] = useState<boolean>(false);
   const [loadingMoreDrives, setLoadingMoreDrives] = useState<boolean>(false);
@@ -297,7 +302,7 @@ export const DonationScreen: React.FC = () => {
   const fetchDrives = useCallback(async (cursor?: string, append = false) => {
     setDrivesError(null);
     try {
-      const page = await LogisticsApi.getPublicDonationDrives(50, cursor);
+      const page = await LogisticsApi.getPublicDonationDrives(50, cursor, positionRef.current);
       setDrives((current) => append ? [...current, ...page.items] : page.items);
       if (!append) setDriveProgress({});
       void loadDriveProgress(page.items);
@@ -389,6 +394,40 @@ export const DonationScreen: React.FC = () => {
       setSelectedDrive(knownDrive || { id: pending.driveId, title: pending.driveTitle, status: 'OPEN', items: [] });
     }).catch(() => Alert.alert('Không thể khôi phục lần khai báo', 'Không đọc được bản khai đang chờ trên thiết bị.'));
   }, [fetchDrives, loadRecentReceipts]);
+
+  const toggleNearby = async () => {
+    if (nearbyActive) {
+      positionRef.current = null;
+      setNearbyActive(false);
+      setLocationMessage(null);
+      setLoading(true);
+      void fetchDrives();
+      return;
+    }
+    setLocating(true);
+    setLocationMessage(null);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setLocationMessage('Chưa được cấp quyền vị trí. Bạn có thể chọn đợt quyên góp trong danh sách.');
+        return;
+      }
+      const fix = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      positionRef.current = { lat: fix.coords.latitude, lng: fix.coords.longitude };
+      setNearbyActive(true);
+      setLoading(true);
+      await fetchDrives();
+    } catch {
+      setLocationMessage('Không lấy được vị trí hiện tại. Bạn có thể chọn đợt quyên góp trong danh sách.');
+    } finally {
+      setLocating(false);
+    }
+  };
+
+  const nearestDrive = nearbyActive
+    ? drives.find((drive) => typeof drive.distance_m === 'number' && getDriveAvailability(drive).canAccept)
+    : undefined;
+  const formatDistance = (meters: number) => meters < 1000 ? `${meters} m` : `${(meters / 1000).toFixed(1).replace('.', ',')} km`;
 
   const handleOpenDonateModal = (drive: DonationDrive) => {
     const availability = getDriveAvailability(drive);
@@ -1184,6 +1223,27 @@ export const DonationScreen: React.FC = () => {
               Hệ thống chỉ tiếp nhận nhu yếu phẩm hiện vật thực tế, kiểm đếm độc lập và không nhận quyên góp tiền mặt.
             </Text>
           </View>
+
+          <TouchableOpacity
+            style={[styles.searchButton, { alignSelf: 'flex-start', marginLeft: 0, marginBottom: 12 }]}
+            onPress={() => { void toggleNearby(); }}
+            disabled={locating}
+            accessibilityLabel={nearbyActive ? 'Bỏ sắp xếp theo vị trí' : 'Tìm đợt quyên góp gần tôi'}
+          >
+            {locating ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.searchButtonText}>{nearbyActive ? 'Bỏ sắp xếp theo vị trí' : 'Tìm đợt gần tôi'}</Text>}
+          </TouchableOpacity>
+          {locationMessage ? <Text style={styles.emptySubtitle}>{locationMessage}</Text> : null}
+          {nearestDrive ? (
+            <View style={styles.bannerBox}>
+              <Text style={styles.bannerTitle}>ĐỢT GẦN BẠN NHẤT</Text>
+              <Text style={styles.bannerDesc}>
+                {nearestDrive.title} · {nearestDrive.intake_location?.warehouse_name ?? nearestDrive.intake_warehouse_name} · cách khoảng {formatDistance(nearestDrive.distance_m as number)}
+              </Text>
+              <TouchableOpacity style={[styles.searchButton, { alignSelf: 'flex-start', marginLeft: 0, marginTop: 8 }]} onPress={() => handleOpenDonateModal(nearestDrive)}>
+                <Text style={styles.searchButtonText}>Khai báo cho đợt này</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
 
           {loading ? (
             <View style={styles.centerBox}>

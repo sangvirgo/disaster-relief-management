@@ -46,12 +46,6 @@ export class CreateNeedDto {
   @IsString() @MaxLength(100) @Matches(decimalQuantity)
   quantity!: string;
 
-  @ValidateIf((_object, value) => value !== undefined) @IsIn(['FINAL_RECIPIENT'])
-  delivery_target_kind?: 'FINAL_RECIPIENT';
-
-  @ValidateIf((_object, value) => value !== undefined) @IsUUID('all')
-  designated_point_id?: string;
-
   @ValidateIf((_object, value) => value !== undefined) @IsString() @MaxLength(500) @Matches(/\S/u)
   reason?: string;
 }

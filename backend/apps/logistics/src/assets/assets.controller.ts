@@ -3,8 +3,7 @@ import type { Request, Response } from 'express';
 import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotency.interceptor';
 import { AssetsQueriesService } from './assets-queries.service';
 import {
-  AssetPageQueryDto, CreateReliefPointDto, CreateVehicleDto, CreateWarehouseDto, DeactivateAssetDto,
-  PatchReliefPointDto, PatchVehicleDto, PatchWarehouseDto,
+  AssetPageQueryDto, CreateWarehouseDto, DeactivateAssetDto, PatchWarehouseDto,
 } from './assets.dto';
 import { AssetsService } from './assets.service';
 import { noStore, markIdempotentReplay as replay } from '@c48/technical/http/response-headers';
@@ -21,22 +20,10 @@ export class AssetsController {
     return this.queries.list('warehouse', query, request);
   }
 
-  @Get('relief-points')
-  reliefPoints(@Query() query: AssetPageQueryDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+  @Get('warehouses/:id')
+  warehouseDetail(@Param('id', new ParseUUIDPipe({ version: 'all' })) id: string, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
     noStore(response);
-    return this.queries.list('relief_point', query, request);
-  }
-
-  @Get('relief-points/:id')
-  reliefPointDetail(@Param('id', new ParseUUIDPipe({ version: 'all' })) id: string, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
-    noStore(response);
-    return this.queries.reliefPointDetail(id, request);
-  }
-
-  @Get('vehicles')
-  vehicles(@Query() query: AssetPageQueryDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
-    noStore(response);
-    return this.queries.list('vehicle', query, request);
+    return this.queries.warehouseDetail(id, request);
   }
 
   @Post('warehouses')
@@ -64,64 +51,6 @@ export class AssetsController {
   async deactivateWarehouse(@Param('id', new ParseUUIDPipe({ version: 'all' })) id: string, @Body() dto: DeactivateAssetDto, @Req() request: AssetRequest, @Res({ passthrough: true }) response: Response) {
     noStore(response);
     const result = await this.assets.deactivate('warehouse', id, dto, request);
-    replay(response, result.replay);
-    return result.value;
-  }
-
-  @Post('relief-points')
-  @HttpCode(HttpStatus.CREATED)
-  @UseInterceptors(IdempotencyKeyInterceptor)
-  async createReliefPoint(@Body() dto: CreateReliefPointDto, @Req() request: AssetRequest, @Res({ passthrough: true }) response: Response) {
-    noStore(response);
-    const result = await this.assets.createReliefPoint(dto, request);
-    replay(response, result.replay);
-    return result.value;
-  }
-
-  @Patch('relief-points/:id')
-  @UseInterceptors(IdempotencyKeyInterceptor)
-  async patchReliefPoint(@Param('id', new ParseUUIDPipe({ version: 'all' })) id: string, @Body() dto: PatchReliefPointDto, @Req() request: AssetRequest, @Res({ passthrough: true }) response: Response) {
-    noStore(response);
-    const result = await this.assets.patchReliefPoint(id, dto, request);
-    replay(response, result.replay);
-    return result.value;
-  }
-
-  @Post('relief-points/:id/deactivate')
-  @HttpCode(HttpStatus.OK)
-  @UseInterceptors(IdempotencyKeyInterceptor)
-  async deactivateReliefPoint(@Param('id', new ParseUUIDPipe({ version: 'all' })) id: string, @Body() dto: DeactivateAssetDto, @Req() request: AssetRequest, @Res({ passthrough: true }) response: Response) {
-    noStore(response);
-    const result = await this.assets.deactivate('relief_point', id, dto, request);
-    replay(response, result.replay);
-    return result.value;
-  }
-
-  @Post('vehicles')
-  @HttpCode(HttpStatus.CREATED)
-  @UseInterceptors(IdempotencyKeyInterceptor)
-  async createVehicle(@Body() dto: CreateVehicleDto, @Req() request: AssetRequest, @Res({ passthrough: true }) response: Response) {
-    noStore(response);
-    const result = await this.assets.createVehicle(dto, request);
-    replay(response, result.replay);
-    return result.value;
-  }
-
-  @Patch('vehicles/:id')
-  @UseInterceptors(IdempotencyKeyInterceptor)
-  async patchVehicle(@Param('id', new ParseUUIDPipe({ version: 'all' })) id: string, @Body() dto: PatchVehicleDto, @Req() request: AssetRequest, @Res({ passthrough: true }) response: Response) {
-    noStore(response);
-    const result = await this.assets.patchVehicle(id, dto, request);
-    replay(response, result.replay);
-    return result.value;
-  }
-
-  @Post('vehicles/:id/deactivate')
-  @HttpCode(HttpStatus.OK)
-  @UseInterceptors(IdempotencyKeyInterceptor)
-  async deactivateVehicle(@Param('id', new ParseUUIDPipe({ version: 'all' })) id: string, @Body() dto: DeactivateAssetDto, @Req() request: AssetRequest, @Res({ passthrough: true }) response: Response) {
-    noStore(response);
-    const result = await this.assets.deactivate('vehicle', id, dto, request);
     replay(response, result.replay);
     return result.value;
   }

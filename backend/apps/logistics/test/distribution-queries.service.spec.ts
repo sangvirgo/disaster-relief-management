@@ -11,13 +11,6 @@ const distribution = {
   warehouse_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
 
   warehouse_status: 'ACTIVE',
-  relief_point_id: null,
-  relief_point_status: null,
-  vehicle_id: null,
-  vehicle_status: null,
-  vehicle_capacity: null,
-  vehicle_capacity_unit: null,
-  vehicle_capacity_scale: null,
   campaign_id: null,
   purpose: 'REQUEST_AID',
   status: 'DISPATCHED',
@@ -171,8 +164,6 @@ describe('DistributionQueriesService handoff detail', () => {
 
   it.each([
     ['DIRECT_HOUSEHOLD', 'OPERATIONS_MANAGER'],
-    ['POINT_RECEIPT', 'OPERATIONS_MANAGER'],
-    ['HOUSEHOLD_HANDOUT', 'OPERATIONS_MANAGER'],
     ['RETURN', 'OPERATIONS_MANAGER'],
     ['LOSS', 'OPERATIONS_MANAGER'],
   ] as const)('allows the authorized role for %s (%s)', async (kind, role) => {

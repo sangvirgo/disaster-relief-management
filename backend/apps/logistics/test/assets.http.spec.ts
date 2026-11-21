@@ -34,8 +34,6 @@ describe('asset deactivation HTTP status', () => {
 
   it.each([
     '/warehouses',
-    '/relief-points',
-    '/vehicles',
   ])('returns HTTP 200 for POST %s/:id/deactivate', async (path) => {
     await request(app.getHttpServer())
       .post(`/api/v1/logistics${path}/${assetId}/deactivate`)

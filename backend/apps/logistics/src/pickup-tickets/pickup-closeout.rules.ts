@@ -17,7 +17,7 @@ export const RETIRE_REASON_LABELS: Readonly<Record<RetireReason, string>> = {
 
 /**
  * Per-item figures in stock units (bigint, scaled). held = issued to the ticket. delivered = DIRECT_HOUSEHOLD handoffs.
- * remaining = goods still on the team side (in transit plus at point). Each distribution line contributes its in-transit
+ * remaining = goods still on the team side (in transit). Each distribution line contributes its in-transit
  * capacity to the allocation of deliveries, returns and retirements.
  */
 export interface BaselineItem {

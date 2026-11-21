@@ -13,7 +13,7 @@ export interface UnaccountedGoodsRow {
 }
 
 /**
- * Goods that a pickup ticket still holds on the team side (in transit or at a point) and that no delivery, return or retire has
+ * Goods that a pickup ticket still holds on the team side (in transit) and that no delivery, return or retire has
  * accounted for yet. Filter by ticket IDs or by Response request ID. Only tickets with a positive balance are returned.
  */
 export async function unaccountedGoods(
@@ -34,12 +34,12 @@ export async function unaccountedGoods(
   if (where.length === 0) throw new AppError('VALIDATION_FAILED', { status: 400 });
   return manager.query(
     `SELECT t.id AS ticket_id,t.request_id,t.status,dl.item_id,i.name AS item_name,
-            SUM(dl.in_transit_quantity+dl.at_point_quantity)::text AS unaccounted_quantity
+            SUM(dl.in_transit_quantity)::text AS unaccounted_quantity
        FROM pickup_ticket t JOIN distribution_line dl ON dl.distribution_id=t.distribution_id
        JOIN item i ON i.id=dl.item_id
       WHERE ${where.join(' AND ')}
       GROUP BY t.id,t.request_id,t.status,dl.item_id,i.name
-     HAVING SUM(dl.in_transit_quantity+dl.at_point_quantity) > 0
+     HAVING SUM(dl.in_transit_quantity) > 0
       ORDER BY t.id,i.name`,
     values,
   ) as Promise<UnaccountedGoodsRow[]>;

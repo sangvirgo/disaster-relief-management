@@ -36,7 +36,6 @@ const tones: Record<string, BadgeTone> = {
   FULFILLED: 'success',
   DELIVERED: 'success',
   RECEIVED: 'info',
-  AT_POINT: 'info',
   PAUSED: 'warning',
   COUNTING: 'warning',
   PENDING_REVIEW: 'warning',

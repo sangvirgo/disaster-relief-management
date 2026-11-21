@@ -40,7 +40,6 @@ interface LineBaselineRow {
   perishable: boolean;
   quantity: string;
   in_transit_quantity: string;
-  at_point_quantity: string;
 }
 
 interface CloseoutRow {
@@ -423,16 +422,16 @@ export class PickupGoodsService {
     const retiring = plans.flatMap((plan) => [...plan.retires].filter(([, amount]) => amount > 0n));
     if (retiring.length === 0) return;
     const distribution = await manager.query(
-      'SELECT id,relief_point_id FROM distribution WHERE id=$1 FOR UPDATE',
+      'SELECT id FROM distribution WHERE id=$1 FOR UPDATE',
       [distributionId],
-    ) as Array<{ id: string; relief_point_id: string | null }>;
+    ) as Array<{ id: string }>;
     if (!distribution[0]) throw new AppError('NOT_FOUND', { status: 404 });
     const counters = await manager.query(
-      `SELECT dl.id,dl.in_transit_quantity::text,dl.at_point_quantity::text,u.scale AS unit_scale
+      `SELECT dl.id,dl.in_transit_quantity::text,u.scale AS unit_scale
          FROM distribution_line dl JOIN item i ON i.id=dl.item_id JOIN unit u ON u.code=i.unit_code
         WHERE dl.distribution_id=$1`,
       [distributionId],
-    ) as Array<{ id: string; in_transit_quantity: string; at_point_quantity: string; unit_scale: number | string }>;
+    ) as Array<{ id: string; in_transit_quantity: string; unit_scale: number | string }>;
     for (const [lineId, amount] of retiring) {
       const current = counters.find((row) => row.id === lineId);
       if (!current) throw new AppError('PICKUP_LEDGER_MISMATCH', { status: 409 });
@@ -442,12 +441,10 @@ export class PickupGoodsService {
         sourceStage: 'IN_TRANSIT',
         quantity: amount,
         inTransit: quantityUnits(current.in_transit_quantity, scale),
-        atPoint: quantityUnits(current.at_point_quantity, scale),
-        hasReliefPoint: distribution[0].relief_point_id !== null,
       });
       await manager.query(
-        'UPDATE distribution_line SET in_transit_quantity=$2::numeric,at_point_quantity=$3::numeric WHERE id=$1',
-        [lineId, decimalFromUnits(next.inTransit, scale), decimalFromUnits(next.atPoint, scale)],
+        'UPDATE distribution_line SET in_transit_quantity=$2::numeric WHERE id=$1',
+        [lineId, decimalFromUnits(next.inTransit, scale)],
       );
     }
   }
@@ -470,7 +467,7 @@ export class PickupGoodsService {
   private async baseline(manager: Pick<EntityManager, 'query'>, distributionId: string): Promise<{ items: BaselineItem[]; pendingLoss: boolean }> {
     const rows = await manager.query(
       `SELECT dl.id AS distribution_line_id,dl.item_id,i.name AS item_name,i.unit_code,u.scale AS unit_scale,i.returnable,i.perishable,
-              dl.quantity::text,dl.in_transit_quantity::text,dl.at_point_quantity::text
+              dl.quantity::text,dl.in_transit_quantity::text
          FROM distribution_line dl JOIN item i ON i.id=dl.item_id JOIN unit u ON u.code=i.unit_code
         WHERE dl.distribution_id=$1 ORDER BY dl.item_id,dl.id`,
       [distributionId],
@@ -500,9 +497,8 @@ export class PickupGoodsService {
         byItem.set(row.item_id, item);
       }
       const inTransit = quantityUnits(row.in_transit_quantity, scale);
-      const atPoint = quantityUnits(row.at_point_quantity, scale);
       item.held += quantityUnits(row.quantity, scale);
-      item.remaining += inTransit + atPoint;
+      item.remaining += inTransit;
       item.lines.push({ distribution_line_id: row.distribution_line_id, in_transit: inTransit });
     }
     for (const row of deliveredRows) {

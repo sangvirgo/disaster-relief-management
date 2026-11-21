@@ -28,7 +28,7 @@ const OPS_SYSTEM = [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' }] a
 const COORD_SYSTEM = [{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }] as const;
 const REVIEWER_SYSTEM = [{ role_code: 'REVIEWER', scope_type: 'SYSTEM' }] as const;
 
-interface DistLine { id: string; item_id: string; quantity: number; in_transit: number; at_point: number }
+interface DistLine { id: string; item_id: string; quantity: number; in_transit: number }
 
 interface Db {
   ticket: Record<string, unknown>;
@@ -60,9 +60,9 @@ function freshDb(): Db {
       created_at: '2026-11-18T00:00:00.000Z', updated_at: '2026-11-18T00:00:00.000Z',
     },
     lines: [
-      { id: LINE_WATER, item_id: WATER, quantity: 6, in_transit: 6, at_point: 0 },
-      { id: LINE_BOTTLE, item_id: BOTTLE, quantity: 3, in_transit: 3, at_point: 0 },
-      { id: LINE_FOOD, item_id: FOOD, quantity: 2, in_transit: 2, at_point: 0 },
+      { id: LINE_WATER, item_id: WATER, quantity: 6, in_transit: 6 },
+      { id: LINE_BOTTLE, item_id: BOTTLE, quantity: 3, in_transit: 3 },
+      { id: LINE_FOOD, item_id: FOOD, quantity: 2, in_transit: 2 },
     ],
     custody: new Map([[`${TEAM}:${WATER}`, 6], [`${TEAM}:${BOTTLE}`, 3], [`${TEAM}:${FOOD}`, 2]]),
     stock: new Map([[`${WH}:${WATER}`, 0]]),
@@ -80,7 +80,7 @@ function lineRowsFor(db: Db) {
   return db.lines.map((line) => ({
     distribution_line_id: line.id, item_id: line.item_id, item_name: ITEMS[line.item_id]!.name, unit_code: 'CAI', unit_scale: 0,
     returnable: ITEMS[line.item_id]!.returnable, perishable: ITEMS[line.item_id]!.perishable,
-    quantity: String(line.quantity), in_transit_quantity: String(line.in_transit), at_point_quantity: String(line.at_point),
+    quantity: String(line.quantity), in_transit_quantity: String(line.in_transit),
   }));
 }
 
@@ -165,18 +165,17 @@ function fakeQuery(db: Db) {
       return [...totals].map(([item_id, delivered]) => ({ item_id, delivered: String(delivered) }));
     }
     if (sql.includes("h.handoff_kind='LOSS' AND r.handoff_id IS NULL")) return db.pendingLoss ? [{ '?column?': 1 }] : [];
-    if (sql.includes('SELECT id,relief_point_id FROM distribution WHERE id=$1 FOR UPDATE')) {
-      return p[0] === DIST ? [{ id: DIST, relief_point_id: null }] : [];
+    if (sql.includes('SELECT id FROM distribution WHERE id=$1 FOR UPDATE')) {
+      return p[0] === DIST ? [{ id: DIST }] : [];
     }
     if (sql.includes('SELECT dl.id,dl.in_transit_quantity::text')) {
       return db.lines.map((line) => ({
-        id: line.id, in_transit_quantity: String(line.in_transit), at_point_quantity: String(line.at_point), unit_scale: 0,
+        id: line.id, in_transit_quantity: String(line.in_transit), unit_scale: 0,
       }));
     }
     if (sql.includes('UPDATE distribution_line SET in_transit_quantity')) {
       const line = db.lines.find((l) => l.id === p[0])!;
       line.in_transit = Number(p[1]);
-      line.at_point = Number(p[2]);
       return [];
     }
     if (sql.includes('UPDATE team_custody SET quantity_held=quantity_held-$3::numeric')) {
@@ -191,9 +190,9 @@ function fakeQuery(db: Db) {
       return [];
     }
     if (sql.includes('HAVING SUM(')) {
-      const rows = db.lines.filter((l) => l.in_transit + l.at_point > 0).map((l) => ({
+      const rows = db.lines.filter((l) => l.in_transit > 0).map((l) => ({
         ticket_id: db.ticket.id, request_id: db.ticket.request_id, status: db.ticket.status, item_id: l.item_id,
-        item_name: ITEMS[l.item_id]!.name, unaccounted_quantity: String(l.in_transit + l.at_point),
+        item_name: ITEMS[l.item_id]!.name, unaccounted_quantity: String(l.in_transit),
       }));
       if (sql.includes('t.request_id = $')) return rows.filter((row) => row.request_id === p[0]);
       return rows.filter((row) => (p[0] as string[]).includes(String(row.ticket_id)));

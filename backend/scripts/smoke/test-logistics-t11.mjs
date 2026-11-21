@@ -128,40 +128,13 @@ try {
     body: { name: `Kho T11 ${suffix}` },
   });
   expectSuccess(warehouse, 201);
-  const point = await call(logisticsUrl, 'relief-points', {
-    method: 'POST', actor: operator, idempotencyKey: key(),
-    body: {
-      name: `Điểm cứu trợ T11 ${suffix}`,
-      location: { type: 'Point', coordinates: [105.85, 21.03] },
-    },
-  });
-  expectSuccess(point, 201);
-  const vehicle = await call(logisticsUrl, 'vehicles', {
-    method: 'POST', actor: operator, idempotencyKey: key(),
-    body: {
-      identifier: `T11-${suffix}`, vehicle_type: 'Xe tải kiểm thử', capacity: '100.00', capacity_unit: unitCode,
-    },
-  });
-  expectSuccess(vehicle, 201);
   for (const [path, id] of [
     ['warehouses?limit=100', warehouse.value.id],
-    ['relief-points?limit=100', point.value.id],
-    ['vehicles?limit=100', vehicle.value.id],
   ]) {
     const listed = await call(logisticsUrl, path, { actor: operator });
     expectSuccess(listed);
     assert.ok(listed.value.items.some((row) => row.id === id));
   }
-  const pointDetail = await call(logisticsUrl, `relief-points/${point.value.id}`, { actor: operator });
-  expectSuccess(pointDetail);
-  assert.equal(pointDetail.value.id, point.value.id);
-
-  const invalidPointPatch = await call(logisticsUrl, `relief-points/${point.value.id}`, {
-    method: 'PATCH', actor: operator, idempotencyKey: key(),
-    body: { expected_version: 1, location: { type: 'Point', coordinates: [181, 21.03] } },
-  });
-  expectVietnameseError(invalidPointPatch, 400, 'VALIDATION_FAILED');
-
   const updatedWarehouse = await call(logisticsUrl, `warehouses/${warehouse.value.id}`, {
     method: 'PATCH', actor: operator, idempotencyKey: key(),
     body: { expected_version: 1, name: `Kho T11 cập nhật ${suffix}`, location_public: true },
@@ -225,28 +198,6 @@ try {
   expectSuccess(areaCleared);
   assert.equal(areaCleared.value.service_radius_m, null);
   assert.equal(areaCleared.value.location, null);
-
-  const updatedPoint = await call(logisticsUrl, `relief-points/${point.value.id}`, {
-    method: 'PATCH', actor: operator, idempotencyKey: key(),
-    body: { expected_version: 1, operating_note: `T11 cập nhật ${suffix}` },
-  });
-  expectSuccess(updatedPoint);
-  assert.equal(updatedPoint.value.version, 2);
-  assert.equal(updatedPoint.value.operating_note, `T11 cập nhật ${suffix}`);
-
-  const stalePointPatch = await call(logisticsUrl, `relief-points/${point.value.id}`, {
-    method: 'PATCH', actor: operator, idempotencyKey: key(),
-    body: { expected_version: 1, name: `Điểm cũ ${suffix}` },
-  });
-  expectVietnameseError(stalePointPatch, 409, 'VERSION_CONFLICT');
-
-  const updatedVehicle = await call(logisticsUrl, `vehicles/${vehicle.value.id}`, {
-    method: 'PATCH', actor: operator, idempotencyKey: key(),
-    body: { expected_version: 1, identifier: `T11-${suffix}-UPDATED`, capacity: '120.00', capacity_unit: unitCode },
-  });
-  expectSuccess(updatedVehicle);
-  assert.equal(updatedVehicle.value.version, 2);
-  assert.equal(updatedVehicle.value.capacity, '120.000');
 
   const opening = await call(logisticsUrl, 'stock/opening', {
     method: 'POST', actor: operator, idempotencyKey: key(),
@@ -320,8 +271,6 @@ try {
 
   for (const [path, asset] of [
     ['warehouses', warehouse.value],
-    ['relief-points', point.value],
-    ['vehicles', vehicle.value],
   ]) {
     const deactivated = await call(logisticsUrl, `${path}/${asset.id}/deactivate`, {
       method: 'POST', actor: operator, idempotencyKey: key(), body: { expected_version: 2 },
@@ -341,17 +290,14 @@ try {
     `SELECT action,entity_id,before_state,after_state FROM audit_log
       WHERE entity_type=ANY($1::text[]) AND entity_id=ANY($2::text[]) AND action=ANY($3::text[])`,
     [
-      ['warehouse', 'relief_point', 'vehicle'],
-      [warehouse.value.id, point.value.id, vehicle.value.id],
-      ['WAREHOUSE_CREATED', 'WAREHOUSE_UPDATED', 'WAREHOUSE_DEACTIVATED', 'RELIEF_POINT_CREATED', 'RELIEF_POINT_UPDATED',
-        'RELIEF_POINT_DEACTIVATED', 'VEHICLE_CREATED', 'VEHICLE_UPDATED', 'VEHICLE_DEACTIVATED'],
+      ['warehouse'],
+      [warehouse.value.id],
+      ['WAREHOUSE_CREATED', 'WAREHOUSE_UPDATED', 'WAREHOUSE_DEACTIVATED'],
     ],
   );
-  assert.equal(assetHistory.rowCount, 9, 'asset create, update and deactivation audit history must be retained');
+  assert.equal(assetHistory.rowCount, 3, 'asset create, update and deactivation audit history must be retained');
   for (const [asset, prefix] of [
     [warehouse.value, 'WAREHOUSE'],
-    [point.value, 'RELIEF_POINT'],
-    [vehicle.value, 'VEHICLE'],
   ]) {
     const history = assetHistory.rows.filter((row) => row.entity_id === asset.id);
     assert.equal(history.length, 3, `expected create, update and deactivation history for ${prefix}`);

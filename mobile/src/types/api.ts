@@ -394,6 +394,8 @@ export interface DonationDrive {
   closes_at?: string | null;
   status: 'OPEN';
   campaign_status?: 'ACTIVE' | 'PAUSED' | 'CLOSED' | null;
+  /** Only when the list was requested with a position; null when the warehouse hides its location. */
+  distance_m?: number | null;
   items: DonationDriveItem[];
   accepted_total?: string;
   generated_at?: string;

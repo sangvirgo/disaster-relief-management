@@ -52,7 +52,7 @@ export class DistributionCommandsService {
     const key = idempotencyKey(request);
     await this.loadWarehouse(this.dataSource, dto.warehouse_id);
     requireScope(session.grants, 'DISTRIBUTION_PREPARE', { campaign_id: dto.campaign_id ?? null });
-    this.assertPurpose(dto.purpose, dto.campaign_id, dto.relief_point_id);
+    this.assertPurpose(dto.purpose, dto.campaign_id);
     assertLinePurpose(dto.purpose, dto.lines);
     let campaignError: AppError | undefined;
     try {
@@ -71,15 +71,13 @@ export class DistributionCommandsService {
       execute: async (manager) => {
         await lockDistributionAssets(manager, {
           warehouse_id: dto.warehouse_id,
-          relief_point_id: dto.relief_point_id ?? null,
-          vehicle_id: dto.vehicle_id ?? null,
         });
         requireScope(session.grants, 'DISTRIBUTION_PREPARE', { campaign_id: dto.campaign_id ?? null });
         if (campaignError) throw campaignError;
         const inserted = await manager.query(
-          `INSERT INTO distribution (warehouse_id,relief_point_id,vehicle_id,campaign_id,purpose,preparer_user_id)
-           VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
-          [dto.warehouse_id, dto.relief_point_id ?? null, dto.vehicle_id ?? null,
+          `INSERT INTO distribution (warehouse_id,campaign_id,purpose,preparer_user_id)
+           VALUES ($1,$2,$3,$4) RETURNING id`,
+          [dto.warehouse_id,
             dto.campaign_id ?? null, dto.purpose, session.userId],
         ) as Array<{ id: string }>;
         const id = inserted[0]?.id;
@@ -293,8 +291,7 @@ export class DistributionCommandsService {
   ): Promise<{ commitments: CommitmentContext[]; scales: Map<string, number> }> {
     assertLinePurpose(distribution.purpose, lines);
     const commitments = await lockCommitmentContexts(
-      manager, lines, distribution.warehouse_id, distribution.campaign_id, distribution.purpose,
-      distribution.relief_point_id, mode,
+      manager, lines, distribution.warehouse_id, distribution.campaign_id, distribution.purpose, mode,
     );
     const scales = await activeItemScales(manager, lines);
     return { commitments, scales };
@@ -309,9 +306,8 @@ export class DistributionCommandsService {
     return rows[0];
   }
 
-  private assertPurpose(purpose: string, campaignId: string | undefined, pointId: string | undefined): void {
-    if ((purpose === 'CAMPAIGN_DISTRIBUTION') !== Boolean(campaignId) ||
-        (purpose === 'POINT_REPLENISHMENT' && !pointId)) {
+  private assertPurpose(purpose: string, campaignId: string | undefined): void {
+    if ((purpose === 'CAMPAIGN_DISTRIBUTION') !== Boolean(campaignId)) {
       throw new AppError('VALIDATION_FAILED', { status: 400 });
     }
   }

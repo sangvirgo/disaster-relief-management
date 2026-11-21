@@ -182,3 +182,109 @@ INSERT INTO need_norm (category, item_type_code, quantity_basis, qty_adult, qty_
   ('MEDICINE', 'Y_TE', 'PER_REQUEST', 0, 0, 0, NULL, 1.000,
      (SELECT id FROM item WHERE item_type_code = 'Y_TE' AND unit_code = 'CAI' ORDER BY name LIMIT 1))
 ON CONFLICT (category) DO NOTHING;
+
+-- ---------- regional warehouses and located donation drives ----------
+-- Each regional warehouse controls an area LARGER than the relief campaigns inside it (radius 60-140 km against campaign radii of
+-- 18-30 km), and every donation drive has its own drop-off point inside the warehouse area so donors can pick the closest one.
+-- Campaign areas repeat seed-campaigns.sql (Response owns campaigns; Logistics is a separate database).
+-- Safe to apply more than once: warehouse ids are a2c01..a2c08 (regional) and a2d01..a2d15 (fallback), drive ids a6c01..a6c99.
+INSERT INTO warehouse (id, name, address_note, location, location_public, service_radius_m) VALUES
+  ('00000000-0000-4000-8000-0000000a2c01', 'Kho vùng Đồng bằng sông Hồng',    'Điểm tập kết giả lập khu vực Hà Nội',                 ST_GeogFromText('SRID=4326;POINT(105.8300 21.0200)'), true,  80000),
+  ('00000000-0000-4000-8000-0000000a2c02', 'Kho vùng Tây Bắc',                'Điểm tập kết giả lập khu vực Yên Bái – Lào Cai',      ST_GeogFromText('SRID=4326;POINT(104.4000 22.1000)'), true, 140000),
+  ('00000000-0000-4000-8000-0000000a2c03', 'Kho vùng Thanh – Nghệ – Tĩnh',    'Điểm tập kết giả lập khu vực Bắc Trung Bộ',           ST_GeogFromText('SRID=4326;POINT(105.7500 19.0000)'), true, 130000),
+  ('00000000-0000-4000-8000-0000000a2c04', 'Kho vùng Quảng Bình – Huế',       'Điểm tập kết giả lập khu vực Quảng Bình – Huế',       ST_GeogFromText('SRID=4326;POINT(107.0000 17.0000)'), true, 120000),
+  ('00000000-0000-4000-8000-0000000a2c05', 'Kho vùng Đà Nẵng – Quảng Ngãi',   'Điểm tập kết giả lập khu vực Nam Trung Bộ',           ST_GeogFromText('SRID=4326;POINT(108.5000 15.6000)'), true, 100000),
+  ('00000000-0000-4000-8000-0000000a2c06', 'Kho vùng Quy Nhơn',               'Điểm tập kết giả lập khu vực Quy Nhơn',               ST_GeogFromText('SRID=4326;POINT(109.1000 13.9000)'), true,  80000),
+  ('00000000-0000-4000-8000-0000000a2c07', 'Kho vùng Đông Nam Bộ',            'Điểm tập kết giả lập khu vực TP. Hồ Chí Minh',        ST_GeogFromText('SRID=4326;POINT(106.7000 10.8500)'), true,  60000),
+  ('00000000-0000-4000-8000-0000000a2c08', 'Kho vùng Đồng bằng sông Cửu Long','Điểm tập kết giả lập khu vực Cần Thơ – Cà Mau',        ST_GeogFromText('SRID=4326;POINT(105.5000 9.6000)'),  true, 140000)
+ON CONFLICT (id) DO NOTHING;
+
+DO $$
+DECLARE
+  c record;
+  centre geography;
+  pt geography;
+  wid uuid;
+  did uuid;
+  factor numeric;
+  n int := 0;
+BEGIN
+  FOR c IN
+    SELECT * FROM (VALUES
+      (1,  '00000000-0000-4000-8000-0000000000c1'::uuid, 'Hà Nội',         105.8500::float8, 21.0300::float8, 30000, 'ACTIVE'),
+      (2,  '00000000-0000-4000-8000-0000000000c2'::uuid, 'Hà Nội mở rộng', 105.9000::float8, 21.0300::float8, 18000, 'ACTIVE'),
+      (3,  '00000000-0000-4000-8000-0000000000c3'::uuid, 'TP. Hồ Chí Minh', 106.7009::float8, 10.7769::float8, 25000, 'ACTIVE'),
+      (4,  '00000000-0000-4000-8000-0000000000c4'::uuid, 'Đà Nẵng',        108.2022::float8, 16.0544::float8, 25000, 'ACTIVE'),
+      (5,  '00000000-0000-4000-8000-0000000000c5'::uuid, 'Lào Cai',        103.9710::float8, 22.4856::float8, 25000, 'ACTIVE'),
+      (6,  '00000000-0000-4000-8000-0000000000c6'::uuid, 'Huế',            107.5909::float8, 16.4637::float8, 20000, 'PAUSED'),
+      (7,  '00000000-0000-4000-8000-0000000000c7'::uuid, 'Cần Thơ',        105.7469::float8, 10.0452::float8, 22000, 'ACTIVE'),
+      (8,  '00000000-0000-4000-8000-0000000000c8'::uuid, 'Nghệ An',        105.6923::float8, 18.6796::float8, 20000, 'PAUSED'),
+      (9,  '00000000-0000-4000-8000-0000000000c9'::uuid, 'Quảng Bình',     106.6222::float8, 17.4689::float8, 28000, 'ACTIVE'),
+      (10, '00000000-0000-4000-8000-0000000000ca'::uuid, 'Hà Tĩnh',        105.9057::float8, 18.3428::float8, 25000, 'ACTIVE'),
+      (11, '00000000-0000-4000-8000-0000000000cb'::uuid, 'Quảng Ngãi',     108.8044::float8, 15.1205::float8, 26000, 'ACTIVE'),
+      (12, '00000000-0000-4000-8000-0000000000cc'::uuid, 'Quy Nhơn',       109.2196::float8, 13.7765::float8, 22000, 'ACTIVE'),
+      (13, '00000000-0000-4000-8000-0000000000cd'::uuid, 'Yên Bái',        104.8985::float8, 21.7168::float8, 30000, 'PAUSED'),
+      (14, '00000000-0000-4000-8000-0000000000ce'::uuid, 'Thanh Hóa',      105.7745::float8, 19.8067::float8, 24000, 'PAUSED'),
+      (15, '00000000-0000-4000-8000-0000000000cf'::uuid, 'Cà Mau',         105.1500::float8,  9.1769::float8, 25000, 'CLOSED')
+    ) AS t(seq, campaign_id, region, lng, lat, radius_m, status)
+    ORDER BY seq
+  LOOP
+    centre := ST_SetSRID(ST_MakePoint(c.lng, c.lat), 4326)::geography;
+
+    -- Fallback for a campaign no warehouse controls: a warehouse twice the campaign radius, so it always out-reaches the campaign.
+    IF NOT EXISTS (
+      SELECT 1 FROM warehouse w
+       WHERE w.status = 'ACTIVE' AND w.location IS NOT NULL AND w.service_radius_m IS NOT NULL
+         AND ST_DWithin(w.location, centre, (w.service_radius_m + c.radius_m)::float8)
+    ) THEN
+      INSERT INTO warehouse (id, name, address_note, location, location_public, service_radius_m)
+      VALUES (('00000000-0000-4000-8000-0000000a2d' || lpad(c.seq::text, 2, '0'))::uuid,
+              'Kho vùng ' || c.region, 'Địa điểm giả lập phục vụ vùng chiến dịch ' || c.region,
+              ST_SetSRID(ST_MakePoint(c.lng + 0.01, c.lat), 4326)::geography, true, least(c.radius_m * 2, 200000))
+      ON CONFLICT (id) DO NOTHING;
+    END IF;
+
+    CONTINUE WHEN c.status = 'CLOSED';
+
+    -- One or two drop-off points per campaign, at offsets from the campaign centre; the second point exists for the three big cities.
+    FOR k IN 1..(CASE WHEN c.seq IN (1, 3, 4) THEN 2 ELSE 1 END) LOOP
+      pt := ST_SetSRID(ST_MakePoint(c.lng + CASE k WHEN 1 THEN 0.02 ELSE -0.05 END, c.lat + CASE k WHEN 1 THEN 0.01 ELSE -0.03 END), 4326)::geography;
+      -- the warehouse that controls this point (nearest first)
+      SELECT w.id INTO wid FROM warehouse w
+       WHERE w.status = 'ACTIVE' AND w.location IS NOT NULL AND w.service_radius_m IS NOT NULL
+         AND ST_DWithin(w.location, pt, w.service_radius_m::float8)
+       ORDER BY ST_Distance(w.location, pt), w.id LIMIT 1;
+      CONTINUE WHEN wid IS NULL;
+
+      n := c.seq * 2 + k;
+      did := ('00000000-0000-4000-8000-0000000a6c' || lpad(n::text, 2, '0'))::uuid;
+      INSERT INTO donation_drive (id, campaign_id, campaign_status, campaign_status_at, intake_warehouse_id, title, description, status,
+                                  opens_at, closes_at, created_at, location, location_note)
+      VALUES (did, c.campaign_id, c.status, now(), wid,
+              CASE k WHEN 1 THEN 'Điểm quyên góp trung tâm ' ELSE 'Điểm quyên góp khu vực phụ ' END || c.region,
+              'Tiếp nhận lương thực, nước uống, vật tư y tế và chăn màn cho chiến dịch cứu trợ ' || c.region || ' (dữ liệu giả lập).',
+              CASE WHEN c.status = 'ACTIVE' THEN 'OPEN' ELSE 'PAUSED' END,
+              now() - interval '1 day', now() + interval '14 days', now() - interval '1 day',
+              pt, CASE k WHEN 1 THEN 'Điểm tập kết gần trung tâm ' ELSE 'Điểm tập kết phía tây nam ' END || c.region)
+      ON CONFLICT (id) DO NOTHING;
+
+      factor := c.radius_m / 1000.0;
+      INSERT INTO drive_item (drive_id, item_id, target_quantity, acceptance_note)
+      SELECT did, i.id, i.target, i.note
+        FROM (VALUES
+          ('00000000-0000-4000-8000-0000000a1001'::uuid, round(factor * 8, 3),  'Gạo còn hạn dùng, đóng túi kín'),
+          ('00000000-0000-4000-8000-0000000a1003'::uuid, round(factor * 40, 0), 'Chai nguyên seal'),
+          ('00000000-0000-4000-8000-0000000a1005'::uuid, round(factor * 2, 0),  'Bộ sơ cứu đầy đủ dụng cụ cơ bản'),
+          ('00000000-0000-4000-8000-0000000a1007'::uuid, round(factor * 3, 0),  NULL::text)
+        ) AS i(id, target, note)
+        JOIN item ON item.id = i.id
+       WHERE EXISTS (SELECT 1 FROM donation_drive d WHERE d.id = did)
+      ON CONFLICT DO NOTHING;
+    END LOOP;
+  END LOOP;
+END $$;
+
+-- Drives seeded before drives had their own location sit at their warehouse position (always inside its own service area).
+UPDATE donation_drive d SET location = w.location, location_note = 'Tại kho tiếp nhận'
+  FROM warehouse w
+ WHERE w.id = d.intake_warehouse_id AND d.location IS NULL AND w.location IS NOT NULL;

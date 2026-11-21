@@ -26,6 +26,9 @@ interface DriveRow extends Record<string, unknown> {
   closes_at: Date | string | null;
   version: number | string;
   created_at: Date | string;
+  longitude?: number | string | null;
+  latitude?: number | string | null;
+  location_note?: string | null;
 }
 
 interface WarehouseRow {
@@ -47,6 +50,8 @@ function driveValue(row: DriveRow, items: Array<Record<string, unknown>>): Recor
     status: row.status,
     title: row.title,
     description: row.description,
+    location: row.longitude == null || row.latitude == null ? null : { type: 'Point', coordinates: [Number(row.longitude), Number(row.latitude)] },
+    location_note: row.location_note ?? null,
     opens_at: iso(row.opens_at),
     closes_at: iso(row.closes_at),
     version: Number(row.version),
@@ -58,7 +63,8 @@ function driveValue(row: DriveRow, items: Array<Record<string, unknown>>): Recor
 async function readDrive(manager: Pick<EntityManager, 'query'>, id: string): Promise<Record<string, unknown>> {
   const rows = await manager.query(
     `SELECT d.id,d.intake_warehouse_id,d.campaign_id,d.campaign_status,d.campaign_status_at,d.status,
-            d.title,d.description,d.opens_at,d.closes_at,d.version,d.created_at
+            d.title,d.description,d.opens_at,d.closes_at,d.version,d.created_at,
+            ST_X(d.location::geometry)::float8 AS longitude,ST_Y(d.location::geometry)::float8 AS latitude,d.location_note
        FROM donation_drive d JOIN warehouse w ON w.id=d.intake_warehouse_id WHERE d.id=$1`,
     [id],
   ) as DriveRow[];
@@ -106,6 +112,8 @@ export class DrivesService {
     const campaign = dto.campaign_id ? await this.activeCampaign(dto.campaign_id) : null;
     const title = cleanDriveText(dto.title, true)!;
     const description = cleanDriveText(dto.description);
+    const locationNote = cleanDriveText(dto.location_note);
+    if (dto.location) await this.assertInServiceArea(this.dataSource, dto.intake_warehouse_id, dto.location);
     this.validateWindow(dto.opens_at ?? null, dto.closes_at ?? null);
 
     return this.idempotency.execute(this.dataSource, {
@@ -119,11 +127,13 @@ export class DrivesService {
         const items = await this.validateDriveItems(manager, dto.items);
         const rows = await manager.query(
           `INSERT INTO donation_drive
-             (intake_warehouse_id,campaign_id,campaign_status,campaign_status_at,title,description,opens_at,closes_at)
-           VALUES ($1,$2,$3,CASE WHEN $2::uuid IS NULL THEN NULL ELSE clock_timestamp() END,$4,$5,$6,$7)
+             (intake_warehouse_id,campaign_id,campaign_status,campaign_status_at,title,description,opens_at,closes_at,location,location_note)
+           VALUES ($1,$2,$3,CASE WHEN $2::uuid IS NULL THEN NULL ELSE clock_timestamp() END,$4,$5,$6,$7,
+                   CASE WHEN $8::float8 IS NULL THEN NULL ELSE ST_SetSRID(ST_MakePoint($8,$9),4326)::geography END,$10)
            RETURNING id`,
           [dto.intake_warehouse_id, campaign?.id ?? null, campaign?.status ?? null,
-            title, description, dto.opens_at ?? null, dto.closes_at ?? null],
+            title, description, dto.opens_at ?? null, dto.closes_at ?? null,
+            dto.location?.coordinates[0] ?? null, dto.location?.coordinates[1] ?? null, locationNote],
         ) as Array<{ id: string }>;
         const id = rows[0]!.id;
         await this.insertDriveItems(manager, id, items);
@@ -145,6 +155,8 @@ export class DrivesService {
     this.validateWindow(dto.opens_at === undefined ? before.opens_at : dto.opens_at, dto.closes_at === undefined ? before.closes_at : dto.closes_at);
     const title = dto.title === undefined ? undefined : cleanDriveText(dto.title, true);
     const description = dto.description === undefined ? undefined : cleanDriveText(dto.description);
+    const locationNote = dto.location_note === undefined ? undefined : cleanDriveText(dto.location_note);
+    if (dto.location) await this.assertInServiceArea(this.dataSource, before.intake_warehouse_id, dto.location);
 
     return this.idempotency.execute(this.dataSource, {
       scopeKey: `user:${session.userId}`,
@@ -167,11 +179,15 @@ export class DrivesService {
              campaign_status_at=CASE WHEN $7::boolean THEN CASE WHEN $8::uuid IS NULL THEN NULL ELSE clock_timestamp() END ELSE campaign_status_at END,
              opens_at=CASE WHEN $10::boolean THEN $11::timestamptz ELSE opens_at END,
              closes_at=CASE WHEN $12::boolean THEN $13::timestamptz ELSE closes_at END,
+             location=CASE WHEN $14::boolean THEN CASE WHEN $15::float8 IS NULL THEN NULL ELSE ST_SetSRID(ST_MakePoint($15,$16),4326)::geography END ELSE location END,
+             location_note=CASE WHEN $17::boolean THEN $18::text ELSE location_note END,
              version=version+1
            WHERE id=$1 AND version=$2 RETURNING id`,
           [id, dto.expected_version, title !== undefined, title ?? null, dto.description !== undefined, description,
             hasCampaign, dto.campaign_id ?? null, campaign?.status ?? null, dto.opens_at !== undefined, dto.opens_at ?? null,
-            dto.closes_at !== undefined, dto.closes_at ?? null],
+            dto.closes_at !== undefined, dto.closes_at ?? null,
+            dto.location !== undefined, dto.location?.coordinates[0] ?? null, dto.location?.coordinates[1] ?? null,
+            locationNote !== undefined, locationNote ?? null],
         ) as [Array<{ id: string }>, number];
         if (!updated[0]) throw new AppError('VERSION_CONFLICT', { status: 409 });
         if (items) await this.replaceDriveItems(manager, id, items);
@@ -297,10 +313,26 @@ export class DrivesService {
     return warehouse;
   }
 
+  /** The drop-off point must lie inside the warehouse's service area (a warehouse without an area cannot host a located drive). */
+  private async assertInServiceArea(query: Pick<DataSource, 'query'> | Pick<EntityManager, 'query'>, warehouseId: string, location: { coordinates: [number, number] }): Promise<void> {
+    const [longitude, latitude] = location.coordinates;
+    if (!Number.isFinite(longitude) || !Number.isFinite(latitude) || Math.abs(longitude) > 180 || Math.abs(latitude) > 90) {
+      throw new AppError('VALIDATION_FAILED', { status: 400 });
+    }
+    const rows = await query.query(
+      `SELECT (w.location IS NOT NULL AND w.service_radius_m IS NOT NULL
+               AND ST_DWithin(w.location, ST_SetSRID(ST_MakePoint($2,$3),4326)::geography, w.service_radius_m::float8)) AS inside
+         FROM warehouse w WHERE w.id=$1`,
+      [warehouseId, longitude, latitude],
+    ) as Array<{ inside: boolean }>;
+    if (!rows[0]?.inside) throw new AppError('DRIVE_LOCATION_OUTSIDE_AREA', { status: 409 });
+  }
+
   private async findDrive(query: Pick<DataSource, 'query'> | Pick<EntityManager, 'query'>, id: string, forUpdate = false): Promise<DriveRow> {
     const rows = await query.query(
       `SELECT d.id,d.intake_warehouse_id,d.campaign_id,d.campaign_status,d.status,
-              d.title,d.description,d.opens_at,d.closes_at,d.version,d.created_at
+              d.title,d.description,d.opens_at,d.closes_at,d.version,d.created_at,
+              ST_X(d.location::geometry)::float8 AS longitude,ST_Y(d.location::geometry)::float8 AS latitude,d.location_note
          FROM donation_drive d JOIN warehouse w ON w.id=d.intake_warehouse_id WHERE d.id=$1${forUpdate ? ' FOR UPDATE OF d' : ''}`,
       [id],
     ) as DriveRow[];

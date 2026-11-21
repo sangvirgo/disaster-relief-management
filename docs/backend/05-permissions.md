@@ -32,7 +32,7 @@ Roles are a code catalog. The current role set has six codes: `ADMIN`, `COORDINA
 | `PICKUP_CLOSEOUT_REVIEW` (approve or reject a submitted close-out; reviewer differs from submitter and from the handover user) |  |  |  | ● | ● |  |
 | `RESPONSE_REPORT_READ` (Response aggregates) |  |  | ● | ● |  | ● |
 | `REPORT_READ` (Logistics aggregates) |  |  | ● | ● |  | ● |
-| `CATALOG_MANAGE`, `ASSET_MANAGE` (items, warehouses, vehicles, relief points; SYSTEM scope only) |  |  |  | ● |  |  |
+| `CATALOG_MANAGE`, `ASSET_MANAGE` (items, warehouses; SYSTEM scope only) |  |  |  | ● |  |  |
 | `DONATION_INTAKE` (count received goods) |  |  |  | ● |  |  |
 | `DONATION_REVIEW` (approve and post receipts) |  |  |  |  | ● |  |
 | `NEED_MANAGE` (define, reduce or cancel need) |  |  | ● | ● |  |  |
@@ -81,7 +81,7 @@ Only a primary system coordinator sees the shared intake queue. `unassigned=true
 
 - **CAMPAIGN scope (default).** One grant binds `OPERATIONS_MANAGER` to one campaign. It covers campaign-attributed donation drives, deliveries, receipts and their reviews, fulfillment cycles, needs and commitments under that campaign, and distributions whose `campaign_id` matches. Use it for staff who work on one campaign's intake and dispatch.
 - **SYSTEM scope (exception).** Covers every campaign and the shared resources. Issued only by ADMIN, recorded in the audit log, and reserved for managers who coordinate across campaigns (for example `ops_mgr`).
-- **Shared resources need SYSTEM.** `CATALOG_MANAGE` and `ASSET_MANAGE` (items, units, warehouses, relief points, vehicles) are usable only with a SYSTEM grant, whatever the campaign.
+- **Shared resources need SYSTEM.** `CATALOG_MANAGE` and `ASSET_MANAGE` (items, units, warehouses) are usable only with a SYSTEM grant, whatever the campaign.
 - **Campaign creation needs SYSTEM.** `CAMPAIGN_MANAGE` on a new campaign is checked without a campaign identifier, so only a SYSTEM grant passes. Update and pause of an existing campaign pass with a SYSTEM grant or a matching CAMPAIGN grant.
 
 ## 3. Separation of duties

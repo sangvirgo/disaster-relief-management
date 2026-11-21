@@ -57,7 +57,6 @@ export const pages: Record<Workspace, Page[]> = {
     { id: 'notices', title: 'Thông báo', icon: 'notice', service: 'response', path: '/notices' },
   ],
   operations: [
-    { id: 'campaigns', title: 'Chiến dịch và kho', icon: 'campaign', service: 'response', path: '/campaigns' },
     {
       id: 'overview',
       title: 'Tổng quan',
@@ -66,22 +65,15 @@ export const pages: Record<Workspace, Page[]> = {
       path: '/reports/stock-summary',
     },
     {
-      id: 'drives',
-      title: 'Nhu cầu và quyên góp',
-      icon: 'drive',
-      service: 'logistics',
-      path: '/donation-drives',
-    },
-    {
       id: 'intake',
-      title: 'Tiếp nhận và phân phối',
+      title: 'Nhu cầu và phân phối',
       icon: 'intake',
       service: 'logistics',
       path: '/donation-deliveries',
     },
     {
       id: 'assets',
-      title: 'Kho và địa điểm',
+      title: 'Kho và đợt quyên góp',
       icon: 'assets',
       service: 'logistics',
       path: '/warehouses',
@@ -149,6 +141,6 @@ export function allowedPages(workspace: Workspace, user: Me | null): Page[] {
     if (page.id === 'overview') return manages || reviews;
     return manages;
   }).map((page) => workspace === 'operations' && page.id === 'intake'
-    ? { ...page, title: r.has('REVIEWER') ? 'Tiếp nhận, duyệt và phân phối' : 'Tiếp nhận và phân phối' }
+    ? { ...page, title: r.has('REVIEWER') ? 'Nhu cầu, duyệt và phân phối' : 'Nhu cầu và phân phối' }
     : page);
 }

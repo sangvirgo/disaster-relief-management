@@ -3,24 +3,16 @@ import { hasPermission } from '@c48/identity-contracts/permissions';
 import type { AuthenticatedLogisticsSession } from '../auth/logistics-session.service';
 import type { AssetPointDto } from './assets.dto';
 
-export type AssetKind = 'warehouse' | 'relief_point' | 'vehicle';
+export type AssetKind = 'warehouse';
 
 export const assetTables: Record<AssetKind, string> = {
   warehouse: 'warehouse',
-  relief_point: 'relief_point',
-  vehicle: 'vehicle',
 };
 
 export interface AssetRow {
   id: string;
   name?: string;
-  identifier?: string;
-  vehicle_type?: string;
-  capacity?: string | null;
-  capacity_unit?: string | null;
   address_note?: string | null;
-  contact_note?: string | null;
-  operating_note?: string | null;
   location_public?: boolean;
   service_radius_m?: number | string | null;
   longitude?: number | string | null;
@@ -50,74 +42,39 @@ export function pointCoordinates(location: AssetPointDto | null | undefined): [n
   return [longitude, latitude];
 }
 
-export function assetSelect(kind: AssetKind, includePrivate: boolean): string {
-  const location = kind === 'vehicle'
-    ? 'NULL::float8 AS longitude, NULL::float8 AS latitude'
-    : 'ST_X(location::geometry)::float8 AS longitude, ST_Y(location::geometry)::float8 AS latitude';
-  if (kind === 'warehouse') {
-    return `SELECT id,name,${includePrivate ? 'address_note' : 'NULL::text AS address_note'},
-                   location_public,service_radius_m,status,version,created_at,${location} FROM warehouse`;
-  }
-  if (kind === 'relief_point') {
-    return `SELECT id,name,${includePrivate ? 'contact_note,operating_note' : 'NULL::text AS contact_note,NULL::text AS operating_note'},
-                   status,version,created_at,${location} FROM relief_point`;
-  }
-  return `SELECT id,identifier,vehicle_type,capacity::text AS capacity,capacity_unit,
-                 status,version,created_at,${location} FROM vehicle`;
+export function assetSelect(includePrivate: boolean): string {
+  const location = 'ST_X(location::geometry)::float8 AS longitude, ST_Y(location::geometry)::float8 AS latitude';
+  return `SELECT id,name,${includePrivate ? 'address_note' : 'NULL::text AS address_note'},
+                 location_public,service_radius_m,status,version,created_at,${location} FROM warehouse`;
 }
 
-export function assetView(kind: AssetKind, row: AssetRow, includePrivate: boolean): Record<string, unknown> {
+export function assetView(row: AssetRow, includePrivate: boolean): Record<string, unknown> {
   const result: Record<string, unknown> = {
     id: row.id,
     status: row.status,
     version: Number(row.version),
     created_at: new Date(row.created_at).toISOString(),
-  };
-  if (kind === 'warehouse') {
-    result.name = row.name;
-    result.location = row.longitude === null || row.longitude === undefined
+    name: row.name,
+    location: row.longitude === null || row.longitude === undefined
       ? null
-      : { type: 'Point', coordinates: [Number(row.longitude), Number(row.latitude)] };
-    result.location_public = Boolean(row.location_public);
-    result.service_radius_m = row.service_radius_m === null || row.service_radius_m === undefined ? null : Number(row.service_radius_m);
-    if (includePrivate) result.address_note = row.address_note ?? null;
-  } else if (kind === 'relief_point') {
-    result.name = row.name;
-    result.location = { type: 'Point', coordinates: [Number(row.longitude), Number(row.latitude)] };
-    if (includePrivate) {
-      result.contact_note = row.contact_note ?? null;
-      result.operating_note = row.operating_note ?? null;
-    }
-  } else {
-    result.identifier = row.identifier;
-    result.vehicle_type = row.vehicle_type;
-    result.capacity = row.capacity ?? null;
-    result.capacity_unit = row.capacity_unit ?? null;
-  }
+      : { type: 'Point', coordinates: [Number(row.longitude), Number(row.latitude)] },
+    location_public: Boolean(row.location_public),
+    service_radius_m: row.service_radius_m === null || row.service_radius_m === undefined ? null : Number(row.service_radius_m),
+  };
+  if (includePrivate) result.address_note = row.address_note ?? null;
   return result;
 }
 
-export function assetAuditState(kind: AssetKind, row: AssetRow): Record<string, unknown> {
-  const state: Record<string, unknown> = {
+export function assetAuditState(row: AssetRow): Record<string, unknown> {
+  return {
     id: row.id,
     status: row.status,
     version: Number(row.version),
+    name: row.name,
+    location_public: Boolean(row.location_public),
+    has_location: row.longitude !== null && row.longitude !== undefined,
+    service_radius_m: row.service_radius_m === null || row.service_radius_m === undefined ? null : Number(row.service_radius_m),
   };
-  if (kind === 'warehouse') {
-    state.name = row.name;
-    state.location_public = Boolean(row.location_public);
-    state.has_location = row.longitude !== null && row.longitude !== undefined;
-    state.service_radius_m = row.service_radius_m === null || row.service_radius_m === undefined ? null : Number(row.service_radius_m);
-  } else if (kind === 'relief_point') {
-    state.name = row.name;
-    state.has_location = row.longitude !== null && row.longitude !== undefined;
-  } else {
-    state.identifier = row.identifier;
-    state.vehicle_type = row.vehicle_type;
-    state.capacity = row.capacity ?? null;
-    state.capacity_unit = row.capacity_unit ?? null;
-  }
-  return state;
 }
 
 export async function findAsset(
@@ -127,7 +84,7 @@ export async function findAsset(
   options: { includePrivate?: boolean; forUpdate?: boolean } = {},
 ): Promise<AssetRow | undefined> {
   const rows = await manager.query(
-    `${assetSelect(kind, options.includePrivate ?? true)} WHERE id=$1${options.forUpdate ? ' FOR UPDATE' : ''}`,
+    `${assetSelect(options.includePrivate ?? true)} WHERE id=$1${options.forUpdate ? ' FOR UPDATE' : ''}`,
     [id],
   ) as AssetRow[];
   return rows[0];

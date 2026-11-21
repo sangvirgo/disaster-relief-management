@@ -758,7 +758,7 @@ test('documented endpoint errors use catalog status and exact Vietnamese message
   assert.ok(operationAt(logistics, 'post', '/stock/adjustments/{id}/review').responses['409'].content['application/json'].examples.ADJUSTMENT_VIOLATES_RESERVED);
 });
 
-test('documented pagination, evidence, stock movement, and relief point projections are exported', () => {
+test('documented pagination, evidence, and stock movement projections are exported', () => {
   const documents = Object.fromEntries(['identity', 'response', 'logistics'].map((service) => [service, exportService(service).document]));
   const expectedQueries = {
     identity: {
@@ -845,13 +845,6 @@ test('documented pagination, evidence, stock movement, and relief point projecti
   }
   assert.ok(movements.properties.more);
   assert.ok(movements.properties.cursor);
-
-  const reliefPoint = operationAt(logistics, 'get', '/relief-points/{id}');
-  const reliefPointFields = reliefPoint.responses['200'].content['application/json'].schema.properties;
-  for (const field of ['id', 'status', 'version', 'created_at', 'name', 'location', 'contact_note', 'operating_note']) {
-    assert.ok(reliefPointFields[field], `relief point includes ${field}`);
-  }
-  assert.equal(reliefPoint['x-c48-contract-gap'], undefined);
 });
 
 test('T12 Logistics recovery and attachment routes document one-use recovery and private evidence access', () => {
@@ -987,8 +980,6 @@ test('documented route errors include verification, mission, donation, and quant
     'logisticsDonationReceiptsCount', 'logisticsDonationReceiptsPost', 'logisticsDonationReceiptsReleaseHeld',
     'logisticsDonationReceiptsReview', 'logisticsCatalogDeactivateItem', 'logisticsNeedsCancel',
     'logisticsNeedsIncrease', 'logisticsNeedsReduce', 'logisticsDonationsReviseDeclaration',
-    'logisticsAssetsPatchReliefPoint', 'logisticsAssetsDeactivateReliefPoint',
-    'logisticsAssetsPatchVehicle', 'logisticsAssetsDeactivateVehicle',
     'logisticsAssetsPatchWarehouse', 'logisticsAssetsDeactivateWarehouse',
   ]) expectErrors('logistics', operationId, ['VERSION_CONFLICT']);
   for (const operationId of ['logisticsDrivesPatch', 'logisticsDrivesClose', 'logisticsDrivesOpen', 'logisticsDrivesPause', 'logisticsDrivesResume', 'logisticsStockReviewAdjustment']) {
@@ -1002,11 +993,10 @@ test('documented request and report fields are carried in the per-service contra
   const needs = operationAt(logistics, 'post', '/needs');
   const requestSchema = needs.requestBody.content['application/json'].schema;
   const responseSchema = needs.responses['201'].content['application/json'].schema;
-  assert.deepEqual(requestSchema.properties.delivery_target_kind.enum, ['FINAL_RECIPIENT']);
-  assert.equal(requestSchema.required?.includes('delivery_target_kind') ?? false, false, 'delivery_target_kind is optional');
-  assert.ok(responseSchema.properties.delivery_target_kind);
+  assert.equal(requestSchema.properties.delivery_target_kind, undefined, 'relief points were removed from needs');
+  assert.equal(responseSchema.properties.designated_point_id, undefined);
   assert.equal(needs['x-c48-contract-gap'], undefined);
-  for (const field of ['id', 'cycle_id', 'request_id', 'work_cycle', 'campaign_id', 'item_id', 'item', 'original_quantity', 'requested_quantity', 'cancelled_remaining', 'delivery_target_kind', 'designated_point_id', 'status', 'version', 'created_at']) {
+  for (const field of ['id', 'cycle_id', 'request_id', 'work_cycle', 'campaign_id', 'item_id', 'item', 'original_quantity', 'requested_quantity', 'cancelled_remaining', 'status', 'version', 'created_at']) {
     assert.ok(responseSchema.properties[field], `created need includes ${field}`);
   }
 
@@ -1047,7 +1037,7 @@ test('documented request and report fields are carried in the per-service contra
   assert.equal(fulfillmentRow.properties.cancelled_remainder, undefined);
 
   const reconciliationRow = operationAt(logistics, 'get', '/reconciliation').responses['200'].content['application/json'].schema.properties.items.items;
-  for (const field of ['item', 'unit', 'intake_accepted', 'posted_movements', 'posted_reserved_movements', 'reserved', 'issued_in_transit', 'at_point', 'delivered', 'returned', 'lost', 'flags']) {
+  for (const field of ['item', 'unit', 'intake_accepted', 'posted_movements', 'posted_reserved_movements', 'reserved', 'issued_in_transit', 'delivered', 'returned', 'lost', 'flags']) {
     assert.ok(reconciliationRow.properties[field], `reconciliation row includes ${field}`);
   }
   assert.ok(reconciliationRow.properties.item.properties.id);
@@ -1095,8 +1085,6 @@ test('source-defined resolution, team, and asset projections have complete schem
 
   const assetFields = {
     '/warehouses': ['id', 'status', 'version', 'created_at', 'name', 'location', 'location_public'],
-    '/relief-points': ['id', 'status', 'version', 'created_at', 'name', 'location'],
-    '/vehicles': ['id', 'status', 'version', 'created_at', 'identifier', 'vehicle_type', 'capacity', 'capacity_unit'],
   };
   for (const [routePath, fields] of Object.entries(assetFields)) {
     const operation = operationAt(logistics, 'get', routePath);
@@ -1120,13 +1108,13 @@ test('source-defined Logistics projections and collection envelopes match their 
   };
 
   const distributionFields = [
-    'id', 'warehouse_id', 'relief_point_id', 'vehicle_id', 'campaign_id', 'purpose', 'status',
+    'id', 'warehouse_id', 'campaign_id', 'purpose', 'status',
     'preparer_user_id', 'approver_user_id', 'approved_version', 'dispatch_actor_user_id', 'dispatched_at',
-    'reconciled_at', 'created_at', 'version', 'vehicle_capacity_exceeded', 'lines',
+    'reconciled_at', 'created_at', 'version', 'lines',
   ];
   const distributionLineFields = [
-    'id', 'item_id', 'item_name', 'unit', 'commitment_id', 'delivery_target_kind', 'quantity', 'dispatched',
-    'received', 'handed_out', 'returned', 'lost', 'pending_loss_count', 'in_transit', 'at_point',
+    'id', 'item_id', 'item_name', 'unit', 'commitment_id', 'quantity', 'dispatched',
+    'handed_out', 'returned', 'lost', 'pending_loss_count', 'in_transit',
   ];
   expectFields('logisticsDistributionsList', ['items', '[]'], distributionFields);
   expectFields('logisticsDistributionsList', ['items', '[]', 'lines', '[]'], distributionLineFields);
@@ -1209,7 +1197,7 @@ test('source-defined Logistics projections and collection envelopes match their 
 
   const needFields = [
     'id', 'cycle_id', 'request_id', 'work_cycle', 'campaign_id', 'item_id', 'item',
-    'original_quantity', 'requested_quantity', 'cancelled_remaining', 'delivery_target_kind', 'designated_point_id', 'status', 'version', 'created_at',
+    'original_quantity', 'requested_quantity', 'cancelled_remaining', 'status', 'version', 'created_at',
   ];
   for (const operationId of ['logisticsNeedsCancel', 'logisticsNeedsIncrease', 'logisticsNeedsReduce']) {
     expectFields(operationId, [], needFields);
@@ -1251,12 +1239,6 @@ test('source-defined Logistics projections and collection envelopes match their 
     logisticsAssetsCreateWarehouse: ['id', 'status', 'version', 'created_at', 'name', 'location', 'location_public', 'address_note'],
     logisticsAssetsPatchWarehouse: ['id', 'status', 'version', 'created_at', 'name', 'location', 'location_public', 'address_note'],
     logisticsAssetsDeactivateWarehouse: ['id', 'status', 'version', 'created_at', 'name', 'location', 'location_public', 'address_note'],
-    logisticsAssetsCreateReliefPoint: ['id', 'status', 'version', 'created_at', 'name', 'location', 'contact_note', 'operating_note'],
-    logisticsAssetsPatchReliefPoint: ['id', 'status', 'version', 'created_at', 'name', 'location', 'contact_note', 'operating_note'],
-    logisticsAssetsDeactivateReliefPoint: ['id', 'status', 'version', 'created_at', 'name', 'location', 'contact_note', 'operating_note'],
-    logisticsAssetsCreateVehicle: ['id', 'status', 'version', 'created_at', 'identifier', 'vehicle_type', 'capacity', 'capacity_unit'],
-    logisticsAssetsPatchVehicle: ['id', 'status', 'version', 'created_at', 'identifier', 'vehicle_type', 'capacity', 'capacity_unit'],
-    logisticsAssetsDeactivateVehicle: ['id', 'status', 'version', 'created_at', 'identifier', 'vehicle_type', 'capacity', 'capacity_unit'],
   };
   for (const [operationId, fields] of Object.entries(assetCommandFields)) expectFields(operationId, [], fields);
 

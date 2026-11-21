@@ -27,19 +27,12 @@ interface ItemRow {
   scale: number;
 }
 
-interface ReliefPointRow {
-  id: string;
-  status: 'ACTIVE' | 'INACTIVE';
-}
-
 function requestHash(dto: CreateNeedDto): string {
   return canonicalRequestHash({
     request_id: dto.request_id,
     work_cycle: dto.work_cycle,
     item_id: dto.item_id,
     quantity: dto.quantity,
-    delivery_target_kind: dto.delivery_target_kind ?? null,
-    designated_point_id: dto.designated_point_id ?? null,
     reason: dto.reason ?? null,
   });
 }
@@ -56,17 +49,6 @@ async function loadItem(manager: Pick<EntityManager, 'query'>, itemId: string): 
   return item;
 }
 
-async function loadReliefPoint(manager: Pick<EntityManager, 'query'>, id: string): Promise<ReliefPointRow> {
-  const rows = await manager.query(
-    'SELECT id,status FROM relief_point WHERE id=$1 FOR SHARE',
-    [id],
-  ) as ReliefPointRow[];
-  const point = rows[0];
-  if (!point) throw new AppError('NOT_FOUND', { status: 404 });
-  if (point.status !== 'ACTIVE') throw new AppError('POINT_INACTIVE', { status: 409 });
-  return point;
-}
-
 @Injectable()
 export class NeedsService {
   constructor(
@@ -79,12 +61,6 @@ export class NeedsService {
   async create(dto: CreateNeedDto, request: NeedCommandRequest): Promise<IdempotentResult<Record<string, unknown>>> {
     const session = await this.sessions.require(request);
     const idempotencyKey = needCommandKey(request);
-    if (dto.designated_point_id && (!dto.reason || !dto.reason.trim())) {
-      throw new AppError('VALIDATION_FAILED', { status: 400 });
-    }
-    if (dto.designated_point_id && dto.delivery_target_kind === 'FINAL_RECIPIENT') {
-      throw new AppError('VALIDATION_FAILED', { status: 400 });
-    }
 
     const idempotent = {
       scopeKey: `user:${session.userId}`,
@@ -119,19 +95,10 @@ export class NeedsService {
         requireNeedManage(session.grants, cycle);
         const item = await loadItem(manager, dto.item_id);
         const quantity = validateQuantity(dto.quantity, Number(item.scale));
-        let designatedPointId: string | null = null;
-        if (dto.designated_point_id) {
-          const point = await loadReliefPoint(manager, dto.designated_point_id);
-          requireNeedManage(session.grants, {
-            campaign_id: cycle.campaign_id,
-          });
-          designatedPointId = point.id;
-        }
-
         const inserted = await manager.query(
-          `INSERT INTO relief_need (cycle_id,item_id,original_quantity,requested_quantity,designated_point_id)
-           VALUES ($1,$2,$3,$3,$4) RETURNING id`,
-          [cycle.id, item.id, quantity, designatedPointId],
+          `INSERT INTO relief_need (cycle_id,item_id,original_quantity,requested_quantity)
+           VALUES ($1,$2,$3,$3) RETURNING id`,
+          [cycle.id, item.id, quantity],
         ) as Array<{ id: string }>;
         const id = inserted[0]?.id;
         if (!id) throw new AppError('INTERNAL_ERROR', { status: 500 });

@@ -26,14 +26,13 @@ const needRow = {
   campaign_id: null,
   item_id: itemId, item_name: 'Nước uống', unit_code: 'L', unit_name: 'Lít',
   original_quantity: '3', requested_quantity: '3', cancelled_remaining: null,
-  designated_point_id: null, status: 'OPEN', version: 1,
+  status: 'OPEN', version: 1,
   created_at: new Date('2026-10-12T12:00:00.000Z'),
 };
 
 function setup(overrides: Partial<{
   cycleState: string;
   itemStatus: string;
-  point: { id: string; status: string } | null;
   grants: Grant[];
   admissionError: Error;
   existingReplay: boolean;
@@ -50,7 +49,6 @@ function setup(overrides: Partial<{
       if (sql.includes('INSERT INTO fulfillment_cycle')) return [];
       if (sql.includes('FROM fulfillment_cycle') && sql.includes('FOR UPDATE')) return [cycle];
       if (sql.includes('FROM item i JOIN unit u')) return [{ id: itemId, status: overrides.itemStatus ?? 'ACTIVE', scale: 0 }];
-      if (sql.includes('FROM relief_point')) return overrides.point ? [overrides.point] : [];
       if (sql.includes('INSERT INTO relief_need')) return [{ id: needId }];
       if (sql.includes('FROM relief_need n JOIN fulfillment_cycle')) return [needRow];
       if (sql.includes('INSERT INTO audit_log')) return [];
@@ -118,7 +116,7 @@ describe('NeedsService.create', () => {
     expect(result.value).toMatchObject({
       id: needId, request_id: requestId, work_cycle: 2,
       campaign_id: null, item_id: itemId, original_quantity: '3',
-      requested_quantity: '3', delivery_target_kind: 'FINAL_RECIPIENT', status: 'OPEN', version: 1,
+      requested_quantity: '3', status: 'OPEN', version: 1,
     });
     const cycleInsert = calls.find(({ sql }) => sql.includes('INSERT INTO fulfillment_cycle'));
     expect(cycleInsert?.values).toEqual([requestId, 2, null]);
@@ -189,27 +187,5 @@ describe('NeedsService.create', () => {
 
     expect(calls.some(({ sql }) => sql.includes('FROM fulfillment_cycle') && sql.includes('FOR UPDATE'))).toBe(true);
     expect(calls.some(({ sql }) => sql.includes('FROM item i JOIN unit u'))).toBe(false);
-  });
-
-  it('requires an active relief point before creating a need', async () => {
-    const pointId = '99999999-9999-4999-8999-999999999999';
-    const { service, calls } = setup({ point: {
-      id: pointId, status: 'INACTIVE',
-    } });
-
-    await expect(service.create({ ...dto, designated_point_id: pointId, reason: 'Giao tại điểm.' }, request))
-      .rejects.toMatchObject({ code: 'POINT_INACTIVE', status: 409 });
-    expect(calls.some(({ sql }) => sql.includes('INSERT INTO relief_need'))).toBe(false);
-  });
-
-  it('requires a reason and does not accept FINAL_RECIPIENT with a designated point', async () => {
-    const pointId = '99999999-9999-4999-8999-999999999999';
-    const { service, response } = setup();
-
-    await expect(service.create({ ...dto, designated_point_id: pointId }, request))
-      .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 });
-    expect(response.admit).not.toHaveBeenCalled();
-    await expect(service.create({ ...dto, delivery_target_kind: 'FINAL_RECIPIENT', designated_point_id: pointId, reason: 'Giao tại điểm.' }, request))
-      .rejects.toMatchObject({ code: 'VALIDATION_FAILED', status: 400 });
   });
 });

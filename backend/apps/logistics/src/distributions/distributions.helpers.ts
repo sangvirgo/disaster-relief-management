@@ -1,26 +1,19 @@
 import { AppError } from '@c48/technical/errors/errors';
 
-export type DistributionHandoffKind =
-  | 'DIRECT_HOUSEHOLD'
-  | 'POINT_RECEIPT'
-  | 'HOUSEHOLD_HANDOUT'
-  | 'RETURN'
-  | 'LOSS';
+export type DistributionHandoffKind = 'DIRECT_HOUSEHOLD' | 'RETURN' | 'LOSS';
 
-export type HandoffSourceStage = 'IN_TRANSIT' | 'AT_POINT' | null;
-export type FulfillmentTarget = 'FINAL_RECIPIENT' | 'RELIEF_POINT';
+/** Returned or lost goods always come from the in-transit balance; the column stays so history keeps its shape. */
+export type HandoffSourceStage = 'IN_TRANSIT' | null;
 export type SettlementType = 'DELIVERED' | 'RETURNED' | 'LOST';
 
 export interface CustodyBalance {
   inTransit: bigint;
-  atPoint: bigint;
 }
 
 interface HandoffBalanceInput extends CustodyBalance {
   handoffKind: DistributionHandoffKind;
   sourceStage: HandoffSourceStage;
   quantity: bigint;
-  hasReliefPoint: boolean;
 }
 
 function invalidHandoffKind(): never {
@@ -35,52 +28,23 @@ function checkedRemainder(balance: bigint, quantity: bigint): bigint {
 }
 
 export function nextCustodyBalance(input: HandoffBalanceInput): CustodyBalance {
-  const { handoffKind, sourceStage, quantity, inTransit, atPoint, hasReliefPoint } = input;
-  if (quantity <= 0n || inTransit < 0n || atPoint < 0n) {
+  const { handoffKind, sourceStage, quantity, inTransit } = input;
+  if (quantity <= 0n || inTransit < 0n) {
     throw new AppError('VALIDATION_FAILED', { status: 400 });
   }
 
   if (handoffKind === 'DIRECT_HOUSEHOLD') {
-    if (hasReliefPoint || sourceStage !== null) return invalidHandoffKind();
-    return { inTransit: checkedRemainder(inTransit, quantity), atPoint };
+    if (sourceStage !== null) return invalidHandoffKind();
+    return { inTransit: checkedRemainder(inTransit, quantity) };
   }
 
-  if (handoffKind === 'POINT_RECEIPT') {
-    if (!hasReliefPoint || sourceStage !== null) return invalidHandoffKind();
-    return { inTransit: checkedRemainder(inTransit, quantity), atPoint: atPoint + quantity };
-  }
-
-  if (handoffKind === 'HOUSEHOLD_HANDOUT') {
-    if (!hasReliefPoint || sourceStage !== null) return invalidHandoffKind();
-    return { inTransit, atPoint: checkedRemainder(atPoint, quantity) };
-  }
-
-  if ((handoffKind !== 'RETURN' && handoffKind !== 'LOSS') || sourceStage === null ||
-      (sourceStage === 'AT_POINT' && !hasReliefPoint)) {
+  if ((handoffKind !== 'RETURN' && handoffKind !== 'LOSS') || sourceStage !== 'IN_TRANSIT') {
     return invalidHandoffKind();
   }
-
-  if (sourceStage === 'IN_TRANSIT') {
-    return { inTransit: checkedRemainder(inTransit, quantity), atPoint };
-  }
-  return { inTransit, atPoint: checkedRemainder(atPoint, quantity) };
+  return { inTransit: checkedRemainder(inTransit, quantity) };
 }
 
-export function handoffSettlementType(
-  target: FulfillmentTarget,
-  handoffKind: DistributionHandoffKind,
-  sourceStage: HandoffSourceStage,
-): SettlementType | null {
-  if (target === 'FINAL_RECIPIENT') {
-    if (handoffKind === 'DIRECT_HOUSEHOLD' || handoffKind === 'HOUSEHOLD_HANDOUT') return 'DELIVERED';
-    if (handoffKind === 'RETURN') return 'RETURNED';
-    if (handoffKind === 'LOSS') return 'LOST';
-    return null;
-  }
-
-  if (handoffKind === 'POINT_RECEIPT') return 'DELIVERED';
-  if (sourceStage !== 'IN_TRANSIT') return null;
-  if (handoffKind === 'RETURN') return 'RETURNED';
-  if (handoffKind === 'LOSS') return 'LOST';
-  return null;
+export function handoffSettlementType(handoffKind: DistributionHandoffKind): SettlementType {
+  if (handoffKind === 'DIRECT_HOUSEHOLD') return 'DELIVERED';
+  return handoffKind === 'RETURN' ? 'RETURNED' : 'LOST';
 }

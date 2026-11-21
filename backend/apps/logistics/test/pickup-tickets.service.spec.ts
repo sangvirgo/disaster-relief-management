@@ -47,8 +47,8 @@ function freshDb(): Db {
     tickets: [],
     lines: [],
     needs: [
-      { relief_need_id: NEED_WATER, item_id: WATER, requested_quantity: '10', unit_scale: 0, committed: '0', status: 'OPEN', source: 'CONFIRMED', designated_point_id: null },
-      { relief_need_id: NEED_RICE, item_id: RICE, requested_quantity: '5', unit_scale: 0, committed: '3', status: 'OPEN', source: 'DECLARED', designated_point_id: null },
+      { relief_need_id: NEED_WATER, item_id: WATER, requested_quantity: '10', unit_scale: 0, committed: '0', status: 'OPEN', source: 'CONFIRMED' },
+      { relief_need_id: NEED_RICE, item_id: RICE, requested_quantity: '5', unit_scale: 0, committed: '3', status: 'OPEN', source: 'DECLARED' },
     ],
     stock: [
       { warehouse_id: WH_PRIMARY, item_id: WATER, on_hand: '4', reserved: '0' },
@@ -80,7 +80,7 @@ function fakeManager(db: Db) {
     }
     if (sql.startsWith('SELECT id FROM pickup_ticket WHERE mission_id=$1')) return db.tickets.filter((t) => t.mission_id === p[0]);
     if (sql.includes('COALESCE((SELECT SUM(cm.quantity-cm.released_quantity-cm.returned_quantity-cm.lost_quantity)::text') && sql.includes('c.request_id=$1')) {
-      return db.needs.filter((n) => ['OPEN', 'PARTIALLY_FULFILLED'].includes(String(n.status)) && n.source !== 'ESTIMATED' && n.designated_point_id === null);
+      return db.needs.filter((n) => ['OPEN', 'PARTIALLY_FULFILLED'].includes(String(n.status)) && n.source !== 'ESTIMATED');
     }
     if (sql.startsWith('INSERT INTO pickup_ticket (')) {
       const id = TICKET;
@@ -277,14 +277,6 @@ describe('pickup ticket: creation from the mission request', () => {
     db.tickets.push({ id: 'existing', mission_id: MISSION });
     const { service } = harness(db);
     await expectCode(service.create({ mission_id: MISSION }, req(OPS, OPS_SYSTEM as never, OUTER_KEY)), 'PICKUP_TICKET_EXISTS', 409);
-  });
-
-  it('skips a need that designates a relief point, so a final-recipient ticket never fails on it', async () => {
-    const db = freshDb();
-    db.needs[0] = { ...db.needs[0], designated_point_id: '10000000-0000-4000-8000-0000000000aa' };
-    const { service } = harness(db);
-    await service.create({ mission_id: MISSION }, req(OPS, OPS_SYSTEM as never, OUTER_KEY));
-    expect(db.lines).toEqual([expect.objectContaining({ relief_need_id: NEED_RICE })]);
   });
 
   it('answers PICKUP_NO_NEEDS when the request has no confirmed or declared goods lines', async () => {
@@ -523,8 +515,7 @@ describe('DistributionCommandsService.dispatch: existing approver rule used by h
   it('rejects a dispatch by the same user who approved the distribution', async () => {
     const userId = OPS;
     const row = {
-      id: DIST, warehouse_id: WH_PRIMARY, warehouse_status: 'ACTIVE', relief_point_id: null, relief_point_status: null,
-      vehicle_id: null, vehicle_status: null, vehicle_capacity: null, vehicle_capacity_unit: null, vehicle_capacity_scale: null,
+      id: DIST, warehouse_id: WH_PRIMARY, warehouse_status: 'ACTIVE',
       campaign_id: CAMPAIGN, purpose: 'REQUEST_AID', status: 'APPROVED', preparer_user_id: VOLUNTEER, approver_user_id: userId,
       approved_version: 2, dispatch_actor_user_id: null, dispatched_at: null, reconciled_at: null,
       created_at: '2026-11-18T00:00:00.000Z', version: 2,

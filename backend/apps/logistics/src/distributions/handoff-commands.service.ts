@@ -79,8 +79,8 @@ export class HandoffCommandsService {
         const lineIds = dto.lines.map((line) => line.distribution_line_id);
         if (new Set(lineIds).size !== lineIds.length) throw new AppError('VALIDATION_FAILED', { status: 400 });
         const lines = await readDistributionHandoffLines(manager, distributionId, lineIds);
-        const sourceStage = dto.source_stage ?? null;
         const kind = dto.handoff_kind as DistributionHandoffKind;
+        const sourceStage: HandoffSourceStage = dto.source_stage ?? (kind === 'DIRECT_HOUSEHOLD' ? null : 'IN_TRANSIT');
         const quantityByLine = new Map(dto.lines.map((line) => [line.distribution_line_id, line.quantity]));
         const balances = new Map<string, ReturnType<typeof nextCustodyBalance>>();
         for (const line of lines) {
@@ -90,12 +90,10 @@ export class HandoffCommandsService {
             sourceStage,
             quantity: quantityUnits(quantity, Number(line.unit_scale)),
             inTransit: quantityUnits(line.in_transit_quantity, Number(line.unit_scale)),
-            atPoint: quantityUnits(line.at_point_quantity, Number(line.unit_scale)),
-            hasReliefPoint: distribution.relief_point_id !== null,
           }));
         }
 
-        const settlementRows = kind === 'LOSS' ? [] : await lockSettlementCommitments(manager, lines, kind, sourceStage);
+        const settlementRows = kind === 'LOSS' ? [] : await lockSettlementCommitments(manager, lines, kind);
         const settlementById = new Map(settlementRows.map((row) => [row.id, row]));
         const before = auditState(distribution);
         const inserted = await manager.query(
@@ -127,7 +125,7 @@ export class HandoffCommandsService {
           }
           if (kind === 'RETURN') await this.returnToWarehouse(manager, distribution, line, handoffLineId, quantity, session.userId);
 
-          const settlementType = eligibleSettlement(line, kind, sourceStage);
+          const settlementType = eligibleSettlement(line, kind);
           if (settlementType) {
             const commitment = line.commitment_id ? settlementById.get(line.commitment_id) : undefined;
             if (!commitment) throw new AppError('INTERNAL_ERROR', { status: 500 });
@@ -192,13 +190,11 @@ export class HandoffCommandsService {
               handoffKind: 'LOSS', sourceStage: handoff.source_stage,
               quantity: quantityUnits(quantity, Number(line.unit_scale)),
               inTransit: quantityUnits(line.in_transit_quantity, Number(line.unit_scale)),
-              atPoint: quantityUnits(line.at_point_quantity, Number(line.unit_scale)),
-              hasReliefPoint: distribution.relief_point_id !== null,
             }));
           }
         }
         const settlementRows = dto.decision === 'APPROVE'
-          ? await lockSettlementCommitments(manager, lines, 'LOSS', handoff.source_stage)
+          ? await lockSettlementCommitments(manager, lines, 'LOSS')
           : [];
         const settlementById = new Map(settlementRows.map((row) => [row.id, row]));
         const before = auditState(distribution);
@@ -215,7 +211,7 @@ export class HandoffCommandsService {
             const quantity = quantityByLine.get(line.id);
             if (!balance || !handoffLineId || !quantity) throw new AppError('INTERNAL_ERROR', { status: 500 });
             await this.writeCustodyBalance(manager, line, balance);
-            const settlementType = eligibleSettlement(line, 'LOSS', handoff.source_stage);
+            const settlementType = eligibleSettlement(line, 'LOSS');
             if (settlementType) {
               const commitment = line.commitment_id ? settlementById.get(line.commitment_id) : undefined;
               if (!commitment) throw new AppError('INTERNAL_ERROR', { status: 500 });
@@ -297,12 +293,12 @@ export class HandoffCommandsService {
   private async writeCustodyBalance(
     manager: EntityManager,
     line: DistributionHandoffLineContext,
-    next: { inTransit: bigint; atPoint: bigint },
+    next: { inTransit: bigint },
   ): Promise<void> {
     const scale = Number(line.unit_scale);
     await manager.query(
-      `UPDATE distribution_line SET in_transit_quantity=$2::numeric,at_point_quantity=$3::numeric WHERE id=$1`,
-      [line.id, decimalFromUnits(next.inTransit, scale), decimalFromUnits(next.atPoint, scale)],
+      `UPDATE distribution_line SET in_transit_quantity=$2::numeric WHERE id=$1`,
+      [line.id, decimalFromUnits(next.inTransit, scale)],
     );
   }
 
@@ -329,9 +325,8 @@ export class HandoffCommandsService {
   private async lossLines(manager: EntityManager, handoffId: string): Promise<HandoffLineRow[]> {
     const rows = await manager.query(
       `SELECT dl.id,dl.distribution_id,dl.item_id,u.scale AS unit_scale,hl.quantity::text,
-              dl.in_transit_quantity::text,dl.at_point_quantity::text,d.warehouse_id,cm.id AS commitment_id,
+              dl.in_transit_quantity::text,d.warehouse_id,cm.id AS commitment_id,
               cm.relief_need_id,n.cycle_id,
-              CASE WHEN n.designated_point_id IS NULL THEN 'FINAL_RECIPIENT' ELSE 'RELIEF_POINT' END AS delivery_target_kind,
               hl.id AS handoff_line_id
          FROM handoff_line hl JOIN distribution_line dl ON dl.id=hl.distribution_line_id
          JOIN distribution d ON d.id=hl.distribution_id JOIN item i ON i.id=dl.item_id JOIN unit u ON u.code=i.unit_code
@@ -358,7 +353,7 @@ export class HandoffCommandsService {
     const pending = await this.hasPendingLoss(manager, distributionId);
     if (pending) return false;
     const outstanding = await manager.query(
-      'SELECT 1 FROM distribution_line WHERE distribution_id=$1 AND (in_transit_quantity<>0 OR at_point_quantity<>0) LIMIT 1',
+      'SELECT 1 FROM distribution_line WHERE distribution_id=$1 AND in_transit_quantity<>0 LIMIT 1',
       [distributionId],
     ) as unknown[];
     if (outstanding.length) return false;

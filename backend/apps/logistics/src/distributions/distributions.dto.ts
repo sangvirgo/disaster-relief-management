@@ -6,8 +6,8 @@ import {
 
 const decimalQuantity = /^(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/u;
 
-export const distributionPurposes = ['REQUEST_AID', 'CAMPAIGN_DISTRIBUTION', 'POINT_REPLENISHMENT'] as const;
-export const handoffKinds = ['DIRECT_HOUSEHOLD', 'POINT_RECEIPT', 'HOUSEHOLD_HANDOUT', 'RETURN', 'LOSS'] as const;
+export const distributionPurposes = ['REQUEST_AID', 'CAMPAIGN_DISTRIBUTION'] as const;
+export const handoffKinds = ['DIRECT_HOUSEHOLD', 'RETURN', 'LOSS'] as const;
 
 export class DistributionLineDto {
   @IsUUID('all')
@@ -23,12 +23,6 @@ export class DistributionLineDto {
 export class CreateDistributionDto {
   @IsUUID('all')
   warehouse_id!: string;
-
-  @IsOptional() @IsUUID('all')
-  relief_point_id?: string;
-
-  @IsOptional() @IsUUID('all')
-  vehicle_id?: string;
 
   @IsOptional() @IsUUID('all')
   campaign_id?: string;
@@ -62,8 +56,8 @@ export class CreateHandoffDto {
   @IsIn(handoffKinds)
   handoff_kind!: typeof handoffKinds[number];
 
-  @IsOptional() @IsIn(['IN_TRANSIT', 'AT_POINT'])
-  source_stage?: 'IN_TRANSIT' | 'AT_POINT';
+  @IsOptional() @IsIn(['IN_TRANSIT'])
+  source_stage?: 'IN_TRANSIT';
 
   @IsOptional() @IsUUID('all')
   receiver_user_id?: string;

@@ -14,10 +14,14 @@ import { generateUUID } from '../utils/secureStore';
 
 export const LogisticsApi = {
   // Lấy danh sách các đợt tiếp nhận quyên góp cứu trợ đang mở
-  async getPublicDonationDrives(limit = 50, cursor?: string): Promise<CollectionPage<DonationDrive>> {
+  async getPublicDonationDrives(
+    limit = 50,
+    cursor?: string,
+    position?: { lat: number; lng: number } | null,
+  ): Promise<CollectionPage<DonationDrive>> {
     const response = await apiClient.get<CollectionPage<DonationDrive>>(
       '/logistics/public/donation-drives',
-      { params: { limit, ...(cursor ? { cursor } : {}) } }
+      { params: { limit, ...(cursor ? { cursor } : {}), ...(position ? { lat: position.lat, lng: position.lng } : {}) } }
     );
     return response.data;
   },

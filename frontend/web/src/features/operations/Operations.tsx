@@ -4,6 +4,7 @@ import { api } from '../../api/client';
 import { fetchAll } from '../../api/fetchAll';
 import { useCursorNav, LIST_PAGE_SIZE } from '../../api/useCursorNav';
 import { ListNav } from '../../components/ui/Pager';
+import { WarehouseMapManager } from './WarehouseMapManager';
 import { roles, type Me } from '../../auth/session';
 import { CommandForm, type CommandSpec, type Field } from '../../components/CommandForm';
 import { dateLabel, label, requestStatusLabel, timeLabel } from '../../i18n/labels';
@@ -11,7 +12,6 @@ import { formatQuantity } from '../../i18n/quantity';
 import { NeedReasonChips, NeedSourceBadge } from '../supply-gaps/SupplyBadges';
 import { HandoffDetail } from './HandoffDetail';
 import { ReceiptCountForm } from './ReceiptCountForm';
-import { DriveCreateForm } from './DriveCreateForm';
 import { operationRecordKey } from './recordKey';
 import { RecoveryIssue } from '../../components/RecoveryIssue';
 import { DetailSurface } from '../../components/DetailSurface';
@@ -44,7 +44,7 @@ const routes: Record<string, string> = {
   intake: '/donation-deliveries',
   review: '/donation-deliveries',
   stock: '/stock',
-  assets: '/relief-points',
+  assets: '/warehouses',
   needs: '/needs',
   distribution: '/distributions',
   handoff: '/distributions',
@@ -56,7 +56,7 @@ const headings: Record<string, string> = {
   intake: 'Tiếp nhận đóng góp',
   review: 'Duyệt biên nhận',
   stock: 'Tồn kho theo kho',
-  assets: 'Kho, điểm cứu trợ và phương tiện',
+  assets: 'Kho',
   needs: 'Danh sách nhu cầu vật tư',
   distribution: 'Danh sách phiếu phân phối',
   handoff: 'Bàn giao vật tư',
@@ -96,20 +96,19 @@ function distributionItems(item: Row, itemUnits: ReferenceOptions[string] = []):
 const fields = (entries: [string, string, boolean?][]) =>
   entries.map(([name, title, required]) => ({ name, label: title, required }));
 
-function readReportFilters(userId: string): { warehouse?: string; campaign?: string; pageSize?: number } {
+function readReportFilters(userId: string): { warehouse?: string; campaign?: string } {
   try {
     const saved = JSON.parse(sessionStorage.getItem(`operations-filters:${userId}`) || '{}');
     return {
       warehouse: typeof saved?.warehouse === 'string' ? saved.warehouse : '',
       campaign: typeof saved?.campaign === 'string' ? saved.campaign : '',
-      pageSize: [10, 25, 50].includes(saved?.pageSize) ? saved.pageSize : 50,
     };
   } catch { return {}; }
 }
 
 export function Operations({ page, user }: { page: string; user: Me }) {
   const rights = roles(user);
-  const [asset, setAsset] = useUrlView('view', assetViews, 'warehouses');
+  const [asset] = useUrlView('view', assetViews, 'warehouses');
   const [reviewTab, setReviewTab] = useUrlView('view', reviewViews, 'receipts');
   const [report, setReport] = useUrlView('view', reportViews, 'stock-summary');
   const [warehouse, setWarehouse] = useState(() => readReportFilters(user.id).warehouse || '');
@@ -117,11 +116,10 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   const initialReportFilters = useRef({ warehouse: false });
   const [items, setItems] = useState<Row[]>([]);
   const [cursor, setCursor, prevPage, pageIndex] = useCursorNav<string>('');
-  const [pageSize, setPageSize] = useState(() => readReportFilters(user.id).pageSize || 50);
   useEffect(() => {
-    try { sessionStorage.setItem(`operations-filters:${user.id}`, JSON.stringify({ warehouse, campaign, pageSize })); }
+    try { sessionStorage.setItem(`operations-filters:${user.id}`, JSON.stringify({ warehouse, campaign })); }
     catch { /* Filtering remains available when browser storage is disabled. */ }
-  }, [user.id, warehouse, campaign, pageSize]);
+  }, [user.id, warehouse, campaign]);
   const [next, setNext] = useState<string | null>(null);
   const [generatedAt, setGeneratedAt] = useState('');
   const [selected, setSelected] = useState<Row | null>(null);
@@ -159,8 +157,6 @@ export function Operations({ page, user }: { page: string; user: Me }) {
       ['drives', 'logistics', '/donation-drives'],
       ['items', 'logistics', '/items'],
       ['campaigns', 'response', '/campaigns'],
-      ['reliefPoints', 'logistics', '/relief-points'],
-      ['vehicles', 'logistics', '/vehicles'],
       ...(rights.has('COORDINATOR') ? [['requests', 'response', '/requests']] as const : []),
     ] as const;
     void Promise.allSettled(sources.map(([, service, path]) => fetchAll<Row>(service, path))).then((results) => {
@@ -178,7 +174,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
         if (key === 'items') options.itemUnits = result.value.filter(item => item.id && string((item.unit as Row | undefined)?.display_name))
           .map(item => ({ value: item.id!, label: string((item.unit as Row).display_name) }));
         options[key] = result.value
-          .filter((item) => (key !== 'requests' || ['VERIFIED', 'TRIAGED', 'DISPATCHED', 'IN_PROGRESS'].includes(string(item.status))) && (item.id || item.code) && (!['campaigns', 'reliefPoints', 'warehouses', 'vehicles', 'items'].includes(key) || item.status === 'ACTIVE'))
+          .filter((item) => (key !== 'requests' || ['VERIFIED', 'TRIAGED', 'DISPATCHED', 'IN_PROGRESS'].includes(string(item.status))) && (item.id || item.code) && (!['campaigns', 'warehouses', 'items'].includes(key) || item.status === 'ACTIVE'))
           .map((item) => ({
             value: item.id!,
             label: key === 'requests'
@@ -276,7 +272,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           ? '/donation-disputes'
           : routes[page];
   const params = new URLSearchParams();
-  params.set('limit', String(page === 'stock' || page === 'reports' ? pageSize : LIST_PAGE_SIZE));
+  params.set('limit', String(LIST_PAGE_SIZE));
   if ((page === 'stock' || (page === 'reports' && report === 'stock-summary')) && warehouse)
     params.set('warehouse_id', warehouse);
   if (cursor) params.set('cursor', cursor);
@@ -341,9 +337,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           : ''
         : (page === 'distribution' || page === 'handoff') && selected.id
           ? `/distributions/${selected.id}`
-          : page === 'assets' && asset === 'relief-points' && selected.id
-            ? `/relief-points/${selected.id}`
-            : '';
+          : '';
     if (!detailPath) {
       setDetail(selected);
       return;
@@ -390,7 +384,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
     )) ||
     (status === 'DISPATCHED' && (
       detail.dispatch_actor_user_id === user.id ||
-      (Array.isArray(detail.lines) && (detail.lines as Row[]).every((line) => Number(line.in_transit) === 0 && Number(line.at_point) === 0 && Number(line.pending_loss_count) === 0) &&
+      (Array.isArray(detail.lines) && (detail.lines as Row[]).every((line) => Number(line.in_transit) === 0 && Number(line.pending_loss_count) === 0) &&
         (rights.has('REVIEWER') || rights.has('OPERATIONS_MANAGER'))) ||
       (page === 'distribution' && detail.dispatch_actor_user_id !== user.id && Array.isArray(detail.lines) &&
         rights.has('OPERATIONS_MANAGER'))
@@ -437,11 +431,10 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   const canCreatePage =
     (page === 'drives' && (rights.has('COORDINATOR') || rights.has('OPERATIONS_MANAGER'))) ||
     (page === 'needs' && (rights.has('OPERATIONS_MANAGER') || rights.has('COORDINATOR'))) ||
-    (page === 'assets' && rights.has('OPERATIONS_MANAGER')) ||
     (page === 'distribution' &&
       rights.has('OPERATIONS_MANAGER'));
   const createTitle = page === 'drives' ? 'Tạo đợt thủ công' : page === 'needs' ? 'Ghi nhận nhu cầu' :
-    page === 'assets' ? asset === 'vehicles' ? 'Thêm phương tiện' : asset === 'warehouses' ? 'Thêm kho' : 'Thêm điểm cứu trợ' :
+    page === 'assets' ? 'Thêm kho' :
     'Tạo phiếu phân phối';
   useEffect(() => { setShowCreate(false); }, [page, asset]);
   return (
@@ -454,29 +447,10 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             {canCreatePage && <button type="button" className="button primary list-create-button" onClick={() => { setSelected(null); setDetail(null); setShowCreate(true); }}>{createTitle}</button>}
           </div>
         </div>
-        {page === 'assets' && (
-          <div className="tabs">
-            {(
-              [
-                ['warehouses', 'Kho'],
-                ['relief-points', 'Điểm cứu trợ'],
-                ['vehicles', 'Phương tiện'],
-              ] as const
-            ).map(([value, title]) => (
-              <button
-                key={value}
-                className={asset === value ? 'active' : ''}
-                onClick={() => {
-                  setAsset(value);
-                  setCursor('');
-                  setSelected(null);
-                }}
-              >
-                {title}
-              </button>
-            ))}
-          </div>
-        )}
+        {page === 'assets' && asset === 'warehouses' && <WarehouseMapManager
+          canManage={rights.has('OPERATIONS_MANAGER')} canManageDrives={rights.has('OPERATIONS_MANAGER') || rights.has('COORDINATOR')}
+          warehouseOptions={warehouseOptions} campaigns={references.campaigns || []} items={references.items || []} itemScales={references.itemScales || []}
+          refreshKey={revision} onCreateWarehouse={() => { setSelected(null); setDetail(null); setShowCreate(true); }} onChanged={() => setRevision((value) => value + 1)} />}
         {page === 'review' && (
           <div className="tabs">
             <button
@@ -570,17 +544,6 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             {warehouseOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
           </Dropdown>
         </label>}
-        {(page === 'stock' || page === 'reports') && <label className="filter">
-          Số dòng mỗi lần tải
-          <Dropdown value={pageSize} onChange={event => {
-            setPageSize(Number(event.target.value));
-            setCursor('');
-            setSelected(null);
-            setDetail(null);
-          }}>
-            {[10, 25, 50].map(size => <option key={size} value={size}>{size} dòng</option>)}
-          </Dropdown>
-        </label>}
         {!ready && <p>Chọn kho hoặc chiến dịch để tải báo cáo theo phạm vi được cấp quyền.</p>}
         {loading && <p role="status">Đang tải dữ liệu…</p>}
         {error && (
@@ -646,10 +609,10 @@ export function Operations({ page, user }: { page: string; user: Me }) {
               </table>
             </div>
           </>
-        ) : (
+        ) : page === 'assets' ? null : (
           <div className="operations-table-scroll" role="region" aria-label={`Bảng ${headings[page] || 'bản ghi'}`} tabIndex={0}>
             <table className={`operations-record-table${page === 'drives' ? ' operations-record-table--drives' : ''}`}>
-              <thead><tr><th scope="col">{page === 'assets' ? asset === 'vehicles' ? 'Phương tiện' : asset === 'warehouses' ? 'Kho' : 'Điểm cứu trợ' : 'Tên bản ghi'}</th>{page !== 'assets' && page !== 'drives' && <th scope="col">Thông tin chính</th>}<th scope="col">Thời gian</th><th scope="col">Trạng thái</th></tr></thead>
+              <thead><tr><th scope="col">{page === 'assets' ? 'Kho' : 'Tên bản ghi'}</th>{page !== 'assets' && page !== 'drives' && <th scope="col">Thông tin chính</th>}<th scope="col">Thời gian</th><th scope="col">Trạng thái</th></tr></thead>
               <tbody>{items.map((item) => <tr key={operationRecordKey(item)}>
                 <th scope="row">{page === 'assets' && asset === 'warehouses' && item.id
                   ? <a className="table-row-link" href={`?workspace=operations&page=assets&view=warehouses&warehouse_id=${encodeURIComponent(item.id)}&warehouse_name=${encodeURIComponent(recordTitle(page, item))}`} aria-label={`Xem tồn kho ${recordTitle(page, item)}`}>{recordTitle(page, item)}</a>
@@ -667,7 +630,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             </table>
           </div>
         )}
-        <ListNav page={pageIndex} hasNext={Boolean(next)} loading={loading} onPrev={prevPage} onNext={() => next && setCursor(next)} count={items.length} />
+        {page !== 'assets' && <ListNav page={pageIndex} hasNext={Boolean(next)} loading={loading} onPrev={prevPage} onNext={() => next && setCursor(next)} count={items.length} />}
       </section>
       {page === 'distribution' && commitmentsError && <p role="alert" className="notice error">{commitmentsError} Hãy tải lại trước khi lập phiếu hỗ trợ SOS.</p>}
       {(selected || showCreate) && <DetailSurface key={selected?.id || 'create'} className={`operations-detail-transition operations-management-dialog ${page === 'drives' && selected ? 'drive-detail-dialog' : ''} ${distributionPages.has(page) && !showCreate ? 'distribution-detail-panel' : ''}`} heading={selected ? recordTitle(page, selected) : createTitle} modal open={Boolean(selected) || showCreate} onClose={() => { setSelected(null); setDetail(null); setShowCreate(false); }} label={selected ? `Chi tiết ${recordTitle(page, selected)}` : createTitle}>
@@ -694,14 +657,10 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 <p><strong>Thời gian dự kiến</strong><span className="detail-value">Mở: {detail.opens_at ? timeLabel(detail.opens_at) : 'Chưa đặt'} · Đóng: {detail.closes_at ? timeLabel(detail.closes_at) : 'Chưa đặt'}</span></p>
               </>}
               {page === 'assets' && <>
-                {asset !== 'vehicles' && <p><strong>{asset === 'warehouses' ? 'Tên kho' : 'Tên điểm cứu trợ'}</strong><span className="detail-value">{string(detail.name) || 'Chưa có tên'}</span></p>}
+                {<p><strong>Tên kho</strong><span className="detail-value">{string(detail.name) || 'Chưa có tên'}</span></p>}
                 {asset === 'warehouses' && <p><strong>Bán kính phục vụ</strong><span className="detail-value">{detail.service_radius_m == null ? 'Chưa khai báo' : `${Number(detail.service_radius_m).toLocaleString('vi-VN')} m`}</span></p>}
-                {asset === 'vehicles' && <>
-                  <p><strong>Loại phương tiện</strong><span className="detail-value">{string(detail.vehicle_type) || 'Chưa có thông tin'}</span></p>
-                  <p><strong>Sức chứa</strong><span className="detail-value">{detail.capacity == null ? 'Chưa khai báo' : `${quantity(detail.capacity)} ${label(detail.capacity_unit)}`}</span></p>
-                </>}
                 {['address_note', 'contact_note', 'operating_note'].map(field => string(detail[field]) && <p key={field}><strong>{{ address_note: 'Ghi chú địa chỉ', contact_note: 'Thông tin liên hệ', operating_note: 'Hướng dẫn hoạt động' }[field]}</strong><span className="detail-value">{string(detail[field])}</span></p>)}
-                {asset !== 'vehicles' && <p><strong>Vị trí</strong><span className="detail-value">{(() => {
+                {<p><strong>Vị trí</strong><span className="detail-value">{(() => {
                   const coordinates = (detail.location as { coordinates?: unknown[] } | null)?.coordinates;
                   return coordinates?.length === 2 && coordinates.every(value => typeof value === 'number' && Number.isFinite(value))
                     ? `Vĩ độ ${coordinates[1]} · Kinh độ ${coordinates[0]}` : 'Chưa khai báo vị trí';
@@ -746,14 +705,6 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 <p><strong>Còn thiếu hiện hành</strong><span className="detail-value">{quantityWithUnit(detail, detail.active_outstanding)}</span></p>
                 {detail.status === 'CANCELLED' && <p className="notice">Nhu cầu đã hủy không còn được tính vào lượng cần đáp ứng hiện hành. Số đã giao vẫn được giữ lại để đối chiếu lịch sử.</p>}
               </>}
-              {page === 'assets' && asset === 'vehicles' && Boolean(detail.identifier) && (
-                <p>
-                  <strong>Biển số hoặc mã xe</strong>
-                  <span className="detail-value">
-                    {string(detail.identifier)}
-                  </span>
-                </p>
-              )}
               {distributionPages.has(page) && status === 'DISPATCHED' && <p className="notice">Phiếu tự đối soát khi hết hàng đang vận chuyển, hàng tại điểm và không còn thất thoát chờ duyệt.</p>}
               {page === 'needs' && <><p><strong>Yêu cầu SOS</strong><span className="detail-value">{references.requests?.find((item) => item.value === detail.request_id)?.label || string(detail.request_id)}</span></p><p><strong>Nhu cầu</strong><span className="detail-value">{quantityWithUnit(detail, detail.requested)} · Đã giao {quantityWithUnit(detail, detail.delivered)}</span></p><p><strong>Nguồn nhu cầu</strong><span className="detail-value"><NeedSourceBadge source={detail.source} /></span></p><NeedReasonChips codes={detail.reason_codes} all /></>}
               {distributionPages.has(page) && Boolean(detail.purpose) && (
@@ -909,8 +860,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                     <strong>{string(line.item_name) || string(line.item_id) || 'Vật phẩm'}</strong>
                     <p>
                       Số lượng: {lineQuantity(line, line.quantity)} · Đã giao: {lineQuantity(line, line.handed_out)} ·
-                      Đang vận chuyển: {lineQuantity(line, line.in_transit)} · Tại điểm:{' '}
-                      {lineQuantity(line, line.at_point)} · Đã hoàn: {lineQuantity(line, line.returned)} · Hao hụt đã duyệt: {lineQuantity(line, line.lost)}
+                      Đang vận chuyển: {lineQuantity(line, line.in_transit)} · Đã hoàn: {lineQuantity(line, line.returned)} · Hao hụt đã duyệt: {lineQuantity(line, line.lost)}
                       {Number(line.pending_loss_count) > 0 && ' · Có thất thoát chờ duyệt'}
                     </p>
                   </div>
@@ -934,7 +884,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             {page === 'reports' && report === 'reconciliation' && <section className="reconciliation-section"><h3>Đối soát {string((detail.item as Row)?.name)}</h3>
               <div className="operations-table-scroll" role="region" aria-label="Bảng đối soát vật phẩm" tabIndex={0}>
                 <table className="reconciliation-table"><thead><tr><th scope="col">Chỉ tiêu</th><th scope="col">Số lượng ({string((detail.unit as Row)?.display_name)})</th></tr></thead><tbody>
-                  {Object.entries({ intake_accepted: 'Đã tiếp nhận', posted_movements: 'Tồn theo sổ', posted_reserved_movements: 'Giữ chỗ theo sổ', reserved: 'Đang giữ chỗ', issued_in_transit: 'Đang vận chuyển', at_point: 'Tại điểm cứu trợ', delivered: 'Đã giao', returned: 'Đã hoàn trả', lost: 'Hao hụt' }).map(([key, title]) => <tr key={key}><th scope="row">{title}</th><td>{quantity(detail[key])}</td></tr>)}
+                  {Object.entries({ intake_accepted: 'Đã tiếp nhận', posted_movements: 'Tồn theo sổ', posted_reserved_movements: 'Giữ chỗ theo sổ', reserved: 'Đang giữ chỗ', issued_in_transit: 'Đang vận chuyển', delivered: 'Đã giao', returned: 'Đã hoàn trả', lost: 'Hao hụt' }).map(([key, title]) => <tr key={key}><th scope="row">{title}</th><td>{quantity(detail[key])}</td></tr>)}
                 </tbody></table>
               </div><p className="reconciliation-result">{Object.values((detail.flags as Row) || {}).some(Boolean) ? 'Có chênh lệch cần rà soát giữa sổ kho và các cam kết.' : 'Chưa ghi nhận chênh lệch đối soát.'}</p>
             </section>}
@@ -1291,7 +1241,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                       version,
                       warning: 'Xác nhận hủy phiếu phân phối trước khi xuất kho?',
                     })}
-                  {status === 'DISPATCHED' && Array.isArray(detail.lines) && (detail.lines as Row[]).every((line) => Number(line.in_transit) === 0 && Number(line.at_point) === 0 && Number(line.pending_loss_count) === 0) &&
+                  {status === 'DISPATCHED' && Array.isArray(detail.lines) && (detail.lines as Row[]).every((line) => Number(line.in_transit) === 0 && Number(line.pending_loss_count) === 0) &&
                     (rights.has('REVIEWER') || rights.has('OPERATIONS_MANAGER')) &&
                     command({
                       title: 'Đối soát phiếu',
@@ -1318,19 +1268,11 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                       label: 'Loại bàn giao',
                       type: 'select',
                       required: true,
-                      options: (detail.relief_point_id
-                        ? [
-                            ['POINT_RECEIPT', 'Điểm cứu trợ đã nhận'],
-                            ['HOUSEHOLD_HANDOUT', 'Đã giao cho hộ dân'],
-                            ['RETURN', 'Hoàn về kho'],
-                            ['LOSS', 'Ghi nhận thất thoát'],
-                          ]
-                        : [
-                            ['DIRECT_HOUSEHOLD', 'Giao trực tiếp cho hộ dân'],
-                            ['RETURN', 'Hoàn về kho'],
-                            ['LOSS', 'Ghi nhận thất thoát'],
-                          ]
-                      ).map(([value, title]) => ({ value, label: title })),
+                      options: [
+                        ['DIRECT_HOUSEHOLD', 'Giao trực tiếp cho hộ dân'],
+                        ['RETURN', 'Hoàn về kho'],
+                        ['LOSS', 'Ghi nhận thất thoát'],
+                      ].map(([value, title]) => ({ value, label: title })),
                     },
                     {
                       name: 'distribution_line_id',
@@ -1344,7 +1286,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                     },
                     { name: 'quantity', label: 'Số lượng thực tế', type: 'number', required: true,
                       scaleFor: (values) => Number(((detail.lines as Row[]).find((line) => line.id === values.distribution_line_id)?.unit as Row)?.scale ?? 3),
-                      maxFor: (values) => { const line = (detail.lines as Row[]).find((line) => line.id === values.distribution_line_id); return line ? Number(values.handoff_kind === 'HOUSEHOLD_HANDOUT' || (['RETURN', 'LOSS'].includes(values.handoff_kind) && values.source_stage === 'AT_POINT') ? line.at_point : line.in_transit) : undefined; },
+                      maxFor: (values) => { const line = (detail.lines as Row[]).find((line) => line.id === values.distribution_line_id); return line ? Number(line.in_transit) : undefined; },
                     },
                     {
                       name: 'source_stage',
@@ -1352,7 +1294,6 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                       type: 'select', required: true, visibleFor: (values) => ['RETURN', 'LOSS'].includes(values.handoff_kind),
                       options: [
                         ['IN_TRANSIT', 'Đang vận chuyển'],
-                        ...(detail.relief_point_id ? [['AT_POINT', 'Tại điểm cứu trợ']] : []),
                       ].map(([value, title]) => ({ value, label: title })),
                     },
                     {
@@ -1360,7 +1301,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                       label: 'Người hoặc đơn vị nhận', visibleFor: (values) => values.handoff_kind !== 'LOSS',
                       requiredWhen: {
                         field: 'handoff_kind',
-                        values: ['DIRECT_HOUSEHOLD', 'POINT_RECEIPT', 'HOUSEHOLD_HANDOUT', 'RETURN'],
+                        values: ['DIRECT_HOUSEHOLD', 'RETURN'],
                       },
                     },
                     { name: 'confirmation_basis', label: 'Căn cứ xác nhận', required: true },
@@ -1401,7 +1342,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
         {!selected &&
           page === 'drives' &&
           (rights.has('COORDINATOR') || rights.has('OPERATIONS_MANAGER')) &&
-          <DriveCreateForm warehouses={warehouseOptions} campaigns={references.campaigns || []} items={references.items || []} itemScales={references.itemScales || []} onSuccess={done} />}
+          <p className="notice">Đợt quyên góp được tạo và chỉnh sửa trên bản đồ tại <a href="?workspace=operations&page=assets">Kho và đợt quyên góp</a>, nơi chọn vị trí điểm quyên góp trong vùng phục vụ của kho.</p>}
         {!selected &&
           page === 'needs' &&
           (rights.has('OPERATIONS_MANAGER') || rights.has('COORDINATOR')) &&
@@ -1411,42 +1352,18 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           rights.has('OPERATIONS_MANAGER') &&
           command({
             hideTitle: true,
-            title:
-              asset === 'vehicles'
-                ? 'Thêm phương tiện'
-                : asset === 'warehouses'
-                  ? 'Thêm kho'
-                  : 'Thêm điểm cứu trợ',
+            title: 'Thêm kho',
             service: 'logistics',
-            path: `/${asset}`,
+            path: '/warehouses',
             fields:
-              asset === 'vehicles'
-                ? [
-                    { name: 'identifier', label: 'Biển số hoặc mã xe', required: true, maxLength: 100 },
-                    { name: 'vehicle_type', label: 'Loại phương tiện', required: true, maxLength: 80 },
-                  ]
-                : asset === 'warehouses'
-                  ? [
+                  [
                       { name: 'name', label: 'Tên kho', required: true, maxLength: 200 },
                       { name: 'location', label: 'Vị trí kho và vùng phục vụ', type: 'service-area', radiusFieldName: 'service_radius_m', addressFieldName: 'address_note', radiusRange: { min: 500, max: 200_000 } },
                       { name: 'address_note', label: 'Địa chỉ', maxLength: 500, visibleFor: (values) => Boolean(values.location), hintFor: () => 'Có thể chỉnh lại địa chỉ gần đúng sau khi chọn điểm.' },
                       { name: 'service_radius_m', label: 'Bán kính phục vụ (mét)', type: 'number', integer: true, min: 500, max: 200_000, visibleFor: (values) => Boolean(values.location) },
-                    ]
-                  : [
-                      { name: 'name', label: 'Tên điểm cứu trợ', required: true, maxLength: 200 },
-                      { name: 'location', label: 'Địa chỉ hoặc vị trí trên bản đồ', type: 'location', required: true },
                     ],
             build:
-              asset === 'relief-points'
-                ? (values) => ({
-                    name: values.name,
-                    location: {
-                      type: 'Point',
-                      coordinates: values.location.split(',').map(Number),
-                    },
-                  })
-                : asset === 'warehouses'
-                  ? (values) => ({
+                  (values) => ({
                       name: values.name,
                       ...(values.address_note?.trim() ? { address_note: values.address_note.trim() } : {}),
                       // Location and radius are sent together or not at all (the form enforces the pair).
@@ -1456,8 +1373,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                             service_radius_m: Number(values.service_radius_m),
                           }
                         : {}),
-                    })
-                  : undefined,
+                    }),
           })}
         {!selected &&
           page === 'distribution' &&
@@ -1477,7 +1393,6 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 options: [
                   ['REQUEST_AID', 'Hỗ trợ yêu cầu SOS'],
                   ['CAMPAIGN_DISTRIBUTION', 'Phân phối theo chiến dịch'],
-                  ['POINT_REPLENISHMENT', 'Bổ sung tại điểm cứu trợ'],
                 ].map(([value, title]) => ({ value, label: title })),
               },
               { name: 'quantity', label: 'Số lượng', type: 'number', required: true, scaleFor: (values) => { const chosen = commitments.find((item) => item.id === values.commitment_id); const scale = references.itemScales?.find(item => item.value === values.item_id); return chosen ? Number(chosen.unit_scale) : scale ? Number(scale.label) : undefined; }, maxFor: (values) => values.purpose === 'REQUEST_AID' && values.commitment_id ? (commitments.some((item) => item.id === values.commitment_id) ? Number(commitments.find((item) => item.id === values.commitment_id)!.reserved_remaining) : undefined) : undefined },
@@ -1488,15 +1403,11 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                   .map((item) => ({ value: item.id!, label: string(item.item_name) + ' · còn ' + quantity(item.reserved_remaining) + ' ' + string(item.unit_name) + ' · ' + string(item.warehouse_name) + ' · SOS …' + string(item.request_id).slice(-8) })),
               },
               { ...referenceField('campaign_id', 'Chiến dịch', 'campaigns', true), visibleWhen: { field: 'purpose', value: 'CAMPAIGN_DISTRIBUTION' } },
-              { ...referenceField('relief_point_id', 'Điểm cứu trợ', 'reliefPoints', true), visibleWhen: { field: 'purpose', value: 'POINT_REPLENISHMENT' } },
-              referenceField('vehicle_id', 'Phương tiện (nếu có)', 'vehicles'),
             ],
             build: (values) => ({
               warehouse_id: values.warehouse_id,
               purpose: values.purpose,
               ...(values.purpose === 'CAMPAIGN_DISTRIBUTION' && values.campaign_id ? { campaign_id: values.campaign_id } : {}),
-              ...(values.purpose === 'POINT_REPLENISHMENT' && values.relief_point_id ? { relief_point_id: values.relief_point_id } : {}),
-              ...(values.vehicle_id ? { vehicle_id: values.vehicle_id } : {}),
               lines: [
                 {
                   item_id: values.item_id,

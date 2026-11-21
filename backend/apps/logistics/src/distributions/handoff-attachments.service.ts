@@ -18,7 +18,7 @@ const attachmentBytesLimit = 100 * 1024 * 1024;
 interface HandoffAttachmentOwner {
   handoff_id: string;
   distribution_id: string;
-  handoff_kind: 'DIRECT_HOUSEHOLD' | 'POINT_RECEIPT' | 'HOUSEHOLD_HANDOUT' | 'RETURN' | 'LOSS';
+  handoff_kind: 'DIRECT_HOUSEHOLD' | 'RETURN' | 'LOSS';
   campaign_id: string | null;
 }
 

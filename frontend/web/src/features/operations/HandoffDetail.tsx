@@ -10,7 +10,7 @@ type Handoff = {
   review?: { decision: string; reason: string } | null;
   lines: { distribution_line_id: string; quantity: string; unit_code: string }[];
 };
-const kinds: Record<string, string> = { LOSS: 'Báo cáo thất thoát', RETURN: 'Hoàn về kho', POINT_RECEIPT: 'Điểm cứu trợ nhận hàng', HOUSEHOLD_HANDOUT: 'Giao cho hộ dân tại điểm', DIRECT_HOUSEHOLD: 'Giao trực tiếp cho hộ dân' };
+const kinds: Record<string, string> = { LOSS: 'Báo cáo thất thoát', RETURN: 'Hoàn về kho', DIRECT_HOUSEHOLD: 'Giao trực tiếp cho hộ dân' };
 const statuses: Record<string, string> = { PENDING_LOSS: 'Chờ duyệt thất thoát', APPROVED: 'Đã duyệt thất thoát', REJECTED: 'Đã từ chối thất thoát', RECORDED: 'Đã ghi nhận' };
 export function HandoffDetail({ distributionId, initialId, canReview, userId, onChanged }: {
   distributionId: string; initialId?: string; canReview: boolean; userId: string; onChanged: () => void;

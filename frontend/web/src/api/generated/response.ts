@@ -1817,6 +1817,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/internal/missions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * MissionsController.internal
+         * @description Route exported from backend/apps/response/src/missions/missions.controller.ts#MissionsController.internal. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.
+         */
+        get: operations["responseMissionsInternal"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/internal/requests/supply-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * SupplyCandidatesController.list
+         * @description Route exported from backend/apps/response/src/supply-candidates/supply-candidates.controller.ts#SupplyCandidatesController.list. Detailed request, response, and error contract: docs/backend/03-response-api.md. This export does not infer payload schemas.
+         */
+        get: operations["responseSupplyCandidatesList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1853,6 +1893,7 @@ export interface components {
             needs_rescue: boolean;
             /** @default false */
             needs_relief_supplies: boolean;
+            relief_items_text?: string | null;
         };
         CreateProxyRequest: {
             incident_category_code: string;
@@ -1883,6 +1924,7 @@ export interface components {
             needs_rescue: boolean;
             /** @default false */
             needs_relief_supplies: boolean;
+            relief_items_text?: string | null;
         };
         CreatedSelfRequest: {
             /** Format: uuid */
@@ -6298,6 +6340,10 @@ export interface operations {
                         /** @enum {string} */
                         status?: "VERIFIED" | "TRIAGED" | "DISPATCHED" | "IN_PROGRESS";
                         campaign_id?: string | null;
+                        people_affected?: number | null;
+                        children_count?: number | null;
+                        elderly_count?: number | null;
+                        needs_relief_supplies?: boolean;
                     };
                 };
             };
@@ -9169,6 +9215,110 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    responseMissionsInternal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success response; see docs/backend/03-response-api.md for the documented response shape. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    responseSupplyCandidatesList: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Documented response shape. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            /** Format: uuid */
+                            request_id: string;
+                            work_cycle: number;
+                            campaign_id: string | null;
+                            /** @enum {string} */
+                            status: "VERIFIED" | "TRIAGED" | "DISPATCHED" | "IN_PROGRESS";
+                            people_affected: number | null;
+                            children_count: number | null;
+                            elderly_count: number | null;
+                            relief_items_text: string | null;
+                            verified_at: string | null;
+                        }[];
+                        more: boolean;
+                        cursor?: string;
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
             };
             /** @description Documented error response; clients branch on the stable code. */
             401: {

@@ -14,6 +14,9 @@ import { GrantCampaignWarehouseAccess1795824000000 } from './migrations/GrantCam
 import { AddNeedExtractionLog1795910400000 } from './migrations/AddNeedExtractionLog1795910400000';
 import { RepairLegacyNeedEstimateSchema1795996800000 } from './migrations/RepairLegacyNeedEstimateSchema1795996800000';
 import { AllowUnusedItemDeletion1796083200000 } from './migrations/AllowUnusedItemDeletion1796083200000';
+import { RemoveVehicles1796169600000 } from './migrations/RemoveVehicles1796169600000';
+import { RemoveReliefPoints1796256000000 } from './migrations/RemoveReliefPoints1796256000000';
+import { AddDonationDriveLocation1796342400000 } from './migrations/AddDonationDriveLocation1796342400000';
 
 export default new DataSource(postgresOptions([
   InitialLogistics1710000000000,
@@ -29,4 +32,7 @@ export default new DataSource(postgresOptions([
   AddNeedExtractionLog1795910400000,
   RepairLegacyNeedEstimateSchema1795996800000,
   AllowUnusedItemDeletion1796083200000,
+  RemoveVehicles1796169600000,
+  RemoveReliefPoints1796256000000,
+  AddDonationDriveLocation1796342400000,
 ], 'logistics'));

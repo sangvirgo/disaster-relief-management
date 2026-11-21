@@ -1,3 +1,6 @@
+// STALE after relief point removal (migration RemoveReliefPoints1796256000000): this smoke test still creates relief points,
+// POINT_REPLENISHMENT distributions and POINT_RECEIPT/HOUSEHOLD_HANDOUT handoffs. It must be rewritten around DIRECT_HOUSEHOLD
+// and campaign distributions before it is run again; it was not run or updated as part of the removal.
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
@@ -192,11 +195,10 @@ async function verifyRequest(request, coordinator) {
   assert.equal(verified.status, 200, JSON.stringify(verified.value));
 }
 
-async function createDistribution(actor, warehouseId, itemId, quantity, reliefPointId = null, commitmentId = null, vehicleId = null) {
+async function createDistribution(actor, warehouseId, itemId, quantity, reliefPointId = null, commitmentId = null) {
   const body = {
     warehouse_id: warehouseId,
     ...(reliefPointId ? { relief_point_id: reliefPointId } : {}),
-    ...(vehicleId ? { vehicle_id: vehicleId } : {}),
     purpose: commitmentId ? 'REQUEST_AID' : 'POINT_REPLENISHMENT',
     lines: [{ item_id: itemId, quantity, ...(commitmentId ? { commitment_id: commitmentId } : {}) }],
   };
@@ -251,13 +253,6 @@ try {
     name: `Kho phân phối T15 ${suffix}`,
   });
   expectSuccess(warehouse, 201);
-  const lowCapacityVehicle = await command(logisticsUrl, 'vehicles', staff, {
-    identifier: `T15-${suffix}`,
-    vehicle_type: 'Xe tải kiểm thử',
-    capacity: '1.00',
-    capacity_unit: unit.value.code,
-  });
-  expectSuccess(lowCapacityVehicle, 201);
   const opening = await command(logisticsUrl, 'stock/opening', staff, {
     warehouse_id: warehouse.value.id,
     lines: [{ item_id: item.value.id, quantity: '25.00' }],
@@ -304,22 +299,16 @@ try {
   expectSuccess(commitmentResult, 201);
   const commitmentId = commitmentResult.value.id;
 
-  const underCapacity = await createDistribution(
-    staff, warehouse.value.id, item.value.id, '1.00', null, commitmentId, lowCapacityVehicle.value.id,
-  );
-  assert.equal((await distributionDetail(underCapacity.id, staff)).vehicle_capacity_exceeded, false);
+  const underCapacity = await createDistribution(staff, warehouse.value.id, item.value.id, '1.00', null, commitmentId);
   expectSuccess(await command(logisticsUrl, `distributions/${underCapacity.id}/cancel`, staff, { expected_version: 1 }));
 
   const frozenCandidate = await createDistribution(staff, warehouse.value.id, item.value.id, '5.00', null, commitmentId);
   const frozenCandidateApproval = await command(logisticsUrl, `distributions/${frozenCandidate.id}/approve`, approver, { expected_version: 1 });
   expectSuccess(frozenCandidateApproval);
 
-  const requestAid = await createDistribution(
-    staff, warehouse.value.id, item.value.id, '1.00', null, commitmentId, lowCapacityVehicle.value.id,
-  );
+  const requestAid = await createDistribution(staff, warehouse.value.id, item.value.id, '1.00', null, commitmentId);
   const prepared = await command(logisticsUrl, `distributions/${requestAid.id}/prepare-from-commitments`, staff, { expected_version: 1 });
   expectSuccess(prepared);
-  assert.equal(prepared.value.vehicle_capacity_exceeded, true, 'capacity is reported as a warning during preparation');
   assert.equal(prepared.value.lines.length, 1);
   assert.equal(Number(prepared.value.lines[0].quantity), 10);
   const reducedPreparation = await command(logisticsUrl, `distributions/${requestAid.id}/lines`, staff, {
@@ -329,13 +318,12 @@ try {
   expectSuccess(reducedPreparation);
   assert.equal(Number(reducedPreparation.value.lines[0].quantity), 5);
   const issued = await approveAndDispatch(reducedPreparation.value, approver, dispatcher, 3);
-  assert.equal(issued.vehicle_capacity_exceeded, true, 'capacity is reported as a warning after dispatch');
   const requestAidLineId = issued.lines[0].id;
   const overCapacityStock = await logisticsDb.query(
     'SELECT on_hand::text,reserved::text FROM stock_balance WHERE warehouse_id=$1 AND item_id=$2',
     [warehouse.value.id, item.value.id],
   );
-  assert.deepEqual(overCapacityStock.rows, [{ on_hand: '20.000', reserved: '5.000' }], 'over-capacity dispatch still issues the reserved stock');
+  assert.deepEqual(overCapacityStock.rows, [{ on_hand: '20.000', reserved: '5.000' }], 'dispatch issues the reserved stock');
   const directHandoffBody = {
     handoff_kind: 'DIRECT_HOUSEHOLD',
     receiver_label: 'Hộ dân kiểm thử T15',

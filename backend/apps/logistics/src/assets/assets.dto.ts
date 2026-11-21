@@ -3,8 +3,6 @@ import {
   ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt, IsNumber, IsObject, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateNested,
 } from 'class-validator';
 
-const decimalQuantity = /^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/u;
-
 export const WAREHOUSE_SERVICE_RADIUS_MIN_M = 1;
 export const WAREHOUSE_SERVICE_RADIUS_MAX_M = 200_000;
 
@@ -64,68 +62,6 @@ export class PatchWarehouseDto {
 
   @IsOptional() @IsInt() @Min(WAREHOUSE_SERVICE_RADIUS_MIN_M) @Max(WAREHOUSE_SERVICE_RADIUS_MAX_M)
   declare service_radius_m?: number | null;
-}
-
-export class CreateReliefPointDto extends AssetCreateDto {
-  @IsString() @MaxLength(200) @Matches(/\S/u)
-  name!: string;
-
-  @IsOptional() @IsString() @MaxLength(1_000)
-  declare contact_note?: string | null;
-
-  @IsOptional() @IsString() @MaxLength(1_000)
-  declare operating_note?: string | null;
-
-  @IsObject() @ValidateNested() @Type(() => AssetPointDto)
-  location!: AssetPointDto;
-}
-
-export class PatchReliefPointDto {
-  @Type(() => Number) @IsInt() @Min(1)
-  expected_version!: number;
-
-  @IsOptional() @IsString() @MaxLength(200) @Matches(/\S/u)
-  declare name?: string;
-
-  @IsOptional() @IsString() @MaxLength(1_000)
-  declare contact_note?: string | null;
-
-  @IsOptional() @IsString() @MaxLength(1_000)
-  declare operating_note?: string | null;
-
-  @IsOptional() @IsObject() @ValidateNested() @Type(() => AssetPointDto)
-  declare location?: AssetPointDto;
-}
-
-export class CreateVehicleDto extends AssetCreateDto {
-  @IsString() @MaxLength(100) @Matches(/\S/u)
-  identifier!: string;
-
-  @IsString() @MaxLength(80) @Matches(/\S/u)
-  vehicle_type!: string;
-
-  @IsOptional() @IsString() @Matches(decimalQuantity)
-  declare capacity?: string | null;
-
-  @IsOptional() @IsString() @Matches(/^[A-Z0-9_]{1,20}$/u)
-  declare capacity_unit?: string | null;
-}
-
-export class PatchVehicleDto {
-  @Type(() => Number) @IsInt() @Min(1)
-  expected_version!: number;
-
-  @IsOptional() @IsString() @MaxLength(100) @Matches(/\S/u)
-  declare identifier?: string;
-
-  @IsOptional() @IsString() @MaxLength(80) @Matches(/\S/u)
-  declare vehicle_type?: string;
-
-  @IsOptional() @IsString() @Matches(decimalQuantity)
-  declare capacity?: string | null;
-
-  @IsOptional() @IsString() @Matches(/^[A-Z0-9_]{1,20}$/u)
-  declare capacity_unit?: string | null;
 }
 
 export class DeactivateAssetDto {

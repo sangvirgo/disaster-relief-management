@@ -6,26 +6,24 @@ import { readDistributionHandoffLines } from '../src/distributions/handoff-settl
 const distributionId = '11111111-1111-4111-8111-111111111111';
 const lineId = '22222222-2222-4222-8222-222222222222';
 
-describe('distribution delivery target queries', () => {
-  it('derives distribution line targets from designated_point_id', async () => {
+describe('distribution line queries', () => {
+  it('reads distribution line custody without any relief point columns', async () => {
     const query = jest.fn().mockResolvedValue([]);
 
     await readDistributionLines({ query } as unknown as DataSource, [distributionId]);
 
-    expect(query.mock.calls[0]?.[0]).toContain(
-      "CASE WHEN n.designated_point_id IS NULL THEN 'FINAL_RECIPIENT' ELSE 'RELIEF_POINT' END AS delivery_target_kind",
-    );
-    expect(query.mock.calls[0]?.[0]).not.toContain('n.delivery_target_kind');
+    const sql = String(query.mock.calls[0]?.[0]);
+    expect(sql).toContain('dl.in_transit_quantity');
+    expect(sql).not.toMatch(/designated_point_id|at_point_quantity|POINT_RECEIPT/u);
   });
 
-  it('derives handoff line targets from designated_point_id', async () => {
-    const query = jest.fn().mockResolvedValue([{ id: lineId, delivery_target_kind: 'RELIEF_POINT' }]);
+  it('reads handoff line context without relief point columns', async () => {
+    const query = jest.fn().mockResolvedValue([{ id: lineId }]);
 
     await readDistributionHandoffLines({ query } as never, distributionId, [lineId]);
 
-    expect(query.mock.calls[0]?.[0]).toContain(
-      "CASE WHEN n.designated_point_id IS NULL THEN 'FINAL_RECIPIENT' ELSE 'RELIEF_POINT' END AS delivery_target_kind",
-    );
-    expect(query.mock.calls[0]?.[0]).not.toContain('n.delivery_target_kind');
+    const sql = String(query.mock.calls[0]?.[0]);
+    expect(sql).toContain('dl.in_transit_quantity');
+    expect(sql).not.toMatch(/designated_point_id|at_point_quantity/u);
   });
 });

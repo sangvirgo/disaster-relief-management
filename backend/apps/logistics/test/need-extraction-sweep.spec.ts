@@ -97,7 +97,7 @@ function fakeDatabase(state: FakeState) {
       return [{
         id: values[0], cycle_id: 'cycle', request_id: need?.cycleRequest ?? '', work_cycle: 1, campaign_id: null,
         item_id: basis.item_id, item_name: 'Item', unit_code: 'L', unit_name: 'Lít', unit_scale: 3,
-        original_quantity: '1.000', requested_quantity: '1.000', cancelled_remaining: null, designated_point_id: null,
+        original_quantity: '1.000', requested_quantity: '1.000', cancelled_remaining: null, 
         status: 'OPEN', source: 'ESTIMATED', estimate_basis: basis, version: 1, created_at: '2026-11-18T10:00:00.000Z',
         reference_estimate_quantity: null,
       }];

@@ -13,13 +13,6 @@ const distribution = {
   warehouse_id: 'warehouse-1',
 
   warehouse_status: 'ACTIVE',
-  relief_point_id: null,
-  relief_point_status: null,
-  vehicle_id: null,
-  vehicle_status: null,
-  vehicle_capacity: null,
-  vehicle_capacity_unit: null,
-  vehicle_capacity_scale: null,
   campaign_id: null,
   purpose: 'REQUEST_AID',
   status: 'DISPATCHED',

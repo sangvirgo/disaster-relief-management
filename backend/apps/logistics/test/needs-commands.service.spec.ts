@@ -33,7 +33,7 @@ const baseNeed = {
   original_quantity: '3',
   requested_quantity: '3',
   cancelled_remaining: null,
-  designated_point_id: null,
+  
   status: 'OPEN',
   source: 'DECLARED',
   estimate_basis: null,

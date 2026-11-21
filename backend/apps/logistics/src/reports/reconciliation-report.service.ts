@@ -22,7 +22,6 @@ interface ReconciliationRow {
   posted_reserved_movements: string;
   reserved: string;
   issued_in_transit: string;
-  at_point: string;
   delivered: string;
   returned: string;
   lost: string;
@@ -76,7 +75,6 @@ export class ReconciliationReportService {
               COALESCE(movements.posted_reserved_movements,0)::text AS posted_reserved_movements,
               b.reserved::text AS reserved,
               COALESCE(custody.issued_in_transit,0)::text AS issued_in_transit,
-              COALESCE(custody.at_point,0)::text AS at_point,
               (COALESCE(commitments.delivered,0)+COALESCE(physical_handoffs.delivered,0))::text AS delivered,
               (COALESCE(commitments.returned,0)+COALESCE(physical_handoffs.returned,0))::text AS returned,
               (COALESCE(commitments.lost,0)+COALESCE(physical_handoffs.lost,0))::text AS lost,
@@ -96,7 +94,7 @@ export class ReconciliationReportService {
              FROM stock_movement movement WHERE movement.balance_id=b.id
          ) movements ON TRUE
          LEFT JOIN LATERAL (
-           SELECT SUM(line.in_transit_quantity) AS issued_in_transit,SUM(line.at_point_quantity) AS at_point
+           SELECT SUM(line.in_transit_quantity) AS issued_in_transit
              FROM distribution_line line
             WHERE line.warehouse_id=b.warehouse_id AND line.item_id=b.item_id
          ) custody ON TRUE
@@ -137,7 +135,6 @@ export class ReconciliationReportService {
         posted_reserved_movements: row.posted_reserved_movements,
         reserved: row.reserved,
         issued_in_transit: row.issued_in_transit,
-        at_point: row.at_point,
         delivered: row.delivered,
         returned: row.returned,
         lost: row.lost,

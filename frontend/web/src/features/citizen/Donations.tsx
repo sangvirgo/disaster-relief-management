@@ -1,3 +1,4 @@
+import { DriveNearbyMap, type MapDrive } from '../../maps/DriveNearbyMap';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, newCommandKey, upload } from '../../api/client';
 import { useLoadMore } from '../../api/useCursorPages';
@@ -33,9 +34,11 @@ type Drive = {
   opens_at?: string | null;
   closes_at?: string | null;
   items: DriveItem[];
-  intake_location?: { warehouse_name?: string; address_note?: string | null };
+  intake_location?: { warehouse_name?: string; address_note?: string | null; location?: { coordinates?: [number, number] } | null };
+  distance_m?: number | null;
   generated_at?: string;
 };
+const distanceLabel = (meters: number) => meters < 1000 ? `${meters} m` : `${(meters / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} km`;
 type Declaration = { id: string; public_code: string; status: string };
 function driveUnavailable(drive: Drive): string {
   if (drive.status !== 'OPEN') return 'Đợt quyên góp hiện không nhận bản khai.';
@@ -107,8 +110,27 @@ export function Donations({ user }: { user: Me | null }) {
   }
   const [dialogOffset, setDialogOffset] = useState({ x: 0, y: 0 });
   const dragStart = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
-  const drivePages = useLoadMore<Drive>('logistics', '/public/donation-drives', 10);
+  const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null);
+  const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState('');
+  const drivePages = useLoadMore<Drive>('logistics', position
+    ? `/public/donation-drives?lat=${position.lat.toFixed(5)}&lng=${position.lng.toFixed(5)}` : '/public/donation-drives', 10);
   const drives = drivePages.items;
+  const nearest = position ? drives.find((drive) => typeof drive.distance_m === 'number' && !driveUnavailable(drive)) : undefined;
+  const mapDrives: MapDrive[] = drives.flatMap((drive) => {
+    const coordinates = drive.intake_location?.location?.coordinates;
+    return coordinates && coordinates.every((value) => Number.isFinite(value))
+      ? [{ id: drive.id, title: drive.title, warehouseName: drive.intake_location?.warehouse_name, lat: coordinates[1], lng: coordinates[0], distanceM: drive.distance_m, open: !driveUnavailable(drive) }] : [];
+  });
+  function locateMe() {
+    if (!navigator.geolocation) { setLocationError('Trình duyệt không hỗ trợ định vị. Vui lòng chọn đợt quyên góp trong danh sách.'); return; }
+    setLocating(true); setLocationError('');
+    navigator.geolocation.getCurrentPosition(
+      (result) => { setPosition({ lat: result.coords.latitude, lng: result.coords.longitude }); setLocating(false); },
+      () => { setLocating(false); setLocationError('Không lấy được vị trí. Hãy cho phép định vị hoặc chọn đợt quyên góp trong danh sách.'); },
+      { enableHighAccuracy: false, timeout: 10_000, maximumAge: 60_000 },
+    );
+  }
   const [selected, setSelected] = useState<Drive | null>(null);
   useModalScrollLock(Boolean(selected && showDeclaration));
   const [quantities, setQuantities] = useState<Record<string, string>>({});
@@ -890,6 +912,18 @@ export function Donations({ user }: { user: Me | null }) {
     <div className="donation-layout">
       <section className="card">
         <h2>Các đợt quyên góp</h2>
+        <div className="donation-nearest">
+          {position
+            ? <button type="button" className="button secondary" onClick={() => setPosition(null)}>Bỏ sắp xếp theo vị trí</button>
+            : <button type="button" className="button secondary" disabled={locating} onClick={locateMe}>{locating ? 'Đang lấy vị trí…' : 'Tìm đợt gần tôi'}</button>}
+          {locationError && <p className="notice warning" role="alert">{locationError}</p>}
+          {position && nearest && <p className="notice" role="status">
+            Đợt gần bạn nhất: <strong>{nearest.title}</strong> · {nearest.intake_location?.warehouse_name} · cách khoảng {distanceLabel(nearest.distance_m!)}.{' '}
+            <button type="button" className="button" onClick={() => choose(nearest.id, true)}>Khai báo cho đợt này</button>
+          </p>}
+          {mapDrives.length > 0 && <DriveNearbyMap drives={mapDrives} position={position} selectedId={selected?.id ?? null} onSelect={(id) => void choose(id)} />}
+          {position && !drivePages.loading && drives.length > 0 && !nearest && <p className="muted">Các kho nhận hàng chưa công khai vị trí nên chưa tính được khoảng cách. Vui lòng chọn đợt trong danh sách.</p>}
+        </div>
         {(loading || drivePages.loading) && <p role="status">Đang tải…</p>}
         {(error || drivePages.error) && (
           <p className="notice error" role="alert">
@@ -906,7 +940,7 @@ export function Donations({ user }: { user: Me | null }) {
                 <div>
                   <strong>{drive.title}</strong>
                   <p>{drive.description}</p>
-                  <small>Điểm tiếp nhận: {drive.intake_location?.warehouse_name}</small>
+                  <small>Điểm tiếp nhận: {drive.intake_location?.warehouse_name}{typeof drive.distance_m === 'number' ? ` · cách khoảng ${distanceLabel(drive.distance_m)}` : ''}</small>
                   {drive.opens_at && <p>Bắt đầu nhận: {new Date(drive.opens_at).toLocaleString('vi-VN')}</p>}
                   {drive.closes_at && <p>Hạn nhận: {new Date(drive.closes_at).toLocaleString('vi-VN')}</p>}
                   {driveUnavailable(drive) && <p className="notice warning">{driveUnavailable(drive)}</p>}

@@ -12,8 +12,6 @@ export interface CommitmentContext {
   campaign_id: string | null;
   cycle_state: string;
   need_status: string;
-  delivery_target_kind: 'FINAL_RECIPIENT' | 'RELIEF_POINT';
-  designated_point_id: string | null;
   quantity: string;
   released_quantity: string;
   issued_quantity: string;
@@ -39,7 +37,6 @@ export async function lockCommitmentContexts(
   warehouseId: string,
   distributionCampaignId: string | null,
   purpose: string,
-  reliefPointId: string | null,
   mode: 'PREPARATION' | 'DISPATCH' = 'PREPARATION',
 ): Promise<CommitmentContext[]> {
   assertLinePurpose(purpose, lines);
@@ -62,8 +59,6 @@ export async function lockCommitmentContexts(
   const rows = await manager.query(
     `SELECT cm.id,cm.relief_need_id,n.cycle_id,cm.item_id,cm.warehouse_id,c.campaign_id,c.state AS cycle_state,
             n.status AS need_status,
-            CASE WHEN n.designated_point_id IS NULL THEN 'FINAL_RECIPIENT' ELSE 'RELIEF_POINT' END AS delivery_target_kind,
-            n.designated_point_id,
             cm.quantity::text,cm.released_quantity::text,cm.issued_quantity::text,u.scale AS unit_scale
        FROM commitment cm JOIN relief_need n ON n.id=cm.relief_need_id
        JOIN fulfillment_cycle c ON c.id=n.cycle_id JOIN item i ON i.id=n.item_id JOIN unit u ON u.code=i.unit_code
@@ -83,9 +78,6 @@ export async function lockCommitmentContexts(
     if (commitment.cycle_state === 'FROZEN') throw new AppError('CYCLE_FROZEN', { status: 409 });
     if (commitment.need_status === 'CANCELLED' || commitment.need_status === 'FULFILLED') {
       throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
-    }
-    if (commitment.delivery_target_kind === 'RELIEF_POINT' && commitment.designated_point_id !== reliefPointId) {
-      throw new AppError('VALIDATION_FAILED', { status: 400 });
     }
     const quantity = validateQuantity(line.quantity, Number(commitment.unit_scale));
     const remaining = quantityUnits(commitment.quantity, Number(commitment.unit_scale)) -

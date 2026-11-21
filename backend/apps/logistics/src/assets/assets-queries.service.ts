@@ -52,24 +52,24 @@ export class AssetsQueriesService {
     const limit = query.limit ?? 50;
     values.push(limit + 1);
     const rows = await this.dataSource.query(
-      `${assetSelect(kind, false).replace(`FROM ${kind === 'relief_point' ? 'relief_point' : kind}`, `FROM ${kind === 'relief_point' ? 'relief_point' : kind} a`)}
+      `${assetSelect(false).replace('FROM warehouse', 'FROM warehouse a')}
        WHERE ${conditions.join(' AND ')} ORDER BY a.id ASC LIMIT $${values.length}`,
       values,
     ) as AssetRow[];
     const items = rows.slice(0, limit);
     const last = items.at(-1);
     return {
-      items: items.map((row) => assetView(kind, row, false)),
+      items: items.map((row) => assetView(row, false)),
       more: rows.length > limit,
       ...(rows.length > limit && last ? { cursor: encodeKeysetCursor([last.id], last.id, filters) } : {}),
     };
   }
 
-  async reliefPointDetail(id: string, request: Request): Promise<Record<string, unknown>> {
+  async warehouseDetail(id: string, request: Request): Promise<Record<string, unknown>> {
     const session = await this.sessions.require(request);
     requireAnyAssetManage(session);
-    const row = await findAsset(this.dataSource, 'relief_point', id);
-    if (!row || !hasPermission(session.grants, 'ASSET_MANAGE', { campaignId: null })) throw new AppError('NOT_FOUND', { status: 404 });
-    return assetView('relief_point', row, true);
+    const row = await findAsset(this.dataSource, 'warehouse', id);
+    if (!row) throw new AppError('NOT_FOUND', { status: 404 });
+    return assetView(row, true);
   }
 }

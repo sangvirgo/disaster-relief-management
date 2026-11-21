@@ -1,9 +1,6 @@
 export const physicalHandoffsLateralSql = `LEFT JOIN LATERAL (
            SELECT SUM(line.quantity) FILTER (
-                    WHERE distribution_line.commitment_id IS NULL AND (
-                      (distribution.relief_point_id IS NULL AND handoff.handoff_kind='DIRECT_HOUSEHOLD') OR
-                      (distribution.relief_point_id IS NOT NULL AND handoff.handoff_kind='HOUSEHOLD_HANDOUT')
-                    )
+                    WHERE distribution_line.commitment_id IS NULL AND handoff.handoff_kind='DIRECT_HOUSEHOLD'
                   ) AS delivered,
                   SUM(line.quantity) FILTER (
                     WHERE handoff.handoff_kind='RETURN' AND NOT EXISTS (

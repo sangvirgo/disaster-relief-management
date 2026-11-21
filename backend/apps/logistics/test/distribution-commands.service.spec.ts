@@ -20,7 +20,7 @@ describe('DistributionCommandsService line validation lock order', () => {
       cycle_state: 'OPEN',
       need_status: 'OPEN',
       delivery_target_kind: 'FINAL_RECIPIENT',
-      designated_point_id: null,
+      
       quantity: '1.00',
       released_quantity: '0.00',
       issued_quantity: '0.00',
@@ -42,7 +42,6 @@ describe('DistributionCommandsService line validation lock order', () => {
       purpose: 'REQUEST_AID',
       warehouse_id: 'warehouse-1',
       campaign_id: null,
-      relief_point_id: null,
     } as DistributionContext, [{ item_id: itemId, commitment_id: commitmentId, quantity: '1.00' }]);
 
     const sqlCalls = query.mock.calls.map(([sql]) => String(sql));
@@ -53,8 +52,8 @@ describe('DistributionCommandsService line validation lock order', () => {
   });
 });
 
-describe('DistributionCommandsService vehicle capacity warning', () => {
-  it('keeps over-capacity prepare and dispatch available and preserves stock outcomes', async () => {
+describe('DistributionCommandsService prepare and dispatch', () => {
+  it('prepares and dispatches while preserving stock outcomes', async () => {
     const distributionId = '55555555-5555-4555-8555-555555555555';
     const warehouseId = '66666666-6666-4666-8666-666666666666';
     const lineId = '88888888-8888-4888-8888-888888888888';
@@ -66,13 +65,6 @@ describe('DistributionCommandsService vehicle capacity warning', () => {
       warehouse_id: warehouseId,
       campaign_id: null,
       warehouse_status: 'ACTIVE',
-      relief_point_id: null,
-      relief_point_status: null,
-      vehicle_id: 'vehicle-1',
-      vehicle_status: 'ACTIVE',
-      vehicle_capacity: '1.00',
-      vehicle_capacity_unit: 'kg',
-      vehicle_capacity_scale: 2,
       campaign_id: null,
       purpose: 'REQUEST_AID',
       status: 'DRAFT',
@@ -109,7 +101,6 @@ describe('DistributionCommandsService vehicle capacity warning', () => {
       delivery_target_kind: 'FINAL_RECIPIENT',
       quantity: line.quantity,
       in_transit_quantity: distribution.status === 'DISPATCHED' ? line.quantity : '0.00',
-      at_point_quantity: '0.00',
       received_quantity: null,
       handed_out_quantity: null,
       returned_quantity: null,
@@ -121,7 +112,6 @@ describe('DistributionCommandsService vehicle capacity warning', () => {
       if (sql.includes('SELECT status FROM warehouse')) {
         return [{ status: 'ACTIVE' }];
       }
-      if (sql.includes('SELECT status FROM vehicle')) return [{ status: 'ACTIVE' }];
       if (sql.includes('FROM distribution d JOIN warehouse w')) return [distributionRow()];
       if (sql.includes('SELECT cm.id,cm.item_id,cm.warehouse_id,cm.quantity::text')) return [{ ...commitment }];
       if (sql.includes('SELECT dl.id,dl.item_id,dl.commitment_id,dl.quantity::text')) {
@@ -175,7 +165,7 @@ describe('DistributionCommandsService vehicle capacity warning', () => {
       { expected_version: 1 },
       { idempotencyKey: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', userId: preparerId } as never,
     );
-    expect(prepared.value).toMatchObject({ status: 'DRAFT', version: 2, vehicle_capacity_exceeded: true });
+    expect(prepared.value).toMatchObject({ status: 'DRAFT', version: 2 });
     expect(lines).toHaveLength(1);
 
     Object.assign(distribution, { status: 'APPROVED', approver_user_id: 'reviewer-1', approved_version: 2 });
@@ -184,7 +174,7 @@ describe('DistributionCommandsService vehicle capacity warning', () => {
       { expected_version: 2 },
       { idempotencyKey: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', userId: dispatcherId } as never,
     );
-    expect(dispatched.value).toMatchObject({ status: 'DISPATCHED', version: 3, vehicle_capacity_exceeded: true });
+    expect(dispatched.value).toMatchObject({ status: 'DISPATCHED', version: 3 });
     expect(stock).toMatchObject({ on_hand: '15.00', reserved: '0.00' });
   });
 });

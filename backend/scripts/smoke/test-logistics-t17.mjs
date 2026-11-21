@@ -1,3 +1,6 @@
+// STALE after relief point removal (migration RemoveReliefPoints1796256000000): this smoke test still creates relief points,
+// POINT_REPLENISHMENT distributions and POINT_RECEIPT/HOUSEHOLD_HANDOUT handoffs. It must be rewritten around DIRECT_HOUSEHOLD
+// and campaign distributions before it is run again; it was not run or updated as part of the removal.
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
