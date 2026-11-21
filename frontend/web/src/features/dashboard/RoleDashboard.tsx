@@ -93,7 +93,7 @@ function Breakdown({ title, counts, requestStatuses = false }: { title: string; 
 function ResponseDashboard() {
   const snapshot = useSnapshot<ResponseOverview>('response', '/dashboard/overview');
   const { data } = snapshot;
-  return <section className="card dashboard-section"><div className="section-header"><h2>Tình hình ứng cứu</h2><button type="button" className="button secondary" onClick={snapshot.refresh}>Cập nhật</button></div>
+  return <section className="card dashboard-section"><div className="section-header"><h2>Tình hình ứng cứu</h2><button type="button" className="button secondary refresh-action" onClick={snapshot.refresh}>Làm mới</button></div>
     <SnapshotState {...snapshot} onRetry={snapshot.refresh} />
     {data && !snapshot.error && <>
       <p className="muted">Cập nhật lúc {timeLabel(data.generated_at)}. Quá hạn xác minh sau {data.thresholds.verification_overdue_minutes} phút; đề nghị nhiệm vụ sau {data.thresholds.offer_overdue_minutes} phút.</p>
@@ -126,7 +126,7 @@ function ResponseDashboard() {
 function AdminDashboard() {
   const snapshot = useSnapshot<AdminOverview>('identity', '/dashboard/admin');
   const { data } = snapshot;
-  return <section className="card dashboard-section"><div className="section-header"><h2>Tài khoản và quyền truy cập</h2><button type="button" className="button secondary" onClick={snapshot.refresh}>Cập nhật</button></div>
+  return <section className="card dashboard-section"><div className="section-header"><h2>Tài khoản và quyền truy cập</h2><button type="button" className="button secondary refresh-action" onClick={snapshot.refresh}>Làm mới</button></div>
     <SnapshotState {...snapshot} onRetry={snapshot.refresh} />
     {data && !snapshot.error && <>
       <p className="muted">Cập nhật lúc {timeLabel(data.generated_at)}</p>
@@ -139,7 +139,7 @@ function AdminDashboard() {
 function OperationsSnapshot({ showReports }: { showReports: boolean }) {
   const snapshot = useSnapshot<OperationsOverview>('logistics', '/dashboard/operations');
   const { data } = snapshot;
-  return <><section className="card dashboard-section"><div className="section-header"><h2>Vận hành cứu trợ</h2><button type="button" className="button secondary" onClick={snapshot.refresh}>Cập nhật</button></div>
+  return <><section className="card dashboard-section"><div className="section-header"><h2>Vận hành cứu trợ</h2><button type="button" className="button secondary refresh-action" onClick={snapshot.refresh}>Làm mới</button></div>
     <SnapshotState {...snapshot} onRetry={snapshot.refresh} />
     {data && !snapshot.error && <><p className="muted">Cập nhật lúc {timeLabel(data.generated_at)}</p>
       {data.intake && <><h3>Tiếp nhận quyên góp</h3><div className="report-metrics"><Metric title="Chờ kiểm đếm hoặc duyệt" value={data.intake.awaiting_count_or_review} />
@@ -161,7 +161,7 @@ function OperationsSnapshot({ showReports }: { showReports: boolean }) {
 function DriveSuggestions() {
   const snapshot = useSnapshot<Suggestions>('logistics', '/reports/drive-suggestions');
   const { data } = snapshot;
-  return <section className="card dashboard-section dashboard-suggestions"><div className="section-header"><h2>Gợi ý đợt quyên góp</h2><button type="button" className="button secondary" onClick={snapshot.refresh}>Cập nhật</button></div>
+  return <section className="card dashboard-section dashboard-suggestions"><div className="section-header"><h2>Gợi ý đợt quyên góp</h2><button type="button" className="button secondary refresh-action" onClick={snapshot.refresh}>Làm mới</button></div>
     <p>Các gợi ý dựa trên tồn kho, nhu cầu và thời tiết; người phụ trách quyết định có mở đợt mới hay không.</p>
     <SnapshotState {...snapshot} onRetry={snapshot.refresh} />
     {data && !snapshot.error && <>{!data.weather_available && <p className="notice warning">Chưa có dữ liệu thời tiết; gợi ý về kho vẫn có hiệu lực.</p>}

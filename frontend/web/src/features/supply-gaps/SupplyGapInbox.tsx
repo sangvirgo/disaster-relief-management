@@ -207,7 +207,7 @@ export function SupplyGapInbox({ user }: { user: Me }) {
           <h2 id="supply-inbox-title">Đề xuất bổ sung vật tư theo kho</h2>
         </div>
         <div className="list-header-actions">
-          <button type="button" className="button secondary" disabled={loading} onClick={() => { setCursor(''); setRevision((value) => value + 1); }}>Cập nhật</button>
+          <button type="button" className="button secondary refresh-action" disabled={loading} onClick={() => { setCursor(''); setRevision((value) => value + 1); }}>Làm mới</button>
         </div>
       </div>
       <p className="muted">Hệ thống chỉ đề xuất. Chỉ quản lý vận hành mới tạo đợt quyên góp từ đề xuất thiếu hàng (mức đỏ).</p>

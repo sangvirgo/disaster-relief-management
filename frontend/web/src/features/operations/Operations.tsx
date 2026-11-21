@@ -464,19 +464,19 @@ export function Operations({ page, user }: { page: string; user: Me }) {
     'Tạo phiếu phân phối';
   useEffect(() => { setShowCreate(false); }, [page, asset]);
   return (
-    <div className="operations-workspace">
+    <div className={`operations-workspace${page === 'assets' && asset === 'warehouses' ? ' operations-workspace--warehouse-map' : ''}`}>
       <section className="card">
-        <div className="section-header list-action-header">
+        {!(page === 'assets' && asset === 'warehouses') && <div className="section-header list-action-header">
           <h2>{page === 'review' && reviewTab === 'disputes' ? 'Xử lý khiếu nại' : headings[page]}</h2>
           <div className="list-header-actions">
-            <button type="button" className="button secondary" disabled={loading} onClick={() => { setCursor(''); setRevision((value) => value + 1); }}>Cập nhật</button>
+            <button type="button" className="button secondary refresh-action" disabled={loading} onClick={() => { setCursor(''); setRevision((value) => value + 1); }}>Làm mới</button>
             {canCreatePage && <button type="button" className="button primary list-create-button" onClick={() => { setSelected(null); setDetail(null); setShowCreate(true); }}>{createTitle}</button>}
           </div>
-        </div>
+        </div>}
         {page === 'assets' && asset === 'warehouses' && <WarehouseMapManager
           canManage={rights.has('OPERATIONS_MANAGER')} canManageDrives={rights.has('OPERATIONS_MANAGER') || rights.has('COORDINATOR')}
           warehouseOptions={warehouseOptions} campaigns={references.campaigns || []} items={references.items || []} itemScales={references.itemScales || []}
-          refreshKey={revision} onChanged={() => setRevision((value) => value + 1)} />}
+          refreshKey={revision} onChanged={() => setRevision((value) => value + 1)} onRefresh={() => { setCursor(''); setRevision(value => value + 1); }} />}
         {page === 'review' && (
           <div className="tabs">
             <button

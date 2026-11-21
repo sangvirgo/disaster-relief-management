@@ -16,7 +16,7 @@ export function TeamReadinessQueue({ refreshRevision, onChanged }: { refreshRevi
   useEffect(() => { if (open) list.reload(); }, [revision, refreshRevision]);
   return <>
     <button type="button" className="button secondary" disabled={loading}
-      onClick={() => { setMessage(''); setRevision(value => value + 1); setOpen(true); }}>Cập nhật danh sách đội</button>
+      onClick={() => { setMessage(''); setRevision(value => value + 1); setOpen(true); }}><span aria-hidden="true">↻</span> Làm mới danh sách đội</button>
     {open && <section className="team-readiness-results" aria-label="Kết quả cập nhật danh sách đội" aria-busy={loading}>
     {message && <p role="status" className="notice">{message}</p>}
     {loading && <p role="status">Đang tải các đội cần xác nhận…</p>}

@@ -198,7 +198,7 @@ export function Campaigns({ canManage = false, canSetup = false, canAssignWareho
           </div>
           <div className="list-header-actions">
             <span className="chip">Đã tải {items.length} chiến dịch</span>
-            <button type="button" className="button secondary" disabled={loading} onClick={done}>Cập nhật</button>
+            <button type="button" className="button secondary refresh-action" disabled={loading} onClick={done}>Làm mới</button>
             {canSetup && <button type="button" className="button primary" onClick={() => setShowCreate(true)}>Tạo chiến dịch</button>}
           </div>
         </div>

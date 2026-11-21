@@ -172,7 +172,7 @@ export function CampaignCoordination({ user, initialRequestId = '' }: { user: Me
             </div>
             <div className="campaign-overview__header-actions">
               <span className="campaign-overview__count">{overviewCampaigns.length} chiến dịch</span>
-              <button type="button" className="button secondary" disabled={loading} onClick={() => setRefresh((value) => value + 1)}>Cập nhật</button>
+              <button type="button" className="button secondary refresh-action" disabled={loading} onClick={() => setRefresh((value) => value + 1)}>Làm mới</button>
               <button type="button" className="button secondary" aria-expanded={managementOpen} aria-controls="campaign-management-panel"
                 onClick={() => setManagementOpen((value) => !value)}>{managementOpen ? 'Ẩn quản lý' : 'Quản lý chiến dịch'}</button>
             </div>

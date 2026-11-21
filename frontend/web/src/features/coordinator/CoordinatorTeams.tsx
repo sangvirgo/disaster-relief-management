@@ -63,7 +63,7 @@ export function CoordinatorTeams({ user }: { user: Me }) {
     <Card id="coordinator-team-list" className="coordinator-team-list-card">
       <div className="section-header"><h2>Quản lý đội cứu hộ</h2><div className="team-header-actions">
         {isAdmin && <Button type="button" onClick={() => setShowCreate(true)}>Tạo đội</Button>}
-        <Button type="button" variant="secondary" onClick={refresh}>Cập nhật</Button></div></div>
+        <Button type="button" variant="secondary" className="refresh-action" onClick={refresh}>Làm mới</Button></div></div>
       <p>Hệ thống xét trạng thái sẵn sàng, kỹ năng, khoảng cách và độ mới của GPS khi đề xuất đội xử lý SOS.</p>
       {loading && <Skeleton label="Đang tải đội cứu hộ…" />}
       {error && <div className="notice error" role="alert">{error} <Button type="button" variant="secondary" onClick={refresh}>Thử lại</Button></div>}

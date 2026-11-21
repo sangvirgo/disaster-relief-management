@@ -126,14 +126,14 @@ export function NormEditor({ user }: { user: Me }) {
           <h2 id="norm-editor-title">Bảng định mức ước tính nhu cầu</h2>
         </div>
         <div className="list-header-actions">
-          <button type="button" className="button secondary" disabled={loading} onClick={() => setRevision((value) => value + 1)}>Cập nhật</button>
+          <button type="button" className="button secondary refresh-action" disabled={loading} onClick={() => setRevision((value) => value + 1)}>Làm mới</button>
         </div>
       </div>
       <p className="muted">Định mức dùng để ước tính nhu cầu SOS từ số người, trẻ em và người cao tuổi. Nhu cầu ước tính chỉ được cam kết xuất kho sau khi quản lý vận hành duyệt.</p>
       {notice && <p className="notice" role="status">{notice}</p>}
       {error && <p className="notice error" role="alert">{error}</p>}
       {canManage && !loading && !itemsReady && norms.length > 0 && (
-        <p className="notice error" role="alert">Chưa tải được danh mục vật phẩm nên chưa thể sửa định mức. Hãy bấm Cập nhật để thử lại.</p>
+        <p className="notice error" role="alert">Chưa tải được danh mục vật phẩm nên chưa thể sửa định mức. Hãy bấm Làm mới để thử lại.</p>
       )}
       {loading && <Skeleton rows={4} label="Đang tải bảng định mức…" />}
       {!loading && !error && !norms.length && <EmptyState title="Chưa có định mức" description="Bảng định mức chưa có dòng nào. Hãy liên hệ quản trị viên để khởi tạo." />}

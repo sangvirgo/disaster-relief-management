@@ -1687,6 +1687,28 @@
 .warehouse-coverage__overlay--error { background: #fef2f2; color: #b91c1c; }
 .warehouse-map-toolbar { flex-wrap: wrap; justify-content: flex-end; }
 @media (max-width: 1100px) { .warehouse-manager__map { position: static; } }
+.operations-workspace--warehouse-map > .card { padding: 12px; }
+.operations-workspace--warehouse-map .warehouse-manager__map .warehouse-coverage__map { height: min(86vh, 960px); }
+.refresh-action { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.refresh-action::before { content: '↻'; display: inline-block; font-family: Arial, sans-serif; font-size: 21px; font-weight: 400; line-height: 0.8; }
+.refresh-action--icon-only { width: 38px; min-width: 38px; height: 38px; min-height: 38px; padding: 0; }
+.warehouse-map-toolbar { align-items: flex-start; gap: 6px; }
+.warehouse-map-tool { min-height: 38px; padding: 6px 10px; font-size: 13px; box-shadow: 0 2px 8px #0f172a26; }
+.warehouse-map-add-menu { position: relative; }
+.warehouse-map-add-menu summary, .warehouse-map-layer-button { display: inline-flex; align-items: center; justify-content: center; min-height: 38px; border: 1px solid #cbd9ed; border-radius: 9px; background: #fff; color: #17212f; box-shadow: 0 2px 8px #0f172a26; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.warehouse-map-add-menu summary { gap: 6px; padding: 0 10px; list-style: none; }
+.warehouse-map-add-menu summary::-webkit-details-marker { display: none; }
+.warehouse-map-add-menu summary::after { content: '▾'; font-size: 11px; }
+.warehouse-map-add-menu__items { position: absolute; top: calc(100% + 5px); right: 0; display: grid; gap: 2px; min-width: 170px; padding: 5px; border: 1px solid #cbd9ed; border-radius: 9px; background: #fff; box-shadow: 0 8px 24px #0f172a30; }
+.warehouse-map-add-menu__items button { width: 100%; padding: 9px 10px; border: 0; border-radius: 6px; background: transparent; color: #17212f; font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.warehouse-map-add-menu__items button:hover, .warehouse-map-add-menu__items button:focus-visible { background: #eef4ff; }
+.warehouse-map-layer-button { width: 38px; padding: 0; }
+.warehouse-map-layer-button svg { width: 18px; height: 18px; }
+.warehouse-map-layer-button.is-active { color: #2563eb; border-color: #93b6fa; background: #eef4ff; }
+@media (max-width: 700px) {
+  .warehouse-map-add-menu__items { left: 0; right: auto; }
+  .operations-workspace--warehouse-map .leaflet-top.leaflet-left { top: 48px; }
+}
 
 .warehouse-manager__layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
 .warehouse-manager__map { position: sticky; top: 12px; }

@@ -89,8 +89,8 @@ export function CitizenRequests({
           <span className="eyebrow">SOS cá nhân</span>
           <h2>Danh sách yêu cầu</h2>
         </div>
-        <button className="button secondary" type="button" onClick={refresh} disabled={loading}>
-          Cập nhật danh sách
+        <button className="button secondary refresh-action" type="button" onClick={refresh} disabled={loading}>
+          Làm mới danh sách
         </button>
       </div>
       <p>Chọn một yêu cầu để xem tiến độ. Những SOS đã gắn với tài khoản không cần nhập mã.</p>

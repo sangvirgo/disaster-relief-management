@@ -80,7 +80,7 @@ export function ItemCatalogPage({ user }: { user: Me }) {
         <div><span className="eyebrow">Quản lý vận hành</span><h2 id="catalog-items-title">Danh mục vật phẩm</h2></div>
         <div className="list-header-actions">
           <Button size="sm" aria-haspopup="dialog" onClick={() => { setNotice(''); setCreating(true); }}>Thêm vật phẩm</Button>
-          <Button variant="secondary" size="sm" disabled={pages.loading} onClick={pages.reload}>Cập nhật</Button>
+          <Button variant="secondary" size="sm" className="refresh-action" disabled={pages.loading} onClick={pages.reload}>Làm mới</Button>
         </div>
       </div>
       <p className="muted">Chọn dấu ba chấm trên từng dòng để sửa vật phẩm, sửa từ khóa hoặc xóa vật phẩm chưa được sử dụng. Nhóm hàng và đơn vị tính không thay đổi sau khi tạo.</p>

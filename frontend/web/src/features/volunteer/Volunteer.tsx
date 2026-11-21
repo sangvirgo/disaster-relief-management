@@ -306,7 +306,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
       if (live) { setTeamActivityLoaded(true); setBusyTeamIds(new Set(missions.filter((mission) => ['OFFERED', 'ACCEPTED', 'EN_ROUTE', 'ON_SCENE'].includes(mission.status)).map((mission) => mission.team.id))); }
     }).catch(() => { if (live) {
       setBusyTeamIds(new Set());
-      setTeamActivityError('Chưa kiểm tra được nhiệm vụ của đội. Bấm Cập nhật để thử lại trước khi xác nhận sẵn sàng.');
+      setTeamActivityError('Chưa kiểm tra được nhiệm vụ của đội. Bấm Làm mới để thử lại trước khi xác nhận sẵn sàng.');
     } });
     return () => { live = false; };
   }, [isTeam, revision]);
@@ -809,7 +809,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
       {/* Danh sách nhiệm vụ hoặc đội */}
       {isTeam && loading && !selectedTeam && <section className="card volunteer-team-detail-card" role="status">Đang tải thông tin đội cứu hộ…</section>}
       {(isTeam ? !selectedTeam && !loading : !activeMission) && <section className={`card ${isTeam ? 'volunteer-team-list-card' : 'mission-list-panel'}`} ref={missionListRef}>
-        <div className="section-header"><h2>{isTeam ? 'Đội của tôi' : 'Nhiệm vụ và tiến độ'}</h2><button type="button" className="button secondary" disabled={loading || busy} onClick={() => { setCursor(''); refreshAll(); }}>Cập nhật</button></div>
+        <div className="section-header"><h2>{isTeam ? 'Đội của tôi' : 'Nhiệm vụ và tiến độ'}</h2><button type="button" className="button secondary refresh-action" disabled={loading || busy} onClick={() => { setCursor(''); refreshAll(); }}>Làm mới</button></div>
         <p className="mission-list-intro">{isTeam ? 'Chọn một đội để xem hồ sơ và các thao tác quản lý.' : 'Chọn một nhiệm vụ trong bảng để xem tình huống, tiến độ và minh chứng.'}</p>
         {error && (
           <p role="alert" className="notice error">
@@ -916,7 +916,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
             <div className="volunteer-team-detail-heading">
               <h2 ref={teamHeadingRef} tabIndex={-1}>Chi tiết đội cứu hộ</h2>
               {selectedTeam && <div className="mission-detail-heading__actions">
-                <button type="button" className="button secondary" disabled={loading || teamLoading || busy} onClick={() => { setCursor(''); setRevision(value => value + 1); }}>Cập nhật</button>
+                <button type="button" className="button secondary refresh-action" disabled={loading || teamLoading || busy} onClick={() => { setCursor(''); setRevision(value => value + 1); }}>Làm mới</button>
                 {!hasSingleTeam && <button type="button" className="button secondary" onClick={returnToTeamList}>← Danh sách đội</button>}
               </div>}
             </div>
@@ -1060,7 +1060,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
           <>
             <div className="mission-detail-heading"><h2 ref={missionHeadingRef} tabIndex={-1}>Chi tiết nhiệm vụ</h2>
               {activeMission && <div className="mission-detail-heading__actions">
-                <button type="button" className="button secondary" disabled={loading || missionLoading || busy} onClick={() => { setCursor(''); refreshAll(); }}>Cập nhật</button>
+                <button type="button" className="button secondary refresh-action" disabled={loading || missionLoading || busy} onClick={() => { setCursor(''); refreshAll(); }}>Làm mới</button>
                 <button type="button" className="button secondary mission-back-to-list" onClick={returnToMissionList}>← Danh sách nhiệm vụ</button>
               </div>}
             </div>
@@ -1165,7 +1165,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                   </div>
                 ) : (
                   <p className="notice">
-                    Chưa nhận được tọa độ hiện trường từ hệ thống. Hãy bấm Cập nhật để thử lại; nếu vẫn thiếu, báo điều phối viên bổ sung vị trí trước khi di chuyển.
+                    Chưa nhận được tọa độ hiện trường từ hệ thống. Hãy bấm Làm mới để thử lại; nếu vẫn thiếu, báo điều phối viên bổ sung vị trí trước khi di chuyển.
                   </p>
                 )}
                 </div>}

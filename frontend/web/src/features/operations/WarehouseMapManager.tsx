@@ -32,10 +32,10 @@ type CampaignRow = { id?: string; name?: string; status?: string; center?: { lat
  * Warehouse map for operations: shows every warehouse with its radius and, for the selected one, its donation drives with the
  * goods still needed. Managers can add and adjust warehouses and drives without leaving the map.
  */
-export function WarehouseMapManager({ canManage, canManageDrives, warehouseOptions, campaigns, items, itemScales, refreshKey, onChanged }: {
+export function WarehouseMapManager({ canManage, canManageDrives, warehouseOptions, campaigns, items, itemScales, refreshKey, onChanged, onRefresh }: {
   canManage: boolean; canManageDrives: boolean;
   warehouseOptions: Option[]; campaigns: Option[]; items: Option[]; itemScales: Option[];
-  refreshKey: number; onChanged: () => void;
+  refreshKey: number; onChanged: () => void; onRefresh: () => void;
 }) {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [drives, setDrives] = useState<Drive[]>([]);
@@ -56,6 +56,7 @@ export function WarehouseMapManager({ canManage, canManageDrives, warehouseOptio
   const [draftError, setDraftError] = useState('');
   const draftKey = useRef<string | null>(null);
   const [hovered, setHovered] = useState<HoverTarget | null>(null);
+  const addMenuRef = useRef<HTMLDetailsElement>(null);
 
   useEffect(() => {
     let live = true;
@@ -231,12 +232,19 @@ export function WarehouseMapManager({ canManage, canManageDrives, warehouseOptio
   });
 
   const toolbar = <>
-    {canManage && !editingWarehouseId && <button type="button" className={`button ${creatingWarehouse ? 'secondary' : ''}`} aria-pressed={creatingWarehouse} onClick={() => {
-      if (creatingWarehouse) cancelWarehouseDraft();
-      else { setCreatingWarehouse(true); setPlacing(false); setSelectedId(null); setHovered(null); setPlaceMessage(''); }
-    }}>{creatingWarehouse ? 'Hủy thêm kho' : '+ Thêm kho'}</button>}
-    {canManageDrives && !creatingWarehouse && !editingWarehouseId && <button type="button" className={`button ${placing ? '' : 'secondary'}`} aria-pressed={placing} onClick={() => { setPlacing((value) => !value); setPlaceMessage(''); }}>{placing ? 'Hủy chọn điểm' : '+ Thêm đợt quyên góp'}</button>}
-    <label className="warehouse-map-toggle"><input type="checkbox" checked={showCampaigns} onChange={(event) => setShowCampaigns(event.target.checked)} /> Vùng chiến dịch</label>
+    {creatingWarehouse ? <button type="button" className="button secondary warehouse-map-tool" aria-label="Hủy thêm kho" title="Hủy thêm kho" onClick={cancelWarehouseDraft}>× Hủy</button>
+      : placing ? <button type="button" className="button secondary warehouse-map-tool" aria-label="Hủy chọn điểm quyên góp" title="Hủy chọn điểm" onClick={() => { setPlacing(false); setPlaceMessage(''); }}>× Hủy</button>
+      : !editingWarehouseId && (canManage || canManageDrives) && <details ref={addMenuRef} className="warehouse-map-add-menu">
+        <summary>＋ Thêm</summary>
+        <div className="warehouse-map-add-menu__items">
+          {canManage && <button type="button" onClick={() => { addMenuRef.current?.removeAttribute('open'); setCreatingWarehouse(true); setPlacing(false); setSelectedId(null); setHovered(null); setPlaceMessage(''); }}>Kho</button>}
+          {canManageDrives && <button type="button" onClick={() => { addMenuRef.current?.removeAttribute('open'); setPlacing(true); setPlaceMessage(''); }}>Đợt quyên góp</button>}
+        </div>
+      </details>}
+    <button type="button" className={`warehouse-map-layer-button${showCampaigns ? ' is-active' : ''}`} aria-label={showCampaigns ? 'Ẩn vùng chiến dịch' : 'Hiện vùng chiến dịch'} title={showCampaigns ? 'Ẩn vùng chiến dịch' : 'Hiện vùng chiến dịch'} aria-pressed={showCampaigns} onClick={() => setShowCampaigns(value => !value)}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5M3 16l9 5 9-5"/></svg>
+    </button>
+    <button type="button" className="button secondary refresh-action refresh-action--icon-only warehouse-map-tool" aria-label="Làm mới bản đồ kho" title="Làm mới bản đồ kho" disabled={state === 'loading'} onClick={onRefresh} />
   </>;
   const hoveredWarehouse = warehouses.find(row => row.id === hovered?.warehouseId);
   const hoveredDrive = hovered?.kind === 'drive' ? drives.find(row => row.id === hovered.id) : undefined;

@@ -66,7 +66,7 @@ export function WarehouseDetailPage({ warehouseId, warehouseName }: { warehouseI
         <h2>Tồn kho {warehouseName ? `— ${warehouseName}` : ''}</h2>
         <p>Số lượng vật phẩm hiện có tại kho này.</p>
       </div>
-      <button type="button" className="button secondary" onClick={() => setRevision((value) => value + 1)}>Cập nhật</button>
+      <button type="button" className="button secondary refresh-action" onClick={() => setRevision((value) => value + 1)}>Làm mới</button>
     </div>
     <section className="card warehouse-detail__location" aria-label="Vị trí gần đúng của kho">
       <h3>Vị trí gần đúng</h3>

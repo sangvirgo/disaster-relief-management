@@ -674,7 +674,7 @@ export function Donations({ user }: { user: Me | null }) {
           )}
         </section>
         {user && <section className="card donation-owned-list">
-          <div className="section-header"><div><h2>Phiếu quyên góp của tôi</h2><p>Chọn một phiếu để xem trạng thái mới nhất.</p></div><button type="button" className="button secondary" disabled={ownedLoading} onClick={() => setOwnedRevision((value) => value + 1)}>Cập nhật danh sách</button></div>
+          <div className="section-header"><div><h2>Phiếu quyên góp của tôi</h2><p>Chọn một phiếu để xem trạng thái mới nhất.</p></div><button type="button" className="button secondary refresh-action" disabled={ownedLoading} onClick={() => setOwnedRevision((value) => value + 1)}>Làm mới danh sách</button></div>
           <form className="donation-history-search" onSubmit={(event) => { event.preventDefault(); if (ownedSearch.trim() === ownedSearchTerm) setOwnedRevision((value) => value + 1); else setOwnedSearchTerm(ownedSearch.trim()); }}>
             <label htmlFor="donation-history-search">Tìm theo mã phiếu, định danh hoặc đợt quyên góp</label>
             <div className="donation-lookup-code-row">

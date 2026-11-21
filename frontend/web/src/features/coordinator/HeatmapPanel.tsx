@@ -541,7 +541,7 @@ export function HeatmapPanel({
       </div>
       {selected?.status && <p className="muted">SOS đang chọn: {selected.trackingCode} · {requestStatusLabel(selected.status)}. Ghim vị trí được hiển thị riêng với lớp mật độ.</p>}
       <button type="button" className="button secondary heatmap-refresh" disabled={loading}
-        onClick={() => setRefresh((value) => value + 1)}>Cập nhật SOS trên bản đồ</button>
+        onClick={() => setRefresh((value) => value + 1)}><span aria-hidden="true">↻</span> Làm mới SOS trên bản đồ</button>
       </>}
       <>
         {loading && <p role="status">Đang cập nhật bản đồ nhiệt…</p>}

@@ -262,7 +262,7 @@ export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, er
       <span><i className="legend-dot legend-dot--draft">♥</i> Bản nháp</span>
     </div>
     {loading && <p className="warehouse-coverage__overlay" role="status">Đang tải vị trí các kho…</p>}
-    {error && <p className="warehouse-coverage__overlay warehouse-coverage__overlay--error" role="alert">Chưa tải được dữ liệu kho. Hãy bấm Cập nhật để thử lại.</p>}
+    {error && <p className="warehouse-coverage__overlay warehouse-coverage__overlay--error" role="alert">Chưa tải được dữ liệu kho. Hãy bấm Làm mới để thử lại.</p>}
     {!loading && !error && rows.length === 0 && <p className="warehouse-coverage__overlay">Chưa có kho nào có vị trí. Hãy thêm kho hoặc sửa kho để chọn vị trí.</p>}
   </div>;
 }

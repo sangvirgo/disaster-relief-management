@@ -364,7 +364,7 @@ function CoordinatorMissionControl({ missionId, teamId, revision, onSuccess, onS
   const retry = <button type="button" className="button secondary" onClick={() => setLoadRevision(value => value + 1)}>Thử tải lại điều khiển nhiệm vụ</button>;
   if (loadError) return <><p role="alert" className="notice error">Không tải được trạng thái nhiệm vụ: {loadError}</p>{retry}</>;
   if (!mission) return <p role="status">Đang tải nhiệm vụ…</p>;
-  if (!['OFFERED', 'ACCEPTED', 'EN_ROUTE', 'ON_SCENE'].includes(mission.status)) return <p className="notice">Nhiệm vụ đã chuyển sang {label(mission.status)}. Bấm Cập nhật danh sách SOS để tải lại hồ sơ.</p>;
+  if (!['OFFERED', 'ACCEPTED', 'EN_ROUTE', 'ON_SCENE'].includes(mission.status)) return <p className="notice">Nhiệm vụ đã chuyển sang {label(mission.status)}. Bấm Làm mới SOS để tải lại hồ sơ.</p>;
   const cancel = <SosCommandPopup
     key={`${missionId}-${mission.version}-cancel`}
     spec={{ title: 'Hủy giao nhiệm vụ', service: 'response', path: `/missions/${missionId}/cancel`,
@@ -1026,7 +1026,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
             className="button secondary queue-refresh-button"
             onClick={() => setRevision((value) => value + 1)}
           >
-            <span aria-hidden="true">↻</span> Cập nhật SOS
+            <span aria-hidden="true">↻</span> Làm mới SOS
           </button>
           <TeamReadinessQueue refreshRevision={revision} onChanged={() => { setRevision(value => value + 1); setDetailRevision(value => value + 1); }} />
         </div>
@@ -1677,7 +1677,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
               {detail.status === 'TRIAGED' && (
                 <section>
                   {latestCompletedMissionId && !completionCheck && <p role="status">Đang đối chiếu nhiệm vụ đã hoàn thành với chu kỳ xử lý hiện tại…</p>}
-                  {completionCheck?.error && <p className="notice warning" role="alert">Chưa đối chiếu được nhiệm vụ đã hoàn thành. Hãy bấm “Cập nhật SOS” trước khi giao thêm đội.</p>}
+                  {completionCheck?.error && <p className="notice warning" role="alert">Chưa đối chiếu được nhiệm vụ đã hoàn thành. Hãy bấm “Làm mới SOS” trước khi giao thêm đội.</p>}
                   {completedInCurrentCycle && <div className="notice">
                     <strong>Đội đã hoàn thành nhiệm vụ trong chu kỳ này.</strong>
                     <p>Kết quả đã được ghi nhận. Điều phối viên cần kiểm tra minh chứng và kết thúc xử lý SOS nếu nhu cầu đã được đáp ứng.</p>

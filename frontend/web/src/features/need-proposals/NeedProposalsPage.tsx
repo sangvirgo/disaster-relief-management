@@ -255,7 +255,7 @@ export function NeedProposalsPage({ user }: { user: Me }) {
             <h2 id="need-proposals-title">Đề xuất cấp phát</h2>
           </div>
           <div className="list-header-actions">
-            <Button variant="secondary" size="sm" disabled={loading} onClick={() => reload()}>Cập nhật</Button>
+            <Button variant="secondary" size="sm" className="refresh-action" disabled={loading} onClick={() => reload()}>Làm mới</Button>
           </div>
         </div>
         <p className="muted">
