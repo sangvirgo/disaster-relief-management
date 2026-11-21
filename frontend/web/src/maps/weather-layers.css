@@ -1,0 +1,51 @@
+/* Weather layers: horizontal chip row along the top of the map, colour-field legends, storm list. */
+.weather-bar { position: absolute; z-index: 500; top: 10px; left: 54px; right: 10px; display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 4px; scrollbar-width: none; }
+.weather-bar::-webkit-scrollbar { display: none; }
+.weather-bar .weather-chip { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 6px; width: auto; min-height: 0; margin: 0; padding: 7px 13px; border: 0; border-radius: 999px; background: #1b2a3ccc; color: #fff; font-size: 13px; font-weight: 600; line-height: 1; cursor: pointer; white-space: nowrap; backdrop-filter: blur(6px); box-shadow: 0 2px 8px #0003; transition: background .15s; }
+.weather-bar .weather-chip:hover { background: #1b2a3ce6; }
+.weather-bar .weather-chip.active { background: #fff; color: #0f2d4a; box-shadow: 0 2px 10px #0004; }
+.weather-chip__spin { width: 11px; height: 11px; border: 2px solid #8aa; border-top-color: #1d6fd6; border-radius: 50%; animation: weather-spin .8s linear infinite; }
+.weather-chip__err { display: grid; place-items: center; width: 14px; height: 14px; border-radius: 50%; background: #d62828; color: #fff; font-size: 10px; }
+@keyframes weather-spin { to { transform: rotate(360deg); } }
+.weather-note { position: absolute; z-index: 500; top: 52px; left: 54px; padding: 4px 10px; border-radius: 8px; background: #fffffff2; color: var(--color-text-secondary); font-size: 12px; }
+.weather-legends { position: absolute; z-index: 500; left: 10px; bottom: 34px; display: grid; gap: 6px; pointer-events: none; }
+.weather-legend { display: grid; grid-template-columns: 1fr auto; gap: 2px 14px; width: 210px; padding: 6px 10px; border-radius: 10px; background: #1b2a3ccc; color: #fff; font-size: 11px; line-height: 14px; backdrop-filter: blur(6px); }
+.weather-legend i { grid-column: 1 / -1; height: 8px; border-radius: 4px; }
+.weather-label { display: inline-block; width: 40px; color: #fff; font-size: 13px; font-weight: 700; text-align: center; text-shadow: 0 0 3px #000, 0 0 3px #000, 0 1px 2px #0008; }
+.weather-storm { display: grid; place-items: center; width: 34px; height: 34px; border: 2px solid #fff; border-radius: 50%; font-size: 19px; box-shadow: 0 2px 8px #0006; }
+.weather-popup { display: grid; gap: 2px; font-size: 13px; }
+.weather-storms { position: absolute; z-index: 500; top: 52px; right: 10px; display: grid; gap: 4px; max-width: 240px; }
+.weather-storms > small { padding: 5px 10px; border-radius: 8px; background: #fffffff2; color: var(--color-text-secondary); font-size: 12px; }
+.weather-storms .weather-storms__item { display: grid; gap: 1px; width: auto; margin: 0; padding: 6px 10px; border: 0; border-left: 4px solid #888; border-radius: 8px; background: #fffffff2; color: var(--color-text-primary); font-size: 13px; text-align: left; cursor: pointer; box-shadow: 0 2px 8px #0003; }
+.weather-storms__item span { font-size: 12px; color: var(--color-text-secondary); }
+
+/* Campaign tools drawn over a campaign map (bottom-right). */
+.campaign-area-map__tools { position: absolute; z-index: 1000; right: 10px; top: 10px; display: grid; gap: 8px; justify-items: end; max-width: min(340px, calc(100% - 20px)); }
+.campaign-tools__bar { display: flex; gap: 6px; padding: 6px; border-radius: 12px; background: #fffffff2; box-shadow: 0 2px 10px #0003; }
+.campaign-tools__bar .button { min-height: 38px; padding: 6px 14px; white-space: nowrap; }
+.campaign-tools__bar select { min-width: 150px; max-width: 190px; min-height: 38px; }
+.campaign-tools__panel { display: grid; gap: 8px; width: 100%; padding: 12px; border-radius: 12px; background: #fffffff7; box-shadow: 0 2px 12px #0004; }
+.campaign-tools__panel label { display: grid; gap: 4px; font-size: 13px; font-weight: 600; }
+.campaign-tools__panel input { min-height: 36px; }
+.campaign-tools__panel .notice { margin: 0; padding: 6px 10px; font-size: 12px; }
+.campaign-tools__panel .muted, .campaign-tools__hint { margin: 0; font-size: 12px; }
+.campaign-tools__actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.campaign-tools__actions .button { min-height: 34px; padding: 4px 12px; font-size: 13px; }
+.campaign-area-map-shell:has(.campaign-area-map__tools) .weather-bar { right: 150px; }
+.campaign-area-map-shell:has(.campaign-area-map__tools) .weather-storms { right: auto; left: 54px; top: 92px; }
+.campaign-tools__refresh { min-width: 38px; padding: 6px 10px !important; font-size: 18px; line-height: 1; }
+.campaign-tools__note { margin: 0; padding: 4px 10px; border-radius: 8px; background: #1b2a3ccc; color: #fff; font-size: 12px; }
+.campaign-area-circle { cursor: pointer; }
+@media (max-width: 900px) { .campaign-area-map-shell:has(.campaign-area-map__tools) .weather-bar { right: 10px; top: auto; bottom: 10px; left: 54px; } }
+.campaign-area-map__note { position: absolute; z-index: 600; top: 52px; left: 54px; margin: 0; display: grid; gap: 3px; padding: 7px 12px; border-radius: 12px; background: #fffffff2; color: #1f2937; font-size: 12.5px; font-weight: 600; box-shadow: 0 2px 8px #0003; pointer-events: none; }
+.campaign-area-map__alert { position: absolute; z-index: 1000; right: 10px; bottom: 30px; max-width: min(360px, calc(100% - 20px)); }
+.campaign-map-alert { display: flex; align-items: center; gap: 10px; width: 100%; margin: 0; padding: 10px 14px; border: 0; border-left: 6px solid #fff; border-radius: 12px; background: #dc2626; color: #fff; text-align: left; cursor: pointer; box-shadow: 0 4px 16px #7f1d1d66; }
+.campaign-map-alert:hover { background: #b91c1c; }
+.campaign-map-alert strong { display: block; font-size: 16px; font-weight: 800; }
+.campaign-map-alert small { display: block; margin-top: 1px; font-size: 12px; opacity: .95; }
+.campaign-map-alert__icon { display: grid; flex: none; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: #fff; color: #dc2626; font-size: 20px; font-weight: 800; animation: sos-alert-pulse 1.6s ease-out infinite; }
+.sos-focus-ring span { display: block; width: 44px; height: 44px; border: 3px solid #dc2626; border-radius: 50%; background: #dc262622; animation: sos-focus-pulse 1.1s ease-out infinite; }
+@keyframes sos-focus-pulse { 0% { transform: scale(.45); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
+.campaign-area-map__note > span { display: flex; align-items: center; gap: 7px; }
+.map-note-swatch { display: inline-block; width: 26px; height: 0; border-top: 3px solid #2563eb; }
+.map-note-swatch--dashed { border-top-style: dashed; }

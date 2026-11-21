@@ -376,15 +376,12 @@ export function SosForm({
       <div className="sos-layout">
         <div className="sos-col-map">
           <Card className="sos-location-card" aria-labelledby="sos-location-title">
-            <div className="location-heading" id="sos-location">
-              <h2 id="sos-location-title"><span className="sos-step-number" aria-hidden="true">1</span>Vị trí cần hỗ trợ <span className="required-mark" aria-hidden="true">*</span></h2>
-              {mode === 'SELF' && <Button type="button" variant="secondary" onClick={locate}>
-                Dùng vị trí hiện tại
-              </Button>}
-            </div>
+            <h2 id="sos-location-title" className="visually-hidden">Vị trí cần hỗ trợ</h2>
+            <span id="sos-location" />
             {fieldMessage('location')}
             <LocationPicker
               initiallyOpen
+              onLocate={mode === 'SELF' ? locate : undefined}
               value={longitude && latitude ? { longitude: Number(longitude), latitude: Number(latitude) } : null}
               onSelect={chooseMapPoint}
               weather={mapWeather ? {
@@ -402,7 +399,7 @@ export function SosForm({
         </div>
         <div className="sos-col-form">
           <Card className="sos-step-card" aria-labelledby="sos-situation-title">
-            <h2 id="sos-situation-title"><span className="sos-step-number" aria-hidden="true">2</span>Tình huống</h2>
+            <h2 id="sos-situation-title" className="visually-hidden">Tình huống</h2>
             {user && (
               <fieldset className="sos-request-mode">
                 <legend>Yêu cầu này là</legend>
@@ -514,7 +511,7 @@ export function SosForm({
             </fieldset>
           </Card>
           <Card className="sos-step-card" aria-labelledby="sos-detail-title">
-            <h2 id="sos-detail-title"><span className="sos-step-number" aria-hidden="true">3</span>Chi tiết thêm</h2>
+            <h2 id="sos-detail-title" className="visually-hidden">Chi tiết thêm</h2>
             <div className="form-grid sos-grid-3">
               <label>
                 Số người cần hỗ trợ
@@ -602,7 +599,7 @@ export function SosForm({
             <SelectedFiles files={files} onRemove={(index) => { setFiles((current) => current.filter((_, position) => position !== index)); setFileMessage(''); }} />
           </Card>
           <Card className="sos-step-card" aria-labelledby="sos-contact-title">
-            <h2 id="sos-contact-title"><span className="sos-step-number" aria-hidden="true">4</span>Người liên hệ</h2>
+            <h2 id="sos-contact-title" className="visually-hidden">Người liên hệ</h2>
             <div className="form-grid">
               <label>
                 Họ tên người báo
@@ -640,7 +637,7 @@ export function SosForm({
           </Card>
           {mode === 'PROXY' && (
             <Card className="sos-step-card" aria-labelledby="sos-proxy-title">
-              <h2 id="sos-proxy-title">Thông tin báo hộ</h2>
+              <h2 id="sos-proxy-title" className="visually-hidden">Thông tin báo hộ</h2>
               <div className="notice warning">
                 Vị trí ở trên phải là vị trí của gia đình cần hỗ trợ, không phải của người báo hộ.
               </div>

@@ -17,7 +17,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--space-5);
-  align-items: start;
+  align-items: stretch;
 }
 .sos-col-map,
 .sos-col-form {
@@ -28,8 +28,16 @@
 }
 @media (min-width: 1080px) {
   .sos-layout { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
-  .sos-form .location-map-wrap { height: clamp(420px, calc(100dvh - 360px), 640px); }
+  /* Left card stretches to the height of the right column; the map fills whatever is left under the search box. */
+  .sos-col-map { grid-template-rows: minmax(0, 1fr); align-content: stretch; }
+  .sos-location-card { display: flex; flex-direction: column; }
+  .sos-form .location-picker { display: flex; flex: 1; flex-direction: column; margin: 0; }
+  .sos-form .location-map-panel { display: flex; flex: 1; flex-direction: column; }
+  .sos-form .location-map-wrap { flex: 1; height: auto; min-height: 420px; }
+  .sos-form .location-map-wrap > .location-map { position: absolute; inset: 0; width: auto !important; height: auto !important; }
 }
+.sos-form .location-locate-button { position: absolute; z-index: 1000; left: 10px; top: 86px; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 2px solid #0003; border-radius: 4px; background: #fff; color: #1d4f9c; cursor: pointer; }
+.sos-form .location-locate-button:hover { background: #f0f4fa; }
 .sos-step-card > h2,
 .sos-location-card .location-heading h2 {
   display: flex;

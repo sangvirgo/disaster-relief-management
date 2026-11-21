@@ -8,6 +8,7 @@ import { Pager } from '../../components/ui/Pager';
 import { Coordinator } from './Coordinator';
 import { Campaigns } from './Campaigns';
 import { CommonQueueSuggestions } from './CommonQueueSuggestions';
+import { ScopedCampaignMap } from './ScopedCampaignMap';
 import { HistorySummary, MyHistory, Timeline, type EngagementItem, type HistoryItem, type HistorySummaryData } from './CampaignHistory';
 import './campaign-coordination.css';
 
@@ -37,8 +38,8 @@ const reasonLabel: Record<string, string> = {
 };
 export function CampaignCoordination({ user, initialRequestId = '' }: { user: Me; initialRequestId?: string }) {
   const opensSos = Boolean(initialRequestId) || Boolean(new URL(window.location.href).searchParams.get('sos_id'));
-  // Tabs: campaigns (map + list) · SOS routing · SOS queue · coordination workspace · history.
-  const [tab, setTab] = useUrlView('campaign_tab', campaignTabs, opensSos ? 'sos' : 'campaigns');
+  // Tabs: SOS routing (default, map) · campaigns (overview + list) · SOS queue · coordination workspace · history.
+  const [tab, setTab] = useUrlView('campaign_tab', campaignTabs, opensSos ? 'sos' : 'routing');
   const [triage, setTriage] = useState<TriageCampaign[]>([]);
   const [overview, setOverview] = useState<OverviewCampaign[]>([]);
   const [commonQueue, setCommonQueue] = useState({ unmatched: 0, conflict: 0 });
@@ -131,7 +132,14 @@ export function CampaignCoordination({ user, initialRequestId = '' }: { user: Me
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Không thể tải lịch sử điều phối của bạn.'); }
   }
 
-  const tabs = [['campaigns', 'Chiến dịch'], ['routing', 'Phân vùng SOS'], ['sos', 'Xử lý SOS'], ['workspace', 'Không gian điều phối'], ['history', 'Lịch sử']];
+  // A coordinator with only campaign-scoped grants works their assigned campaigns and never handles unassigned/conflict SOS.
+  const isScopedCoordinator = !user.grants.some((grant) => grant.scope_type === 'SYSTEM' && (grant.role_code === 'COORDINATOR' || grant.role_code === 'ADMIN'))
+    && user.grants.some((grant) => grant.role_code === 'COORDINATOR' && grant.scope_type === 'CAMPAIGN');
+  const scopedCampaignIds = [...new Set([
+    ...user.grants.filter((grant) => grant.role_code === 'COORDINATOR' && grant.scope_type === 'CAMPAIGN' && grant.campaign_id).map((grant) => grant.campaign_id!),
+    ...engagements.map((item) => item.campaign_id),
+  ])];
+  const tabs = [['routing', isScopedCoordinator ? 'Bản đồ chiến dịch' : 'Phân vùng SOS'], ['campaigns', 'Chiến dịch'], ['sos', 'Xử lý SOS'], ['workspace', 'Không gian điều phối'], ['history', 'Lịch sử']];
   const activeTab = (id: string) => tab === id || (id === 'workspace' && tab === 'choose') || (id === 'history' && tab === 'my-history');
   return <section className="campaign-coordination">
     <div className="tabs" role="tablist" aria-label="Điều phối chiến dịch">
@@ -153,7 +161,7 @@ export function CampaignCoordination({ user, initialRequestId = '' }: { user: Me
             <strong>{loading && overviewCampaigns.length === 0 ? '—' : openRequestCount}</strong>
             <span className="campaign-overview__metric-note">trên các chiến dịch</span>
           </article>
-          <button type="button" className="campaign-overview__metric campaign-overview__metric--attention"
+          {!isScopedCoordinator && <button type="button" className="campaign-overview__metric campaign-overview__metric--attention"
             aria-label={`Mở tab Phân vùng SOS, ${unassignedRequestCount} SOS cần phân vùng`} onClick={() => setTab('routing')}>
             <span className="campaign-overview__metric-label">SOS cần phân vùng</span>
             <strong>{loading && overviewCampaigns.length === 0 ? '—' : unassignedRequestCount}</strong>
@@ -161,7 +169,7 @@ export function CampaignCoordination({ user, initialRequestId = '' }: { user: Me
               {loading && overviewCampaigns.length === 0 ? 'Đang tải dữ liệu…' : `${commonQueue.unmatched} ngoài vùng · ${commonQueue.conflict} trùng vùng`}
               <span className="campaign-overview__metric-link">Mở tab Phân vùng SOS <span aria-hidden="true">→</span></span>
             </span>
-          </button>
+          </button>}
         </div>
 
         <section className="campaign-overview__list" aria-labelledby="campaign-overview-title">
@@ -212,8 +220,9 @@ export function CampaignCoordination({ user, initialRequestId = '' }: { user: Me
         </section>
       </div>
     </>}
-    {tab === 'routing' && <CommonQueueSuggestions onChanged={() => { setQueueRevision((value) => value + 1); setRefresh((value) => value + 1); }} />}
-    {tab === 'sos' && <Coordinator key={`sos-${queueRevision}-${initialRequestId}`} page="queue" currentUserId={user.id} user={user} canSeeUnassigned initialRequestId={initialRequestId} />}
+    {tab === 'routing' && isScopedCoordinator && <ScopedCampaignMap campaigns={overviewCampaigns} campaignIds={scopedCampaignIds} />}
+    {tab === 'routing' && !isScopedCoordinator && <CommonQueueSuggestions onChanged={() => { setQueueRevision((value) => value + 1); setRefresh((value) => value + 1); }} />}
+    {tab === 'sos' && <Coordinator key={`sos-${queueRevision}-${initialRequestId}`} page="queue" currentUserId={user.id} user={user} canSeeUnassigned={!isScopedCoordinator} initialRequestId={initialRequestId} />}
     {tab === 'history' && <>
       <p><button className="button secondary" type="button" onClick={() => void showMyHistory()}>Xem lịch sử điều phối của tôi</button></p>
       <label className="campaign-history-select">Chiến dịch <Dropdown value={historyId} onChange={(event) => void showHistory(event.target.value)}>

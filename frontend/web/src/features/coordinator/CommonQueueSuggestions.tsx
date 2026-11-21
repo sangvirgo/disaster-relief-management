@@ -78,10 +78,11 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
   const [highlight, setHighlight] = useState('');
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const [campaignRequests, setCampaignRequests] = useState<MapPoint[]>([]);
+  const [attachedPoints, setAttachedPoints] = useState<MapPoint[]>([]);
   const [filter, setFilter] = useState<MatchFilter>('');
   const [cursor, setCursor, prevPage, pageIndex] = useCursorNav<string>('');
   const [choice, setChoice] = useState<Record<string, string>>({});
-  const [campaignSearch, setCampaignSearch] = useState<Record<string, string>>({});
+  const [mapFocus, setMapFocus] = useState<{ id: string; nonce: number } | null>(null);
   // Map editor: draw a new campaign area, or adjust an existing one (kind 'adjust' carries the campaign id).
   const [editMode, setEditMode] = useState<{ kind: 'create' } | { kind: 'adjust'; id: string } | null>(null);
   const [draftCenter, setDraftCenter] = useState<{ lat: number; lng: number } | null>(null);
@@ -102,6 +103,33 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
       .finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
   }, [revision, filter, cursor]);
+
+  // Open SOS already attached to a campaign (blue dots on the overview map).
+  useEffect(() => {
+    let live = true;
+    const load = async () => {
+      const points: MapPoint[] = [];
+      for (const state of ['AUTO_ATTACHED', 'MANUAL']) {
+        let next = '';
+        let pages = 0;
+        do {
+          const params = new URLSearchParams({ campaign_match_state: state, limit: '100' });
+          if (next) params.set('cursor', next);
+          const page = await api<{ items: Array<{ id: string; tracking_code: string; status: string; priority: string | null;
+            campaign_id?: string | null; approx_location?: { latitude: number; longitude: number } | null }>; more: boolean; cursor?: string }>('response', `/requests?${params}`);
+          points.push(...page.items.filter((item) => item.campaign_id && item.approx_location
+            && !['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(item.status)).map((item) => ({
+            id: item.id, tracking_code: item.tracking_code, priority: item.priority, campaign_match_state: 'CAMPAIGN', location: item.approx_location!,
+          })));
+          next = page.more ? page.cursor ?? '' : '';
+          pages += 1;
+        } while (next && pages < 5);
+      }
+      if (live) setAttachedPoints(points);
+    };
+    void load().catch(() => { if (live) setAttachedPoints([]); });
+    return () => { live = false; };
+  }, [revision]);
 
   useEffect(() => {
     if (!selectedCampaignId) { setCampaignRequests([]); return; }
@@ -225,28 +253,30 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
 
   return (
     <section className="card common-queue-suggestions">
-      <div className="section-header">
-        <h3>Bản đồ chiến dịch</h3>
-        <button type="button" className="button secondary" disabled={loading || busy} onClick={() => setRevision((value) => value + 1)}>Làm mới</button>
-      </div>
       {error && !editMode && <p className="notice error" role="alert">{error}</p>}
       {message && <p className="notice" role="status">{message}</p>}
 
-      <div className="campaign-area-editor">
-        <div className="campaign-area-editor__row">
-          <button type="button" className="button primary" disabled={busy || editMode?.kind === 'create'} onClick={startCreate}>Vẽ chiến dịch mới trên bản đồ</button>
-          <label>Chỉnh vùng chiến dịch
-            <Dropdown value={editMode?.kind === 'adjust' ? editMode.id : ''} disabled={busy} onChange={(event) => event.target.value ? startAdjust(event.target.value) : cancelEdit()}>
-              <option value="">Chọn chiến dịch…</option>
-              {data?.campaigns.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-            </Dropdown>
-          </label>
-        </div>
-        {editMode && <>
-          <p className="notice" role="status">
-            {!draftCenter ? 'Chạm lên bản đồ để đặt tâm vùng.' : 'Vòng nét đứt là bản xem trước chưa lưu. Kéo ✥ để di chuyển vùng, kéo ↔ ở mép vòng để đổi bán kính.'}
-          </p>
-          <div className="campaign-area-editor__row">
+      <CampaignAreaMap
+        height="clamp(540px, 76dvh, 880px)"
+        focusRequestId={mapFocus}
+        note={editMode ? null : <>
+          <span>💡 Nhấp đúp vào vòng chiến dịch để chỉnh vùng.</span>
+          <span><i className="map-note-swatch map-note-swatch--solid" aria-hidden="true" /> Vòng nét liền: đang hoạt động</span>
+          <span><i className="map-note-swatch map-note-swatch--dashed" aria-hidden="true" /> Vòng nét đứt: tạm dừng hoặc bản nháp</span>
+        </>}
+        alert={data && data.total > 0 ? <button type="button" className="campaign-map-alert"
+          onClick={() => document.getElementById('sos-unassigned')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+          <span className="campaign-map-alert__icon" aria-hidden="true">!</span>
+          <span><strong>{data.total} SOS chưa có chiến dịch</strong><small>Cần quyết định ngay · bấm để xem danh sách</small></span>
+        </button> : null}
+        overlay={<>
+          <div className="campaign-tools__bar">
+            <button type="button" className="button primary" disabled={busy || editMode?.kind === 'create'} onClick={startCreate}>＋ Vẽ mới</button>
+          </div>
+          {editMode && <div className="campaign-tools__panel">
+            <p className="campaign-tools__hint" role="status">
+              {!draftCenter ? 'Chạm lên bản đồ để đặt tâm vùng.' : 'Kéo ✥ để di chuyển, kéo ↔ để đổi bán kính.'}
+            </p>
             {editMode.kind === 'create' && <label>Tên chiến dịch
               <input value={draftName} maxLength={200} onChange={(event) => setDraftName(event.target.value)} placeholder="Ví dụ: Cứu trợ lũ Hải Phòng" />
             </label>}
@@ -255,20 +285,20 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
                 onChange={(event) => { setDraftRadius(Math.round(Number(event.target.value))); if (editMode.kind === 'adjust') setPendingAdjustment(true); }} />
             </label>
             {draftReady && <span className="muted">≈ {km(draftRadius)} km · {coveredByDraft} SOS chưa thuộc vùng nằm trong vòng này</span>}
-          </div>
-          {editMode.kind === 'create' && <div className="campaign-area-editor__row">
-            <button type="button" className="button primary" disabled={busy || !draftReady || !draftName.trim()} onClick={() => void createFromDraft(true)}>Tạo và kích hoạt</button>
-            <button type="button" className="button secondary" disabled={busy || !draftReady || !draftName.trim()} onClick={() => void createFromDraft(false)}>Lưu bản nháp</button>
-            <button type="button" className="button secondary" disabled={busy} onClick={cancelEdit}>Hủy</button>
+            {adjusting && adjusting.status === 'ACTIVE' && <span className="muted">SOS chưa thuộc vùng nằm trong vùng mới sẽ được gắn vào chiến dịch này.</span>}
+            {invalidCampaignId && <p className="notice warning" role="alert">Chiến dịch này có mã dữ liệu không hợp lệ nên chưa lưu được vùng.</p>}
+            {error && <p className="notice error" role="alert">{error}</p>}
+            {editMode.kind === 'create' && <div className="campaign-tools__actions">
+              <button type="button" className="button primary" disabled={busy || !draftReady || !draftName.trim()} onClick={() => void createFromDraft(true)}>Tạo và kích hoạt</button>
+              <button type="button" className="button secondary" disabled={busy || !draftReady || !draftName.trim()} onClick={() => void createFromDraft(false)}>Lưu nháp</button>
+              <button type="button" className="button secondary" disabled={busy} onClick={cancelEdit}>Hủy</button>
+            </div>}
+            {editMode.kind === 'adjust' && !pendingAdjustment && <div className="campaign-tools__actions">
+              <button type="button" className="button secondary" disabled={busy} onClick={cancelEdit}>Đóng</button>
+            </div>}
           </div>}
-          {invalidCampaignId && <p className="notice warning" role="alert">Chiến dịch này có mã dữ liệu không hợp lệ nên API chưa nhận thao tác lưu vùng. Cần sửa dữ liệu chiến dịch trước khi chỉnh vùng.</p>}
-          {error && <p className="notice error" role="alert">{error}</p>}
-          {adjusting && adjusting.status === 'ACTIVE' && <p className="muted">SOS chưa thuộc vùng nằm trong vùng mới sẽ được gắn vào chiến dịch này.</p>}
         </>}
-      </div>
-
-      <CampaignAreaMap
-        requests={selectedCampaignId ? campaignRequests : data?.map_points ?? []}
+        requests={selectedCampaignId ? campaignRequests : [...(data?.map_points ?? []), ...attachedPoints]}
         campaigns={data?.campaigns ?? []}
         selectedCampaignId={selectedCampaignId}
         onCampaignSelect={(id) => { cancelEdit(); setSelectedCampaignId(id); }}
@@ -285,7 +315,7 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
           document.getElementById(`sos-suggestion-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }}
       />
-      <p className="muted">{selectedCampaignId ? 'Đang xem SOS còn mở trong chiến dịch. Chọn chiến dịch khác ở danh sách bên dưới hoặc xem toàn cảnh.' : 'Chấm cam: ngoài mọi vùng · chấm tím: trùng nhiều vùng · chấm lớn: ưu tiên P1 · vòng liền: đang hoạt động · vòng nét đứt: tạm dừng/bản nháp.'}</p>
+      <p className="muted">{selectedCampaignId ? 'Đang xem SOS còn mở trong chiến dịch. Chọn chiến dịch khác ở danh sách bên dưới hoặc xem toàn cảnh.' : 'Chấm đỏ: SOS chưa gắn chiến dịch (quầng đỏ lớn hơn: trùng nhiều vùng) · chấm xanh: SOS đã gắn chiến dịch và còn mở · chấm lớn: ưu tiên P1 · vòng liền: đang hoạt động · vòng nét đứt: tạm dừng/bản nháp.'}</p>
       {selectedCampaignId && <button type="button" className="button secondary campaign-map-reset" onClick={() => setSelectedCampaignId(null)}>Xem toàn cảnh</button>}
 
       {data && data.clusters.length > 0 && (
@@ -305,7 +335,7 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
         </details>
       )}
 
-      <div className="suggestion-group">
+      <div className="suggestion-group" id="sos-unassigned">
         <div className="section-header">
           <h4>SOS chưa có chiến dịch{data ? ` (${data.total})` : ''}</h4>
           <div className="campaign-filters" role="group" aria-label="Lọc SOS chưa có chiến dịch">
@@ -334,15 +364,16 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
           const options = [...attachTargets].sort((a, b) =>
             Number(candidates.has(b.id)) - Number(candidates.has(a.id)) || distance(a.id) - distance(b.id));
           const savedTarget = choice[item.id] ?? (candidates.size ? options[0]?.id : '') ?? '';
-          const query = (campaignSearch[item.id] ?? '').trim().toLocaleLowerCase('vi-VN');
-          const visibleOptions = options.filter((target, index) =>
-            query ? target.name.toLocaleLowerCase('vi-VN').includes(query) : index < 5 || target.id === savedTarget);
+          const visibleOptions = options;
           const selectedTarget = visibleOptions.some((target) => target.id === savedTarget) ? savedTarget : '';
           return (
             <article className={`suggestion-item${highlight === item.id ? ' is-highlighted' : ''}`} key={item.id} id={`sos-suggestion-${item.id}`}>
               <div className="suggestion-head">
                 <div>
-                  <strong>{item.tracking_code}</strong>{' '}
+                  <button type="button" className="suggestion-code-link" title="Xem vị trí SOS trên bản đồ"
+                    onClick={() => { setSelectedCampaignId(null); cancelEdit(); setHighlight(item.id); setMapFocus({ id: item.id, nonce: Date.now() }); }}>
+                    <span aria-hidden="true">📍</span>{item.tracking_code}
+                  </button>{' '}
                   {item.priority && <span className="badge">{item.priority}</span>}{' '}
                   <span className={`chip${item.campaign_match_state === 'CONFLICT' ? ' chip--warn' : ''}`}>{STATE_VI[item.campaign_match_state] ?? item.campaign_match_state}</span>{' '}
                   {item.needs_relief_supplies && <span className="chip chip--warn">Cần hàng cứu trợ</span>}
@@ -353,9 +384,6 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
                   </p>
                 </div>
                 <div className="suggestion-actions">
-                  <input type="search" aria-label={`Tìm chiến dịch cho ${item.tracking_code}`}
-                    placeholder="Tìm chiến dịch theo tên…" value={campaignSearch[item.id] ?? ''}
-                    onChange={(event) => setCampaignSearch((current) => ({ ...current, [item.id]: event.target.value }))} />
                   <div className="suggestion-actions__attach">
                     <Dropdown aria-label={`Chiến dịch để gắn ${item.tracking_code}`} value={selectedTarget} disabled={busy}
                       onChange={(event) => setChoice((current) => ({ ...current, [item.id]: event.target.value }))}>
@@ -366,8 +394,6 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
                     </Dropdown>
                     <button type="button" className="button primary" disabled={busy || !selectedTarget} onClick={() => void attach(item, selectedTarget)}>Gắn</button>
                   </div>
-                  {!query && options.length > 5 && <small className="muted">5 chiến dịch gần nhất; tìm theo tên để xem lựa chọn khác.</small>}
-                  {query && !visibleOptions.length && <small className="muted">Không tìm thấy chiến dịch theo tên này.</small>}
                   <div className="suggestion-actions__alternatives">
                     {canExpand && nearestCampaign && nearest && (
                       <button type="button" className="button secondary suggestion-actions__expand" disabled={busy} onClick={() => void expandArea(nearestCampaign, nearest.suggested_radius_m)}>

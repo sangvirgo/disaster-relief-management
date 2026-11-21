@@ -1548,8 +1548,8 @@
   display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
   background: #fff; border: 2px solid; font-size: 12px; font-weight: 700;
 }
-.campaign-area-legend { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
-.campaign-area-legend li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.campaign-area-legend { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.campaign-area-legend li { display: flex; }
 .campaign-area-legend__badge {
   display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
   border: 2px solid; font-size: 12px; font-weight: 700; background: #fff;
@@ -1566,7 +1566,7 @@
 .campaign-area-map__reject:hover { background: #b91c1c; }
 .campaign-area-map__confirm button:disabled { opacity: .5; cursor: not-allowed; }
 @media (max-width: 600px) { .campaign-area-map__confirm span { display: none; } }
-.campaign-area-legend__button { border: 0; padding: 3px 5px; border-radius: 6px; background: transparent; color: var(--color-text-primary); text-align: left; cursor: pointer; }
+.campaign-area-legend__button { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--color-surface-border); padding: 4px 11px 4px 5px; border-radius: 999px; font-size: 13px; background: #fff; color: var(--color-text-primary); text-align: left; cursor: pointer; }
 .campaign-area-legend__button:hover, .campaign-area-legend__button[aria-pressed='true'] { background: var(--color-primary-bg); color: var(--color-primary-dark); }
 .campaign-area-label { cursor: pointer; }
 .campaign-map-reset { justify-self: start; }
@@ -1783,3 +1783,13 @@
 .receipt-detail-summary { padding: 12px 16px; border: 1px solid var(--color-surface-border); border-radius: 12px; background: var(--color-surface-subtle); }
 .receipt-detail-summary h3 { margin: 0 0 8px; }
 .receipt-detail-summary p { margin: 5px 0; }
+
+/* Urgent banner for SOS that still have no campaign. */
+.sos-unassigned-alert { display: flex; flex: 1 1 380px; align-items: center; gap: 12px; padding: 12px 16px; border: 1px solid #dc2626; border-left-width: 6px; border-radius: 10px; background: #fef2f2; color: #7f1d1d; }
+.sos-unassigned-alert h4 { margin: 0; color: #b91c1c; font-size: 17px; font-weight: 800; }
+.sos-unassigned-alert p { margin: 2px 0 0; font-size: 13px; color: #7f1d1d; }
+.sos-unassigned-alert__icon { display: grid; flex: none; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: #dc2626; color: #fff; font-size: 20px; font-weight: 800; animation: sos-alert-pulse 1.6s ease-out infinite; }
+@keyframes sos-alert-pulse { 0% { box-shadow: 0 0 0 0 #dc262699; } 70% { box-shadow: 0 0 0 10px #dc262600; } 100% { box-shadow: 0 0 0 0 #dc262600; } }
+@media (prefers-reduced-motion: reduce) { .sos-unassigned-alert__icon { animation: none; } }
+.suggestion-code-link { display: inline-flex; align-items: center; gap: 5px; margin: 0; padding: 3px 9px 3px 6px; border: 1px solid transparent; border-radius: 8px; background: var(--color-primary-bg); color: var(--color-primary-dark); font-size: 15px; font-weight: 700; cursor: pointer; }
+.suggestion-code-link:hover { border-color: var(--color-primary); background: #e0ebff; text-decoration: underline; }

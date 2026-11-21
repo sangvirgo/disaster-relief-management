@@ -1,10 +1,12 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { maplibreGL } from '@maplibre/maplibre-gl-leaflet';
 import { setWorkerUrl } from 'maplibre-gl';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import 'maplibre-gl/dist/maplibre-gl.css';
+
+import { WeatherLayers } from './WeatherLayers';
 
 setWorkerUrl(workerUrl);
 
@@ -77,6 +79,11 @@ export function CampaignAreaMap({
   onCampaignSelect,
   onCampaignEdit,
   editActions,
+  overlay,
+  focusRequestId,
+  note,
+  alert,
+  height = 380,
   ariaLabel = 'Bản đồ chiến dịch và SOS cần quyết định',
 }: {
   requests: AreaMapRequest[];
@@ -87,6 +94,14 @@ export function CampaignAreaMap({
   onCampaignSelect?: (id: string) => void;
   onCampaignEdit?: (id: string) => void;
   editActions?: { onConfirm: () => void; onCancel: () => void; busy: boolean; canConfirm: boolean } | null;
+  /** Controls drawn over the map (bottom-right), e.g. draw / adjust campaign tools. */
+  overlay?: ReactNode;
+  /** Short hint pill under the weather chips, and an urgent warning pinned bottom-right. */
+  note?: ReactNode;
+  /** Pan/zoom to one SOS marker and pulse it; a new `nonce` re-triggers the focus. */
+  focusRequestId?: { id: string; nonce: number } | null;
+  alert?: ReactNode;
+  height?: number | string;
   ariaLabel?: string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -103,6 +118,8 @@ export function CampaignAreaMap({
   const campaignEditRef = useRef(onCampaignEdit);
   campaignEditRef.current = onCampaignEdit;
   const focusedRef = useRef(false);
+  const markersRef = useRef(new Map<string, L.CircleMarker>());
+  const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -113,6 +130,7 @@ export function CampaignAreaMap({
       maplibreGL({ style: mapStyleUrl, locale: { 'Map.Title': 'Bản đồ' } }).addTo(map);
     }
     mapRef.current = map;
+    setMapInstance(map);
     layerRef.current = L.layerGroup().addTo(map);
     editLayerRef.current = L.layerGroup().addTo(map);
     map.on('click', (event: L.LeafletMouseEvent) => {
@@ -132,6 +150,7 @@ export function CampaignAreaMap({
     return () => {
       window.clearTimeout(timer);
       map.remove();
+      setMapInstance(null);
       mapRef.current = null;
       layerRef.current = null;
       editLayerRef.current = null;
@@ -181,6 +200,7 @@ export function CampaignAreaMap({
     const layer = layerRef.current;
     if (!map || !layer) return;
     layer.clearLayers();
+    markersRef.current.clear();
     const bounds: L.LatLngTuple[] = [];
     campaigns.forEach((campaign, index) => {
       if (campaign.id === hideId) return;
@@ -193,8 +213,11 @@ export function CampaignAreaMap({
         dashArray: active ? undefined : '6 4',
         fillColor: color,
         fillOpacity: 0.07,
-        interactive: false,
-      }).addTo(layer);
+        className: 'campaign-area-circle',
+      }).on('dblclick', (event: L.LeafletMouseEvent) => {
+        L.DomEvent.stopPropagation(event);
+        campaignEditRef.current?.(campaign.id);
+      }).bindTooltip(`${campaign.name} · nhấp đúp để chỉnh vùng`, { sticky: true }).addTo(layer);
       // Name sits on the circle's northern edge, so nested circles get labels at different heights.
       const edge: L.LatLngTuple = [campaign.center.lat + campaign.radius_m / 111_320, campaign.center.lng];
       L.marker(edge, {
@@ -209,18 +232,33 @@ export function CampaignAreaMap({
         .on('dblclick', () => campaignEditRef.current?.(campaign.id)).addTo(layer);
       bounds.push([campaign.center.lat, campaign.center.lng]);
     });
-    for (const request of requests) {
+    // SOS dots live in their own pane above the campaign number badges, so a dot is never hidden under a circle label.
+    const dotPane = map.getPane('sos-dots') ?? map.createPane('sos-dots');
+    dotPane.style.zIndex = '650';
+    const dotRenderer = L.svg({ pane: 'sos-dots' });
+    // Conflicts are drawn last (on top) and with a red halo so they stand out from the blue dots.
+    const unassigned = (state: string) => state === 'UNMATCHED' || state === 'CONFLICT';
+    const ordered = [...requests].sort((a, b) => Number(unassigned(a.campaign_match_state)) - Number(unassigned(b.campaign_match_state)));
+    for (const request of ordered) {
       const position: L.LatLngTuple = [request.location.latitude, request.location.longitude];
-      L.circleMarker(position, {
-        radius: request.priority === 'P1' ? 9 : 6,
+      const conflict = request.campaign_match_state === 'CONFLICT';
+      const label = `${request.tracking_code}${request.priority ? ` · ${request.priority}` : ''}${conflict ? ' · trùng nhiều vùng' : ''}`;
+      if (conflict) {
+        L.circleMarker(position, { renderer: dotRenderer, radius: 15, color: '#dc2626', weight: 2, fillColor: '#dc2626', fillOpacity: 0.18, interactive: false }).addTo(layer);
+      }
+      const marker = L.circleMarker(position, {
+        renderer: dotRenderer,
+        radius: request.priority === 'P1' ? 10 : 6,
         color: '#ffffff',
         weight: 1.5,
-        fillColor: request.campaign_match_state === 'CONFLICT' ? '#7c3aed' : '#ea580c',
+        // Red: not attached to any campaign. Blue: attached to a campaign and still open.
+        fillColor: unassigned(request.campaign_match_state) ? '#dc2626' : '#2563eb',
         fillOpacity: 0.95,
       })
-        .bindTooltip(`${request.tracking_code}${request.priority ? ` · ${request.priority}` : ''}`)
+        .bindTooltip(label)
         .on('click', () => selectRef.current?.(request.id))
         .addTo(layer);
+      markersRef.current.set(request.id, marker);
       bounds.push(position);
     }
     boundsRef.current = bounds;
@@ -248,6 +286,29 @@ export function CampaignAreaMap({
     containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [selectedCampaignId, campaigns]);
 
+  const focusNonce = focusRequestId?.nonce;
+  const focusId = focusRequestId?.id;
+  useEffect(() => {
+    const map = mapRef.current;
+    const marker = focusId ? markersRef.current.get(focusId) : undefined;
+    if (!map || !marker) return;
+    containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    map.invalidateSize();
+    map.stop();
+    const at = marker.getLatLng();
+    map.flyTo(at, Math.max(map.getZoom(), 12), { duration: 0.8 });
+    marker.bringToFront();
+    marker.openTooltip();
+    const ring = L.marker(at, {
+      interactive: false, keyboard: false, zIndexOffset: 3000,
+      icon: L.divIcon({ className: 'sos-focus-ring', html: '<span></span>', iconSize: [44, 44], iconAnchor: [22, 22] }),
+    }).addTo(map);
+    const timer = window.setTimeout(() => ring.remove(), 4500);
+    return () => { window.clearTimeout(timer); ring.remove(); };
+    // Triggered only by a new focus request (nonce), not by data refreshes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusNonce, focusId]);
+
   return (
     <>
       <div className="campaign-area-map-shell">
@@ -256,8 +317,12 @@ export function CampaignAreaMap({
           className="campaign-area-map"
           role="region"
           aria-label={ariaLabel}
-          style={{ height: 380, width: '100%', borderRadius: 8 }}
+          style={{ height, width: '100%', borderRadius: 8 }}
         />
+        <WeatherLayers map={mapInstance} />
+        {overlay && <div className="campaign-area-map__tools">{overlay}</div>}
+        {note && <p className="campaign-area-map__note">{note}</p>}
+        {alert && <div className="campaign-area-map__alert">{alert}</div>}
         {editActions && <div className="campaign-area-map__confirm" role="group" aria-label="Xác nhận thay đổi vùng chiến dịch">
           <span>Áp dụng vòng vừa chỉnh?</span>
           <button type="button" className="campaign-area-map__accept" aria-label="Xác nhận vùng mới" title="Xác nhận vùng mới"
@@ -270,10 +335,13 @@ export function CampaignAreaMap({
         <ol className="campaign-area-legend" aria-label="Chú giải vùng chiến dịch">
           {campaigns.map((campaign, index) => (
             <li key={campaign.id}>
-              <span className="campaign-area-legend__badge" style={{ borderColor: areaColor(index), color: areaColor(index) }}>{index + 1}</span>
               <button type="button" className="campaign-area-legend__button" aria-pressed={selectedCampaignId === campaign.id}
-                onClick={() => onCampaignSelect?.(campaign.id)}><strong>{campaign.name}</strong></button>
-              <span className="muted"> · {CAMPAIGN_STATUS_VI[campaign.status] ?? campaign.status} · bán kính {(campaign.radius_m / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} km</span>
+                title={`${CAMPAIGN_STATUS_VI[campaign.status] ?? campaign.status} · bán kính ${(campaign.radius_m / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} km`}
+                onClick={() => onCampaignSelect?.(campaign.id)}>
+                <span className="campaign-area-legend__badge" style={{ borderColor: areaColor(index), color: areaColor(index) }}>{index + 1}</span>
+                <strong>{campaign.name}</strong>
+                {campaign.status !== 'ACTIVE' && <span className="muted">{CAMPAIGN_STATUS_VI[campaign.status] ?? campaign.status}</span>}
+              </button>
             </li>
           ))}
         </ol>

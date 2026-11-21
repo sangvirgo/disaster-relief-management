@@ -6,6 +6,7 @@ import { maplibreGL } from '@maplibre/maplibre-gl-leaflet';
 import { setWorkerUrl } from 'maplibre-gl';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { WeatherLayers } from './WeatherLayers';
 
 setWorkerUrl(workerUrl);
 
@@ -84,6 +85,7 @@ export function LocationPicker({
   toggleLabel,
   overlay,
   weather,
+  onLocate,
 }: {
   value: Point | null;
   onSelect: (point: Point | null, address?: string) => void;
@@ -99,6 +101,8 @@ export function LocationPicker({
   overlay?: LocationOverlay;
   /** Forecast at the confirmed SOS location, supplied by the form's weather request. */
   weather?: LocationWeather | null;
+  /** Adds a "use my current location" icon button on the map. */
+  onLocate?: () => void;
 }) {
   const [open, setOpen] = useState(initiallyOpen);
   const activeGoogleKey = envApiKey;
@@ -154,8 +158,7 @@ export function LocationPicker({
   const [moving, setMoving] = useState(false);
   const [pinDropKey, setPinDropKey] = useState(0);
   const [tileError, setTileError] = useState(false);
-  const [rainOn, setRainOn] = useState(true);
-  const [rainState, setRainState] = useState<'loading' | 'ready' | 'unavailable'>('loading');
+  const [weatherMap, setWeatherMap] = useState<L.Map | null>(null);
   const [error, setError] = useState('');
 
   function lookupAddress(point: Point, confirmed = false) {
@@ -257,6 +260,7 @@ export function LocationPicker({
     });
     L.control.zoom({ zoomInTitle: 'Phóng to', zoomOutTitle: 'Thu nhỏ' }).addTo(map);
     leafletMapRef.current = map;
+    setWeatherMap(map);
 
     setTileError(false);
     if (tileUrl) {
@@ -306,34 +310,9 @@ export function LocationPicker({
       pinMarkerRef.current = null;
       map.remove();
       leafletMapRef.current = null;
+      setWeatherMap(null);
     };
   }, [open, mapEngine, applyAutoSelection]);
-
-  // Observed rain radar (RainViewer, no key). Blue = rain; darker/violet = heavier rain, so flooding risk is visible at a glance.
-  useEffect(() => {
-    const map = leafletMapRef.current;
-    if (!open || mapEngine !== 'osm' || !map || !rainOn) return;
-    const controller = new AbortController();
-    let layer: L.TileLayer | null = null;
-    setRainState('loading');
-    (async () => {
-      try {
-        const response = await fetch('https://api.rainviewer.com/public/weather-maps.json', { signal: controller.signal });
-        if (!response.ok) throw new Error('radar');
-        const body = await response.json() as { host?: string; radar?: { past?: { path: string }[] } };
-        const frame = body.radar?.past?.at(-1);
-        if (!body.host || !frame || controller.signal.aborted) throw new Error('radar');
-        if (!map.getPane('rain')) { const pane = map.createPane('rain'); pane.style.zIndex = '350'; pane.style.pointerEvents = 'none'; }
-        layer = L.tileLayer(`${body.host}${frame.path}/256/{z}/{x}/{y}/2/1_1.png`, {
-          pane: 'rain', opacity: 0.65, maxNativeZoom: 7, maxZoom: 19, attribution: 'Radar mưa: RainViewer.com',
-        }).addTo(map);
-        setRainState('ready');
-      } catch {
-        if (!controller.signal.aborted) setRainState('unavailable');
-      }
-    })();
-    return () => { controller.abort(); layer?.remove(); };
-  }, [open, mapEngine, rainOn]);
 
   // The red pin follows the chosen point (clicked, searched or typed).
   useEffect(() => {
@@ -837,18 +816,18 @@ export function LocationPicker({
               </div>
               {weather.stale && <small className="location-weather-overlay__stale">Dữ liệu có thể đã cũ</small>}
             </div>}
-            {mapEngine === 'osm' && (
-              <div className="rain-control">
-                <button type="button" className={rainOn ? 'active' : ''} aria-pressed={rainOn} onClick={() => setRainOn(!rainOn)}>
-                  🌧 Lớp mưa
-                </button>
-                {rainOn && rainState === 'ready' && <div className="rain-legend" aria-label="Chú giải cường độ mưa">
-                  <i /> <span>Nhẹ</span><span>Vừa</span><span>Lớn (nguy cơ ngập)</span>
-                </div>}
-                {rainOn && rainState === 'loading' && <small role="status">Đang tải radar mưa…</small>}
-                {rainOn && rainState === 'unavailable' && <small role="status">Chưa tải được radar mưa.</small>}
-              </div>
-            )}
+            {mapEngine === 'osm' && <WeatherLayers map={weatherMap} />}
+            {onLocate && <button
+              type="button"
+              className="location-locate-button"
+              onClick={onLocate}
+              aria-label="Dùng vị trí hiện tại"
+              title="Dùng vị trí hiện tại"
+            >
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <circle cx="12" cy="12" r="4" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /><circle cx="12" cy="12" r="8" />
+              </svg>
+            </button>}
             {mapEngine === 'osm' && (
               <div
                 ref={leafletContainerRef}
