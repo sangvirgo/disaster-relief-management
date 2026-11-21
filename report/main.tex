@@ -21,7 +21,7 @@
 \usepackage{newfloat}
 \usepackage{tocloft}
 \usepackage{tikz}
-\usetikzlibrary{positioning,shapes.geometric,arrows.meta,fit,backgrounds,calc}
+\usetikzlibrary{positioning,shapes.geometric,shapes.multipart,arrows.meta,fit,backgrounds,calc}
 
 \DeclareFloatingEnvironment[within=chapter,fileext=lod,listname={DANH MỤC SƠ ĐỒ},name={Sơ đồ}]{diagram}
 \newcolumntype{Y}{>{\RaggedRight\arraybackslash}X}
@@ -98,9 +98,9 @@
 \setlength{\cftsubsecindent}{1.5cm}
 \setlength{\cftsubsecnumwidth}{1.3cm}
 \setlength{\cfttabindent}{0pt}
-\setlength{\cfttabnumwidth}{2.7cm}
+\setlength{\cfttabnumwidth}{3.1cm}
 \setlength{\cftfigindent}{0pt}
-\setlength{\cftfignumwidth}{2.7cm}
+\setlength{\cftfignumwidth}{3.1cm}
 \makeatletter
 \AtBeginDocument{\let\l@diagram\l@figure}
 \makeatother
@@ -220,7 +220,7 @@
     \draw[thick,fill=white] (0,0.62) circle (0.17);
     \draw[thick] (0,0.45) -- (0,0.0) (-0.3,0.3) -- (0.3,0.3) (0,0.0) -- (-0.24,-0.4) (0,0.0) -- (0.24,-0.4);
   },
-  usecase/.style={ellipse,draw,thick,fill=white,align=center,text width=3.3cm,inner sep=0pt,font=\footnotesize},
+  usecase/.style={ellipse,draw,thick,fill=white,align=center,text width=3.4cm,inner sep=0pt,font=\footnotesize},
   ucline/.style={thick},
   ucrel/.style={-{Stealth[length=2.2mm]},dashed},
   seqhead/.style={rectangle,draw,thick,fill=white,align=center,text width=2.1cm,minimum height=0.9cm,font=\footnotesize},
@@ -235,6 +235,13 @@
   stlabel/.style={font=\scriptsize\itshape,fill=white,inner sep=1pt,align=center},
   stinit/.style={circle,fill=black,inner sep=0pt,minimum size=0.3cm},
   stfinal/.style={circle,draw,thick,inner sep=0pt,minimum size=0.36cm,path picture={\fill (path picture bounding box.center) circle (0.1cm);}},
+}
+\tikzset{
+  cls/.style={rectangle split,rectangle split parts=2,draw,thick,fill=white,font=\scriptsize,text width=3.5cm,align=left,inner sep=3pt,rectangle split part align={center,left}},
+  clsrel/.style={thick},
+  mult/.style={font=\scriptsize,inner sep=1pt,fill=white},
+  contbox/.style={rectangle,draw,thick,fill=white,align=center,font=\footnotesize,minimum height=1.1cm},
+  lanebox/.style={rectangle,draw,thick,fill=white,align=center,font=\scriptsize,text width=3.2cm,inner sep=3pt,minimum height=0.8cm},
 }
 % #1 tên nút, #2 tọa độ, #3 nhãn tác nhân
 \newcommand{\ucactor}[3]{%
@@ -392,7 +399,7 @@ Nếu bị phát hiện có bất kỳ sự gian lận nào các thành viên tr
 
 \textbf{Tình hình nghiên cứu.} Trên thế giới, Ushahidi là nền tảng mã nguồn mở thu thập báo cáo khủng hoảng từ tin nhắn, Web và mạng xã hội rồi hiển thị trên bản đồ; trong đợt triển khai sau động đất Haiti năm 2010, khó khăn lớn nhất được ghi nhận là xác minh và phân loại khối lượng lớn báo cáo, phần lớn phải làm thủ công. Sahana Eden là bộ công cụ Web mã nguồn mở hỗ trợ tìm người mất tích, quản lý viện trợ, tình nguyện viên và nơi tạm trú, đã được nhiều cơ quan chính phủ và tổ chức phi chính phủ sử dụng. Ở Việt Nam, trang cuuhomientrung.info được tình nguyện viên xây dựng trong đợt lũ miền Trung tháng 10/2020 để tổng hợp, xác minh thông tin và kết nối đội cứu hộ với hộ dân; cuối tháng 11/2025, Zalo bổ sung bản đồ vào tính năng Zalo SOS để người dân chia sẻ vị trí, tình trạng và nhu cầu cứu hộ. Các nền tảng cộng đồng này mạnh ở khâu thu thập và hiển thị yêu cầu, còn việc xác minh, giao nhiệm vụ, giới hạn quyền xem thông tin cá nhân và đối soát hàng cứu trợ phần lớn vẫn diễn ra bên ngoài hệ thống; Sahana Eden có phạm vi rộng hơn nhưng là bộ công cụ tổng quát, cần được cấu hình cho từng tổ chức. Ưu, nhược điểm của từng giải pháp và điểm khác biệt của đề tài được phân tích tại Mục~\ref{sec:similar-systems}.
 
-\textbf{Tính đóng góp của đề tài.} Về giá trị thực tiễn, đề tài xây dựng một quy trình liền mạch từ lúc người dân gửi yêu cầu đến khi điều phối viên xác minh, giao đội và đối soát hàng cứu trợ, giúp các bên cùng làm việc trên một nguồn thông tin thống nhất thay vì tổng hợp từ nhiều kênh rời rạc. Về tính nhân văn, người dân không cần tài khoản vẫn gửi được yêu cầu cho bản thân; người thân ở xa có thể báo giúp hộ gia đình đang mất điện, mất mạng hoặc không có điện thoại; vị trí và số điện thoại của người gặp nạn chỉ hiển thị cho người có nhiệm vụ. Mọi quyết định xác minh, ưu tiên và điều phối do con người thực hiện và được lưu lý do, không để máy tự quyết định trong những tình huống liên quan đến tính mạng. Về hiệu quả, cơ chế chống gửi lặp, liên kết báo cáo trùng có kiểm soát và lọc đội theo kỹ năng, tổ chức, khoảng cách và tình trạng sẵn sàng giúp giảm thao tác lặp và rút ngắn thời gian tìm đội phù hợp; hàng quyên góp được kiểm đếm, duyệt độc lập và ghi tồn kho đúng một lần, giúp minh bạch nguồn hàng với người quyên góp. Đây là các mục tiêu thiết kế; mức cải thiện cụ thể cần được đo khi hệ thống được thử nghiệm trong điều kiện thực tế.
+\textbf{Tính đóng góp của đề tài.} Về giá trị thực tiễn, đề tài xây dựng một quy trình liền mạch từ lúc người dân gửi yêu cầu đến khi điều phối viên xác minh, giao đội và đối soát hàng cứu trợ, giúp các bên cùng làm việc trên một nguồn thông tin thống nhất thay vì tổng hợp từ nhiều kênh rời rạc. Về tính nhân văn, người dân không cần tài khoản vẫn gửi được yêu cầu cho bản thân; người thân ở xa có thể báo giúp hộ gia đình đang mất điện, mất mạng hoặc không có điện thoại; vị trí và số điện thoại của người gặp nạn chỉ hiển thị cho người có nhiệm vụ. Mọi quyết định xác minh, ưu tiên và điều phối do con người thực hiện và được lưu lý do, không để máy tự quyết định trong những tình huống liên quan đến tính mạng. Về hiệu quả, cơ chế chống gửi lặp, liên kết báo cáo trùng có kiểm soát và lọc đội theo kỹ năng, khoảng cách, vị trí gần đây và tình trạng sẵn sàng giúp giảm thao tác lặp và rút ngắn thời gian tìm đội phù hợp; hàng quyên góp được kiểm đếm, duyệt độc lập và ghi tồn kho đúng một lần, giúp minh bạch nguồn hàng với người quyên góp. Đây là các mục tiêu thiết kế; mức cải thiện cụ thể cần được đo khi hệ thống được thử nghiệm trong điều kiện thực tế.
 
 \textbf{Phạm vi và phương pháp nghiên cứu.} Phạm vi gồm ứng dụng Web, ứng dụng di động và phần máy chủ phục vụ tiếp nhận SOS, điều phối đội ứng cứu, quản lý chiến dịch và cứu trợ hiện vật; đề tài không xử lý thu tiền hoặc thanh toán. Nhóm phân tích yêu cầu được giao và tài liệu kỹ thuật, mô hình hóa tác nhân và ca sử dụng, sau đó đối chiếu yêu cầu với thiết kế, mã nguồn và kết quả kiểm thử đã ghi nhận. Nhóm chưa phỏng vấn trực tiếp người dân hoặc lực lượng ứng cứu; vì vậy, các nội dung về quy trình thực tế được trình bày như yêu cầu cần xác nhận, không phải kết quả khảo sát thực địa.
 
@@ -431,8 +438,8 @@ Mục tiêu tổng quát là xây dựng một hệ thống Web/Mobile quản l�
   \item Tiếp nhận SOS/yêu cầu trợ giúp có loại tình huống, vị trí theo hệ thống định vị toàn cầu (GPS) hoặc ghim thủ công, thông tin liên hệ và bằng chứng tùy chọn.
   \item Hỗ trợ điều phối viên xem hàng đợi, ghi nhận xác minh, xử lý báo trùng có lý do, quyết định mức ưu tiên và giao nhiệm vụ.
   \item Hỗ trợ đội/tình nguyện viên xem nhiệm vụ thuộc phạm vi của mình, cập nhật tiến độ và gửi bằng chứng kết quả.
-  \item Theo dõi chiến dịch, điểm tiếp nhận, kho, vật tư, phương tiện và phân phối cứu trợ ở mức cần cho các luồng cốt lõi.
-  \item Cho phép người dân khai báo hàng hóa đã bàn giao; nhân viên tiếp nhận kiểm đếm và một người khác thẩm định độc lập trước khi ghi nhận hàng vào tồn kho.
+  \item Theo dõi chiến dịch, đợt quyên góp có vị trí, kho, vật tư, nhu cầu và phân phối cứu trợ theo nhiệm vụ ở mức cần cho các luồng cốt lõi.
+  \item Cho phép người dân khai báo hàng hóa đã bàn giao; quản lý vận hành kiểm đếm và người thẩm định độc lập đếm xác nhận trước khi ghi nhận hàng vào tồn kho.
   \item Cung cấp bản đồ và báo cáo có phạm vi, bộ lọc và thời điểm tạo dữ liệu rõ ràng; bảo vệ vị trí và thông tin liên hệ nhạy cảm.
 \end{enumerate}
 Trí tuệ nhân tạo (AI), thông báo đẩy và các chức năng ngoại tuyến sâu là phần mở rộng có điều kiện. Nếu có gợi ý AI, quyết định ưu tiên, xác minh và điều phối vẫn do người có thẩm quyền thực hiện; phần lõi phải dùng được khi AI tắt.
@@ -454,7 +461,7 @@ Một số nội dung vận hành vẫn cần được hoàn thiện hoặc ki�
     \hline
     Điều phối ứng cứu & Xác minh yêu cầu, xem xét báo trùng, đặt ưu tiên, giao đội và theo dõi tiến độ, kết quả nhiệm vụ. & Xác minh, ưu tiên và điều phối do người có thẩm quyền quyết định. \\
     \hline
-    Quản lý cứu trợ & Quản lý chiến dịch, điểm tiếp nhận, hàng quyên góp, kiểm đếm, duyệt độc lập, tồn kho và phân phối. & Trong phạm vi là hàng hóa; không gồm thu tiền hoặc thanh toán. \\
+    Quản lý cứu trợ & Đợt quyên góp có vị trí, kho, hàng quyên góp, kiểm đếm, duyệt độc lập, tồn kho, nhu cầu, thiếu hụt, phiếu lấy hàng và phân phối. & Trong phạm vi là hàng hóa; không gồm thu tiền hoặc thanh toán. \\
     \hline
     Theo dõi vận hành & Bản đồ, hàng đợi, báo cáo và lịch sử thao tác theo phạm vi quyền. & Dữ liệu vị trí và thông tin liên hệ nhạy cảm cần được giới hạn truy cập. \\
     \hline
@@ -507,7 +514,7 @@ Từ kết quả khảo sát, hệ thống của đề tài tập trung vào nh�
 \begin{itemize}
   \item Theo dõi liên tục một yêu cầu từ lúc tiếp nhận, xác minh, đặt ưu tiên, giao đội đến khi xác nhận kết quả; mỗi quyết định lưu người thực hiện, thời điểm và lý do.
   \item Tách người báo khỏi hộ cần trợ giúp trong luồng báo hộ từ xa; báo cáo báo hộ vẫn phải được xác minh độc lập.
-  \item Giới hạn quyền xem vị trí chính xác và số điện thoại theo vai trò, tổ chức, vùng và nhiệm vụ; bản đồ tổng hợp không hiển thị thông tin định danh.
+  \item Giới hạn quyền xem vị trí chính xác và số điện thoại theo vai trò, phạm vi chiến dịch và nhiệm vụ; bản đồ tổng hợp không hiển thị thông tin định danh.
   \item Quản lý hàng quyên góp hiện vật với kiểm đếm và duyệt độc lập, tồn kho, phân phối và bàn giao có đối soát; người quyên góp xem được biên nhận đã kiểm chứng.
   \item Thiết kế cho bối cảnh Việt Nam: toàn bộ nội dung hiển thị bằng tiếng Việt, luôn hướng dẫn gọi 113, 114, 115 khi nguy hiểm tức thời.
 \end{itemize}
@@ -524,13 +531,17 @@ Ngược lại, hệ thống của đề tài mới ở mức trình diễn, ch�
     \hline
     Người dân & Gửi yêu cầu trợ giúp, biết máy chủ đã nhận hay chưa, theo dõi trạng thái và bổ sung thông tin khi được phép. & Chỉ xem yêu cầu của mình hoặc dùng bí mật theo dõi riêng cho yêu cầu khách. \\
     \hline
-    Tình nguyện viên/đội cứu hộ & Xem nhiệm vụ được giao, chấp nhận/từ chối, cập nhật tiến độ và báo kết quả. & Chỉ xem nhiệm vụ thuộc đội và phạm vi được cấp; quyền sửa phụ thuộc vai trò đội trưởng. \\
+    Người quyên góp & Xem đợt quyên góp có vị trí, khai báo hàng đã bàn giao, theo dõi biên nhận và phản ánh sai lệch. & Khách hoặc người có tài khoản; chỉ xem khai báo và biên nhận của mình bằng mã riêng. \\
     \hline
-    Điều phối viên & Xác minh báo cáo, rà soát trùng, lựa chọn ưu tiên, giao đội và theo dõi hoạt động trên bản đồ. & Dữ liệu đúng tổ chức/vùng và quyền tác vụ; quyết định được lưu dấu vết. \\
+    Tình nguyện viên/đội cứu hộ & Xem nhiệm vụ được giao, chấp nhận/từ chối, cập nhật tiến độ và báo kết quả. & Chỉ xem nhiệm vụ thuộc đội của mình; quyền sửa phụ thuộc vai trò đội trưởng. \\
     \hline
-    Quản lý vận hành/chiến dịch & Quản lý chiến dịch, điểm cứu trợ, kho, phương tiện và tổng hợp hoạt động. & Thao tác vật tư và báo cáo trong phạm vi được cấp; không mặc nhiên có quyền xem mọi vị trí cá nhân. \\
+    Điều phối viên & Xác minh báo cáo, rà soát trùng, lựa chọn ưu tiên, giao đội, giải quyết yêu cầu, lập chiến dịch từ bản đồ SOS và theo dõi hoạt động trên bản đồ. & Phạm vi toàn hệ thống cho luồng SOS; quyết định được lưu dấu vết. \\
     \hline
-    Quản trị viên hệ thống & Quản lý tài khoản, tổ chức, quyền truy cập và hoạt động hệ thống. & Quyền quản trị được tách khỏi quyền nghiệp vụ; thao tác cấp quyền có kiểm toán. \\
+    Quản lý vận hành & Quản lý đợt quyên góp, kho, danh mục hàng, kiểm đếm, ước tính nhu cầu, cam kết, phiếu lấy hàng, xuất kho và bàn giao. & Phạm vi theo chiến dịch (mặc định) hoặc toàn hệ thống do quản trị viên cấp; không mặc nhiên có quyền xem vị trí cá nhân. \\
+    \hline
+    Người thẩm định độc lập & Đếm xác nhận và duyệt biên nhận, duyệt phiếu phân phối, duyệt thất thoát và đóng phiếu. & Chỉ có quyền kiểm tra độc lập, không có quyền tạo hay xuất hàng; phải khác người thực hiện bước được duyệt. \\
+    \hline
+    Quản trị viên hệ thống & Quản lý tài khoản, quyền truy cập, đội cứu hộ và nhật ký kiểm toán. & Quyền quản trị được tách khỏi quyền nghiệp vụ; không có quyền xem chi tiết người gặp nạn hay người quyên góp; thao tác cấp quyền có kiểm toán. \\
     \hline
     Đơn vị/cơ quan phối hợp bên ngoài & Có thể là nguồn hoặc nơi tiếp nhận thông tin khi phối hợp ứng cứu. & Việc cấp tài khoản cho các đơn vị bên ngoài chưa nằm trong phạm vi xác định; hệ thống chưa xem họ là người dùng nội bộ. \\
     \hline
@@ -584,11 +595,13 @@ Các chức năng chính đã được xây dựng ở cả ba phần Backend, W
 \section{Nguyên tắc và giải pháp đề xuất}
 Giải pháp theo dõi mỗi yêu cầu từ lúc tiếp nhận đến khi được xử lý, đồng thời ghi nhận người thực hiện và căn cứ cho các quyết định quan trọng. Yêu cầu mới ở trạng thái chưa xác minh; thông tin người dân cung cấp chưa được xem là kết luận nghiệp vụ. Điều phối viên chịu trách nhiệm xác minh và lựa chọn mức ưu tiên, còn hệ thống lưu lại người thao tác, thời điểm và lý do.
 
-Ba trạng thái cần được theo dõi riêng là trạng thái yêu cầu, trạng thái nhiệm vụ và trạng thái đáp ứng vật tư. Hoàn thành một nhiệm vụ không tự đóng yêu cầu; một lần giao hàng một phần không tự hoàn thành nhu cầu; giao hàng đến điểm cứu trợ không đồng nghĩa đã phát tận tay cho hộ dân. Đây là các nguyên tắc thiết kế được đề xuất trong kế hoạch kỹ thuật.
+Ba trạng thái cần được theo dõi riêng là trạng thái yêu cầu, trạng thái nhiệm vụ và trạng thái đáp ứng vật tư. Hoàn thành một nhiệm vụ không tự đóng yêu cầu; một lần giao hàng một phần không tự hoàn thành nhu cầu; hàng đã bàn giao cho đội không đồng nghĩa đã phát tận tay cho hộ dân. Đây là các nguyên tắc thiết kế được đề xuất trong kế hoạch kỹ thuật.
 
 \section{Quy trình nghiệp vụ mục tiêu}
 \subsection{Tiếp nhận SOS SELF}
 Người dân chọn loại tình huống, khai báo thông tin biết được, xác nhận vị trí GPS hoặc ghim thủ công, có thể đính kèm bằng chứng rồi gửi yêu cầu. Tài khoản là tùy chọn trong luồng SELF; với yêu cầu gửi khi chưa đăng nhập, ứng dụng cung cấp thông tin theo dõi riêng. Giao diện chỉ báo đã tiếp nhận sau khi nhận được xác nhận từ máy chủ; yêu cầu đang chờ gửi trên thiết bị phải được phân biệt với yêu cầu đã gửi thành công.
+
+Sau khi lưu, hệ thống đối chiếu vị trí với ranh giới các chiến dịch đang hoạt động: nếu nằm trong đúng một chiến dịch thì tự gắn (AUTO\_ATTACHED); nếu nằm trong nhiều chiến dịch (CONFLICT) hoặc không thuộc chiến dịch nào (UNMATCHED) thì yêu cầu ở hàng đợi chung để điều phối viên xử lý.
 
 \subsection{Báo giúp hộ gia đình từ xa (PROXY)}
 Công dân đã đăng nhập có thể báo giúp một hộ gia đình ở địa điểm khác. Biểu mẫu ghi quan hệ với hộ, vị trí hộ, số người nếu biết, thời điểm/nguồn biết tin và thông tin liên hệ thay thế nếu có. Hệ thống không lấy GPS của người báo thay vị trí hộ; số điện thoại/tài khoản của người được báo không phải điều kiện để tiếp nhận. Báo cáo này vẫn phải trải qua xác minh như các báo cáo khác; việc đăng nhập chỉ xác định người gửi, không chứng minh tình huống.
@@ -596,43 +609,168 @@ Công dân đã đăng nhập có thể báo giúp một hộ gia đình ở đ�
 \subsection{Xác minh, ưu tiên và điều phối}
 Điều phối viên mở danh sách hoặc bản đồ trong phạm vi quyền, ghi nhận việc liên hệ hay căn cứ xác minh, rồi chọn kết quả: xác minh, từ chối có lý do hoặc liên kết với báo cáo gốc. Báo cáo trùng vẫn được lưu để giữ lịch sử. Không liên lạc được không tự động chứng minh báo cáo sai và không tự đưa báo cáo sang trạng thái đã xác minh.
 
-Sau khi xác minh, điều phối viên chọn mức ưu tiên P1–P4 theo thang đề xuất trong thiết kế và ghi lại lý do. Mức ưu tiên được theo dõi riêng với trạng thái yêu cầu. Hệ thống có thể lọc đội theo kỹ năng, phạm vi hoạt động, tình trạng sẵn sàng và sức chứa, rồi hiển thị khoảng cách, thời điểm cập nhật vị trí và khối lượng nhiệm vụ gần đây. Điều phối viên quyết định đội nào nhận nhiệm vụ; đội trưởng cập nhật tiến độ, còn điều phối viên xác nhận kết quả hoặc ghi nhận thông tin nhận qua điện thoại hay bộ đàm.
+Sau khi xác minh, điều phối viên chọn mức ưu tiên P1–P4 theo thang đề xuất trong thiết kế và ghi lại lý do. Mức ưu tiên được theo dõi riêng với trạng thái yêu cầu. Hệ thống có thể lọc đội theo kỹ năng, phạm vi hoạt động, tình trạng sẵn sàng và sức chứa, rồi hiển thị khoảng cách, thời điểm cập nhật vị trí và khối lượng nhiệm vụ gần đây. Đội được chọn không bị giới hạn theo chiến dịch của yêu cầu. Điều phối viên quyết định đội nào nhận nhiệm vụ; đội trưởng cập nhật tiến độ, còn điều phối viên ghi nhận thông tin nhận qua điện thoại hay bộ đàm. Hoàn thành nhiệm vụ không tự giải quyết yêu cầu: điều phối viên chỉ giải quyết khi không còn nhiệm vụ đang mở, nhu cầu vật tư đã được quyết toán và hàng đã bàn giao được giải trình (RESOLVING, RESOLVED rồi CLOSED).
 
-\subsection{Tiếp nhận quyên góp hiện vật và phân phối}
-Người quyên góp có thể khai báo lượng hàng đã bàn giao cho một đợt tiếp nhận, có tài khoản hoặc không. Bản khai báo của người tặng chỉ là thông tin bàn giao, không làm tăng tồn kho. Nhân viên tiếp nhận kiểm đếm và ghi nhận chênh lệch; người thẩm định khác duyệt đúng phiên bản kiểm đếm trước khi hệ thống ghi nhận số lượng được chấp nhận. Các lần phân phối lưu lượng, vật tư, người duyệt, người xuất và bằng chứng bàn giao; hàng đến điểm tập kết được phân biệt với hàng đã trao cho hộ.
+\subsection{Tiếp nhận quyên góp hiện vật}
+Đợt quyên góp có vị trí điểm nhận công khai. Người quyên góp, có tài khoản hoặc không, khai báo lượng hàng sẽ bàn giao; bản khai báo chỉ là thông tin, chưa làm thay đổi tồn kho. Quản lý vận hành tiếp nhận và kiểm đếm hàng thực nhận (chấp nhận, giữ lại hoặc từ chối). Người thẩm định độc lập đếm xác nhận lần hai và phải khác mọi người đã đếm trước đó. Khi hai lần đếm khớp, biên nhận được duyệt và ghi vào sổ tồn đúng một lần; khi lệch, hệ thống yêu cầu đếm lại. Hệ thống không có luồng thu tiền hoặc thanh toán.
+
+\subsection{Ước tính nhu cầu và cảnh báo thiếu hụt}
+Với yêu cầu SOS đã xác minh có nhu cầu cứu trợ, tác vụ định kỳ chọn mặt hàng từ danh mục (gợi ý AI, bí danh hoặc gói mặc định) và tính số lượng theo bảng định mức và số người. Kết quả là bản ước tính ESTIMATED, chưa phải nhu cầu có thể cam kết hàng. Quản lý vận hành xác nhận hoặc hủy bản ước tính và ghi lý do khi thay đổi. Mỗi chiến dịch có kho chính được xếp hạng theo tồn kho, tải đang mở và khoảng cách. Tác vụ tính thiếu hụt so sánh nhu cầu đã xác nhận với tồn kho và hàng đã được hứa tặng; mức ĐỎ chỉ tạo bản nháp đợt quyên góp khi quản lý vận hành chấp nhận, mức VÀNG chỉ là cảnh báo.
+
+\subsection{Lấy hàng theo nhiệm vụ và đóng phiếu}
+Khi nhiệm vụ đã được nhận, quản lý vận hành tạo phiếu lấy hàng, mỗi nhiệm vụ một phiếu, tại kho chính của chiến dịch hoặc kho được chỉ định rõ. Hệ thống giữ hàng theo nhu cầu đã xác nhận; kho dự phòng chỉ là gợi ý và hàng không tự chuyển kho. Phiếu được xác nhận rồi bàn giao cho đội, từ lúc này hàng thuộc trách nhiệm của đội và được giao thẳng đến hộ dân. Hàng không dùng được trả lại hoặc thanh lý qua phiếu đóng, do người duyệt độc lập kiểm tra. Hàng đã bàn giao mà chưa được giải trình sẽ chặn việc giải quyết yêu cầu SOS.
 
 \subsection{Bản đồ và báo cáo vận hành}
-Bản đồ được giới hạn theo vùng, thời gian, trạng thái và quyền truy cập. Lớp báo cáo đã xác minh chỉ tính báo cáo gốc; hàng đợi chưa xác minh hiển thị riêng để tránh tính lặp. Bản đồ và báo cáo tổng hợp không hiển thị thông tin liên hệ hoặc tọa độ chính xác của hộ. Mỗi bảng số liệu cần ghi thời điểm cập nhật; nếu một dịch vụ gặp sự cố, giao diện cần báo rõ phần dữ liệu chưa cập nhật thay vì thể hiện cả hệ thống như đang hoạt động tức thời.
+Bản đồ được giới hạn theo khu vực hiển thị, thời gian, trạng thái và quyền truy cập. Lớp báo cáo đã xác minh chỉ tính báo cáo gốc; hàng đợi chưa xác minh hiển thị riêng để tránh tính lặp. Bản đồ và báo cáo tổng hợp không hiển thị thông tin liên hệ hoặc tọa độ chính xác của hộ. Mỗi bảng số liệu cần ghi thời điểm cập nhật; nếu một dịch vụ gặp sự cố, giao diện cần báo rõ phần dữ liệu chưa cập nhật thay vì thể hiện cả hệ thống như đang hoạt động tức thời.
 
 \begin{diagram}[p]
   \centering
-  \begin{tikzpicture}[node distance=1.1cm]
-    \node[flowbox] (start) at (0,0) {Người dân gửi SOS\\(SELF / PROXY)};
-    \node[flowdecision] (server) at (0,-2.5) {Máy chủ\\xác nhận?};
-    \node[flowbox] (wait) at (-5.2,-2.5) {Chờ gửi lại /\\báo lỗi kết nối};
-    \node[flowbox] (submitted) at (0,-5.0) {SUBMITTED\\cấp mã theo dõi};
-    \node[flowdecision] (verify) at (0,-7.7) {Điều phối viên\\xác minh};
-    \node[flowbox] (rejected) at (-5.2,-10.5) {REJECTED\\lưu lý do từ chối};
-    \node[flowbox] (duplicate) at (0,-10.5) {DUPLICATE\\liên kết báo cáo gốc};
-    \node[flowbox] (verified) at (5.2,-10.5) {VERIFIED\\chọn mức P1–P4,\\giao đội};
-    \node[flowbox] (progress) at (5.2,-13.2) {Đội cập nhật tiến độ\\và bằng chứng};
-    \node[flowbox] (confirm) at (5.2,-15.7) {Điều phối viên\\xác nhận kết quả};
-    \node[flowbox,dashed] (needs) at (0,-13.2) {Nhu cầu vật tư\\theo dõi riêng,\\không tự đóng SOS};
+  \begin{tikzpicture}[flowbox/.append style={minimum width=5.8cm,minimum height=0.9cm,font=\footnotesize},flowdecision/.append style={font=\footnotesize},side/.style={flowbox,minimum width=4.2cm,font=\footnotesize}]
+    \node[flowbox] (start) at (0,0) {Người báo gửi SOS\\(SELF hoặc PROXY, GPS hoặc ghim tay)};
+    \node[flowdecision] (server) at (0,-1.95) {Máy chủ\\xác nhận?};
+    \node[side] (wait) at (-5.6,-1.95) {Chờ gửi lại\\(cùng khóa chống gửi lặp)};
+    \node[flowbox] (sub) at (0,-3.95) {SUBMITTED: cấp mã theo dõi,\\tách người báo khỏi đối tượng};
+    \node[flowbox,minimum width=8.8cm] (match) at (0,-5.95) {Đối chiếu ranh giới chiến dịch đang hoạt động (PostGIS)\\1 vùng: AUTO\_ATTACHED $\cdot$ nhiều vùng: CONFLICT\\không có vùng: UNMATCHED (hàng đợi chung)};
+    \node[flowbox] (ver) at (0,-7.95) {VERIFYING: điều phối viên liên hệ,\\đối chiếu bằng chứng};
+    \node[flowdecision] (verdict) at (0,-9.8) {Kết quả\\xác minh};
+    \node[side] (rej) at (-5.6,-11.8) {REJECTED\\từ chối, có lý do};
+    \node[side] (dup) at (5.6,-11.8) {DUPLICATE\\liên kết báo cáo gốc};
+    \node[flowbox] (verified) at (0,-11.8) {VERIFIED\\có căn cứ xác minh};
+    \node[flowbox] (tri) at (0,-13.75) {TRIAGED: mức ưu tiên P1–P4\\do điều phối viên quyết định};
+    \node[flowbox] (dis) at (0,-15.7) {DISPATCHED: giao đội đủ điều kiện\\(nhiệm vụ OFFERED)};
+    \node[flowbox] (prog) at (0,-17.65) {IN\_PROGRESS: đội trưởng nhận,\\cập nhật tiến độ và bằng chứng};
+    \node[flowbox] (resolving) at (0,-19.6) {RESOLVING: kiểm tra không còn nhiệm vụ mở,\\nhu cầu và hàng bàn giao đã rõ};
+    \node[flowbox] (res) at (0,-21.4) {RESOLVED $\rightarrow$ CLOSED\\điều phối viên giải quyết, rồi đóng};
+    \node[side,dashed] (needs) at (5.6,-13.75) {Nhu cầu cứu trợ (nếu có)\\theo dõi riêng ở Logistics};
+    \node[side,dashed] (note) at (5.6,-17.65) {Nhiệm vụ hoàn thành\\không tự giải quyết SOS};
 
     \draw[flowarrow] (start) -- (server);
     \draw[flowarrow] (server) -- node[flowlabel,above] {Chưa} (wait);
-    \draw[flowarrow,dashed] (wait) |- node[flowlabel,pos=0.25,left] {Gửi lại} (start);
-    \draw[flowarrow] (server) -- node[flowlabel,right] {Có} (submitted);
-    \draw[flowarrow] (submitted) -- (verify);
-    \draw[flowarrow] (verify) -| node[flowlabel,pos=0.25,above] {Từ chối} (rejected);
-    \draw[flowarrow] (verify) -- node[flowlabel,right] {Trùng} (duplicate);
-    \draw[flowarrow] (verify) -| node[flowlabel,pos=0.25,above] {Hợp lệ} (verified);
-    \draw[flowarrow] (verified) -- (progress);
-    \draw[flowarrow] (progress) -- (confirm);
-    \draw[flowarrow,dashed] (verified.south west) -- node[flowlabel,sloped,above] {Theo dõi riêng} (needs.north east);
+    \draw[flowarrow,dashed] (wait.north) |- node[flowlabel,pos=0.75,above] {Gửi lại} (start.west);
+    \draw[flowarrow] (server) -- node[flowlabel,right] {Có} (sub);
+    \draw[flowarrow] (sub) -- (match);
+    \draw[flowarrow] (match) -- (ver);
+    \draw[flowarrow] (ver) -- (verdict);
+    \draw[flowarrow] (verdict.west) -| node[flowlabel,pos=0.2,above] {Từ chối} (rej.north);
+    \draw[flowarrow] (verdict.east) -| node[flowlabel,pos=0.2,above] {Trùng} (dup.north);
+    \draw[flowarrow] (verdict) -- node[flowlabel,right] {Hợp lệ} (verified);
+    \draw[flowarrow] (verified) -- (tri);
+    \draw[flowarrow] (tri) -- (dis);
+    \draw[flowarrow] (dis) -- (prog);
+    \draw[flowarrow] (prog) -- (resolving);
+    \draw[flowarrow] (resolving) -- (res);
+    \draw[flowarrow,dashed] (tri) -- (needs);
+    \draw[flowarrow,dashed] (prog) -- (note);
   \end{tikzpicture}
   \caption{Luồng xử lý SOS}\label{dia:sos-workflow}
 \end{diagram}
+
+\begin{diagram}[p]
+  \centering
+  \begin{tikzpicture}[flowbox/.append style={minimum width=6.4cm,minimum height=1.0cm,font=\footnotesize},flowdecision/.append style={font=\footnotesize},side/.style={flowbox,minimum width=4.4cm,font=\footnotesize}]
+    \node[flowbox] (a) at (0,0) {\textbf{Người quyên góp} (khách hoặc có tài khoản)\\khai báo hàng bàn giao cho đợt có vị trí\\DECLARED: chưa thay đổi tồn kho};
+    \node[flowbox] (b) at (0,-2.3) {\textbf{Quản lý vận hành}: tiếp nhận, kiểm đếm\\COUNTING: chấp nhận $\cdot$ giữ lại $\cdot$ từ chối};
+    \node[flowbox] (c) at (0,-4.6) {\textbf{Người thẩm định độc lập}: đếm xác nhận\\khác mọi người đã đếm (PENDING\_REVIEW)};
+    \node[flowdecision] (d) at (0,-7.0) {Quyết định của\\người thẩm định};
+    \node[side] (f) at (-5.6,-7.0) {Đếm lại\\(REQUEST\_RECOUNT)};
+    \node[side] (g) at (5.6,-7.0) {REJECTED hoặc\\phản ánh sai lệch};
+    \node[flowbox] (e) at (0,-9.5) {APPROVED $\rightarrow$ POSTED\\duyệt đúng phiên bản,\\ghi sổ nhập kho một lần (RECEIPT)};
+    \node[flowbox] (h) at (0,-11.8) {Biên nhận riêng tư\\người quyên góp xem được tiến độ};
+    \draw[flowarrow] (a) -- (b);
+    \draw[flowarrow] (b) -- (c);
+    \draw[flowarrow] (c) -- (d);
+    \draw[flowarrow] (d) -- node[flowlabel,left] {Hai lần đếm khớp, duyệt} (e);
+    \draw[flowarrow] (d) -- node[flowlabel,above] {Lệch} (f);
+    \draw[flowarrow] (d) -- node[flowlabel,above] {Từ chối} (g);
+    \draw[flowarrow,dashed] (f.north) |- node[flowlabel,pos=0.75,above] {Kiểm đếm lại} (b.west);
+    \draw[flowarrow] (e) -- (h);
+  \end{tikzpicture}
+  \caption{Luồng tiếp nhận quyên góp và duyệt biên nhận}\label{dia:donation-flow}
+\end{diagram}
+
+\begin{diagram}[p]
+  \centering
+  \begin{tikzpicture}[flowbox/.append style={minimum width=6.6cm,minimum height=1.0cm,font=\footnotesize},flowdecision/.append style={font=\footnotesize},side/.style={flowbox,minimum width=4.6cm,font=\footnotesize}]
+    \node[flowbox] (a) at (0,0) {SOS đã VERIFIED có nhu cầu cứu trợ\\không còn bổ sung chờ xem xét};
+    \node[flowbox] (b) at (0,-2.0) {Quét 5 phút: chọn mặt hàng trong danh mục\\gợi ý AI $\rightarrow$ bí danh $\rightarrow$ gói mặc định};
+    \node[flowbox] (c) at (0,-4.0) {Bộ định mức: tính số lượng\\theo số người, trẻ em, người cao tuổi};
+    \node[flowbox] (d) at (0,-6.0) {ESTIMATED: đề xuất chưa xác nhận\\chưa tính vào nhu cầu và tồn kho};
+    \node[flowdecision] (e) at (0,-8.2) {Quản lý\\vận hành};
+    \node[side] (f) at (5.6,-8.2) {CANCELLED\\hủy ước tính, ghi lý do};
+    \node[flowbox] (g) at (0,-10.6) {Nhu cầu OPEN đã xác nhận; kho chính của chiến dịch\\xếp hạng theo tồn kho, tải đang mở, khoảng cách};
+    \node[flowbox] (h) at (0,-12.8) {Quét 15 phút: thiếu hụt =\\nhu cầu xác nhận $-$ tồn kho $-$ hàng đã hứa};
+    \node[flowdecision] (i) at (0,-15.0) {Mức\\thiếu hụt};
+    \node[side] (j) at (-5.2,-17.5) {ĐỎ: quản lý vận hành chấp nhận,\\tạo bản nháp đợt quyên góp};
+    \node[side] (k) at (5.2,-17.5) {VÀNG: chỉ cảnh báo,\\không tự tạo đợt};
+    \draw[flowarrow] (a) -- (b);
+    \draw[flowarrow] (b) -- (c);
+    \draw[flowarrow] (c) -- (d);
+    \draw[flowarrow] (d) -- (e);
+    \draw[flowarrow] (e) -- node[flowlabel,left] {Xác nhận} (g);
+    \draw[flowarrow] (e) -- node[flowlabel,above] {Hủy} (f);
+    \draw[flowarrow] (g) -- (h);
+    \draw[flowarrow] (h) -- (i);
+    \draw[flowarrow] (i.west) -| node[flowlabel,pos=0.2,above] {Đỏ} (j.north);
+    \draw[flowarrow] (i.east) -| node[flowlabel,pos=0.2,above] {Vàng} (k.north);
+  \end{tikzpicture}
+  \caption{Luồng ước tính nhu cầu cứu trợ và cảnh báo thiếu hụt}\label{dia:needs-flow}
+\end{diagram}
+
+\begin{diagram}[p]
+  \centering
+  \begin{tikzpicture}[flowbox/.append style={minimum width=6.4cm,minimum height=1.0cm,font=\footnotesize},flowdecision/.append style={font=\footnotesize},side/.style={flowbox,minimum width=4.4cm,font=\footnotesize}]
+    \node[flowbox] (a) at (0,0) {Nhiệm vụ đã được nhận\\(ACCEPTED, EN\_ROUTE hoặc ON\_SCENE)};
+    \node[flowbox] (b) at (0,-2.0) {OPEN: tạo phiếu, mỗi nhiệm vụ một phiếu\\tại kho chính hoặc kho chỉ định rõ};
+    \node[flowbox] (c) at (0,-4.1) {Giữ hàng theo nhu cầu đã xác nhận\\thiếu hàng: kho dự phòng chỉ là gợi ý};
+    \node[flowbox] (d) at (0,-6.2) {READY: xác nhận phiếu\\người duyệt khác người lập};
+    \node[flowbox] (e) at (0,-8.3) {HANDED\_OVER: xuất kho, hàng chuyển sang đội\\người xuất khác người duyệt};
+    \node[flowbox] (f) at (0,-10.4) {Đội giao thẳng đến hộ dân\\(DIRECT\_HOUSEHOLD, ghi nhận bàn giao)};
+    \node[flowbox] (g) at (0,-12.5) {Đóng phiếu: ghi số đã giao,\\trả lại, thanh lý hàng không dùng};
+    \node[flowdecision] (h) at (0,-14.7) {Người duyệt\\độc lập};
+    \node[side] (i) at (-5.6,-14.7) {Từ chối\\sửa lại đóng phiếu};
+    \node[flowbox] (j) at (0,-17.0) {CLOSED: hàng đã được giải trình\\mở đường giải quyết SOS};
+    \node[side,dashed,minimum width=3.8cm] (x) at (6.0,-4.1) {CANCELLED\\chỉ từ OPEN hoặc READY};
+    \draw[flowarrow] (a) -- (b);
+    \draw[flowarrow] (b) -- (c);
+    \draw[flowarrow] (c) -- (d);
+    \draw[flowarrow] (d) -- (e);
+    \draw[flowarrow] (e) -- (f);
+    \draw[flowarrow] (f) -- (g);
+    \draw[flowarrow] (g) -- (h);
+    \draw[flowarrow] (h) -- node[flowlabel,left] {Duyệt} (j);
+    \draw[flowarrow] (h) -- node[flowlabel,above] {Từ chối} (i);
+    \draw[flowarrow,dashed] (i.north) |- (g.west);
+    \draw[flowarrow,dashed] (c) -- (x);
+  \end{tikzpicture}
+  \caption{Luồng phiếu lấy hàng theo nhiệm vụ và đóng phiếu}\label{dia:pickup-flow}
+\end{diagram}
+
+\begin{diagram}[p]
+  \centering
+  \begin{tikzpicture}
+    \foreach \x/\t in {-5.85/{Người báo},-1.95/{Điều phối viên},1.95/{Đội cứu hộ},5.85/{Quản lý vận hành,\\người thẩm định}}{
+      \node[rectangle,draw,thick,fill=white,font=\footnotesize\bfseries,align=center,minimum width=3.9cm,minimum height=0.9cm] at (\x,0) {\t};
+    }
+    \foreach \x in {-7.8,-3.9,0,3.9,7.8} \draw[gray] (\x,-0.45) -- (\x,-17.6);
+    \draw[gray] (-7.8,-17.6) -- (7.8,-17.6);
+    \node[stinit] (init) at (-5.85,-1.2) {};
+    \node[lanebox] (a1) at (-5.85,-2.4) {Gửi SOS (SELF hoặc PROXY), nhận mã theo dõi};
+    \node[lanebox] (a2) at (-1.95,-4.0) {Xác minh: liên hệ, đối chiếu căn cứ};
+    \node[lanebox] (a3) at (-1.95,-5.6) {Xếp ưu tiên P1–P4, ghi lý do};
+    \node[lanebox] (a4) at (-1.95,-7.2) {Chọn đội đủ điều kiện, giao nhiệm vụ};
+    \node[lanebox] (a5) at (1.95,-8.8) {Chấp nhận nhiệm vụ, cập nhật tiến độ};
+    \node[lanebox] (a6) at (5.85,-10.4) {Tạo phiếu lấy hàng, giữ hàng, xuất kho cho đội};
+    \node[lanebox] (a7) at (1.95,-12.0) {Giao hàng đến hộ dân, đóng phiếu};
+    \node[lanebox] (a8) at (5.85,-13.6) {Người thẩm định duyệt đóng phiếu};
+    \node[lanebox] (a9) at (-1.95,-15.2) {Giải quyết yêu cầu, rồi đóng};
+    \node[lanebox] (a10) at (-5.85,-16.6) {Xem kết quả qua mã theo dõi};
+    \node[stfinal] (fin) at (-5.85,-17.25) {};
+    \foreach \a/\b in {init/a1,a1/a2,a2/a3,a3/a4,a4/a5,a5/a6,a6/a7,a7/a8,a8/a9,a9/a10}
+      \draw[flowarrow] (\a.south) -- ++(0,-0.35) -| (\b.north);
+  \end{tikzpicture}
+  \caption{Sơ đồ hoạt động theo làn của quy trình từ SOS đến giải quyết}\label{dia:activity-swimlane}
+\end{diagram}
+
 
 \section{Yêu cầu người dùng và chức năng}\label{sec:requirements}
 \subsection{Yêu cầu người dùng (UR)}
@@ -657,7 +795,7 @@ Mỗi yêu cầu người dùng (UR) được gán mã để truy vết sang yê
   \hline
   UR-04 & Tình nguyện viên / đội & Chỉ truy cập nhiệm vụ được giao; chấp nhận/từ chối, cập nhật tiến độ và nộp bằng chứng kết quả. \\
   \hline
-  UR-05 & Quản lý chiến dịch / vận hành & Quản lý chiến dịch, đợt tiếp nhận, điểm cứu trợ và phân bổ/giao hàng cơ bản; nghiệp vụ kho nâng cao được hoãn. \\
+  UR-05 & Điều phối viên / quản lý vận hành & Lập chiến dịch từ bản đồ SOS, quản lý đợt quyên góp có vị trí, kho, ước tính nhu cầu và phân phối theo nhiệm vụ; nghiệp vụ kho nâng cao được hoãn. \\
   \hline
   UR-06 & Quản trị viên / quản lý & Quản lý tài khoản, quyền theo phạm vi và xem báo cáo vận hành. \\
   \hline
@@ -665,9 +803,9 @@ Mỗi yêu cầu người dùng (UR) được gán mã để truy vết sang yê
   \hline
   UR-08 & Người quyên góp có tài khoản hoặc khách & Tìm đợt tiếp nhận, khai báo hàng đã bàn giao, xem biên nhận đã kiểm chứng/tiến độ phân phối và phản ánh sai lệch. \\
   \hline
-  UR-09 & Nhân viên tiếp nhận / người thẩm định độc lập & Kiểm đếm, duyệt độc lập, lưu sai lệch và ghi nhận tồn kho được chấp nhận đúng một lần. \\
+  UR-09 & Quản lý vận hành / người thẩm định độc lập & Kiểm đếm, duyệt độc lập, lưu sai lệch và ghi nhận tồn kho được chấp nhận đúng một lần. \\
   \hline
-  UR-10 & Nhân viên phân phối / bên nhận & Phê duyệt xuất hàng theo quyền, ghi nhận thay đổi bàn giao và phát hàng, đối soát thiếu hụt, trả lại và thất thoát. \\
+  UR-10 & Quản lý vận hành / người thẩm định / đội nhận hàng & Phê duyệt xuất hàng theo quyền, ghi nhận thay đổi bàn giao và phát hàng, đối soát thiếu hụt, trả lại và thất thoát. \\
   \hline
 \end{longtable}
 \normalsize
@@ -686,7 +824,7 @@ Yêu cầu chức năng (FR) được chia theo ba mức ưu tiên do nhóm đ�
     \centering\textbf{Nhóm chức năng} & \centering\textbf{Mã / mức} & \centering\arraybackslash\textbf{Nội dung yêu cầu} \\
     \hline
     \endhead
-    Nhận dạng và quyền & FR-IAM-01..03 (M) & Đăng nhập, phiên, tài khoản và quyền theo tổ chức/vùng/đối tượng; kiểm tra quyền ở API, không dựa riêng vào việc ẩn nút giao diện. \\
+    Nhận dạng và quyền & FR-IAM-01..03 (M) & Đăng nhập, phiên, tài khoản và quyền theo phạm vi hệ thống/chiến dịch/đối tượng; kiểm tra quyền ở API, không dựa riêng vào việc ẩn nút giao diện. \\
     \hline
     SOS/yêu cầu & FR-REQ-01..07, 09..11 (M) & SELF khách/đăng nhập; PROXY có đăng nhập; tiếp nhận lặp an toàn; xác minh, từ chối, báo trùng; ưu tiên thủ công; bản đồ/hàng đợi; lịch sử xử lý; khôi phục chu kỳ có kiểm soát. \\
     \hline
@@ -696,7 +834,7 @@ Yêu cầu chức năng (FR) được chia theo ba mức ưu tiên do nhóm đ�
     \hline
     Bản đồ & FR-MAP-01 (M) & Bản đồ nhiệt theo vùng/thời gian/trạng thái; mặc định chỉ tổng hợp các báo cáo gốc đã xác minh; không lộ thông tin định danh cá nhân (PII) và không tự điều phối. \\
     \hline
-    Chiến dịch và cứu trợ & FR-CAM-01, FR-LOG-01..07 (M) & Chiến dịch, kho/vật tư/điểm/phương tiện cần thiết, nhu cầu, cam kết, phân phối một phần và bàn giao có lịch sử; không đọc trực tiếp dữ liệu của dịch vụ khác. \\
+    Chiến dịch và cứu trợ & FR-CAM-01, FR-LOG-01..07 (M) & Chiến dịch, kho/vật tư, nhu cầu, cam kết, phiếu lấy hàng, phân phối một phần và bàn giao có lịch sử; không đọc trực tiếp dữ liệu của dịch vụ khác. \\
     \hline
     Quyên góp hiện vật & FR-DON-01..05 (M) & Công bố đợt nhận; khai báo bàn giao khách hoặc đăng nhập; lưu bản kiểm đếm; duyệt độc lập; ghi tồn kho đúng một lần; biên nhận và tranh chấp riêng tư. \\
     \hline
@@ -759,15 +897,17 @@ Mỗi ca sử dụng (UC) gắn với kết quả nghiệp vụ cần bảo đ�
     \hline
     UC-03 & Giao và nhận nhiệm vụ & Chọn đội đủ điều kiện; giao/nhận và cập nhật theo chuyển trạng thái hợp lệ; có lý do khi ghi thay đội. \\
     \hline
-    UC-04 & Cam kết và đáp ứng một phần & Theo dõi lượng yêu cầu, cam kết, xuất, giao và còn thiếu riêng biệt. \\
+    UC-04 & Ước tính nhu cầu, cam kết và đáp ứng một phần & Ước tính do quản lý vận hành xác nhận; theo dõi lượng yêu cầu, cam kết, xuất, giao và còn thiếu riêng biệt; cảnh báo thiếu hụt chỉ mang tính tư vấn. \\
     \hline
     UC-05 & Xem bảng điều hành/báo cáo & Tổng hợp đúng phạm vi, có thời điểm tạo; không đưa dữ liệu nhạy cảm vào báo cáo công khai. \\
     \hline
     UC-06 & Quản lý tài khoản/quyền & Cấp quyền theo phạm vi; đăng ký người dân không tự cấp quyền nhân viên. \\
     \hline
-    UC-08 & Quản lý chiến dịch & Tạo/điều chỉnh trạng thái chiến dịch theo quyền và lưu lịch sử. \\
+    UC-08 & Quản lý chiến dịch & Điều phối viên lập, kích hoạt chiến dịch và vẽ khu vực từ bản đồ SOS; tạm dừng/đóng theo quyền; quản lý vận hành chỉ định kho chính; có lịch sử. \\
     \hline
-    UC-10..13 & Đợt nhận, khai báo, kiểm đếm và phân phối hiện vật & Bản khai báo, kiểm đếm và phê duyệt độc lập là các bước riêng; một đơn vị hàng không bị ghi tồn kho hoặc xuất hai lần. \\
+    UC-09 & Quản lý kho và danh mục hàng & Quản lý vận hành tạo, ngừng sử dụng kho, loại hàng và đơn vị; kho có vùng phục vụ; thao tác ở phạm vi hệ thống. \\
+    \hline
+    UC-10..13 & Đợt nhận có vị trí, khai báo, kiểm đếm, phiếu lấy hàng và phân phối hiện vật & Bản khai báo, kiểm đếm và phê duyệt độc lập là các bước riêng; phiếu lấy hàng, xuất kho và bàn giao tách người thực hiện; một đơn vị hàng không bị ghi tồn kho hoặc xuất hai lần. \\
     \hline
     UC-15 & Báo giúp hộ gia đình từ xa & Ghi riêng thông tin người báo và hộ cần giúp; đăng nhập không thay cho xác minh. \\
     \hline
@@ -777,7 +917,7 @@ Mỗi ca sử dụng (UC) gắn với kết quả nghiệp vụ cần bảo đ�
     \hline
   \end{tabularx}
 \end{table}
-UC-07 về gợi ý AI là phần mở rộng tùy chọn; điều phối viên xem xét gợi ý và tự quyết định có sử dụng hay không. UC-09 quản lý phương tiện và điểm cứu trợ là ca sử dụng hỗ trợ cho phân phối.
+UC-07 về gợi ý AI là phần mở rộng tùy chọn; điều phối viên xem xét gợi ý và tự quyết định có sử dụng hay không. UC-09 là ca sử dụng hỗ trợ: kho và danh mục hàng là dữ liệu dùng chung cho quyên góp và phân phối. Phương tiện và điểm cứu trợ đã được loại khỏi phạm vi; hàng được giao thẳng từ kho cho đội và hộ dân.
 
 \subsection{Sơ đồ ca sử dụng}
 Hệ thống được chia thành hai nhóm ca sử dụng: nhóm ứng cứu phục vụ tiếp nhận SOS, xác minh và điều phối đội; nhóm cứu trợ và quản trị phục vụ chiến dịch, quyên góp hiện vật, tồn kho, phân phối và tài khoản. Mọi tác nhân nội bộ phải đăng nhập trước khi thực hiện ca sử dụng; người dân và người quyên góp được dùng một số chức năng mà không cần tài khoản.
@@ -785,25 +925,26 @@ Hệ thống được chia thành hai nhóm ca sử dụng: nhóm ứng cứu ph
 \begin{diagram}[htbp]
   \centering
   \begin{tikzpicture}
-    \draw[thick,rounded corners=4pt] (-5.3,-4.45) rectangle (5.3,5.0);
-    \node[font=\small\bfseries,anchor=north] at (0,4.95) {Phân hệ ứng cứu};
+    \draw[thick,rounded corners=4pt] (-5.4,-5.7) rectangle (5.4,6.3);
+    \node[font=\small\bfseries,anchor=north] at (0,6.25) {Phân hệ ứng cứu};
     \node[usecase] (uc01) at (-2.75,3.6) {UC-01\\Gửi SOS cho bản thân};
-    \node[usecase] (trk)  at (-2.75,1.85) {Theo dõi, bổ sung thông tin yêu cầu};
-    \node[usecase] (uc15) at (-2.75,0.1) {UC-15\\Báo giúp hộ gia đình từ xa};
-    \node[usecase] (login) at (-2.75,-2.6) {Đăng nhập};
-    \node[usecase] (uc16) at (2.75,3.6) {UC-16\\Xem bản đồ nhiệt, hàng đợi};
-    \node[usecase] (uc02) at (2.75,1.85) {UC-02\\Xác minh, phân loại yêu cầu};
-    \node[usecase] (uc03) at (2.75,0.1) {UC-03\\Giao, nhận và cập nhật nhiệm vụ};
-    \node[usecase] (uc17) at (2.75,-1.65) {UC-17\\Xem nhiệm vụ của đội};
-    \node[usecase] (uc18) at (2.75,-3.4) {UC-18\\Cập nhật hồ sơ, vị trí đội};
-    \ucactor{dan}{-6.8,1.85}{Người dân}
-    \ucactor{qlvh}{6.8,3.9}{Quản lý\\vận hành}
-    \ucactor{dpv}{6.8,1.0}{Điều phối viên}
-    \ucactor{doi}{6.8,-2.4}{Đội cứu hộ\\(đội trưởng,\\thành viên)}
+    \node[usecase] (trk)  at (-2.75,1.8) {Theo dõi, bổ sung thông tin yêu cầu};
+    \node[usecase] (uc15) at (-2.75,0.0) {UC-15\\Báo giúp hộ gia đình từ xa};
+    \node[usecase] (login) at (-2.75,-2.4) {Đăng nhập};
+    \node[usecase] (uc16) at (2.8,4.6) {UC-16\\Xem bản đồ nhiệt, hàng đợi};
+    \node[usecase] (uc02) at (2.8,2.85) {UC-02\\Xác minh, phân loại yêu cầu};
+    \node[usecase] (uc03) at (2.8,1.1) {UC-03\\Giao, nhận, giải quyết};
+    \node[usecase] (uc08) at (2.8,-0.65) {UC-08\\Lập, kích hoạt chiến dịch};
+    \node[usecase] (uc17) at (2.8,-2.4) {UC-17\\Xem nhiệm vụ của đội};
+    \node[usecase] (uc18) at (2.8,-4.15) {UC-18\\Cập nhật hồ sơ, vị trí đội};
+    \ucactor{dan}{-6.8,1.8}{Người dân\\(khách hoặc\\có tài khoản)}
+    \ucactor{qlvh}{6.8,4.0}{Quản lý\\vận hành}
+    \ucactor{dpv}{6.8,0.8}{Điều phối viên}
+    \ucactor{doi}{6.8,-3.0}{Đội cứu hộ\\(đội trưởng,\\thành viên)}
     \begin{scope}[on background layer]
       \foreach \u in {uc01,trk,uc15} \draw[ucline] ($(dan)+(0.35,0.25)$) -- (\u.west);
       \draw[ucline] ($(qlvh)+(-0.35,0.25)$) -- (uc16.east);
-      \foreach \u in {uc16,uc02,uc03,uc18} \draw[ucline] ($(dpv)+(-0.35,0.25)$) -- (\u.east);
+      \foreach \u in {uc16,uc02,uc03,uc08,uc18} \draw[ucline] ($(dpv)+(-0.35,0.25)$) -- (\u.east);
       \foreach \u in {uc03,uc17,uc18} \draw[ucline] ($(doi)+(-0.35,0.25)$) -- (\u.east);
     \end{scope}
     \draw[ucrel] (uc15) -- node[right,font=\scriptsize] {«include»} (login);
@@ -814,30 +955,27 @@ Hệ thống được chia thành hai nhóm ca sử dụng: nhóm ứng cứu ph
 \begin{diagram}[htbp]
   \centering
   \begin{tikzpicture}
-    \draw[thick,rounded corners=4pt] (-5.3,-4.45) rectangle (5.3,5.0);
-    \node[font=\small\bfseries,anchor=north] at (0,4.95) {Phân hệ cứu trợ và quản trị};
-    \node[usecase] (uc11) at (-2.75,3.6) {UC-11\\Khai báo bàn giao hiện vật};
-    \node[usecase] (trkd) at (-2.75,1.85) {Theo dõi biên nhận, phản ánh sai lệch};
-    \node[usecase] (uc04) at (-2.75,0.1) {UC-04\\Cam kết, đáp ứng một phần};
-    \node[usecase] (uc05) at (-2.75,-1.65) {UC-05\\Xem bảng điều hành, báo cáo};
-    \node[usecase] (uc06) at (-2.75,-3.4) {UC-06\\Quản lý tài khoản, quyền};
-    \node[usecase] (uc08) at (2.75,3.6) {UC-08\\Quản lý chiến dịch};
-    \node[usecase] (uc10) at (2.75,1.85) {UC-10\\Công bố đợt nhận quyên góp};
-    \node[usecase] (uc12) at (2.75,0.1) {UC-12\\Kiểm đếm, duyệt biên nhận};
-    \node[usecase] (uc13) at (2.75,-1.65) {UC-13\\Duyệt, xuất kho, bàn giao};
-    \node[usecase] (uc09) at (2.75,-3.4) {UC-09\\Quản lý phương tiện, điểm};
+    \draw[thick,rounded corners=4pt] (-5.4,-5.2) rectangle (5.4,5.7);
+    \node[font=\small\bfseries,anchor=north] at (0,5.65) {Phân hệ cứu trợ và quản trị};
+    \node[usecase] (uc11) at (-2.8,3.9) {UC-11\\Khai báo bàn giao hiện vật};
+    \node[usecase] (trkd) at (-2.8,2.0) {Theo dõi biên nhận, phản ánh sai lệch};
+    \node[usecase] (uc05) at (-2.8,-0.6) {UC-05\\Xem bảng điều hành, báo cáo};
+    \node[usecase] (uc06) at (-2.8,-2.8) {UC-06\\Quản lý tài khoản, quyền};
+    \node[usecase] (uc10) at (2.8,3.9) {UC-10\\Công bố đợt quyên góp có vị trí};
+    \node[usecase] (uc09) at (2.8,2.0) {UC-09\\Quản lý kho, danh mục hàng};
+    \node[usecase] (uc04) at (2.8,0.1) {UC-04\\Ước tính nhu cầu, cam kết hàng};
+    \node[usecase] (uc12) at (2.8,-1.8) {UC-12\\Kiểm đếm, duyệt biên nhận};
+    \node[usecase] (uc13) at (2.8,-3.7) {UC-13\\Phiếu lấy hàng, xuất kho};
     \ucactor{donor}{-6.8,2.9}{Người quyên góp\\(khách hoặc\\có tài khoản)}
-    \ucactor{dpv}{-6.8,-0.6}{Điều phối viên}
+    \ucactor{dpv}{-6.8,-0.2}{Điều phối viên}
     \ucactor{admin}{-6.8,-3.3}{Quản trị viên}
-    \ucactor{qlcd}{6.8,3.1}{Quản lý chiến\\dịch, vận hành}
-    \ucactor{kho}{6.8,0.4}{Nhân viên\\tiếp nhận, kho}
-    \ucactor{tdinh}{6.8,-2.6}{Người thẩm định\\độc lập}
+    \ucactor{qlvh}{6.8,2.4}{Quản lý\\vận hành}
+    \ucactor{tdinh}{6.8,-2.8}{Người thẩm định\\độc lập}
     \begin{scope}[on background layer]
       \foreach \u in {uc11,trkd} \draw[ucline] ($(donor)+(0.35,0.25)$) -- (\u.west);
-      \foreach \u in {uc04,uc05} \draw[ucline] ($(dpv)+(0.35,0.25)$) -- (\u.west);
+      \draw[ucline] ($(dpv)+(0.35,0.25)$) -- (uc05.west);
       \foreach \u in {uc06,uc05} \draw[ucline] ($(admin)+(0.35,0.25)$) -- (\u.west);
-      \foreach \u in {uc08,uc10,uc09} \draw[ucline] ($(qlcd)+(-0.35,0.25)$) -- (\u.east);
-      \foreach \u in {uc12,uc13} \draw[ucline] ($(kho)+(-0.35,0.25)$) -- (\u.east);
+      \foreach \u in {uc10,uc09,uc04,uc12,uc13} \draw[ucline] ($(qlvh)+(-0.35,0.25)$) -- (\u.east);
       \foreach \u in {uc12,uc13} \draw[ucline] ($(tdinh)+(-0.35,0.25)$) -- (\u.east);
     \end{scope}
   \end{tikzpicture}
@@ -878,7 +1016,7 @@ Hệ thống được chia thành hai nhóm ca sử dụng: nhóm ứng cứu ph
   \small
   \begin{tabularx}{\textwidth}{|L{3.0cm}|Y|}
     \hline
-    \textbf{Tác nhân} & Điều phối viên trong phạm vi tổ chức, vùng được cấp quyền. \\
+    \textbf{Tác nhân} & Điều phối viên có phạm vi toàn hệ thống. \\
     \hline
     \textbf{Tiền điều kiện} & Yêu cầu tồn tại và chưa ở trạng thái kết thúc. \\
     \hline
@@ -906,14 +1044,14 @@ Hệ thống được chia thành hai nhóm ca sử dụng: nhóm ứng cứu ph
     \hline
     \textbf{Tác nhân} & Điều phối viên; đội trưởng đang hoạt động; thành viên đội chỉ được xem. \\
     \hline
-    \textbf{Tiền điều kiện} & Yêu cầu đã được phân loại ưu tiên; đội sẵn sàng và thuộc phạm vi; chiến dịch không tạm dừng. \\
+    \textbf{Tiền điều kiện} & Yêu cầu đã được phân loại ưu tiên; đội sẵn sàng; nếu yêu cầu đã gắn chiến dịch thì chiến dịch đang hoạt động. \\
     \hline
-    \textbf{Luồng sự kiện chính} & 1. Điều phối viên xem danh sách đội đủ điều kiện theo kỹ năng, vùng, tình trạng sẵn sàng, khoảng cách và tải nhiệm vụ gần đây.\newline
+    \textbf{Luồng sự kiện chính} & 1. Điều phối viên xem danh sách đội đủ điều kiện theo kỹ năng, tình trạng sẵn sàng, vị trí gần đây, khoảng cách và tải nhiệm vụ gần đây; đội không bị giới hạn theo chiến dịch.\newline
       2. Chọn đội; ghi lý do nếu khác đội được gợi ý.\newline
       3. Hệ thống tạo nhiệm vụ OFFERED, yêu cầu chuyển DISPATCHED và gửi thông báo cho đội trưởng.\newline
       4. Đội trưởng chấp nhận (ACCEPTED); yêu cầu chuyển IN\_PROGRESS.\newline
       5. Đội trưởng cập nhật EN\_ROUTE, ON\_SCENE rồi COMPLETED kèm kết quả và bằng chứng.\newline
-      6. Điều phối viên xem kết quả và xác nhận việc giải quyết yêu cầu. \\
+      6. Điều phối viên xem kết quả; khi không còn nhiệm vụ mở và hàng bàn giao đã được giải trình, giải quyết yêu cầu (RESOLVING, RESOLVED, CLOSED). \\
     \hline
     \textbf{Luồng ngoại lệ} & Đội từ chối có lý do (DECLINED): điều phối viên chọn đội khác. Đội đang có nhiệm vụ khác: hệ thống từ chối giao. Đội không dùng ứng dụng: điều phối viên ghi thay tiến độ, nêu rõ nguồn (bộ đàm, điện thoại) và người báo. Nhiệm vụ quá hạn chưa được nhận chỉ được đánh dấu để người xử lý, hệ thống không tự giao lại. \\
     \hline
@@ -930,17 +1068,17 @@ Hệ thống được chia thành hai nhóm ca sử dụng: nhóm ứng cứu ph
   \small
   \begin{tabularx}{\textwidth}{|L{3.0cm}|Y|}
     \hline
-    \textbf{Tác nhân} & Nhân viên tiếp nhận (kiểm đếm); người thẩm định độc lập. \\
+    \textbf{Tác nhân} & Quản lý vận hành (kiểm đếm); người thẩm định độc lập. \\
     \hline
-    \textbf{Tiền điều kiện} & Có bản khai báo bàn giao thuộc một đợt nhận trong phạm vi. \\
+    \textbf{Tiền điều kiện} & Có bản khai báo bàn giao thuộc một đợt nhận trong phạm vi chiến dịch hoặc hệ thống. \\
     \hline
-    \textbf{Luồng sự kiện chính} & 1. Nhân viên tiếp nhận kiểm đếm hàng thực nhận, đối chiếu với bản khai báo.\newline
-      2. Ghi số lượng chấp nhận, tạm giữ, từ chối và tình trạng hàng; nộp phiên bản kiểm đếm.\newline
-      3. Người thẩm định (không phải người kiểm đếm) duyệt đúng phiên bản khai báo và kiểm đếm.\newline
-      4. Trong một giao dịch, hệ thống cộng số lượng chấp nhận vào tồn kho, ghi biến động nhập kho, nhật ký và thông báo.\newline
+    \textbf{Luồng sự kiện chính} & 1. Quản lý vận hành kiểm đếm hàng thực nhận, đối chiếu với bản khai báo.\newline
+      2. Ghi số lượng chấp nhận, tạm giữ, từ chối và tình trạng hàng; lưu phiên bản kiểm đếm.\newline
+      3. Người thẩm định (khác mọi người đã đếm) đếm xác nhận độc lập, rồi duyệt đúng phiên bản khai báo và kiểm đếm.\newline
+      4. Khi hai lần đếm khớp, trong một giao dịch hệ thống cộng số lượng chấp nhận vào tồn kho, ghi biến động nhập kho, nhật ký và thông báo.\newline
       5. Người quyên góp xem biên nhận riêng tư. \\
     \hline
-    \textbf{Luồng ngoại lệ} & Bản kiểm đếm hoặc khai báo thay đổi sau khi duyệt: phê duyệt mất hiệu lực. Gửi lại lệnh duyệt không ghi tồn kho lần hai. Hàng tạm giữ chưa được xuất. Người quyên góp không đồng ý có thể mở phản ánh sai lệch. \\
+    \textbf{Luồng ngoại lệ} & Hai lần đếm lệch nhau: người thẩm định yêu cầu đếm lại, biên nhận quay về kiểm đếm. Bản kiểm đếm hoặc khai báo thay đổi sau khi duyệt: phê duyệt mất hiệu lực. Gửi lại lệnh ghi sổ không ghi tồn kho lần hai. Hàng tạm giữ chưa được xuất. Người quyên góp không đồng ý có thể mở phản ánh sai lệch. \\
     \hline
     \textbf{Hậu điều kiện} & Tồn kho thay đổi đúng một lần theo số lượng được chấp nhận. \\
     \hline
@@ -951,23 +1089,24 @@ Hệ thống được chia thành hai nhóm ca sử dụng: nhóm ứng cứu ph
 
 \begin{table}[H]
   \centering
-  \caption{Đặc tả ca sử dụng UC-13: Duyệt, xuất kho và bàn giao phân phối}\label{tab:uc13-spec}
+  \caption{Đặc tả ca sử dụng UC-13: Phiếu lấy hàng, duyệt, xuất kho và bàn giao}\label{tab:uc13-spec}
   \small
   \begin{tabularx}{\textwidth}{|L{3.0cm}|Y|}
     \hline
-    \textbf{Tác nhân} & Người lập phiếu, người duyệt, nhân viên xuất kho, người ghi nhận bàn giao. \\
+    \textbf{Tác nhân} & Quản lý vận hành (lập phiếu, xuất kho, ghi nhận bàn giao); người thẩm định độc lập (duyệt, đối soát). \\
     \hline
-    \textbf{Tiền điều kiện} & Kho, vật tư, điểm cứu trợ và phương tiện đang hoạt động, thuộc phạm vi. \\
+    \textbf{Tiền điều kiện} & Nhiệm vụ đã được nhận; kho và vật tư đang hoạt động, thuộc phạm vi chiến dịch hoặc hệ thống. \\
     \hline
-    \textbf{Luồng sự kiện chính} & 1. Người lập phiếu tạo phiếu phân phối (kho, mục đích, điểm nhận, phương tiện, dòng hàng) ở trạng thái DRAFT.\newline
-      2. Người duyệt khác người lập duyệt đúng phiên bản phiếu (APPROVED).\newline
-      3. Nhân viên xuất kho khác người duyệt xuất hàng; hệ thống ghi biến động xuất kho và trừ tồn kho (DISPATCHED).\newline
-      4. Người ghi nhận lưu việc nhận tại điểm cứu trợ, trao tận tay hộ dân, trả lại hoặc thất thoát kèm căn cứ xác nhận.\newline
-      5. Người duyệt đối soát khi không còn hàng đang vận chuyển hoặc đang ở điểm (RECONCILED). \\
+    \textbf{Luồng sự kiện chính} & 1. Quản lý vận hành tạo phiếu lấy hàng cho nhiệm vụ tại kho chính; hệ thống giữ hàng theo nhu cầu đã xác nhận và lập phiếu phân phối nháp (DRAFT).\newline
+      2. Người duyệt khác người lập xác nhận đúng phiên bản phiếu (APPROVED, phiếu lấy hàng READY).\newline
+      3. Người xuất kho khác người duyệt xuất hàng; hệ thống ghi biến động xuất kho, trừ tồn và chuyển hàng sang đội (DISPATCHED, HANDED\_OVER).\newline
+      4. Đội giao thẳng hàng đến hộ dân; một quản lý vận hành khác người xuất kho ghi nhận bàn giao, trả lại hoặc thất thoát kèm căn cứ xác nhận.\newline
+      5. Đóng phiếu: ghi số đã giao, trả lại, thanh lý; người duyệt độc lập (khác người nộp và người bàn giao) duyệt.\newline
+      6. Phiếu phân phối được đối soát khi không còn hàng đang vận chuyển hoặc thất thoát chờ duyệt (RECONCILED). \\
     \hline
-    \textbf{Luồng ngoại lệ} & Tự duyệt hoặc tự xác nhận bị từ chối. Sửa dòng hàng sau khi duyệt làm phiếu trở về DRAFT. Thiếu tồn kho: toàn bộ lệnh xuất được hoàn tác. Thất thoát cần người thẩm định độc lập xem xét. Hộ dân không có tài khoản hoặc số điện thoại được ghi bằng tên mô tả và căn cứ xác nhận. \\
+    \textbf{Luồng ngoại lệ} & Tự duyệt hoặc tự xác nhận bị từ chối. Sửa dòng hàng sau khi duyệt làm phiếu trở về DRAFT. Thiếu tồn kho: toàn bộ lệnh xuất được hoàn tác. Thiếu hàng ở kho chính: kho dự phòng chỉ là gợi ý, hàng không tự chuyển kho. Thất thoát cần người thẩm định độc lập xem xét. Hộ dân không có tài khoản hoặc số điện thoại được ghi bằng tên mô tả và căn cứ xác nhận. Phiếu chỉ hủy được khi chưa xuất kho. \\
     \hline
-    \textbf{Hậu điều kiện} & Mỗi đơn vị hàng chỉ được xuất kho một lần; số đã xuất bằng tổng số đã nhận, trả lại, thất thoát và còn lại. \\
+    \textbf{Hậu điều kiện} & Mỗi đơn vị hàng chỉ được xuất kho một lần; số đã xuất bằng tổng số đã giao, trả lại, thanh lý, thất thoát và còn lại; hàng chưa giải trình chặn việc giải quyết yêu cầu. \\
     \hline
     \textbf{Truy vết} & UR-10; FR-LOG-06, FR-LOG-07. \\
     \hline
@@ -976,12 +1115,12 @@ Hệ thống được chia thành hai nhóm ca sử dụng: nhóm ứng cứu ph
 
 \section{Sơ đồ tuần tự}
 \subsection{Gửi yêu cầu SOS}
-Ứng dụng tạo khóa chống gửi lặp trước khi gửi. Khi phản hồi bị mất và người dân gửi lại, Response nhận ra khóa đã dùng với cùng nội dung và trả lại đúng yêu cầu đã tạo, nên không phát sinh yêu cầu trùng.
+Ứng dụng tạo khóa chống gửi lặp trước khi gửi. Khi phản hồi bị mất và người dân gửi lại, Response nhận ra khóa đã dùng với cùng nội dung và trả lại đúng yêu cầu đã tạo, nên không phát sinh yêu cầu trùng. Sau khi lưu, vị trí được đối chiếu với ranh giới các chiến dịch đang hoạt động để gắn chiến dịch hoặc chuyển yêu cầu vào hàng đợi chung.
 
 \begin{diagram}[htbp]
   \centering
   \begin{tikzpicture}
-    \def\bottom{-11.8}
+    \def\bottom{-13.4}
     \foreach \n/\x/\t in {u/0/{Người dân},a/3.9/{Ứng dụng\\Web, Mobile},r/7.8/{Response API},d/11.7/{CSDL Response}}{
       \node[seqhead] (h\n) at (\x,0) {\t};
       \draw[dashed,gray] (h\n.south) -- (\x,\bottom);
@@ -991,16 +1130,17 @@ Hệ thống được chia thành hai nhóm ca sử dụng: nhóm ứng cứu ph
     \node[font=\scriptsize,anchor=west,align=left] at (4.6,-2.33) {Tạo khóa chống gửi lặp,\\bí mật theo dõi};
     \draw[seqmsg] (3.9,-3.7) -- node[seqlabel] {POST /requests\\(Idempotency-Key)} (7.8,-3.7);
     \draw[seqmsg] (7.8,-4.7) -- node[seqlabel] {Kiểm tra khóa chống gửi lặp} (11.7,-4.7);
-    \draw[seqframe] (6.6,-5.15) rectangle (12.95,-9.2);
+    \draw[seqframe] (6.6,-5.15) rectangle (12.95,-10.5);
     \node[seqtag] at (6.6,-5.15) {alt};
     \node[seqguard] at (7.25,-5.15) {[Khóa mới]};
-    \draw[seqmsg] (7.8,-6.5) -- node[seqlabel] {Lưu yêu cầu, sự kiện, nhật ký trong một giao dịch} (11.7,-6.5);
-    \draw[seqret] (11.7,-7.25) -- node[seqlabel] {Đã lưu} (7.8,-7.25);
-    \draw[dashed] (6.6,-7.65) -- (12.95,-7.65);
-    \node[seqguard] at (6.6,-7.65) {[Khóa đã dùng, cùng nội dung]};
-    \draw[seqret] (11.7,-8.8) -- node[seqlabel] {Yêu cầu đã tạo trước đó} (7.8,-8.8);
-    \draw[seqret] (7.8,-10.0) -- node[seqlabel] {201: mã yêu cầu, mã tra cứu, SUBMITTED} (3.9,-10.0);
-    \draw[seqret] (3.9,-11.2) -- node[seqlabel] {Báo đã tiếp nhận, hiển thị mã tra cứu} (0,-11.2);
+    \draw[seqmsg] (7.8,-6.4) -- node[seqlabel] {Lưu yêu cầu, sự kiện, nhật ký trong một giao dịch} (11.7,-6.4);
+    \draw[seqmsg] (7.8,-7.4) -- node[seqlabel] {Đối chiếu ranh giới chiến dịch (PostGIS)} (11.7,-7.4);
+    \draw[seqret] (11.7,-8.2) -- node[seqlabel] {Đã lưu, trạng thái gắn chiến dịch} (7.8,-8.2);
+    \draw[dashed] (6.6,-8.65) -- (12.95,-8.65);
+    \node[seqguard] at (6.6,-8.65) {[Khóa đã dùng, cùng nội dung]};
+    \draw[seqret] (11.7,-10.05) -- node[seqlabel] {Yêu cầu đã tạo trước đó} (7.8,-10.05);
+    \draw[seqret] (7.8,-11.4) -- node[seqlabel] {201: mã yêu cầu, mã tra cứu, SUBMITTED} (3.9,-11.4);
+    \draw[seqret] (3.9,-12.7) -- node[seqlabel] {Báo đã tiếp nhận, hiển thị mã tra cứu} (0,-12.7);
   \end{tikzpicture}
   \caption{Sơ đồ tuần tự gửi yêu cầu SOS}\label{dia:seq-sos}
 \end{diagram}
@@ -1035,37 +1175,170 @@ Mỗi lệnh thay đổi trạng thái gửi kèm phiên bản dữ liệu mà n
   \caption{Sơ đồ tuần tự xác minh yêu cầu và giao nhiệm vụ}\label{dia:seq-mission}
 \end{diagram}
 
-\subsection{Duyệt và xuất kho phân phối}
-Người lập phiếu, người duyệt và người xuất kho là ba người khác nhau. Lệnh xuất kho chỉ thành công khi phiếu đúng phiên bản đã duyệt và đủ tồn kho; nếu không, toàn bộ giao dịch được hoàn tác.
+\subsection{Kiểm đếm, duyệt và ghi sổ biên nhận quyên góp}
+Quản lý vận hành kiểm đếm hàng thực nhận; người thẩm định đếm xác nhận độc lập, không phải người đã đếm trước đó. Lệnh ghi sổ chỉ thành công khi bản kiểm đếm và bản khai báo được duyệt vẫn là phiên bản hiện hành; gửi lại lệnh không ghi tồn kho lần hai.
 
 \begin{diagram}[htbp]
   \centering
   \begin{tikzpicture}
-    \def\bottom{-12.9}
-    \foreach \n/\x/\t in {p/0/{Người lập phiếu},v/3.3/{Người duyệt},x/6.6/{Nhân viên\\xuất kho},r/9.9/{Logistics API},d/13.2/{CSDL Logistics}}{
+    \def\bottom{-12.6}
+    \foreach \n/\x/\t in {q/0/{Quản lý\\vận hành},v/4.4/{Người thẩm định\\độc lập},a/8.8/{Logistics API},d/13.2/{CSDL Logistics}}{
       \node[seqhead] (h\n) at (\x,0) {\t};
       \draw[dashed,gray] (h\n.south) -- (\x,\bottom);
     }
-    \draw[seqmsg] (0,-1.3) -- node[seqlabel,text width=4.6cm,pos=0.3] {POST /distributions (dòng hàng)} (9.9,-1.3);
-    \draw[seqmsg] (9.9,-2.2) -- node[seqlabel] {Tạo phiếu DRAFT} (13.2,-2.2);
-    \draw[seqmsg] (3.3,-3.2) -- node[seqlabel,text width=4.6cm,pos=0.25] {POST approve} (9.9,-3.2);
-    \draw[seqmsg] (9.9,-4.3) -- node[seqlabel] {Người duyệt khác người lập; APPROVED, lưu phiên bản} (13.2,-4.3);
-    \draw[seqmsg] (6.6,-5.3) -- node[seqlabel] {POST dispatch} (9.9,-5.3);
-    \draw[seqframe] (5.4,-5.7) rectangle (14.45,-10.35);
-    \node[seqtag] at (5.4,-5.7) {alt};
-    \node[seqguard] at (6.05,-5.7) {[Hợp lệ, đủ tồn kho]};
-    \draw[seqmsg] (9.9,-7.0) -- node[seqlabel] {Ghi xuất kho, trừ tồn; DISPATCHED (một giao dịch)} (13.2,-7.0);
-    \draw[seqret] (9.9,-7.75) -- node[seqlabel] {200: đã xuất kho} (6.6,-7.75);
-    \draw[dashed] (5.4,-8.15) -- (14.45,-8.15);
-    \node[seqguard] at (5.4,-8.15) {[Thiếu tồn kho hoặc phiếu đã đổi]};
-    \draw[seqret] (9.9,-9.95) -- node[seqlabel] {409: thiếu tồn kho hoặc phiếu đã đổi; hoàn tác} (6.6,-9.95);
-    \draw[seqmsg] (3.3,-11.4) -- node[seqlabel,text width=4.6cm,pos=0.25] {POST reconcile} (9.9,-11.4);
-    \draw[seqmsg] (9.9,-12.5) -- node[seqlabel] {RECONCILED khi hết hàng đang chuyển, tại điểm} (13.2,-12.5);
+    \draw[seqmsg] (0,-1.4) -- node[seqlabel,text width=4.6cm,pos=0.65] {POST /donation-receipts/\{id\}/counts} (8.8,-1.4);
+    \draw[seqmsg] (8.8,-2.3) -- node[seqlabel] {Lưu bản kiểm đếm (phiên bản mới)} (13.2,-2.3);
+    \draw[seqmsg] (4.4,-3.3) -- node[seqlabel,text width=4.6cm,pos=0.55] {POST confirmations (đếm độc lập)} (8.8,-3.3);
+    \draw[seqmsg] (8.8,-4.2) -- node[seqlabel] {Lưu bản đếm xác nhận; người đếm khác nhau} (13.2,-4.2);
+    \draw[seqmsg] (4.4,-5.2) -- node[seqlabel] {POST review (APPROVE)} (8.8,-5.2);
+    \draw[seqmsg] (8.8,-6.1) -- node[seqlabel] {Ghi quyết định, gắn đúng phiên bản} (13.2,-6.1);
+    \draw[seqmsg] (4.4,-7.1) -- node[seqlabel] {POST post} (8.8,-7.1);
+    \draw[seqframe] (3.3,-7.5) rectangle (14.45,-11.85);
+    \node[seqtag] at (3.3,-7.5) {alt};
+    \node[seqguard] at (3.95,-7.5) {[Đúng phiên bản được duyệt]};
+    \draw[seqmsg] (8.8,-8.8) -- node[seqlabel] {Cộng tồn kho, ghi RECEIPT, nhật ký (một giao dịch)} (13.2,-8.8);
+    \draw[seqret] (8.8,-9.55) -- node[seqlabel] {200: đã ghi sổ} (4.4,-9.55);
+    \draw[dashed] (3.3,-9.95) -- (14.45,-9.95);
+    \node[seqguard] at (3.3,-9.95) {[Bản đếm hoặc khai báo đã đổi]};
+    \draw[seqret] (8.8,-11.35) -- node[seqlabel] {409: phê duyệt mất hiệu lực} (4.4,-11.35);
   \end{tikzpicture}
-  \caption{Sơ đồ tuần tự duyệt và xuất kho phân phối}\label{dia:seq-distribution}
+  \caption{Sơ đồ tuần tự kiểm đếm, duyệt và ghi sổ biên nhận}\label{dia:seq-receipt}
+\end{diagram}
+
+\subsection{Duyệt, xuất kho và đối soát phân phối}
+Người duyệt phải khác người lập phiếu, người xuất kho phải khác người duyệt, và người ghi nhận bàn giao phải khác người xuất kho. Bàn giao cho hộ dân do một quản lý vận hành khác ghi nhận trước khi đối soát. Lệnh xuất kho chỉ thành công khi phiếu đúng phiên bản đã duyệt và đủ tồn kho; nếu không, toàn bộ giao dịch được hoàn tác.
+
+\begin{diagram}[htbp]
+  \centering
+  \begin{tikzpicture}
+    \def\bottom{-12.5}
+    \foreach \n/\x/\t in {q/0/{Quản lý vận hành\\(lập, xuất kho)},v/4.4/{Người duyệt\\(thẩm định)},a/8.8/{Logistics API},d/13.2/{CSDL Logistics}}{
+      \node[seqhead] (h\n) at (\x,0) {\t};
+      \draw[dashed,gray] (h\n.south) -- (\x,\bottom);
+    }
+    \draw[seqmsg] (0,-1.4) -- node[seqlabel,text width=4.6cm,pos=0.65] {POST /distributions (dòng hàng)} (8.8,-1.4);
+    \draw[seqmsg] (8.8,-2.3) -- node[seqlabel] {Tạo phiếu DRAFT} (13.2,-2.3);
+    \draw[seqmsg] (4.4,-3.3) -- node[seqlabel] {POST approve} (8.8,-3.3);
+    \draw[seqmsg] (8.8,-4.3) -- node[seqlabel] {Người duyệt khác người lập; APPROVED, lưu phiên bản} (13.2,-4.3);
+    \draw[seqmsg] (0,-5.3) -- node[seqlabel,text width=4.6cm,pos=0.65] {POST dispatch (người xuất khác người duyệt)} (8.8,-5.3);
+    \draw[seqframe] (-0.9,-5.75) rectangle (14.45,-9.6);
+    \node[seqtag] at (-0.9,-5.75) {alt};
+    \node[seqguard] at (-0.25,-5.75) {[Hợp lệ, đủ tồn kho]};
+    \draw[seqmsg] (8.8,-6.9) -- node[seqlabel] {Ghi xuất kho, trừ tồn; DISPATCHED (một giao dịch)} (13.2,-6.9);
+    \draw[seqret] (8.8,-7.6) -- node[seqlabel,text width=4.6cm,pos=0.65] {200: đã xuất kho} (0,-7.6);
+    \draw[dashed] (-0.9,-8.0) -- (14.45,-8.0);
+    \node[seqguard] at (-0.9,-8.0) {[Thiếu tồn kho hoặc phiếu đã đổi]};
+    \draw[seqret] (8.8,-9.15) -- node[seqlabel,text width=4.6cm,pos=0.65] {409: hoàn tác} (0,-9.15);
+    \draw[seqmsg] (4.4,-10.5) -- node[seqlabel,text width=4.0cm] {POST reconcile (sau khi bàn giao đã ghi nhận)} (8.8,-10.5);
+    \draw[seqmsg] (8.8,-11.7) -- node[seqlabel] {RECONCILED khi hết hàng đang chuyển, không còn thất thoát chờ duyệt} (13.2,-11.7);
+  \end{tikzpicture}
+  \caption{Sơ đồ tuần tự duyệt, xuất kho và đối soát phân phối}\label{dia:seq-distribution}
+\end{diagram}
+
+\section{Sơ đồ lớp miền}
+Backend truy cập dữ liệu bằng các truy vấn trực tiếp, không định nghĩa lớp thực thể (entity) cho từng bảng, nên các sơ đồ lớp dưới đây là mô hình miền rút ra từ lược đồ cơ sở dữ liệu: mỗi lớp là một đối tượng nghiệp vụ chính, thuộc tính là các cột đặc trưng và quan hệ là các khóa ngoại trong cùng dịch vụ. Định danh người dùng, chiến dịch và yêu cầu ở dịch vụ khác chỉ là tham chiếu, không vẽ thành quan hệ.
+
+\begin{diagram}[p]
+  \centering
+  \begin{tikzpicture}
+    \node[cls] (cm) at (-5.5,0) {\textbf{Campaign}\nodepart{second}name\\status\\center\\radius\_m};
+    \node[cls] (ar) at (0,0) {\textbf{AssistanceRequest}\nodepart{second}tracking\_code\\status\\priority\\review\_lane\\work\_cycle\\campaign\_match\_state\\needs\_rescue\\needs\_relief\_supplies};
+    \node[cls] (rs) at (5.5,0) {\textbf{RequestSubject}\nodepart{second}people\_affected\\location\\children\_count\\elderly\_count\\contactability};
+    \node[cls] (vd) at (-5.5,-4.6) {\textbf{VerificationDecision}\nodepart{second}outcome\\basis\\reason\\decided\_at};
+    \node[cls] (ca) at (5.5,-4.6) {\textbf{ContactAttempt}\nodepart{second}contact\_target\\outcome\\attempted\_at};
+    \node[cls] (ms) at (0,-5.6) {\textbf{Mission}\nodepart{second}status\\work\_cycle\\mission\_kind};
+    \node[cls] (me) at (-5.5,-9.6) {\textbf{MissionEvent}\nodepart{second}from\_status\\to\_status\\reason};
+    \node[cls] (ev) at (5.5,-9.6) {\textbf{EvidenceMetadata}\nodepart{second}state\\detected\_mime\\size\_bytes};
+    \node[cls] (rt) at (0,-9.6) {\textbf{RescueTeam}\nodepart{second}name\\team\_kind\\availability\\status};
+    \node[cls] (tm) at (0,-13.2) {\textbf{TeamMember}\nodepart{second}user\_id\\member\_role\\left\_at};
+    \draw[clsrel] (cm.east) -- node[mult,near start,above] {0..1} node[mult,near end,above] {0..*} (ar.west);
+    \draw[clsrel] (ar.east) -- node[mult,near start,above] {1} node[mult,near end,above] {1} (rs.west);
+    \draw[clsrel] (ar.south west) -- node[mult,near start,left] {1} node[mult,near end,left] {0..*} (vd.north east);
+    \draw[clsrel] (ar.south east) -- node[mult,near start,right] {1} node[mult,near end,right] {0..*} (ca.north west);
+    \draw[clsrel] (ar.south) -- node[mult,near start,right] {1} node[mult,near end,right] {0..*} (ms.north);
+    \draw[clsrel] (ms.south west) -- node[mult,near start,left] {1} node[mult,near end,left] {0..*} (me.north east);
+    \draw[clsrel] (ms.south east) -- node[mult,near start,right] {0..1} node[mult,near end,right] {0..*} (ev.north west);
+    \draw[clsrel] (ms.south) -- node[mult,near start,right] {0..*} node[mult,near end,right] {1} (rt.north);
+    \draw[clsrel] (rt.south) -- node[mult,near start,right] {1} node[mult,near end,right] {1..*} (tm.north);
+  \end{tikzpicture}
+  \caption{Sơ đồ lớp miền của phân hệ ứng cứu (Response)}\label{dia:class-response}
+\end{diagram}
+
+\begin{diagram}[p]
+  \centering
+  \begin{tikzpicture}
+    \node[cls] (dd) at (-5.5,0) {\textbf{DonationDrive}\nodepart{second}title\\status\\opens\_at\\closes\_at\\location};
+    \node[cls] (dl) at (0,0) {\textbf{DonationDelivery}\nodepart{second}public\_code\\status\\donor\_name};
+    \node[cls] (rc) at (5.5,0) {\textbf{DonationReceipt}\nodepart{second}delivery\_id\\warehouse\_id};
+    \node[cls] (rn) at (5.5,-3.4) {\textbf{ReceiptCount}\nodepart{second}revision\\counted\_by\_user\_id\\counted\_at};
+    \node[cls] (wh) at (-5.5,-4.6) {\textbf{Warehouse}\nodepart{second}name\\status\\location\\service\_radius\_m};
+    \node[cls] (sb) at (0,-4.6) {\textbf{StockBalance}\nodepart{second}on\_hand\\reserved};
+    \node[cls] (it) at (-5.5,-8.4) {\textbf{Item}\nodepart{second}name\\unit\_code\\returnable\\perishable};
+    \node[cls] (sm) at (0,-8.4) {\textbf{StockMovement}\nodepart{second}movement\_type\\delta\_on\_hand\\delta\_reserved};
+    \node[cls] (rn2) at (-5.5,-12.0) {\textbf{ReliefNeed}\nodepart{second}status\\requested\_quantity\\source};
+    \node[cls] (cm2) at (0,-12.0) {\textbf{Commitment}\nodepart{second}quantity\\issued\_quantity\\delivered\_quantity\\returned\_quantity\\lost\_quantity};
+    \node[cls] (ds) at (5.5,-12.0) {\textbf{Distribution}\nodepart{second}purpose\\status\\approved\_version};
+    \node[cls] (hf) at (5.5,-15.6) {\textbf{HandoffRecord}\nodepart{second}handoff\_kind\\receiver\_label\\recorder\_user\_id};
+    \node[cls] (pt) at (0,-15.8) {\textbf{PickupTicket}\nodepart{second}status\\mission\_id\\collected\_by\_user\_id};
+    \draw[clsrel] (dd.east) -- node[mult,near start,above] {1} node[mult,near end,above] {0..*} (dl.west);
+    \draw[clsrel] (dl.east) -- node[mult,near start,above] {1} node[mult,near end,above] {0..*} (rc.west);
+    \draw[clsrel] (rc.south) -- node[mult,near start,right] {1} node[mult,near end,right] {1..*} (rn.north);
+    \draw[clsrel] (rc.south west) -- node[mult,near start,below] {*} node[mult,near end,above] {1} (wh.north east);
+    \draw[clsrel] (wh.east) -- node[mult,near start,above] {1} node[mult,near end,above] {0..*} (sb.west);
+    \draw[clsrel] (it.north east) -- node[mult,near start,left] {1} node[mult,near end,left] {0..*} (sb.south west);
+    \draw[clsrel] (sb.south) -- node[mult,near start,right] {1} node[mult,near end,right] {0..*} (sm.north);
+    \draw[clsrel] (rn2.east) -- node[mult,near start,above] {1} node[mult,near end,above] {0..*} (cm2.west);
+    \draw[clsrel] (ds.south) -- node[mult,near start,right] {1} node[mult,near end,right] {0..*} (hf.north);
+    \draw[clsrel] (pt.north east) -- node[mult,near start,left] {*} node[mult,near end,left] {1} (ds.south west);
+  \end{tikzpicture}
+  \caption{Sơ đồ lớp miền của phân hệ cứu trợ (Logistics)}\label{dia:class-logistics}
 \end{diagram}
 
 \section{Sơ đồ trạng thái}
+\subsection{Trạng thái yêu cầu}
+Yêu cầu SOS có mười hai trạng thái. Bốn trạng thái REJECTED, DUPLICATE, CANCELLED và CLOSED là trạng thái kết thúc; yêu cầu RESOLVED hoặc CLOSED có thể được mở lại về TRIAGED ở chu kỳ xử lý mới. DISPATCHED và IN\_PROGRESS được tính lại từ trạng thái các nhiệm vụ của yêu cầu. Khi đang RESOLVING, hệ thống từ chối cung cấp nhiệm vụ, cập nhật tiến độ, bổ sung thông tin và các lệnh giải quyết hoặc hủy cạnh tranh. Mức ưu tiên P1–P4 được lưu riêng, không phải một trạng thái.
+
+\begin{diagram}[htbp]
+  \centering
+  \begin{tikzpicture}
+    \node[stinit] (init) at (0,1.5) {};
+    \node[ststate] (sub) at (0,0) {SUBMITTED\\Đã tiếp nhận};
+    \node[ststate] (ver) at (4.2,0) {VERIFYING\\Đang xác minh};
+    \node[ststate] (vfd) at (8.4,0) {VERIFIED\\Đã xác minh};
+    \node[ststate] (tri) at (12.6,0) {TRIAGED\\Đã xếp ưu tiên};
+    \node[ststate] (rej) at (0,-3.4) {REJECTED\\Bị từ chối};
+    \node[ststate] (dup) at (4.2,-3.4) {DUPLICATE\\Báo cáo trùng};
+    \node[ststate] (dis) at (12.6,-3.4) {DISPATCHED\\Đã giao đội};
+    \node[ststate] (inp) at (12.6,-6.8) {IN\_PROGRESS\\Đang xử lý};
+    \node[ststate] (rsg) at (12.6,-10.2) {RESOLVING\\Đang giải quyết};
+    \node[ststate] (rsd) at (8.4,-10.2) {RESOLVED\\Đã giải quyết};
+    \node[ststate] (clo) at (4.2,-10.2) {CLOSED\\Đã đóng};
+    \node[ststate] (can) at (12.6,-13.6) {CANCELLED\\Đã hủy};
+    \node[stfinal] (frej) at ($(rej.south)+(0,-0.8)$) {};
+    \node[stfinal] (fdup) at ($(dup.south)+(0,-0.8)$) {};
+    \node[stfinal] (fclo) at ($(clo.south)+(0,-0.8)$) {};
+    \node[stfinal] (fcan) at ($(can.south)+(0,-0.8)$) {};
+    \draw[starrow] (rej) -- (frej);
+    \draw[starrow] (dup) -- (fdup);
+    \draw[starrow] (clo) -- (fclo);
+    \draw[starrow] (can) -- (fcan);
+    \draw[starrow] (init) -- (sub);
+    \draw[starrow] (sub) -- node[stlabel,above] {bắt đầu\\xác minh} (ver);
+    \draw[starrow] (ver) -- node[stlabel,above] {xác minh\\(căn cứ)} (vfd);
+    \draw[starrow] (vfd) -- node[stlabel,above] {xếp ưu tiên\\(lý do)} (tri);
+    \draw[starrow] (tri) -- node[stlabel,right] {giao đội (OFFERED)} (dis);
+    \draw[starrow] (dis) -- node[stlabel,right] {đội nhận nhiệm vụ} (inp);
+    \draw[starrow] (inp) -- node[stlabel,right] {giải quyết hoặc hủy} (rsg);
+    \draw[starrow] (rsg) -- node[stlabel,above] {hoàn tất\\giải quyết} (rsd);
+    \draw[starrow] (rsd) -- node[stlabel,above] {đóng} (clo);
+    \draw[starrow] (rsg) -- node[stlabel,right] {hoàn tất hủy} (can);
+    \draw[starrow] (ver.south west) -- node[stlabel,pos=0.45,left,xshift=-2pt] {từ chối\\(lý do)} (rej.north east);
+    \draw[starrow] (ver) -- node[stlabel,right] {trùng} (dup);
+    \draw[starrow] (rsd.north) -- node[stlabel,pos=0.45,right] {mở lại (lý do)} (8.4,-1.7) -- (11.9,-1.7) -- ($(tri.south)+(-0.7,0)$);
+  \end{tikzpicture}
+  \caption{Sơ đồ trạng thái yêu cầu SOS}\label{dia:state-request}
+\end{diagram}
+
 \subsection{Trạng thái nhiệm vụ cứu hộ}
 Nhiệm vụ có trạng thái riêng, độc lập với trạng thái yêu cầu và trạng thái đáp ứng vật tư. Mỗi đội chỉ có tối đa một nhiệm vụ ở các trạng thái OFFERED, ACCEPTED, EN\_ROUTE, ON\_SCENE. Bốn trạng thái DECLINED, CANCELLED, FAILED và COMPLETED là trạng thái kết thúc; giao lại cho đội khác sẽ tạo nhiệm vụ mới. Hủy hoặc đánh dấu thất bại phải kèm lý do; việc điều phối viên ghi thay đội cũng tuân theo đúng các chuyển trạng thái này.
 
@@ -1129,40 +1402,97 @@ Phiếu phân phối chỉ được xuất kho khi đúng phiên bản đã duy�
   \caption{Sơ đồ trạng thái phiếu phân phối}\label{dia:state-distribution}
 \end{diagram}
 
+\section{Phân quyền theo vai trò}
+Hệ thống có sáu vai trò. Quyền được kiểm tra ở API bằng tổ hợp quyền, phạm vi (hệ thống hoặc chiến dịch) và quan hệ với đối tượng; việc ẩn nút trên giao diện không thay thế kiểm tra này. Vai trò đội trưởng, thành viên là quan hệ trong đội, không phải vai trò cấp quyền. Người thẩm định độc lập (REVIEWER) là bên duyệt cho biên nhận, phân phối, thất thoát và phiếu đóng; quản trị viên không có quyền xem chi tiết người gặp nạn hay người quyên góp.
+\begin{table}[htbp]
+  \centering
+  \caption{Ma trận quyền theo vai trò (CIT: CITIZEN, VOL: VOLUNTEER, COO: COORDINATOR, OPS: OPERATIONS\_MANAGER, REV: REVIEWER, ADM: ADMIN)}\label{tab:rbac}
+  \scriptsize
+  \begin{tabular}{|L{6.6cm}|>{\centering\arraybackslash}p{1.35cm}|>{\centering\arraybackslash}p{1.35cm}|>{\centering\arraybackslash}p{1.35cm}|>{\centering\arraybackslash}p{1.35cm}|>{\centering\arraybackslash}p{1.35cm}|>{\centering\arraybackslash}p{1.35cm}|}
+    \hline
+    \textbf{Chức năng} & \textbf{CIT} & \textbf{VOL} & \textbf{COO} & \textbf{OPS} & \textbf{REV} & \textbf{ADM} \\
+    \hline
+    Gửi, theo dõi SOS của mình & \textbullet & \textbullet &  &  &  &  \\
+    \hline
+    Báo giúp hộ gia đình (PROXY, cần đăng nhập) & \textbullet & \textbullet & \textbullet & \textbullet &  & \textbullet \\
+    \hline
+    Xem hàng đợi, xác minh, xếp ưu tiên, giao đội, giải quyết yêu cầu &  &  & \textbullet &  &  &  \\
+    \hline
+    Lập, kích hoạt chiến dịch từ bản đồ SOS &  &  & \textbullet &  &  &  \\
+    \hline
+    Xem chiến dịch; tạm dừng, đóng chiến dịch &  &  & \textbullet & \textbullet &  &  \\
+    \hline
+    Xem bản đồ nhiệt, hàng đợi gộp &  &  & \textbullet & \textbullet &  &  \\
+    \hline
+    Thiết lập đội và kỹ năng &  &  & \textbullet &  &  & \textbullet \\
+    \hline
+    Quản lý tài khoản, cấp quyền, xem nhật ký kiểm toán &  &  &  &  &  & \textbullet \\
+    \hline
+    Quản lý đợt quyên góp, kho và danh mục hàng &  &  &  & \textbullet &  &  \\
+    \hline
+    Tạo biên nhận, kiểm đếm hàng nhận &  &  &  & \textbullet & \textbullet &  \\
+    \hline
+    Đếm xác nhận, duyệt và ghi sổ biên nhận &  &  &  &  & \textbullet &  \\
+    \hline
+    Xác nhận ước tính nhu cầu, cam kết hàng, chấp nhận thiếu hụt &  &  &  & \textbullet &  &  \\
+    \hline
+    Xem cảnh báo thiếu hụt &  &  & \textbullet & \textbullet &  &  \\
+    \hline
+    Lập, giữ hàng, xác nhận, hủy phiếu lấy hàng &  &  & \textbullet & \textbullet &  &  \\
+    \hline
+    Lập phiếu phân phối, xuất kho, ghi nhận bàn giao &  &  &  & \textbullet &  &  \\
+    \hline
+    Duyệt phân phối, duyệt thất thoát và điều chỉnh tồn kho &  &  &  & \textbullet & \textbullet &  \\
+    \hline
+    Duyệt đóng phiếu lấy hàng &  &  &  & \textbullet & \textbullet &  \\
+    \hline
+    Xem báo cáo tổng hợp &  &  & \textbullet & \textbullet &  & \textbullet \\
+    \hline
+  \end{tabular}
+\end{table}
+
 \section{Kiến trúc hệ thống}
-Backend gồm ba dịch vụ Identity, Response và Logistics, được triển khai bằng NestJS với TypeScript; mỗi dịch vụ quản lý dữ liệu thuộc phạm vi của mình. Nginx định tuyến API theo dịch vụ, các dịch vụ trao đổi với nhau qua giao diện REST (Representational State Transfer). Tệp bằng chứng được lưu riêng tư trên MinIO Community thông qua giao thức lưu trữ đối tượng S3 (Simple Storage Service). Web/Mobile là các giao diện dành cho người dân, đội ứng cứu và nhân viên vận hành.
+Backend gồm ba dịch vụ Identity, Response và Logistics, được triển khai bằng NestJS với TypeScript; mỗi dịch vụ sở hữu một cơ sở dữ liệu riêng trên cùng một máy chủ PostgreSQL có PostGIS. Nginx là cổng vào, định tuyến API theo tiền tố dịch vụ và giới hạn tần suất các lời gọi công khai. Các dịch vụ trao đổi với nhau qua giao diện REST (Representational State Transfer). Tệp bằng chứng được lưu riêng tư trên MinIO Community thông qua giao thức lưu trữ đối tượng S3 (Simple Storage Service), chỉ bật khi dùng cấu hình lưu trữ. Gemini (gợi ý AI) và Open-Meteo (dự báo thời tiết) là dịch vụ ngoài tùy chọn. Web/Mobile là các giao diện dành cho người dân, đội ứng cứu và nhân viên vận hành.
 
 \begin{diagram}[p]
   \centering
   \begin{tikzpicture}
-    \node[flowbox,minimum width=9.5cm] (actors) at (0,0) {Người dân $\cdot$ Đội cứu hộ $\cdot$ Điều phối viên\\Quản lý vận hành $\cdot$ Quản trị viên};
-    \node[flowbox,minimum width=5cm] (client) at (0,-2.0) {Ứng dụng Web / Mobile};
-    \node[flowbox,minimum width=5cm] (nginx) at (0,-4.0) {Nginx\\định tuyến API REST};
-    \node[flowbox,minimum width=3.6cm] (identity) at (-5.0,-7.0) {\textbf{Identity}\\tài khoản $\cdot$ quyền};
-    \node[flowbox,minimum width=3.6cm] (response) at (0,-7.0) {\textbf{Response}\\SOS $\cdot$ nhiệm vụ};
-    \node[flowbox,minimum width=3.6cm] (logistics) at (5.0,-7.0) {\textbf{Logistics}\\hàng $\cdot$ tồn kho $\cdot$\\phân phối};
-    \coordinate (backendtop) at ($(identity.north west)+(0,1.0)$);
+    \node[flowbox,minimum width=12.6cm] (actors) at (0,0) {Người dân $\cdot$ Người quyên góp $\cdot$ Tình nguyện viên $\cdot$ Điều phối viên\\Quản lý vận hành $\cdot$ Người thẩm định $\cdot$ Quản trị viên};
+    \node[flowbox,minimum width=4.6cm] (web) at (-3.0,-2.0) {Web\\React, Vite};
+    \node[flowbox,minimum width=4.6cm] (mobile) at (3.0,-2.0) {Mobile\\React Native, Expo};
+    \node[flowbox,minimum width=9.0cm] (nginx) at (0,-4.0) {Nginx: định tuyến API theo tiền tố, giới hạn tần suất};
+    \node[flowbox,minimum width=3.6cm] (identity) at (-5.4,-7.4) {\textbf{Identity}\\tài khoản $\cdot$ quyền};
+    \node[flowbox,minimum width=3.6cm] (response) at (0,-7.4) {\textbf{Response}\\SOS $\cdot$ nhiệm vụ\\chiến dịch};
+    \node[flowbox,minimum width=3.6cm] (logistics) at (5.4,-7.4) {\textbf{Logistics}\\quyên góp $\cdot$ kho\\nhu cầu $\cdot$ phân phối};
+    \coordinate (backendtop) at ($(identity.north west)+(0,0.9)$);
     \begin{scope}[on background layer]
       \node[draw,thick,dashed,rounded corners=3pt,inner xsep=0.35cm,inner ysep=0.3cm,
-            fit=(identity)(response)(logistics)(backendtop),label={[anchor=north west,align=left,font=\small\bfseries,inner sep=4pt]north west:Backend\\NestJS $\cdot$ TypeORM}] (backend) {};
+            fit=(identity)(response)(logistics)(backendtop),label={[anchor=north west,align=left,font=\small\bfseries,inner sep=4pt]north west:Backend NestJS $\cdot$ TypeORM}] (backend) {};
     \end{scope}
-    \node[database] (dbidentity) at (-5.0,-10.3) {CSDL Identity\\(PostgreSQL)};
-    \node[database] (dbresponse) at (-0.6,-10.3) {CSDL Response\\(PostgreSQL/\\PostGIS)};
-    \node[database] (dblogistics) at (5.4,-10.3) {CSDL Logistics\\(PostgreSQL)};
-    \node[database,minimum width=3.6cm] (minio) at (2.5,-13.4) {MinIO Community\\tệp riêng tư};
+    \node[database,minimum width=2.6cm] (dbidentity) at (-5.4,-11.4) {c48\_identity};
+    \node[database,minimum width=2.6cm] (dbresponse) at (0,-11.4) {c48\_response};
+    \node[database,minimum width=2.6cm] (dblogistics) at (5.4,-11.4) {c48\_logistics};
+    \begin{scope}[on background layer]
+      \node[draw,thick,dashed,rounded corners=3pt,inner xsep=0.3cm,inner ysep=0.25cm,
+            fit=(dbidentity)(dbresponse)(dblogistics),label={[anchor=south west,font=\small\bfseries,inner sep=3pt]north west:PostgreSQL + PostGIS (một máy chủ, ba cơ sở dữ liệu)}] (pg) {};
+    \end{scope}
+    \node[database,minimum width=3.6cm] (minio) at (0,-15.4) {MinIO Community\\tệp riêng tư};
+    \node[flowbox,dashed,minimum width=4.2cm,font=\scriptsize] (ext) at (-5.4,-15.4) {Dịch vụ ngoài tùy chọn\\Gemini: gợi ý AI, chọn mặt hàng\\Open-Meteo: dự báo thời tiết};
 
-    \draw[flowarrow] (actors) -- (client);
-    \draw[flowarrow] (client) -- (nginx);
-    \draw[flowarrow] (nginx.south) -- ++(0,-0.6) -| ($(identity.north)+(1.35,0)$);
-    \draw[flowarrow] (nginx) -- (response);
+    \draw[flowarrow] (actors.south -| web) -- (web.north);
+    \draw[flowarrow] (actors.south -| mobile) -- (mobile.north);
+    \draw[flowarrow] (web.south) -- (web.south |- nginx.north);
+    \draw[flowarrow] (mobile.south) -- (mobile.south |- nginx.north);
+    \draw[flowarrow] (nginx.south) -- ++(0,-0.6) -| (identity.north);
     \draw[flowarrow] (nginx.south) -- ++(0,-0.6) -| (logistics.north);
+    \draw[flowarrow] (nginx.south) -- (response.north);
     \draw[{Stealth[length=2.6mm]}-{Stealth[length=2.6mm]},thick] (identity) -- node[flowlabel,above] {REST} (response);
     \draw[{Stealth[length=2.6mm]}-{Stealth[length=2.6mm]},thick] (response) -- node[flowlabel,above] {REST} (logistics);
-    \draw[flowarrow] (identity) -- (dbidentity);
-    \draw[flowarrow] (response.south -| dbresponse) -- (dbresponse);
-    \draw[flowarrow] (logistics.south -| dblogistics) -- (dblogistics);
-    \draw[flowarrow,dashed] (response.south east) -- node[flowlabel,pos=0.5,left] {S3} ($(minio.north)+(-0.5,0)$);
-    \draw[flowarrow,dashed] (logistics.south west) -- node[flowlabel,pos=0.5,right] {S3} ($(minio.north)+(0.5,0)$);
+    \draw[flowarrow] (identity.south) -- (dbidentity.north);
+    \draw[flowarrow] (response.south) -- (dbresponse.north);
+    \draw[flowarrow] (logistics.south) -- (dblogistics.north);
+    \draw[flowarrow,dashed] (-1.5,-8.3) -- node[flowlabel,pos=0.55,left] {S3} (-1.5,-14.35);
+    \draw[flowarrow,dashed] (3.8,-8.3) -- (3.8,-13.6) -- node[flowlabel,pos=0.5,above] {S3} (1.5,-14.35);
   \end{tikzpicture}
   \caption{Kiến trúc hệ thống}\label{dia:architecture}
 \end{diagram}
@@ -1175,25 +1505,62 @@ Backend gồm ba dịch vụ Identity, Response và Logistics, được triển 
     \hline
     \centering\textbf{Thành phần} & \centering\textbf{Dữ liệu/trách nhiệm sở hữu} & \centering\arraybackslash\textbf{Công nghệ/ranh giới} \\
     \hline
-    Identity & Tài khoản, thông tin xác thực, tổ chức, thành viên, quyền và phiên làm mới. & NestJS/TypeScript, TypeORM; cơ sở dữ liệu và thông tin xác thực riêng. \\
+    Identity & Tài khoản, liên kết định danh, thông tin xác thực, quyền theo phạm vi và phiên làm mới. & NestJS/TypeScript, TypeORM; cơ sở dữ liệu và thông tin xác thực riêng. \\
     \hline
-    Response & Yêu cầu trợ giúp, xác minh/ưu tiên, nhóm đội, nhiệm vụ, chiến dịch và dòng thời gian nghiệp vụ. & NestJS/TypeScript, TypeORM, PostgreSQL/PostGIS; sở hữu trạng thái yêu cầu và nhiệm vụ. \\
+    Response & Yêu cầu trợ giúp, xác minh/ưu tiên, đội và vị trí đội, nhiệm vụ, chiến dịch, gợi ý AI và dòng thời gian nghiệp vụ. & NestJS/TypeScript, TypeORM, PostgreSQL/PostGIS; sở hữu trạng thái yêu cầu và nhiệm vụ. \\
     \hline
-    Logistics & Danh mục hàng, đợt nhận, khai báo, kiểm đếm, duyệt biên nhận, sổ tồn, cam kết và phân phối. & NestJS/TypeScript, TypeORM; cơ sở dữ liệu riêng, sở hữu số liệu vật tư và bàn giao. \\
+    Logistics & Danh mục hàng và kho, đợt nhận có vị trí, khai báo, kiểm đếm, duyệt biên nhận, sổ tồn, nhu cầu, cam kết, thiếu hụt, phiếu lấy hàng và phân phối. & NestJS/TypeScript, TypeORM; cơ sở dữ liệu riêng, sở hữu số liệu vật tư và bàn giao. \\
     \hline
     Web/Mobile & Hiển thị/nhập liệu theo vai trò; không phải ranh giới bảo mật. & React/Vite/TypeScript và \mbox{React Native}, Expo, TypeScript. \\
     \hline
-    Lưu tệp & Tệp bằng chứng riêng tư và thông tin kiểm soát tải xuống. & MinIO Community, triển khai một nút cho môi trường demo; quyền riêng tư và khôi phục cần được kiểm tra. \\
+    Lưu tệp & Tệp bằng chứng riêng tư và thông tin kiểm soát tải xuống. & MinIO Community, triển khai một nút và chỉ bật trong cấu hình lưu trữ; quyền riêng tư và khôi phục cần được kiểm tra. \\
     \hline
     Triển khai demo & Các API và thành phần phục vụ trình diễn. & Docker Compose trên một máy; cấu hình này chưa chứng minh khả năng sẵn sàng cao hay cam kết thời gian phục vụ. \\
     \hline
   \end{tabularx}
 \end{table}
 
+Môi trường demo chạy bằng một tệp Docker Compose duy nhất. Chỉ nginx mở cổng ra ngoài; các API, PostgreSQL và MinIO chỉ lắng nghe trên địa chỉ loopback của máy chủ. Dữ liệu nằm trong hai volume riêng (pgdata, minio-data); khôi phục cơ sở dữ liệu chỉ thực hiện bằng lệnh đặt lại tường minh và không xóa dữ liệu MinIO. Cấu hình này chưa chứng minh khả năng sẵn sàng cao.
+
+\begin{diagram}[htbp]
+  \centering
+  \begin{tikzpicture}
+    \node[contbox,minimum width=6.0cm] (client) at (0,0) {Trình duyệt $\cdot$ ứng dụng Mobile};
+    \node[contbox,minimum width=3.4cm] (nginx) at (0,-2.5) {\textbf{nginx}\\cổng công khai :8080};
+    \node[contbox,minimum width=3.4cm] (web) at (-5.2,-2.5) {\textbf{web}\\tệp tĩnh React};
+    \node[contbox,minimum width=3.4cm] (idn) at (-5.2,-5.2) {\textbf{identity-api}\\:3001 (loopback)};
+    \node[contbox,minimum width=3.4cm] (rsp) at (0,-5.2) {\textbf{response-api}\\:3002 (loopback)};
+    \node[contbox,minimum width=3.4cm] (lgs) at (5.2,-5.2) {\textbf{logistics-api}\\:3003 (loopback)};
+    \node[contbox,minimum width=4.2cm] (pg) at (-3.2,-8.4) {\textbf{postgres}\\PostGIS 17, :55432 (loopback)\\3 cơ sở dữ liệu};
+    \node[contbox,dashed,minimum width=3.8cm] (mn) at (3.6,-8.4) {\textbf{minio} (profile storage)\\:59500, :9005 (loopback)};
+    \node[contbox,dashed,minimum width=4.2cm,font=\scriptsize] (job) at (5.2,-2.5) {Tác vụ một lần: db-init,\\*-migrate, seed (profile seed)};
+    \node[database,minimum width=2.4cm] (vp) at (-3.2,-11.0) {volume\\pgdata};
+    \node[database,minimum width=2.4cm] (vm) at (3.6,-11.0) {volume\\minio-data};
+    \coordinate (frametop) at ($(web.north west)+(0,0.75)$);
+    \begin{scope}[on background layer]
+      \node[draw,thick,dashed,rounded corners=3pt,inner xsep=0.35cm,inner ysep=0.3cm,
+            fit=(web)(job)(vp)(vm)(frametop),label={[anchor=north west,font=\small\bfseries,inner sep=4pt]north west:Máy chủ Docker $\cdot$ Docker Compose $\cdot$ mạng c48-internal}] {};
+    \end{scope}
+    \draw[flowarrow] (client) -- (nginx);
+    \draw[flowarrow] (nginx) -- (web);
+    \draw[flowarrow] (nginx.south) -- ++(0,-0.6) -| (idn.north);
+    \draw[flowarrow] (nginx.south) -- (rsp.north);
+    \draw[flowarrow] (nginx.south) -- ++(0,-0.6) -| (lgs.north);
+    \draw[flowarrow] (idn.south) -- (idn |- pg.north);
+    \draw[flowarrow] (rsp.south) -- ++(0,-0.7) -| ($(pg.north)+(0.7,0)$);
+    \draw[flowarrow] (lgs.south) -- ++(0,-0.7) -| ($(pg.north)+(1.6,0)$);
+    \draw[flowarrow,dashed] (rsp.south east) -- (mn.north west);
+    \draw[flowarrow,dashed] (lgs.south) -- (mn.north east);
+    \draw[flowarrow] (pg) -- (vp);
+    \draw[flowarrow] (mn) -- (vm);
+  \end{tikzpicture}
+  \caption{Sơ đồ triển khai trên Docker Compose}\label{dia:deployment}
+\end{diagram}
+
 NestJS với TypeScript được lựa chọn sau khi nhóm so sánh định tính với Spring Boot, Django/DRF (Django REST Framework), FastAPI và Flask. Cách chọn này phù hợp với định hướng dùng TypeScript cho backend và các ứng dụng khách, đồng thời cung cấp cấu trúc mô-đun, kiểm tra dữ liệu đầu vào và hỗ trợ mô tả API. PostgreSQL/PostGIS phù hợp với các dữ liệu có quan hệ, giao dịch tồn kho và truy vấn vị trí. Đây là đánh giá theo nhu cầu của đề tài, không phải kết quả so sánh hiệu năng. MinIO Community được chọn cho lưu trữ tệp trong môi trường demo một nút; việc xác nhận quyền truy cập riêng tư và quy trình sao lưu, khôi phục vẫn còn phải thực hiện.
 
 \section{Kết quả xây dựng backend}
-Backend được chia thành ba dịch vụ theo trách nhiệm dữ liệu. Identity quản lý tài khoản, phiên đăng nhập, tổ chức, thành viên, quyền truy cập và nhật ký thao tác. Response tiếp nhận SOS, theo dõi và bổ sung yêu cầu, hỗ trợ xác minh, xem xét báo trùng, đặt ưu tiên, giao nhiệm vụ cho đội và cập nhật kết quả ứng cứu. Logistics quản lý chiến dịch, hàng cứu trợ, kiểm đếm và duyệt độc lập, tồn kho, nhu cầu, cam kết, phân phối, bàn giao và báo cáo.
+Backend được chia thành ba dịch vụ theo trách nhiệm dữ liệu. Identity quản lý tài khoản, phiên đăng nhập, quyền truy cập theo phạm vi và nhật ký thao tác. Response tiếp nhận SOS, theo dõi và bổ sung yêu cầu, hỗ trợ xác minh, xem xét báo trùng, đặt ưu tiên, giao nhiệm vụ cho đội và cập nhật kết quả ứng cứu. Logistics quản lý đợt quyên góp có vị trí, kho và hàng cứu trợ, kiểm đếm và duyệt độc lập, tồn kho, nhu cầu và thiếu hụt, cam kết, phiếu lấy hàng, phân phối, bàn giao và báo cáo.
 
 \begin{table}[htbp]
   \centering
@@ -1203,11 +1570,11 @@ Backend được chia thành ba dịch vụ theo trách nhiệm dữ liệu. Ide
     \hline
     \centering\textbf{Dịch vụ} & \centering\arraybackslash\textbf{Chức năng chính} \\
     \hline
-    Identity & Đăng ký và đăng nhập; quản lý phiên, tài khoản, tổ chức và thành viên; cấp quyền theo phạm vi; ghi nhận thao tác quản trị. \\
+    Identity & Đăng ký và đăng nhập; quản lý phiên và tài khoản; cấp quyền theo phạm vi; ghi nhận thao tác quản trị. \\
     \hline
     Response & Tiếp nhận SOS SELF/PROXY; theo dõi và bổ sung yêu cầu; xác minh, xem xét báo trùng và ưu tiên; quản lý đội, nhiệm vụ và tiến độ; hỗ trợ chiến dịch và bản đồ vận hành. \\
     \hline
-    Logistics & Quản lý đợt nhận hàng; khai báo, kiểm đếm và duyệt độc lập; ghi nhận tồn kho; quản lý nhu cầu, cam kết, xuất hàng, phân phối, bàn giao và báo cáo. \\
+    Logistics & Quản lý đợt nhận hàng có vị trí; khai báo, kiểm đếm và duyệt độc lập; ghi nhận tồn kho; ước tính nhu cầu, cảnh báo thiếu hụt, cam kết, phiếu lấy hàng, xuất hàng, phân phối, bàn giao và báo cáo. \\
     \hline
   \end{tabularx}
 \end{table}
@@ -1242,7 +1609,7 @@ Nhóm đã chạy kiểm thử tự động cho nhiều thao tác của ba dịc
 \section{Nguyên tắc tổ chức dữ liệu}
 Backend lưu dữ liệu trong ba cơ sở PostgreSQL do các dịch vụ Identity, Response và Logistics sở hữu riêng. Mỗi dịch vụ quản lý cấu trúc dữ liệu, các lần cập nhật và giao dịch của mình. Khi trao đổi qua API, mã định danh của dịch vụ khác chỉ được dùng để tham chiếu; giữa các cơ sở dữ liệu không tạo khóa ngoại. Response dùng PostGIS để lưu và truy vấn vị trí địa lý.
 
-Toàn hệ thống có 65 bảng, trong đó Identity có 9 bảng, Response có 22 bảng và Logistics có 34 bảng. Logistics có nhiều bảng nhất vì phải lưu đủ các bước từ khai báo, kiểm đếm, duyệt đến tồn kho, phân phối và bàn giao.
+Toàn hệ thống có 76 bảng ứng dụng (không tính bảng di trú, bảng hệ thống của PostGIS và các view), trong đó Identity có 9 bảng, Response có 24 bảng và Logistics có 43 bảng. Logistics có nhiều bảng nhất vì phải lưu đủ các bước từ khai báo, kiểm đếm, duyệt đến tồn kho, phân phối và bàn giao.
 
 \begin{table}[htbp]
   \centering
@@ -1252,13 +1619,13 @@ Toàn hệ thống có 65 bảng, trong đó Identity có 9 bảng, Response có
     \hline
     \centering\textbf{Cơ sở dữ liệu} & \centering\textbf{Số bảng} & \centering\arraybackslash\textbf{Nhóm dữ liệu sở hữu} \\
     \hline
-    Identity & 9 & Tài khoản, tổ chức, vùng, thành viên, quyền, phiên xác thực và nhật ký kiểm toán. \\
+    Identity & 9 & Tài khoản, liên kết định danh ngoài, đăng ký bằng email, quyền theo phạm vi, phiên xác thực, nhật ký kiểm toán và bản ghi chống gửi lặp. \\
     \hline
-    Response & 22 & Yêu cầu/SOS, đối tượng được báo, sự kiện và xác minh, bằng chứng, đội/vị trí, nhiệm vụ, chiến dịch và thông báo. \\
+    Response & 24 & Yêu cầu/SOS, đối tượng được báo, sự kiện và xác minh, bằng chứng, chiến dịch và phạm vi tham gia, đội/vị trí, nhiệm vụ, gợi ý AI, thông báo và nhật ký kiểm toán. \\
     \hline
-    Logistics & 34 & Danh mục hàng, đợt tiếp nhận, khai báo, kiểm đếm/duyệt, biên nhận, biến động và số dư tồn kho, nhu cầu, cam kết, phân phối, bàn giao và đối soát. \\
+    Logistics & 43 & Danh mục hàng và kho, đợt quyên góp, khai báo, kiểm đếm/duyệt, biên nhận, biến động và số dư tồn kho, nhu cầu, cam kết, thiếu hụt, phân phối, bàn giao, phiếu lấy hàng và đóng phiếu. \\
     \hline
-    \textbf{Tổng} & \textbf{65} & Tổng số bảng của ba cơ sở dữ liệu. \\
+    \textbf{Tổng} & \textbf{76} & Tổng số bảng của ba cơ sở dữ liệu. \\
     \hline
   \end{tabularx}
 \end{table}
@@ -1266,7 +1633,7 @@ Toàn hệ thống có 65 bảng, trong đó Identity có 9 bảng, Response có
 \section{Ràng buộc và tính toàn vẹn}
 Các quan hệ trong phạm vi một dịch vụ được bảo vệ bằng khóa ngoại và ràng buộc cơ sở dữ liệu. Tham chiếu sang dịch vụ khác được kiểm tra qua API. Những thao tác có thể được gửi lại cần cơ chế chống ghi nhận trùng; các nghiệp vụ kiểm đếm, duyệt và cập nhật tồn kho dùng giao dịch cùng khóa phù hợp để tránh xung đột. Số dư tồn kho được tính từ các biến động đã ghi nhận, không lấy trực tiếp từ bản khai báo của người tặng.
 
-Response lưu điểm địa lý và vùng trong cùng phạm vi dữ liệu, đồng thời chỉ tự gán vùng khi vị trí nằm trong đúng một ranh giới. Bản đồ tổng hợp không cấp quyền xem vị trí chính xác. Thời hạn lưu dữ liệu và chính sách chia sẻ vị trí cần được thống nhất trước khi sử dụng dữ liệu thật.
+Response lưu điểm địa lý và ranh giới chiến dịch trong cùng phạm vi dữ liệu, đồng thời chỉ tự gắn chiến dịch khi vị trí nằm trong đúng một ranh giới đang hoạt động. Bản đồ tổng hợp không cấp quyền xem vị trí chính xác. Thời hạn lưu dữ liệu và chính sách chia sẻ vị trí cần được thống nhất trước khi sử dụng dữ liệu thật.
 
 \section{Sơ đồ cơ sở dữ liệu vật lý}
 Sơ đồ ERD được tách theo từng dịch vụ và từng nhóm nghiệp vụ, mỗi sơ đồ được bố trí riêng trên một trang đứng để giữ cỡ chữ đọc được. Mã tham chiếu sang dịch vụ khác chỉ là một cột dữ liệu, không vẽ thành quan hệ khóa ngoại.
@@ -1281,31 +1648,61 @@ Sơ đồ ERD được tách theo từng dịch vụ và từng nhóm nghiệp v
 \begin{figure}[H]
   \centering
   \includegraphics[width=\textwidth,height=0.84\textheight,keepaspectratio]{images/c48-erd-response-requests.pdf}
-  \caption{ERD vật lý Response: tiếp nhận và theo dõi yêu cầu}\label{fig:erd-response-requests}
+  \caption{ERD vật lý Response: tiếp nhận, xác minh và giải quyết yêu cầu}\label{fig:erd-response-requests}
 \end{figure}
 \clearpage
 \begin{figure}[H]
   \centering
-  \includegraphics[width=\textwidth,height=0.84\textheight,keepaspectratio]{images/c48-erd-response-rescue.pdf}
-  \caption{ERD vật lý Response: đội và hoạt động ứng cứu}\label{fig:erd-response-rescue}
+  \includegraphics[width=\textwidth,height=0.84\textheight,keepaspectratio]{images/c48-erd-response-campaigns.pdf}
+  \caption{ERD vật lý Response: chiến dịch, phân loại sự cố và gợi ý AI}\label{fig:erd-response-campaigns}
+\end{figure}
+\clearpage
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth,height=0.84\textheight,keepaspectratio]{images/c48-erd-response-missions.pdf}
+  \caption{ERD vật lý Response: đội cứu hộ và nhiệm vụ}\label{fig:erd-response-missions}
 \end{figure}
 \clearpage
 \begin{figure}[H]
   \centering
   \includegraphics[width=\textwidth,height=0.84\textheight,keepaspectratio]{images/c48-erd-logistics-donations.pdf}
-  \caption{ERD vật lý Logistics: đợt nhận và quyên góp hiện vật}\label{fig:erd-logistics-donations}
+  \caption{ERD vật lý Logistics: đợt quyên góp và khai báo bàn giao}\label{fig:erd-logistics-donations}
 \end{figure}
 \clearpage
 \begin{figure}[H]
   \centering
-  \includegraphics[width=\textwidth,height=0.84\textheight,keepaspectratio]{images/c48-erd-logistics-fulfillment.pdf}
-  \caption{ERD vật lý Logistics: nhu cầu và đáp ứng cứu trợ}\label{fig:erd-logistics-fulfillment}
+  \includegraphics[width=\textwidth,height=0.84\textheight,keepaspectratio]{images/c48-erd-logistics-receipts.pdf}
+  \caption{ERD vật lý Logistics: kiểm đếm, duyệt biên nhận và phản ánh sai lệch}\label{fig:erd-logistics-receipts}
+\end{figure}
+\clearpage
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth,height=0.84\textheight,keepaspectratio]{images/c48-erd-logistics-stock.pdf}
+  \caption{ERD vật lý Logistics: danh mục, kho và sổ tồn}\label{fig:erd-logistics-stock}
+\end{figure}
+\clearpage
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth,height=0.84\textheight,keepaspectratio]{images/c48-erd-logistics-needs.pdf}
+  \caption{ERD vật lý Logistics: đợt cứu trợ, nhu cầu và cam kết}\label{fig:erd-logistics-needs}
+\end{figure}
+\clearpage
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth,height=0.84\textheight,keepaspectratio]{images/c48-erd-logistics-gaps.pdf}
+  \caption{ERD vật lý Logistics: kho phụ trách chiến dịch, trích xuất nhu cầu và thiếu hụt}\label{fig:erd-logistics-gaps}
 \end{figure}
 \clearpage
 \begin{figure}[H]
   \centering
   \includegraphics[width=\textwidth,height=0.84\textheight,keepaspectratio]{images/c48-erd-logistics-handoff.pdf}
-  \caption{ERD vật lý Logistics: phân phối và bàn giao}\label{fig:erd-logistics-handoff}
+  \caption{ERD vật lý Logistics: phân phối, bàn giao và quyết toán}\label{fig:erd-logistics-handoff}
+\end{figure}
+\clearpage
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth,height=0.84\textheight,keepaspectratio]{images/c48-erd-logistics-pickup.pdf}
+  \caption{ERD vật lý Logistics: phiếu lấy hàng theo nhiệm vụ và đóng phiếu}\label{fig:erd-logistics-pickup}
 \end{figure}
 
 \chapter{THIẾT KẾ GIAO DIỆN WEB}\label{ch:web}
