@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { activateEmailRegistration, withEmail } from './lib/email-registration.mjs';
+import { VALID_PNG } from './lib/valid-png.mjs';
 
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
@@ -291,7 +292,7 @@ try {
 
   const evidenceSecret = secret();
   const evidenceRequest = await createGuestRequest(evidenceSecret);
-  const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from('c48-t5-evidence')]);
+  const png = Buffer.concat([VALID_PNG, Buffer.from('c48-t5-evidence')]);
   const evidenceForm = multipart(png);
   const uploadKey = key();
   const evidence = await upload(responseUrl, evidenceRequest, evidenceSecret, evidenceForm, uploadKey);

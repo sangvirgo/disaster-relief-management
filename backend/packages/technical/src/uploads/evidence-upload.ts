@@ -1,7 +1,7 @@
 import Busboy from 'busboy';
 import { createHash } from 'node:crypto';
 import { createWriteStream } from 'node:fs';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rename, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Request } from 'express';
@@ -9,6 +9,7 @@ import { Transform, type TransformCallback } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { AppError } from '../errors/errors';
 import { detectEvidenceMime, evidenceSizeLimit, EvidenceMime } from '../media/evidence-media';
+import { downscaleEvidenceImage } from '../media/evidence-image';
 
 const maxMultipartBytes = 55 * 1024 * 1024;
 const maxFileBytes = 50 * 1024 * 1024;
@@ -161,8 +162,20 @@ export async function stageEvidenceMultipart(request: Request, declaredBodyBytes
     if (fileTask) await fileTask;
     if (receivedBodyBytes !== declaredBodyBytes) throw new AppError('PAYLOAD_TOO_LARGE', { status: 413 });
     if (fileCount !== 1 || !mime || fileSize === 0 || fileSize > declaredBodyBytes) throw new AppError('UNSUPPORTED_MEDIA', { status: 415 });
+    let storedSize = fileSize;
+    let storedChecksum = checksum.digest('hex');
+    if (mime !== 'video/mp4') {
+      // Images above the maximum edge are stored at reduced resolution; the checksum and size describe the stored bytes.
+      const optimizedPath = join(directory, 'optimized');
+      const optimized = await downscaleEvidenceImage(path, optimizedPath, mime);
+      if (optimized) {
+        await rename(optimizedPath, path);
+        storedSize = optimized.size;
+        storedChecksum = optimized.checksum;
+      }
+    }
     return {
-      path, size: fileSize, mime, checksum: checksum.digest('hex'),
+      path, size: storedSize, mime, checksum: storedChecksum,
       cleanup: async () => {
         try {
           await rm(directory, { recursive: true, force: true });

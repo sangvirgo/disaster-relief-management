@@ -78,10 +78,15 @@ function makeHandoffService(options: Parameters<typeof makeInfrastructure>[0] = 
   };
 }
 
+const validPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+
+/** Size of the multipart fixture file: a valid PNG plus the unique suffix appended in multipartRequest(). */
+const fixtureFileBytes = validPng.length + Buffer.byteLength('c48-t12-file');
+
 function multipartRequest(): Request & { idempotencyKey: string } {
   const boundary = 'c48-t12-boundary';
   const png = Buffer.concat([
-    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    validPng,
     Buffer.from('c48-t12-file'),
   ]);
   const body = Buffer.concat([
@@ -287,7 +292,7 @@ describe('donation attachment access and upload', () => {
     let storedObjectKey = '';
     const manager = {
       query: jest.fn(async (sql: string, values: unknown[] = []) => {
-        if (sql.includes('SELECT count(*)::int AS count')) return [{ count: 0, used: String(100 * 1024 * 1024 - 20) }];
+        if (sql.includes('SELECT count(*)::int AS count')) return [{ count: 0, used: String(100 * 1024 * 1024 - fixtureFileBytes) }];
         if (sql.includes('FROM donation_delivery dd')) return [delivery];
         if (sql.includes('INSERT INTO logistics_attachment')) {
           createdAttachmentId = String(values[0]);
@@ -324,13 +329,13 @@ describe('donation attachment access and upload', () => {
     expect(result).toMatchObject({ status: 201, replay: false, value: { id: expect.any(String), state: 'READY', detected_mime: 'image/png' } });
     expect(createdAttachmentId).toMatch(/^[0-9a-f-]{36}$/u);
     expect(result.value.id).toBe(createdAttachmentId);
-    expect(insertedDeclaredBytes).toBe(20);
+    expect(insertedDeclaredBytes).toBe(fixtureFileBytes);
     expect(manager.query).toHaveBeenCalledWith(expect.stringContaining('SELECT count(*)::int AS count'), [deliveryId]);
     expect(storage.putObject).toHaveBeenCalledWith(
-      `donation/${deliveryId}/${createdAttachmentId}`, expect.any(String), 20, 'image/png', expect.any(String),
+      `donation/${deliveryId}/${createdAttachmentId}`, expect.any(String), fixtureFileBytes, 'image/png', expect.any(String),
     );
     expect(query).toHaveBeenCalledWith(expect.stringContaining("UPDATE logistics_attachment SET state='READY'"), [
-      createdAttachmentId, 20, 'image/png', expect.any(String),
+      createdAttachmentId, fixtureFileBytes, 'image/png', expect.any(String),
     ]);
     expect(storedObjectKey).toBe(`donation/${deliveryId}/${createdAttachmentId}`);
   });

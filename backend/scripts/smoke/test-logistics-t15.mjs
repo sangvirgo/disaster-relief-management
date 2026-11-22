@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { activateEmailRegistration, withEmail } from './lib/email-registration.mjs';
+import { VALID_PNG } from './lib/valid-png.mjs';
 
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
@@ -358,7 +359,7 @@ try {
   assert.equal(recorded.result.value.status, 'RECORDED');
 
   const png = Buffer.concat([
-    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    VALID_PNG,
     Buffer.from(`T15 handoff evidence ${suffix}`),
   ]);
   const uploadedEvidence = await callMultipart(

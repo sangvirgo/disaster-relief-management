@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { VALID_PNG } from './lib/valid-png.mjs';
 
 const require = createRequire(import.meta.url);
 const { Client } = require('pg');
@@ -101,7 +102,7 @@ export async function runMissionSmoke({
   assertVietnameseError(invalidEdge, 409, 'STATE_TRANSITION_INVALID');
 
   const boundary = `----c48-t9-${key()}`;
-  const file = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x54, 0x39]);
+  const file = Buffer.concat([VALID_PNG, Buffer.from('T9')]);
   const multipart = Buffer.concat([
     Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="mission.png"\r\nContent-Type: image/png\r\n\r\n`),
     file,

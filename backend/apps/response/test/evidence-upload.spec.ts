@@ -7,6 +7,8 @@ import type { Request } from 'express';
 import { AppError } from '@c48/technical/errors/errors';
 import { stageEvidenceMultipart, type StagedEvidenceFile } from '@c48/technical/uploads/evidence-upload';
 
+const validPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+
 function multipart(file: Buffer, filename = 'photo.png', declaredType = 'application/octet-stream') {
   const boundary = '----c48-evidence-test';
   const prefix = Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: ${declaredType}\r\n\r\n`);
@@ -59,7 +61,7 @@ describe('Response multipart evidence staging', () => {
   }, 1_000);
 
   it('streams the one file, hashes bytes, and ignores client MIME metadata', async () => {
-    const file = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from('synthetic')]);
+    const file = Buffer.concat([validPng, Buffer.from('synthetic')]);
     const form = multipart(file, 'report.jpg', 'image/jpeg');
     const request = Readable.from([form.body]) as unknown as Request;
     request.headers = { 'content-type': `multipart/form-data; boundary=${form.boundary}` };
@@ -148,5 +150,51 @@ describe('Response multipart evidence staging', () => {
       if (!cleaned) throw new Error('Timed out waiting for multipart upload cleanup after destroying the request');
       if (directory) await rm(join(tmpdir(), directory), { recursive: true, force: true });
     }
+  });
+});
+
+describe('Evidence image decoding and downscaling', () => {
+  async function stage(file: Buffer): Promise<StagedEvidenceFile> {
+    const form = multipart(file);
+    const request = Readable.from([form.body]) as unknown as Request;
+    request.headers = { 'content-type': `multipart/form-data; boundary=${form.boundary}` };
+    return stageEvidenceMultipart(request, form.body.length);
+  }
+
+  it('reduces an oversized-resolution image and reports the stored size and checksum', async () => {
+    const { default: sharp } = await import('sharp');
+    const { readFile, stat } = await import('node:fs/promises');
+    const large = await sharp({ create: { width: 4000, height: 3000, channels: 3, background: { r: 200, g: 40, b: 40 } } })
+      .jpeg({ quality: 90 }).toBuffer();
+
+    const staged = await stage(large);
+    try {
+      const metadata = await sharp(staged.path).metadata();
+      expect(staged.mime).toBe('image/jpeg');
+      expect(Math.max(metadata.width ?? 0, metadata.height ?? 0)).toBe(2048);
+      expect(metadata.width).toBeGreaterThan(metadata.height ?? 0);
+      expect(staged.size).toBe((await stat(staged.path)).size);
+      expect(staged.checksum).toBe(createHash('sha256').update(await readFile(staged.path)).digest('hex'));
+    } finally {
+      await staged.cleanup();
+    }
+  });
+
+  it('keeps an image that is already within the resolution cap byte for byte', async () => {
+    const staged = await stage(validPng);
+    try {
+      expect(staged.size).toBe(validPng.length);
+      expect(staged.checksum).toBe(createHash('sha256').update(validPng).digest('hex'));
+    } finally {
+      await staged.cleanup();
+    }
+  });
+
+  it('rejects content that has an image signature but cannot be decoded', async () => {
+    const before = new Set((await readdir(tmpdir())).filter((name) => name.startsWith('c48-evidence-')));
+    await expect(stage(Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from('not an image')])))
+      .rejects.toMatchObject<AppError>({ code: 'UNSUPPORTED_MEDIA' });
+    const leftover = (await readdir(tmpdir())).filter((name) => name.startsWith('c48-evidence-') && !before.has(name));
+    expect(leftover).toHaveLength(0);
   });
 });
