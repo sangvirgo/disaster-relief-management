@@ -28,6 +28,7 @@ Run the existing Compose stack on one AWS EC2 instance, publish it through a Clo
 - PR #18: deploy job authenticates with a scoped IAM user key from environment secrets (job enabled by variable `DEPLOY_ENABLED`).
 - PR #19: `release` runs `db/migrate` through `bash` (the file is not executable in Git; the first automated deploy stopped on this).
 - PR #20: removed the automatic GHCR cleanup job (it looked up the wrong package name and "keep newest N" is unsafe with untagged child manifests).
+- PR #22: `backend/scripts/deploy/reset-demo-data --reset` wipes and reseeds the demo data on the host (typed hostname confirmation, verified safety dump first, removes only `c48_pgdata`, never touches MinIO or S3, seeds with a one-command `NODE_ENV=development` override); the production guard in `lib.sh` now fails closed.
 - This branch: design doc updated (status, diagram, region, section 15), runbook link, this handoff, and the SVG/PDF diagrams (overview and reliability corrected; new delivery-pipeline page; PDF now 3 pages).
 
 ## 4. Decisions made and deviations from the design
@@ -44,12 +45,12 @@ Run the existing Compose stack on one AWS EC2 instance, publish it through a Clo
 
 - CI skips three tests that already fail on a clean `main`: `apps/logistics/test/donations-queries.service.spec.ts`, `apps/response/test/tracking-pagination.spec.ts`, and the node test "documented endpoint errors use catalog status and exact Vietnamese messages". Remove the exclusions in `deploy.yml` once fixed.
 - `EmailSenderService.sendVerificationCode` swallows every error (`catch { return false }`) and logs nothing, so a mail failure is invisible. A change that logs only the error code (no address, no secret) was proposed and not made.
-- `AGENTS.md` and plan section 6.3 still name MinIO as the object store; the design asked to update them. Not done, awaiting the operator's go-ahead.
+- `AGENTS.md` and plan section 6.3 still name MinIO as the object store, and `AGENTS.md` lists only `test-db --reset` and `reset-demo --reset` as reset commands (the new `reset-demo-data` follows the same rules but is not named). Not updated, awaiting the operator's go-ahead.
 - The Cloudflare `grafana` hostname still has an old proxied A record to a stale address; Grafana is not deployed. Other tunnels and the wildcard record in that zone belong to other projects and must not be touched.
 - Workflow action versions (`checkout@v4`, `setup-node@v4`, `docker/*@v3/v6`, `aws-actions/configure-aws-credentials@v4`) were written from memory; the runner already warns that Node 20 actions are deprecated.
 - `GOOGLE_CLIENT_IDS` is empty on the host, so server-side Google sign-in is not usable yet.
 - Demo data is not seeded. The seed refuses `NODE_ENV=production`; run it with `NODE_ENV=development` for that one command (see the runbook) and a password typed at a hidden prompt. `NODE_ENV=demo` is **invalid** (the services accept only development, test or production); an earlier version of the runbook said otherwise and was corrected.
-- `require_nonproduction_env` in `backend/scripts/dev/lib.sh` fails open: if `backend/.env` cannot be read (for example by a non-root user, since the file is root-owned mode 600), `awk` exits with status 2, which the `if` treats as "not production", so the guard is skipped. In the one observed case the later `docker compose` call also failed on the unreadable file and nothing was reset, but the guard should treat an unreadable file as an error. Not fixed yet.
+- `require_nonproduction_env` in `backend/scripts/dev/lib.sh` used to fail open when `backend/.env` was unreadable (`awk` exit 2 was read as "not production"). Fixed in PR #22 and covered by a test.
 - The Session Manager shell runs as `ssm-user` with `sh`, so commands that touch `/opt/c48` need `sudo`; `sudo -i` gives a root bash login shell for the session.
 - An access key was once pasted into a chat during setup; it was deleted and replaced. Never paste keys, tokens or `.env` contents into chats, tickets or screenshots.
 
@@ -61,7 +62,7 @@ Daily backup to S3 (systemd timer, SHA-256 manifest, `pg_restore --list`, keep t
 
 Local: `tsc --noEmit`, eslint (0 errors), jest (170 suites, 1165 tests, with the two known-failing suites excluded), `npm run check:compose-env`, `nginx -t`, node tests (124 of 125, the one failure pre-existing), shell syntax of both deploy scripts, YAML validation of the workflow. CI on GitHub: same gates plus four Docker image builds (including `sharp` on Debian slim). On the host: `curl` to `/health/live`, `release status`, an SMTP `verify()` call (which showed the three mail faults), an S3 put/list/delete test through the instance role. Anonymous `docker manifest inspect` of all four images succeeded.
 
-Not run: a real rollback, a restore, an evidence upload to S3, an email delivery test, load tests, any phone/GPS test through the public URL.
+Not run: `reset-demo-data` on the real host (tested with fake docker only), a real rollback, a restore, an evidence upload to S3, an email delivery test, load tests, any phone/GPS test through the public URL.
 
 ## 8. Environment needed to resume
 
@@ -70,7 +71,7 @@ Operator machine: AWS CLI v2 and `session-manager-plugin`, a profile with permis
 ## 9. Next concrete task
 
 1. Confirm email works: register a test account on the public URL and check that the code arrives; if not, rerun the `verify()` check from the runbook and fix the specific error.
-2. Seed the demo data, then test login and an SOS with GPS from a phone over HTTPS.
+2. Seed the demo data with `bash backend/scripts/deploy/reset-demo-data --reset` as root from `/opt/c48` (it also works on an empty database; the one-line seed in the runbook is the alternative), then test login and an SOS with GPS from a phone over HTTPS. Do not run it while a deploy is in progress (they share a lock).
 3. Implement the daily backup (S3-aware script plus systemd timer), verify the lifecycle rule, and run one restore drill. This is the largest remaining gap.
 4. Then monitoring, k6 measurement, and the `AGENTS.md` / plan 6.3 update.
 
