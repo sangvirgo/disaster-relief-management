@@ -16,9 +16,16 @@ export interface AttachmentStorageConfig {
   endpoint: string;
   publicEndpoint: string;
   bucket: string;
-  accessKey: string;
-  secretKey: string;
+  /** Static credentials for MinIO; omit both on AWS so the SDK uses the instance IAM role. */
+  accessKey?: string | undefined;
+  secretKey?: string | undefined;
+  /** SigV4 signing region; must match the S3 bucket region on AWS. */
+  region?: string;
 }
+
+const regionPattern = /^[a-z]{2}(?:-[a-z]+)+-\d$/;
+// The Logistics bucket is c48-logistics-evidence, optionally with a globally-unique suffix on AWS S3.
+const logisticsBucketPattern = /^c48-logistics-evidence(?:-[a-z0-9][a-z0-9-]*)?$/;
 
 function validEndpoint(value: string, allowHttp: boolean): boolean {
   try {
@@ -43,13 +50,15 @@ export function loadAttachmentStorageConfig(env: Record<string, string | undefin
   const endpoint = env.S3_ENDPOINT ?? '';
   const publicEndpoint = env.S3_PUBLIC_ENDPOINT ?? '';
   const bucket = env.S3_BUCKET ?? '';
-  const accessKey = env.S3_ACCESS_KEY ?? '';
-  const secretKey = env.S3_SECRET_KEY ?? '';
+  const accessKey = env.S3_ACCESS_KEY || undefined;
+  const secretKey = env.S3_SECRET_KEY || undefined;
+  const region = env.S3_REGION || 'us-east-1';
+  const credentialsValid = (!accessKey && !secretKey) || (!!accessKey && !!secretKey && secretKey.length >= 16);
   if (!validEndpoint(endpoint, true) || !validEndpoint(publicEndpoint, nodeEnv !== 'production') ||
-      bucket !== 'c48-logistics-evidence' || !accessKey || !secretKey || secretKey.length < 16) {
-    throw new Error('Invalid Logistics configuration: S3_ENDPOINT, S3_PUBLIC_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY, S3_SECRET_KEY');
+      bucket.length > 63 || !logisticsBucketPattern.test(bucket) || !credentialsValid || !regionPattern.test(region)) {
+    throw new Error('Invalid Logistics configuration: S3_ENDPOINT, S3_PUBLIC_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY, S3_SECRET_KEY, S3_REGION');
   }
-  return { nodeEnv, endpoint, publicEndpoint, bucket, accessKey, secretKey };
+  return { nodeEnv, endpoint, publicEndpoint, bucket, accessKey, secretKey, region };
 }
 
 export class S3AttachmentStorage implements AttachmentStorage {
@@ -57,13 +66,17 @@ export class S3AttachmentStorage implements AttachmentStorage {
   private readonly public: S3Client;
 
   constructor(private readonly config: AttachmentStorageConfig) {
-    const credentials = { accessKeyId: config.accessKey, secretAccessKey: config.secretKey };
+    // Without static keys the SDK falls back to its default chain (EC2 instance IAM role).
+    const credentials = config.accessKey && config.secretKey
+      ? { credentials: { accessKeyId: config.accessKey, secretAccessKey: config.secretKey } }
+      : {};
+    const region = config.region ?? 'us-east-1';
     this.internal = new S3Client({
-      endpoint: config.endpoint, region: 'us-east-1', forcePathStyle: true, credentials,
+      endpoint: config.endpoint, region, forcePathStyle: true, ...credentials,
       requestHandler: { connectionTimeout: 3_000, socketTimeout: 30_000 },
     });
     this.public = new S3Client({
-      endpoint: config.publicEndpoint, region: 'us-east-1', forcePathStyle: true, credentials,
+      endpoint: config.publicEndpoint, region, forcePathStyle: true, ...credentials,
       requestHandler: { connectionTimeout: 3_000, socketTimeout: 30_000 },
     });
   }

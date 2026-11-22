@@ -17,10 +17,15 @@ export interface EvidenceStorageConfig {
   endpoint: string;
   publicEndpoint: string;
   bucket: string;
-  accessKey: string;
-  secretKey: string;
+  /** Static credentials for MinIO; omit both on AWS so the SDK uses the instance IAM role. */
+  accessKey?: string | undefined;
+  secretKey?: string | undefined;
+  /** SigV4 signing region; must match the S3 bucket region on AWS. */
+  region?: string;
   signedUrlTtlSeconds: number;
 }
+
+const regionPattern = /^[a-z]{2}(?:-[a-z]+)+-\d$/;
 
 function validEndpoint(value: string, allowHttp: boolean): boolean {
   try {
@@ -44,16 +49,18 @@ export function loadEvidenceStorageConfig(env: Record<string, string | undefined
   const endpoint = env.S3_ENDPOINT ?? '';
   const publicEndpoint = env.S3_PUBLIC_ENDPOINT ?? '';
   const bucket = env.S3_BUCKET ?? '';
-  const accessKey = env.S3_ACCESS_KEY ?? '';
-  const secretKey = env.S3_SECRET_KEY ?? '';
+  const accessKey = env.S3_ACCESS_KEY || undefined;
+  const secretKey = env.S3_SECRET_KEY || undefined;
+  const region = env.S3_REGION || 'us-east-1';
   const signedUrlTtlSeconds = Number(env.SIGNED_URL_TTL_S ?? 60);
   const allowHttp = nodeEnv !== 'production';
+  const credentialsValid = (!accessKey && !secretKey) || (!!accessKey && !!secretKey && secretKey.length >= 16);
   if (!validEndpoint(endpoint, true) || !validEndpoint(publicEndpoint, allowHttp) ||
-      !/^[a-z0-9][a-z0-9.-]{1,62}[a-z0-9]$/.test(bucket) || !accessKey || !secretKey || secretKey.length < 16 ||
+      !/^[a-z0-9][a-z0-9.-]{1,62}[a-z0-9]$/.test(bucket) || !credentialsValid || !regionPattern.test(region) ||
       signedUrlTtlSeconds !== 60) {
-    throw new Error('Invalid Response configuration: S3_ENDPOINT, S3_PUBLIC_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY, S3_SECRET_KEY, SIGNED_URL_TTL_S');
+    throw new Error('Invalid Response configuration: S3_ENDPOINT, S3_PUBLIC_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY, S3_SECRET_KEY, S3_REGION, SIGNED_URL_TTL_S');
   }
-  return { nodeEnv, endpoint, publicEndpoint, bucket, accessKey, secretKey, signedUrlTtlSeconds };
+  return { nodeEnv, endpoint, publicEndpoint, bucket, accessKey, secretKey, region, signedUrlTtlSeconds };
 }
 
 @Injectable()
@@ -62,13 +69,17 @@ export class S3EvidenceStorage implements EvidenceObjectStorage {
   private readonly public: S3Client;
 
   constructor(private readonly config: EvidenceStorageConfig) {
-    const credentials = { accessKeyId: config.accessKey, secretAccessKey: config.secretKey };
+    // Without static keys the SDK falls back to its default chain (EC2 instance IAM role).
+    const credentials = config.accessKey && config.secretKey
+      ? { credentials: { accessKeyId: config.accessKey, secretAccessKey: config.secretKey } }
+      : {};
+    const region = config.region ?? 'us-east-1';
     this.internal = new S3Client({
-      endpoint: config.endpoint, region: 'us-east-1', forcePathStyle: true, credentials,
+      endpoint: config.endpoint, region, forcePathStyle: true, ...credentials,
       requestHandler: { connectionTimeout: 3_000, socketTimeout: 30_000 },
     });
     this.public = new S3Client({
-      endpoint: config.publicEndpoint, region: 'us-east-1', forcePathStyle: true, credentials,
+      endpoint: config.publicEndpoint, region, forcePathStyle: true, ...credentials,
       requestHandler: { connectionTimeout: 3_000, socketTimeout: 30_000 },
     });
   }

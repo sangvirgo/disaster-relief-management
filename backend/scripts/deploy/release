@@ -1,0 +1,193 @@
+#!/usr/bin/env bash
+# Release, roll back and inspect the production stack on the AWS host (design: docs/c48-deployment-architecture.md 5.3).
+#
+#   release deploy <image-tag>   pull images, pre-deploy dump, migrate, start, health-check; roll back on failure
+#   release rollback             return to the previous release (images, Compose file from Git, previous .env)
+#   release status               show current/previous release and container state
+#
+# Runs as root through SSM Run Command (or `sudo` from a Session Manager shell). Never removes volumes.
+set -euo pipefail
+umask 077
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=../dev/lib.sh
+source "$SCRIPT_DIR/../dev/lib.sh"
+
+STATE_DIR="${C48_STATE_DIR:-/var/lib/c48}"
+GHCR_TOKEN_FILE="${C48_GHCR_TOKEN_FILE:-/etc/c48/ghcr-token}"
+HEALTH_TIMEOUT_S="${C48_HEALTH_TIMEOUT_S:-180}"
+APP_IMAGES=(identity-api response-api logistics-api web)
+RUN_SERVICES=(identity-api response-api logistics-api web nginx)
+ENV_FILE="$ROOT/backend/.env"
+
+log() { printf '%s [release] %s\n' "$(date -u +%FT%TZ)" "$*"; }
+die() { log "ERROR: $*" >&2; exit 1; }
+
+valid_tag() { [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]]; }
+
+env_value() { # env_value KEY -> value from backend/.env (empty when unset)
+  awk -F= -v key="$1" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "$ENV_FILE"
+}
+
+set_env_value() { # set_env_value KEY VALUE (VALUE has been validated; no sed metacharacters)
+  grep -q "^$1=" "$ENV_FILE" || die "$1 is missing from backend/.env"
+  sed -i "s|^$1=.*|$1=$2|" "$ENV_FILE"
+}
+
+read_release() { [[ -f "$STATE_DIR/releases/$1" ]] && tr -d '[:space:]' < "$STATE_DIR/releases/$1" || true; }
+write_release() { printf '%s\n' "$2" > "$STATE_DIR/releases/$1"; }
+
+prepare_state() {
+  mkdir -p -m 700 "$STATE_DIR" "$STATE_DIR/releases"
+  exec 9>"$STATE_DIR/release.lock"
+  flock -n 9 || die 'another release or rollback is already running'
+}
+
+registry_login() {
+  local namespace owner user
+  namespace="$(env_value C48_IMAGE_NAMESPACE)"
+  [[ "$namespace" == ghcr.io/* ]] || return 0
+  [[ -f "$GHCR_TOKEN_FILE" ]] || { log "no $GHCR_TOKEN_FILE: pulling as an anonymous user (public images only)"; return 0; }
+  owner="${namespace#ghcr.io/}"; owner="${owner%%/*}"
+  user="${C48_GHCR_USER:-$owner}"
+  export HOME="${HOME:-/root}"
+  docker login ghcr.io --username "$user" --password-stdin < "$GHCR_TOKEN_FILE" >/dev/null
+  log 'logged in to ghcr.io'
+}
+
+checkout_release() { # Compose file and scripts come from Git at the release commit
+  [[ "${C48_SKIP_GIT:-0}" == 1 ]] && return 0
+  git -C "$ROOT" fetch --quiet origin
+  git -C "$ROOT" checkout --quiet --detach "$1"
+  log "repository at $(git -C "$ROOT" rev-parse --short HEAD)"
+}
+
+wait_healthy() { # every API ready probe and the public liveness path through nginx
+  local deadline=$((SECONDS + HEALTH_TIMEOUT_S)) port public_port
+  public_port="$(env_value PUBLIC_PORT)"; public_port="${public_port:-8080}"
+  local urls=(
+    "http://127.0.0.1:3001/health/ready" "http://127.0.0.1:3002/health/ready"
+    "http://127.0.0.1:3003/health/ready" "http://127.0.0.1:${public_port}/health/live"
+  )
+  local url
+  for url in "${urls[@]}"; do
+    until curl -fsS --max-time 5 "$url" >/dev/null 2>&1; do
+      (( SECONDS < deadline )) || { log "health check failed: $url"; return 1; }
+      sleep 3
+    done
+  done
+  log 'all health checks passed'
+}
+
+predeploy_dump() { # one extra dump before migrations; only the latest is kept, separate from the daily backups
+  # NOTE: this runs inside an `if` condition, where `set -e` is ignored, so every step checks its own status.
+  if ! main_compose ps --status running --services 2>/dev/null | grep -qx postgres; then
+    log 'postgres is not running yet (first release): no pre-deploy dump'
+    return 0
+  fi
+  local work="$STATE_DIR/pre-deploy.new" database
+  rm -rf "$work"; mkdir -m 700 "$work" || return 1
+  for database in c48_identity c48_response c48_logistics; do
+    main_compose exec -T postgres pg_dump --username=postgres --format=custom --dbname "$database" > "$work/$database.dump" || return 1
+    main_compose exec -T postgres pg_restore --list < "$work/$database.dump" >/dev/null || return 1
+  done
+  (cd "$work" && sha256sum ./*.dump > manifest.sha256) || return 1
+  printf 'created_utc=%s\nrelease_before=%s\n' "$(date -u +%FT%TZ)" "$(read_release current)" > "$work/manifest.txt" || return 1
+  rm -rf "$STATE_DIR/pre-deploy.old"
+  if [[ -d "$STATE_DIR/pre-deploy" ]]; then mv "$STATE_DIR/pre-deploy" "$STATE_DIR/pre-deploy.old" || return 1; fi
+  mv "$work" "$STATE_DIR/pre-deploy" || return 1
+  rm -rf "$STATE_DIR/pre-deploy.old"
+  log "pre-deploy dump verified in $STATE_DIR/pre-deploy"
+}
+
+migrate() { "$ROOT/backend/scripts/db/migrate"; }
+
+start_stack() {
+  main_compose up --no-build -d --wait --wait-timeout "$HEALTH_TIMEOUT_S" "${RUN_SERVICES[@]}"
+}
+
+prune_images() { # keep the current and previous release; remove older local C48 images
+  local namespace keep_current keep_previous image repo tag name
+  namespace="$(env_value C48_IMAGE_NAMESPACE)"
+  keep_current="$(read_release current)"; keep_previous="$(read_release previous)"
+  while IFS= read -r image; do
+    repo="${image%:*}"; tag="${image##*:}"
+    for name in "${APP_IMAGES[@]}"; do
+      [[ "$repo" == "$namespace/$name" ]] || continue
+      [[ "$tag" == "$keep_current" || "$tag" == "$keep_previous" ]] && continue
+      docker image rm "$image" >/dev/null 2>&1 && log "removed old image $image" || true
+    done
+  done < <(docker image ls --format '{{.Repository}}:{{.Tag}}')
+}
+
+restore_previous() { # shared by `rollback` and the automatic rollback inside `deploy`
+  # NOTE: may run inside `||`, where `set -e` is ignored, so every step checks its own status.
+  local previous
+  previous="$(read_release previous)"
+  [[ -n "$previous" ]] || { log 'no previous release is recorded; nothing to roll back to'; return 1; }
+  [[ -f "$STATE_DIR/env.previous" ]] || { log "$STATE_DIR/env.previous is missing"; return 1; }
+  log "rolling back to $previous"
+  checkout_release "$previous" || return 1
+  cp -- "$STATE_DIR/env.previous" "$ENV_FILE" || return 1
+  chmod 600 "$ENV_FILE" || return 1
+  start_stack || return 1
+  wait_healthy || return 1
+  write_release current "$previous"
+  rm -f "$STATE_DIR/releases/previous"
+  log "rolled back to $previous. The database was NOT restored: only restore $STATE_DIR/pre-deploy if the failed migration changed data incompatibly."
+}
+
+cmd_deploy() {
+  local tag="${1:-}" current
+  valid_tag "$tag" || die 'usage: release deploy <image-tag> (letters, digits, dot, dash, underscore)'
+  [[ -f "$ENV_FILE" ]] || die 'backend/.env is missing; run backend/scripts/deploy/init-env first'
+  [[ "$(image_source)" == registry ]] || die 'C48_IMAGE_SOURCE must be registry on the production host'
+  prepare_state
+  current="$(read_release current)"
+  log "deploying $tag (current: ${current:-none})"
+
+  checkout_release "$tag"
+  registry_login
+  if [[ -n "$current" && "$current" != "$tag" ]]; then
+    cp -- "$ENV_FILE" "$STATE_DIR/env.previous"; chmod 600 "$STATE_DIR/env.previous"
+    write_release previous "$current"
+  fi
+  set_env_value C48_IMAGE_TAG "$tag"
+
+  if main_compose pull "${APP_IMAGES[@]}" && predeploy_dump && migrate && start_stack && wait_healthy; then
+    write_release current "$tag"
+    prune_images
+    log "release $tag is live"
+    return 0
+  fi
+
+  log "release $tag failed"
+  if [[ -n "$current" && "$current" != "$tag" ]]; then
+    restore_previous || die 'automatic rollback failed; the stack needs manual attention'
+    die "release $tag failed and the previous release $current was restored"
+  fi
+  die "release $tag failed and there is no earlier release to restore"
+}
+
+cmd_rollback() { prepare_state; registry_login; restore_previous || die 'rollback failed'; }
+
+cmd_status() {
+  printf 'current:  %s\nprevious: %s\n' "$(read_release current)" "$(read_release previous)"
+  main_compose ps
+}
+
+main() {
+  local command="${1:-}"
+  shift || true
+  case "$command" in
+    deploy) cmd_deploy "$@" ;;
+    rollback) cmd_rollback ;;
+    status) cmd_status ;;
+    *) printf 'Usage: release deploy <image-tag> | rollback | status\n' >&2; return 2 ;;
+  esac
+}
+
+# Everything above is parsed before the repository is switched to another commit, then the script exits without
+# reading the (possibly replaced) file again.
+main "$@"
+exit $?
