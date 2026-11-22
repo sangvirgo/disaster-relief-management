@@ -4,6 +4,7 @@
 |---|---|
 | Status | **Implemented, not yet exercised on the real host.** Written 2026-11-22 together with the scripts it describes. |
 | Design | [Deployment and operations architecture](c48-deployment-architecture.md) (decisions, trade-offs, open points) |
+| Handoff | [Deployment handoff](c48-deployment-handoff.md) (what was built, verified and left open on 2026-11-22) |
 | Files | `.github/workflows/deploy.yml`, `backend/.env.production.example`, `backend/scripts/deploy/{init-env,release}`, `backend/infra/compose.yaml`, `backend/infra/nginx/nginx.conf` |
 | Region | The account's project is pinned to **ap-southeast-2 (Sydney)**; the design's `ap-southeast-1` examples become `ap-southeast-2`. |
 
