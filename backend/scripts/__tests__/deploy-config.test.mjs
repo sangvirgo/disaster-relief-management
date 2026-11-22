@@ -63,7 +63,7 @@ test('the production template, once its placeholders are filled, is a valid main
       assert.equal(environment.NODE_ENV, 'production');
     }
     assert.equal(services['identity-api'].environment.WEB_ALLOWED_ORIGINS, 'https://app.example.test');
-    assert.equal(services['identity-api'].image, 'ghcr.io/sangvirgo/identity-api:latest');
+    assert.equal(services['identity-api'].image, 'ghcr.io/sangvirgo/disaster-relief-management/identity-api:latest');
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
