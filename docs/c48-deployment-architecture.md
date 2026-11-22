@@ -3,11 +3,12 @@
 | Attribute | Value |
 |---|---|
 | Project | Reliva (original project code C48) |
-| Status | **Proposal**, revised 2026-11-22 after the user's decisions and a peer design review. Nothing here is implemented or benchmarked. |
+| Status | **Partly implemented 2026-11-22.** The single-host stack, S3 storage, Cloudflare Tunnel, GitHub Actions delivery and release rollback are live or implemented (see the [handoff](c48-deployment-handoff.md) for what was verified); backups, monitoring, log shipping and load tests are still proposals. Nothing is benchmarked. Region, credentials and some details differ from the first proposal: see section 15. |
 | Scope | Where and how the existing Compose stack runs in production-like conditions: domain and edge, storage, reliability, backup, monitoring and logging, capacity, scaling path, cost, rollout. |
 | Out of scope | Application features, schema and API contracts (see `backend/README.md`, `docs/backend/` and the technology plan). |
+| Handoff | [Deployment handoff](c48-deployment-handoff.md): what was done, verified and left open on 2026-11-22. |
 | Implementation | [Deployment runbook](c48-deployment-runbook.md): production `.env` template, `release` script, GitHub Actions pipeline, S3 configuration (status 2026-11-22: implemented and unit-tested, not yet run on the real host). |
-| Related | [Technology and delivery plan](c48-technology-and-delivery-plan.md) §6.3, §14, §15; `backend/infra/compose.yaml`; `backend/scripts/db/`; `docs/diagrams/deployment/c48-deployment-architecture.pdf` (diagrams for this document). |
+| Related | [Technology and delivery plan](c48-technology-and-delivery-plan.md) §6.3, §14, §15; `backend/infra/compose.yaml`; `backend/scripts/db/`; `docs/diagrams/deployment/c48-deployment-architecture.pdf` (3 pages: deployment overview, reliability/backup/rollback, delivery pipeline; sources are the SVG files in the same folder). |
 
 Labels follow the plan's convention: **Decision** (confirmed by the user), **Proposal** (recommended, not yet confirmed), **Needs confirmation** (open question or unverified fact). Prices and provider limits below were not re-verified unless a source is cited; confirm them before relying on them.
 
@@ -39,7 +40,7 @@ flowchart TB
     U["Users: web and mobile (GPS requires HTTPS)"] --> CF["Cloudflare: DNS, proxy, WAF, TLS (app.DOMAIN)"]
     CF -->|"Cloudflare Tunnel (outbound only)"| CFD["cloudflared (host systemd service)"]
 
-    subgraph EC2["One EC2 t3.medium (ap-southeast-1) - Docker Compose"]
+    subgraph EC2["One EC2 t3.medium (ap-southeast-2 Sydney) - Docker Compose"]
         CFD --> NGX["nginx (loopback :8080)"]
         NGX --> WEB["web"]
         NGX --> ID["identity-api :3001"]
@@ -48,19 +49,25 @@ flowchart TB
         ID --> PG[("PostgreSQL/PostGIS: 3 databases")]
         RS --> PG
         LG --> PG
-        BK["backup job (systemd timer)"] -.->|"pg_dump x3"| PG
-        subgraph OBS["profile observability"]
+        BK["backup job (systemd timer) - PLANNED"] -.->|"pg_dump x3"| PG
+        subgraph OBS["profile observability - PLANNED"]
             EXP["exporters"] --> PROM["Prometheus"]
             PROM --> GRAF["Grafana"]
             PROM --> AM["Alertmanager"]
         end
     end
 
-    RS --> S3E[("S3 evidence buckets (primary)")]
+    RS --> S3E[("S3 evidence buckets (primary, IAM role)")]
     LG --> S3E
     BK -.-> S3B[("S3 backup bucket: keeps 2 newest dumps")]
     EXT["External uptime check + Cloudflare tunnel alert"] -.-> CF
     AM -.-> NOTIFY["Telegram / email"]
+
+    DEV["Merge to main"] --> GHA["GitHub Actions: test, build 4 images"]
+    GHA -->|"push, tag = commit SHA"| GHCR[("ghcr.io/owner/repo/*, public")]
+    GHA -->|"SSM Run Command, scoped IAM user key"| REL["release script on the host"]
+    GHCR -->|"anonymous pull"| REL
+    REL -->|"pre-deploy dump, migrate, up --wait, health, rollback"| NGX
 ```
 
 Key properties:
@@ -95,7 +102,7 @@ How it works:
 
 | Item | Proposal | Notes |
 |---|---|---|
-| Region | `ap-southeast-1` (Singapore) | Lowest latency to Vietnam among standard regions. **Needs confirmation:** current latency and pricing. |
+| Region | **`ap-southeast-2` (Sydney) in use** (proposal was `ap-southeast-1`, Singapore) | The shared account's project is pinned to Sydney; other regions need *Activate advanced features*, which was not enabled (billing effect not verified). Latency from Vietnam is higher than Singapore. |
 | Instance | `t3.medium` (2 vCPU, 4 GB), Ubuntu LTS | Move to `t3.large` only if k6 shows memory pressure (§8, §9). |
 | Disk | gp3, 30–40 GB | Holds PostgreSQL data, logs and Docker images. File objects live in S3, not here. |
 | Swap | 2 GB swap file | Safety margin on 4 GB. |
@@ -153,6 +160,8 @@ Verify by a **rollback drill**: deploy a deliberately broken image, confirm that
 ## 6. Object storage: S3 as primary
 
 ### 6.1 Why and how (Decision)
+
+**Status 2026-11-22:** implemented. Compose reads endpoint, region and bucket names from `backend/.env`; the services accept empty S3 keys and then use the EC2 instance role (`S3_REGION` selects the signing region); the three buckets exist (private, Block Public Access, SSE-S3, versioning off). Presigned downloads need no CSP change. Not verified with a real evidence upload yet.
 
 S3 is durable, needs no storage operations, and removes MinIO's RAM, patching and the whole failover mechanism. The backend already uses the AWS SDK for JavaScript v3 S3 client, so the move is mostly configuration. **Needs implementation and verification:**
 
@@ -222,7 +231,7 @@ Storage about USD 0.025/GB-month, requests fractions of a cent per thousand, dat
 
 | Copy | Location | Purpose |
 |---|---|---|
-| Primary | A **dedicated S3 backup bucket** in `ap-southeast-1`, separate from the evidence buckets, with encryption and Block Public Access, holding only the **two newest** dumps | Day-to-day restore |
+| Primary | A **dedicated S3 backup bucket** in the deployment region (`ap-southeast-2`; bucket created, **backup job not built**), separate from the evidence buckets, with encryption and Block Public Access, holding only the **two newest** dumps | Day-to-day restore |
 | Offsite (recommended) | A **manual or scripted download to the operator's machine** after each milestone (and before the defense) | Survives the loss of the AWS account or region at zero cost; an enterprise would instead replicate the bucket to a second region (extra cost) |
 | Local on the host | A short-lived staging folder only, deleted after upload | Never the only copy; the disk is lost with the host |
 
@@ -307,7 +316,9 @@ Roughly USD 45–55 per month, so the credit lasts about two months of continuou
 
 ## 13. Rollout plan
 
-1. AWS account: MFA, non-root user, Budgets alerts, region `ap-southeast-1`.
+**Status 2026-11-22:** steps 1-5 done; step 6 partly (restart policy, log rotation and the real-IP fix are in; the external uptime check and tunnel alert are not set up); steps 7-10 not done. Step 4's demo seed is not run yet.
+
+1. AWS account: MFA, non-root user, Budgets alerts, region (`ap-southeast-2` in practice). *Done: Budgets alerts and spend limit; the account is a shared project account, so root MFA and the IAM Identity Center setup belong to its owner.*
 2. Create the EC2 instance (SSM enabled, no inbound rules), install Docker, add swap.
 3. Create S3 buckets (evidence; backup with the 3-day lifecycle backstop) and the IAM policy; make storage settings configurable in Compose; resolve §6.1 open points.
 4. Deploy the Compose stack (without the `storage` profile); run migrations and demo seed through the declared jobs.
@@ -349,7 +360,19 @@ The user asked for the option most enterprises use. These are **Proposals** with
 | 12 | Video limit | Keep MP4 at 50 MiB for now | Not discussed; revisit if videos are dropped (then lower the 55 MiB body limit) |
 | 13 | Release rollback | Keep the previous image tag and `.env` on the host, take one pre-deploy dump (latest only), roll back automatically when health checks fail (§5.3) | Standard release safety; the previous version is always one command away |
 
-## 15. Sources checked on 2026-11-22
+## 15. Differences between this proposal and what was built (2026-11-22)
+
+| Topic | Proposal | Built | Why |
+|---|---|---|---|
+| Region | `ap-southeast-1` | `ap-southeast-2` | Account project pinned to Sydney |
+| GitHub to AWS | OIDC role | Scoped IAM user key in `production` environment secrets (main branch only) | The IAM Identity providers page is locked behind *Activate advanced features*; OIDC stays the upgrade path |
+| Image names | `ghcr.io/<owner>/<image>` | `ghcr.io/<owner>/<repository>/<image>` | Matches the packages already in the account; packages are public, so the host needs no pull token |
+| GHCR cleanup | Workflow step deleting old versions | None | Untagged child manifests make "keep newest N" unsafe (see the runbook) |
+| Signed URL host in CSP | Add S3 host to `img-src` / `media-src` | Not changed | The web opens signed links as navigation, which the page CSP does not govern |
+| Evidence bucket versioning | On | **Off** (buckets created with defaults) | Set at creation; enable it if file recovery is wanted |
+| Deploy trigger | OIDC plus SSM | Same flow, key instead of OIDC; first run needed a fix (`db/migrate` is not executable in Git) | See the handoff |
+
+## 16. Sources checked on 2026-11-22
 
 - [Cloudflare Tunnel observability](https://developers.cloudflare.com/tunnel/monitoring/) and [tunnel notifications](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/monitor-tunnels/notifications/)
 - [Cloudflare Email Service changelog](https://developers.cloudflare.com/changelog/product/email-service/)
