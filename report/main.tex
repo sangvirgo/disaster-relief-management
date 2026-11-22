@@ -23,6 +23,8 @@
 \usepackage{tocloft}
 \usepackage{tikz}
 \usetikzlibrary{positioning,shapes.geometric,shapes.multipart,arrows.meta,fit,backgrounds,calc}
+% Giữ kiểu chữ của mục lục, đồng thời cho phép bấm tên mục hoặc số trang để đi tới nội dung.
+\usepackage[unicode,pdfencoding=auto,hidelinks,linktoc=all]{hyperref}
 
 \DeclareFloatingEnvironment[within=chapter,fileext=lod,listname={DANH MỤC SƠ ĐỒ},name={Sơ đồ}]{diagram}
 \newcolumntype{Y}{>{\RaggedRight\arraybackslash}X}
@@ -111,11 +113,12 @@
 \newcommand{\reportyear}{2026}
 \newcommand{\frontchapter}[1]{%
   \chapter*{#1}%
+  \phantomsection%
   \addcontentsline{toc}{chapter}{#1}%
   \markboth{#1}{}%
 }
 \newcommand{\pageheading}{\noindent\hfill\textbf{Trang}\par}
-\newcommand{\signdate}{ngày 24 tháng 10 năm 2026}
+\newcommand{\signdate}{ngày 22 tháng 11 năm 2026}
 \newcommand{\signspace}{\vspace{2.6cm}}
 \newcommand{\signatureblock}{%
   \par\vspace{0.4cm}
@@ -400,7 +403,7 @@ Trong tình huống thiên tai, thông tin về người cần trợ giúp, vị
 
 Trên thế giới, Ushahidi là nền tảng mã nguồn mở thu thập báo cáo khủng hoảng từ tin nhắn, Web và mạng xã hội rồi hiển thị trên bản đồ; trong đợt triển khai sau động đất Haiti năm 2010, khó khăn lớn nhất được ghi nhận là xác minh và phân loại khối lượng lớn báo cáo, phần lớn phải làm thủ công. Sahana Eden là bộ công cụ Web mã nguồn mở hỗ trợ tìm người mất tích, quản lý viện trợ, tình nguyện viên và nơi tạm trú, đã được nhiều cơ quan chính phủ và tổ chức phi chính phủ sử dụng. Ở Việt Nam, trang cuuhomientrung.info được tình nguyện viên xây dựng trong đợt lũ miền Trung tháng 10/2020 để tổng hợp, xác minh thông tin và kết nối đội cứu hộ với hộ dân; cuối tháng 11/2025, Zalo bổ sung bản đồ vào tính năng Zalo SOS để người dân chia sẻ vị trí, tình trạng và nhu cầu cứu hộ. Các nền tảng cộng đồng này mạnh ở khâu thu thập và hiển thị yêu cầu, còn việc xác minh, giao nhiệm vụ, giới hạn quyền xem thông tin cá nhân và đối soát hàng cứu trợ phần lớn vẫn diễn ra bên ngoài hệ thống; Sahana Eden có phạm vi rộng hơn nhưng là bộ công cụ tổng quát, cần được cấu hình cho từng tổ chức. Ưu, nhược điểm của từng giải pháp và điểm khác biệt của đề tài được phân tích tại Mục~\ref{sec:similar-systems}.
 
-\textbf{Tính đóng góp của đề tài.} Về giá trị thực tiễn, đề tài xây dựng quy trình liền mạch từ lúc người dân gửi yêu cầu đến khi điều phối viên xác minh, giao đội và theo dõi kết quả, giúp các bên làm việc trên một nguồn thông tin thống nhất. Về tính nhân văn, người dân có thể gửi SOS không cần tài khoản; người thân có thể báo giúp hộ gia đình ở địa điểm khác; vị trí và số điện thoại của người gặp nạn chỉ hiển thị cho người có nhiệm vụ. Mọi quyết định xác minh, ưu tiên và điều phối do con người thực hiện, có lưu căn cứ. Về hiệu quả, hệ thống chống gửi lặp, lưu lịch sử báo trùng và đề xuất đội theo kỹ năng, tình trạng sẵn sàng, sức chứa, độ mới vị trí, khoảng cách và khối lượng nhiệm vụ gần đây; điều phối viên vẫn quyết định đội nhận nhiệm vụ. Hàng quyên góp được kiểm đếm, duyệt độc lập và ghi tồn kho một lần. Đây là các mục tiêu thiết kế; mức cải thiện cụ thể cần được đo trong thử nghiệm.
+Đề tài kết nối việc người dân gửi yêu cầu với các bước xác minh, giao nhiệm vụ và theo dõi kết quả, để những người tham gia cùng nắm được tiến độ xử lý. Người dân có thể gửi SOS không cần tài khoản; người thân có thể báo giúp hộ gia đình ở địa điểm khác; vị trí và số điện thoại của người gặp nạn chỉ hiển thị cho người có nhiệm vụ. Quyết định xác minh, ưu tiên và điều phối vẫn do con người thực hiện và được lưu căn cứ. Hệ thống ghi nhận lịch sử báo trùng, gợi ý đội phù hợp theo kỹ năng, tình trạng sẵn sàng, vị trí và khối lượng nhiệm vụ gần đây. Hàng quyên góp được kiểm đếm, duyệt độc lập trước khi ghi vào tồn kho. Hiệu quả của các chức năng này cần được đánh giá thêm qua quá trình sử dụng và kiểm thử.
 
 Phạm vi gồm ứng dụng Web, ứng dụng di động và phần máy chủ phục vụ tiếp nhận SOS, điều phối đội ứng cứu, quản lý chiến dịch và cứu trợ hiện vật; đề tài không xử lý thu tiền hoặc thanh toán. Nhóm phân tích yêu cầu được giao và tài liệu kỹ thuật, mô hình hóa tác nhân và ca sử dụng, sau đó đối chiếu yêu cầu với thiết kế, mã nguồn và kết quả kiểm thử đã ghi nhận. Nhóm chưa phỏng vấn trực tiếp người dân hoặc lực lượng ứng cứu; vì vậy, các nội dung về quy trình thực tế được trình bày như yêu cầu cần xác nhận, không phải kết quả khảo sát thực địa.
 
@@ -443,12 +446,12 @@ Mục tiêu tổng quát là xây dựng một hệ thống Web/Mobile quản l�
   \item Cho phép người dân khai báo hàng hóa đã bàn giao; quản lý vận hành kiểm đếm và người thẩm định độc lập đếm xác nhận trước khi ghi nhận hàng vào tồn kho.
   \item Cung cấp bản đồ và báo cáo có phạm vi, bộ lọc và thời điểm tạo dữ liệu rõ ràng; bảo vệ vị trí và thông tin liên hệ nhạy cảm.
 \end{enumerate}
-Trí tuệ nhân tạo (AI), thông báo đẩy và các chức năng ngoại tuyến sâu là phần mở rộng có điều kiện. Mã nguồn hiện có gợi ý theo quy tắc và luồng tư vấn AI tùy chọn cho điều phối viên; các kết quả này không tự xác minh, đặt ưu tiên chính thức hay điều phối đội. Điều phối viên xem xét các gợi ý trước khi đưa ra quyết định; các chức năng chính vẫn hoạt động khi tắt AI.
+Đề tài cũng khảo sát khả năng gợi ý mức ưu tiên bằng quy tắc và trí tuệ nhân tạo (AI) để điều phối viên tham khảo. Mọi kết quả gợi ý phải được con người xem xét; việc xác minh, quyết định mức ưu tiên và giao đội thuộc trách nhiệm của điều phối viên. Thông báo đẩy và khả năng làm việc khi mất kết nối được xem là hướng mở rộng sau các chức năng chính.
 
-\section{Mục tiêu sản phẩm và phạm vi báo cáo}
-Phạm vi đề tài gồm sản phẩm Web/Mobile và các tài liệu đặc tả yêu cầu phần mềm (SRS), mô tả thiết kế phần mềm (SDD), ca kiểm thử, hướng dẫn người dùng và hướng dẫn cài đặt. Backend đã có các chức năng quản lý tài khoản và quyền, tiếp nhận và điều phối yêu cầu, quản lý đội ứng cứu, chiến dịch, hàng cứu trợ, tồn kho và phân phối. Giao diện Web đã tích hợp các luồng chính với giao diện lập trình ứng dụng (API) của backend; ứng dụng di động đã có các màn hình chính cho người dân và đội cứu hộ.
+\section{Phạm vi sản phẩm và tài liệu}
+Sản phẩm hướng tới một ứng dụng Web cho điều phối viên, quản lý vận hành và quản trị viên; một ứng dụng di động cho người dân và đội cứu hộ; cùng các dịch vụ phía máy chủ kết nối những bước tiếp nhận, xử lý SOS và cứu trợ hiện vật. Quy trình SOS và nhiệm vụ ứng cứu là trọng tâm; quyên góp, tồn kho và phân phối hỗ trợ việc đáp ứng nhu cầu cứu trợ.
 
-Các nội dung còn lại gồm hoàn thiện quyền truy cập tệp, sao lưu và khôi phục, tác vụ định kỳ, hiệu năng và các tài liệu bàn giao.
+Bộ tài liệu của đồ án gồm đặc tả yêu cầu phần mềm (SRS), mô tả thiết kế phần mềm (SDD), ca kiểm thử, hướng dẫn cài đặt và hướng dẫn người dùng. Việc đánh giá sản phẩm cần xem xét quyền truy cập dữ liệu và tệp, khả năng sao lưu, khôi phục, tác vụ định kỳ và hiệu năng trước khi áp dụng ngoài phạm vi trình diễn.
 
 \begin{table}[htbp]
   \centering
@@ -540,7 +543,7 @@ Hệ thống của đề tài tập trung vào quy trình ứng cứu và cứu 
     \hline
     Quản lý vận hành & Quản lý đợt quyên góp, kho, danh mục hàng, kiểm đếm, ước tính nhu cầu, cam kết, phiếu lấy hàng, xuất kho và bàn giao. & Phạm vi theo chiến dịch (mặc định) hoặc toàn hệ thống do quản trị viên cấp; không mặc nhiên có quyền xem vị trí cá nhân. \\
     \hline
-    Người thẩm định độc lập & Đếm xác nhận và duyệt biên nhận, duyệt phiếu phân phối, duyệt thất thoát và đóng phiếu. & Chỉ có quyền kiểm tra độc lập, không có quyền tạo hay xuất hàng; phải khác người thực hiện bước được duyệt. \\
+    Người thẩm định độc lập & Đếm xác nhận và duyệt biên nhận, duyệt phân phối cứu trợ hộ dân, thất thoát và đóng phiếu lấy hàng. & Có thể lập biên nhận và kiểm đếm nhưng không được duyệt lần đếm do mình thực hiện; không có quyền xuất hàng hay duyệt điều chỉnh tồn kho. \\
     \hline
     Quản trị viên hệ thống & Quản lý tài khoản, quyền truy cập, đội cứu hộ và nhật ký kiểm toán. & Quyền quản trị được tách khỏi quyền nghiệp vụ; không có quyền xem chi tiết người gặp nạn hay người quyên góp; thao tác cấp quyền có kiểm toán. \\
     \hline
@@ -612,7 +615,7 @@ Công dân đã đăng nhập có thể báo giúp một hộ gia đình ở đ�
 \subsection{Xác minh, ưu tiên và điều phối}
 Điều phối viên mở danh sách hoặc bản đồ trong phạm vi quyền, xem vị trí, thông tin và bằng chứng rồi chọn kết quả: xác minh với căn cứ, từ chối có lý do hoặc liên kết với báo cáo gốc. Ghi nhận liên hệ là tùy chọn, không phải điều kiện xác minh; báo cáo trùng vẫn được lưu để giữ lịch sử. Không liên lạc được không tự động chứng minh báo cáo sai và không tự đưa báo cáo sang trạng thái đã xác minh.
 
-Sau khi xác minh, điều phối viên chọn mức ưu tiên P1–P4 theo thang đề xuất trong thiết kế và ghi lại lý do. Mức ưu tiên được theo dõi riêng với trạng thái yêu cầu. Mã nguồn đề xuất đội theo kỹ năng, tình trạng sẵn sàng, sức chứa, độ mới của vị trí và khoảng cách, đồng thời xếp hạng có xét khối lượng nhiệm vụ gần đây; danh sách không lọc theo chiến dịch. Điều phối viên quyết định đội nào nhận nhiệm vụ; đội trưởng cập nhật tiến độ, còn điều phối viên ghi nhận thông tin nhận qua điện thoại hay bộ đàm. Hoàn thành nhiệm vụ không tự giải quyết yêu cầu: điều phối viên chỉ giải quyết khi không còn nhiệm vụ đang mở, nhu cầu vật tư đã được quyết toán và hàng đã bàn giao được giải trình (RESOLVING, RESOLVED rồi CLOSED).
+Sau khi xác minh, điều phối viên chọn mức ưu tiên P1–P4 theo thang đề xuất trong thiết kế và ghi lại lý do. Mức ưu tiên được theo dõi riêng với trạng thái yêu cầu. Hệ thống lọc các đội đang sẵn sàng, có kỹ năng phù hợp và không bận nhiệm vụ khác; trong nhóm đội có vị trí còn hiệu lực, khoảng cách và khối lượng nhiệm vụ gần đây được dùng để xếp thứ tự gợi ý. Đội ứng cứu được dùng chung giữa các chiến dịch. Điều phối viên quyết định đội nào nhận nhiệm vụ; đội trưởng cập nhật tiến độ, còn điều phối viên ghi nhận thông tin nhận qua điện thoại hay bộ đàm. Hoàn thành nhiệm vụ không tự giải quyết yêu cầu: điều phối viên chỉ giải quyết khi không còn nhiệm vụ đang mở, nhu cầu vật tư đã được quyết toán và hàng đã bàn giao được giải trình (RESOLVING, RESOLVED rồi CLOSED).
 
 \subsection{Tiếp nhận quyên góp hiện vật}
 Đợt quyên góp có vị trí điểm nhận công khai. Người quyên góp, có tài khoản hoặc không, khai báo lượng hàng sẽ bàn giao; bản khai báo chỉ là thông tin, chưa làm thay đổi tồn kho. Quản lý vận hành tiếp nhận và kiểm đếm hàng thực nhận (chấp nhận, giữ lại hoặc từ chối). Người thẩm định độc lập đếm xác nhận lần hai và phải khác mọi người đã đếm trước đó. Khi hai lần đếm khớp, biên nhận được duyệt và ghi vào sổ tồn đúng một lần; khi lệch, hệ thống yêu cầu đếm lại. Hệ thống không có luồng thu tiền hoặc thanh toán.
@@ -771,7 +774,7 @@ Bản đồ được giới hạn theo khu vực hiển thị, thời gian, tr�
     \foreach \a/\b in {init/a1,a1/a2,a2/a3,a3/a4,a4/a5,a5/a6,a6/a7,a7/a8,a8/a9,a9/a10}
       \draw[flowarrow] (\a.south) -- ++(0,-0.35) -| (\b.north);
   \end{tikzpicture}
-  \caption{Sơ đồ hoạt động theo làn của quy trình từ SOS đến giải quyết}\label{dia:activity-swimlane}
+  \caption{Hoạt động từ tiếp nhận SOS đến giải quyết yêu cầu}\label{dia:activity-swimlane}
 \end{diagram}
 
 
@@ -885,7 +888,7 @@ Yêu cầu phi chức năng (NFR) đặt ra tiêu chí về bảo mật, riêng 
 
 \section{Ca sử dụng chính}
 \subsection{Danh sách ca sử dụng}
-Mỗi ca sử dụng (UC) gắn với kết quả nghiệp vụ cần bảo đảm và được truy vết tới ca kiểm thử (TC) khi bộ ca kiểm thử hoàn thiện.
+Các ca sử dụng chính xoay quanh việc gửi SOS, xác minh yêu cầu, giao nhiệm vụ và đáp ứng nhu cầu cứu trợ. Mỗi ca sử dụng nêu rõ việc người dùng thực hiện và kết quả cần đạt được. UC-07 cho phép điều phối viên tham khảo gợi ý mức ưu tiên khi xem yêu cầu SOS; điều phối viên vẫn tự xác minh tình huống và quyết định việc giao đội.
 \begin{table}[htbp]
   \centering
   \caption{Tóm tắt các ca sử dụng chính}\label{tab:use-cases}
@@ -916,12 +919,10 @@ Mỗi ca sử dụng (UC) gắn với kết quả nghiệp vụ cần bảo đ�
     \hline
     UC-16 & Xem bản đồ nhiệt/hàng đợi & Chỉ hiển thị số liệu đúng phạm vi và trạng thái; không gộp hộ hoặc tự đổi ưu tiên. \\
     \hline
-    UC-17/18 & Xem nhiệm vụ và hồ sơ đội & Thành viên chỉ xem nhiệm vụ đội mình; đội trưởng/điều phối viên cập nhật hồ sơ và vị trí có nguồn, thời điểm, kiểm toán. \\
+    UC-17/18 & Xem nhiệm vụ và hồ sơ đội & Thành viên chỉ xem nhiệm vụ đội mình; đội trưởng cập nhật hồ sơ đội, điều phối viên xem trạng thái sẵn sàng và có thể ghi nhận vị trí đội kèm nguồn, thời điểm. \\
     \hline
   \end{tabularx}
 \end{table}
-UC-07 về gợi ý AI là phần mở rộng tùy chọn; mã nguồn hiện có gợi ý theo quy tắc và tư vấn AI, còn điều phối viên xem xét rồi tự quyết định. UC-09 về quản lý kho và danh mục hàng là ca hỗ trợ; phương tiện và điểm cứu trợ vẫn thuộc yêu cầu gốc nhưng chưa được hỗ trợ trong các migration Logistics hiện hành.
-
 \subsection{Sơ đồ ca sử dụng}
 Hệ thống được chia thành hai nhóm ca sử dụng: nhóm ứng cứu phục vụ tiếp nhận SOS, xác minh và điều phối đội; nhóm cứu trợ và quản trị phục vụ chiến dịch, quyên góp hiện vật, tồn kho, phân phối và tài khoản. Mọi tác nhân nội bộ phải đăng nhập trước khi thực hiện ca sử dụng; người dân và người quyên góp được dùng một số chức năng mà không cần tài khoản.
 
@@ -939,7 +940,7 @@ Hệ thống được chia thành hai nhóm ca sử dụng: nhóm ứng cứu ph
     \node[usecase] (uc03) at (2.8,1.1) {UC-03\\Giao, nhận, giải quyết};
     \node[usecase] (uc08) at (2.8,-0.65) {UC-08\\Lập, kích hoạt chiến dịch};
     \node[usecase] (uc17) at (2.8,-2.4) {UC-17\\Xem nhiệm vụ của đội};
-    \node[usecase] (uc18) at (2.8,-4.15) {UC-18\\Cập nhật hồ sơ, vị trí đội};
+    \node[usecase] (uc18) at (2.8,-4.15) {UC-18\\Hồ sơ và vị trí đội};
     \ucactor{dan}{-6.8,1.8}{Người dân\\(khách hoặc\\có tài khoản)}
     \ucactor{qlvh}{6.8,4.0}{Quản lý\\vận hành}
     \ucactor{dpv}{6.8,0.8}{Điều phối viên}
@@ -952,7 +953,7 @@ Hệ thống được chia thành hai nhóm ca sử dụng: nhóm ứng cứu ph
     \end{scope}
     \draw[ucrel] (uc15) -- node[right,font=\scriptsize] {«include»} (login);
   \end{tikzpicture}
-  \caption{Sơ đồ ca sử dụng phân hệ ứng cứu}\label{dia:uc-response}
+  \caption{Ca sử dụng tiếp nhận và điều phối SOS}\label{dia:uc-response}
 \end{diagram}
 
 \begin{diagram}[htbp]
@@ -982,7 +983,7 @@ Hệ thống được chia thành hai nhóm ca sử dụng: nhóm ứng cứu ph
       \foreach \u in {uc12,uc13} \draw[ucline] ($(tdinh)+(-0.35,0.25)$) -- (\u.east);
     \end{scope}
   \end{tikzpicture}
-  \caption{Sơ đồ ca sử dụng phân hệ cứu trợ và quản trị}\label{dia:uc-logistics}
+  \caption{Ca sử dụng cứu trợ hiện vật và quản trị tài khoản}\label{dia:uc-logistics}
 \end{diagram}
 
 
@@ -1048,7 +1049,7 @@ Hệ thống được chia thành hai nhóm ca sử dụng: nhóm ứng cứu ph
     \hline
     \textbf{Tác nhân} & Điều phối viên; đội trưởng đang hoạt động; thành viên đội chỉ được xem. \\
     \hline
-    \textbf{Tiền điều kiện} & Yêu cầu đã được xác minh và đặt ưu tiên; đội đáp ứng kỹ năng, tình trạng sẵn sàng, sức chứa và tiêu chí vị trí/bán kính; nếu yêu cầu đã gắn chiến dịch thì chiến dịch đang hoạt động. \\
+    \textbf{Tiền điều kiện} & Yêu cầu đã được xác minh và đặt ưu tiên; đội có kỹ năng phù hợp, đang sẵn sàng, không bận nhiệm vụ khác và đáp ứng tiêu chí vị trí/bán kính; nếu yêu cầu đã gắn chiến dịch thì chiến dịch đang hoạt động. \\
     \hline
     \textbf{Luồng sự kiện chính} & 1. Điều phối viên xem danh sách đội đủ điều kiện theo kỹ năng, tình trạng sẵn sàng, vị trí gần đây, khoảng cách và tải nhiệm vụ gần đây; đội không bị giới hạn theo chiến dịch.\newline
       2. Chọn đội; ghi lý do nếu khác đội được gợi ý.\newline
@@ -1097,7 +1098,7 @@ Hệ thống được chia thành hai nhóm ca sử dụng: nhóm ứng cứu ph
   \small
   \begin{tabularx}{\textwidth}{|L{3.0cm}|Y|}
     \hline
-    \textbf{Tác nhân} & Quản lý vận hành (lập phiếu, xuất kho, ghi nhận bàn giao); người thẩm định độc lập (duyệt, đối soát). \\
+    \textbf{Tác nhân} & Quản lý vận hành (lập phiếu, xuất kho, ghi nhận bàn giao); người thẩm định độc lập (duyệt phân phối cứu trợ hộ dân và phiếu đóng). \\
     \hline
     \textbf{Tiền điều kiện} & Nhiệm vụ đã được nhận; kho và vật tư đang hoạt động, thuộc phạm vi chiến dịch hoặc hệ thống. \\
     \hline
@@ -1118,7 +1119,6 @@ Hệ thống được chia thành hai nhóm ca sử dụng: nhóm ứng cứu ph
 \end{table}
 
 \section{Sơ đồ tuần tự}
-Các sơ đồ tuần tự dưới đây giữ nguyên mô hình trước một số thay đổi mã nguồn: liên hệ trong luồng xác minh không còn bắt buộc; mã tra cứu được trả cho cả khách và người đăng nhập, còn bí mật tạo lại chỉ dùng cho lần gửi lại SOS khách trước khi nhận xác nhận; Logistics chỉ bàn giao trực tiếp từ kho đến hộ dân. Mã tra cứu được gửi trong \texttt{X-Tracking-Code}, không đặt trong URL. Đặc tả UC-01, UC-02 và UC-13 phía trên mô tả các hành vi hiện tại.
 \subsection{Gửi yêu cầu SOS}
 Ứng dụng tạo khóa chống gửi lặp trước khi gửi. Khi phản hồi bị mất và người dân gửi lại, Response nhận ra khóa đã dùng với cùng nội dung và trả lại đúng yêu cầu đã tạo, nên không phát sinh yêu cầu trùng. Sau khi lưu, vị trí được đối chiếu với ranh giới các chiến dịch đang hoạt động để gắn chiến dịch hoặc chuyển yêu cầu vào hàng đợi chung.
 
@@ -1147,7 +1147,7 @@ Các sơ đồ tuần tự dưới đây giữ nguyên mô hình trước một 
     \draw[seqret] (7.8,-11.4) -- node[seqlabel] {201: mã yêu cầu, mã tra cứu, SUBMITTED} (3.9,-11.4);
     \draw[seqret] (3.9,-12.7) -- node[seqlabel] {Báo đã tiếp nhận, hiển thị mã tra cứu} (0,-12.7);
   \end{tikzpicture}
-  \caption{Sơ đồ tuần tự gửi yêu cầu SOS}\label{dia:seq-sos}
+  \caption{Trình tự gửi yêu cầu SOS}\label{dia:seq-sos}
 \end{diagram}
 
 \subsection{Xác minh yêu cầu và giao nhiệm vụ}
@@ -1177,7 +1177,7 @@ Mỗi lệnh thay đổi trạng thái gửi kèm phiên bản dữ liệu mà n
     \draw[seqmsg] (13.2,-14.0) -- node[seqlabel,text width=4.6cm,pos=0.25] {POST /missions/\{id\}/accept} (6.6,-14.0);
     \draw[seqmsg] (6.6,-14.9) -- node[seqlabel] {OFFERED $\rightarrow$ ACCEPTED; yêu cầu IN\_PROGRESS} (9.9,-14.9);
   \end{tikzpicture}
-  \caption{Sơ đồ tuần tự xác minh yêu cầu và giao nhiệm vụ}\label{dia:seq-mission}
+  \caption{Trình tự xác minh yêu cầu và giao nhiệm vụ}\label{dia:seq-mission}
 \end{diagram}
 
 \subsection{Kiểm đếm, duyệt và ghi sổ biên nhận quyên góp}
@@ -1207,7 +1207,7 @@ Quản lý vận hành kiểm đếm hàng thực nhận; người thẩm địn
     \node[seqguard] at (3.3,-9.95) {[Bản đếm hoặc khai báo đã đổi]};
     \draw[seqret] (8.8,-11.35) -- node[seqlabel] {409: phê duyệt mất hiệu lực} (4.4,-11.35);
   \end{tikzpicture}
-  \caption{Sơ đồ tuần tự kiểm đếm, duyệt và ghi sổ biên nhận}\label{dia:seq-receipt}
+  \caption{Trình tự kiểm đếm, duyệt và ghi sổ biên nhận}\label{dia:seq-receipt}
 \end{diagram}
 
 \subsection{Duyệt, xuất kho và đối soát phân phối}
@@ -1237,11 +1237,11 @@ Người duyệt phải khác người lập phiếu, người xuất kho phải
     \draw[seqmsg] (4.4,-10.5) -- node[seqlabel,text width=4.0cm] {POST reconcile (sau khi bàn giao đã ghi nhận)} (8.8,-10.5);
     \draw[seqmsg] (8.8,-11.7) -- node[seqlabel] {RECONCILED khi hết hàng đang chuyển, không còn thất thoát chờ duyệt} (13.2,-11.7);
   \end{tikzpicture}
-  \caption{Sơ đồ tuần tự duyệt, xuất kho và đối soát phân phối}\label{dia:seq-distribution}
+  \caption{Trình tự duyệt, xuất kho và đối soát phân phối}\label{dia:seq-distribution}
 \end{diagram}
 
 \section{Sơ đồ lớp miền}
-Backend truy cập dữ liệu bằng các truy vấn trực tiếp, không định nghĩa lớp thực thể (entity) cho từng bảng, nên các sơ đồ lớp dưới đây là mô hình miền rút ra từ lược đồ cơ sở dữ liệu: mỗi lớp là một đối tượng nghiệp vụ chính, thuộc tính là các cột đặc trưng và quan hệ là các khóa ngoại trong cùng dịch vụ. Định danh người dùng, chiến dịch và yêu cầu ở dịch vụ khác chỉ là tham chiếu, không vẽ thành quan hệ.
+Các sơ đồ lớp thể hiện những đối tượng nghiệp vụ chính và quan hệ trong từng dịch vụ. Thuộc tính được chọn từ lược đồ cơ sở dữ liệu; định danh thuộc dịch vụ khác chỉ được biểu diễn dưới dạng tham chiếu.
 
 \begin{diagram}[p]
   \centering
@@ -1266,7 +1266,7 @@ Backend truy cập dữ liệu bằng các truy vấn trực tiếp, không đ�
     \draw[clsrel] (ms.south) -- node[mult,near start,right] {0..*} node[mult,near end,right] {1} (rt.north);
     \draw[clsrel] (rt.south) -- node[mult,near start,right] {1} node[mult,near end,right] {1..*} (tm.north);
   \end{tikzpicture}
-  \caption{Sơ đồ lớp miền của phân hệ ứng cứu (Response)}\label{dia:class-response}
+  \caption{Các đối tượng nghiệp vụ ứng cứu}\label{dia:class-response}
 \end{diagram}
 
 \begin{diagram}[p]
@@ -1296,7 +1296,7 @@ Backend truy cập dữ liệu bằng các truy vấn trực tiếp, không đ�
     \draw[clsrel] (ds.south) -- node[mult,near start,right] {1} node[mult,near end,right] {0..*} (hf.north);
     \draw[clsrel] (pt.north east) -- node[mult,near start,left] {*} node[mult,near end,left] {1} (ds.south west);
   \end{tikzpicture}
-  \caption{Sơ đồ lớp miền của phân hệ cứu trợ (Logistics)}\label{dia:class-logistics}
+  \caption{Các đối tượng nghiệp vụ cứu trợ hiện vật}\label{dia:class-logistics}
 \end{diagram}
 
 \section{Sơ đồ trạng thái}
@@ -1341,7 +1341,7 @@ Yêu cầu SOS có mười hai trạng thái. Bốn trạng thái REJECTED, DUPL
     \draw[starrow] (ver) -- node[stlabel,right] {trùng} (dup);
     \draw[starrow] (rsd.north) -- node[stlabel,pos=0.45,right] {mở lại (lý do)} (8.4,-1.7) -- (11.9,-1.7) -- ($(tri.south)+(-0.7,0)$);
   \end{tikzpicture}
-  \caption{Sơ đồ trạng thái yêu cầu SOS}\label{dia:state-request}
+  \caption{Trạng thái yêu cầu SOS}\label{dia:state-request}
 \end{diagram}
 
 \subsection{Trạng thái nhiệm vụ cứu hộ}
@@ -1376,7 +1376,7 @@ Nhiệm vụ có trạng thái riêng, độc lập với trạng thái yêu c�
     \draw[starrow] (active.south -| fai.north) -- node[stlabel] {thất bại (lý do)} (fai.north);
     \draw[starrow] (ons) -- node[stlabel] {hoàn thành,\\kết quả} (com);
   \end{tikzpicture}
-  \caption{Sơ đồ trạng thái nhiệm vụ cứu hộ}\label{dia:state-mission}
+  \caption{Trạng thái nhiệm vụ cứu hộ}\label{dia:state-mission}
 \end{diagram}
 
 \subsection{Trạng thái phiếu phân phối}
@@ -1404,62 +1404,73 @@ Phiếu phân phối chỉ được xuất kho khi đúng phiên bản đã duy�
     \draw[starrow] (rec) -- (frec);
     \draw[starrow] (can) -- (fcan);
   \end{tikzpicture}
-  \caption{Sơ đồ trạng thái phiếu phân phối}\label{dia:state-distribution}
+  \caption{Trạng thái phiếu phân phối}\label{dia:state-distribution}
 \end{diagram}
 
 \section{Phân quyền theo vai trò}
-Hệ thống có sáu vai trò. Quyền được kiểm tra ở API bằng tổ hợp quyền, phạm vi (hệ thống hoặc chiến dịch) và quan hệ với đối tượng; việc ẩn nút trên giao diện không thay thế kiểm tra này. Vai trò đội trưởng, thành viên là quan hệ trong đội, không phải vai trò cấp quyền. Người thẩm định độc lập (REVIEWER) là bên duyệt cho biên nhận, phân phối, thất thoát và phiếu đóng; quản trị viên không có quyền xem chi tiết người gặp nạn hay người quyên góp.
-\begin{table}[htbp]
+Hệ thống có sáu vai trò cấp quyền. VOL (LEAD) là tình nguyện viên giữ vị trí đội trưởng trong một đội, không phải vai trò hệ thống thứ bảy. Quyền được kiểm tra ở API theo vai trò, phạm vi (hệ thống hoặc chiến dịch) và quan hệ với đối tượng. Tài khoản của các nhóm tham gia có thể đồng thời mang vai trò người dân, vì vậy đều có thể gửi SOS cho bản thân hoặc báo giúp người thân. Người thẩm định duyệt biên nhận, phân phối cứu trợ hộ dân, thất thoát và phiếu đóng. Quản lý vận hành duyệt điều chỉnh tồn kho, nhưng người đề nghị không được tự duyệt. Điều phối viên xem trạng thái sẵn sàng của đội, đội trưởng cập nhật đội mình, còn quản trị viên có thể tạo và quản lý đội. Quản trị viên không có quyền xem chi tiết người gặp nạn hay người quyên góp.
+\clearpage
+\begin{table}[H]
   \centering
-  \caption{Ma trận quyền theo vai trò (CIT: CITIZEN, VOL: VOLUNTEER, COO: COORDINATOR, OPS: OPERATIONS\_MANAGER, REV: REVIEWER, ADM: ADMIN)}\label{tab:rbac}
+  \caption[Ma trận quyền theo vai trò]{Ma trận quyền theo vai trò (CIT: người dân; VOL: tình nguyện viên; \mbox{VOL (LEAD)}: đội trưởng cứu hộ; COO: điều phối viên; OPS: quản lý vận hành; REV: người thẩm định; ADM: quản trị viên)}\label{tab:rbac}
   \scriptsize
-  \begin{tabular}{|L{6.6cm}|>{\centering\arraybackslash}p{1.35cm}|>{\centering\arraybackslash}p{1.35cm}|>{\centering\arraybackslash}p{1.35cm}|>{\centering\arraybackslash}p{1.35cm}|>{\centering\arraybackslash}p{1.35cm}|>{\centering\arraybackslash}p{1.35cm}|}
+  \setlength{\tabcolsep}{3pt}
+  \begin{tabularx}{\textwidth}{|Y|*{7}{>{\centering\arraybackslash}p{1.05cm}|}}
     \hline
-    \textbf{Chức năng} & \textbf{CIT} & \textbf{VOL} & \textbf{COO} & \textbf{OPS} & \textbf{REV} & \textbf{ADM} \\
+    \textbf{Chức năng} & \textbf{CIT} & \textbf{VOL} & \textbf{\shortstack{VOL\\(LEAD)}} & \textbf{COO} & \textbf{OPS} & \textbf{REV} & \textbf{ADM} \\
     \hline
-    Gửi, theo dõi SOS của mình & \textbullet & \textbullet &  &  &  &  \\
+    Gửi SOS cho bản thân & X & X & X & X & X & X & X \\
     \hline
-    Báo giúp hộ gia đình (PROXY, cần đăng nhập) & \textbullet & \textbullet & \textbullet & \textbullet &  & \textbullet \\
+    Báo giúp hộ gia đình (cần đăng nhập) & X & X & X & X & X & X & X \\
     \hline
-    Xem hàng đợi, xác minh, xếp ưu tiên, giao đội, giải quyết yêu cầu &  &  & \textbullet &  &  &  \\
+    Xem hàng đợi, xác minh, xếp ưu tiên, giao đội, giải quyết yêu cầu &  &  &  & X &  &  &  \\
     \hline
-    Lập, kích hoạt chiến dịch từ bản đồ SOS &  &  & \textbullet &  &  &  \\
+    Lập, kích hoạt chiến dịch từ bản đồ SOS &  &  &  & X &  &  &  \\
     \hline
-    Xem chiến dịch; tạm dừng, đóng chiến dịch &  &  & \textbullet & \textbullet &  &  \\
+    Xem chiến dịch; tạm dừng, đóng chiến dịch &  &  &  & X & X &  &  \\
     \hline
-    Xem bản đồ nhiệt, hàng đợi gộp &  &  & \textbullet & \textbullet &  &  \\
+    Xem bản đồ nhiệt, hàng đợi gộp &  &  &  & X & X &  &  \\
     \hline
-    Thiết lập đội và kỹ năng &  &  & \textbullet &  &  & \textbullet \\
+    Xem đội và trạng thái sẵn sàng &  &  &  & X &  &  & X \\
     \hline
-    Quản lý tài khoản, cấp quyền, xem nhật ký kiểm toán &  &  &  &  &  & \textbullet \\
+    Tạo đội cứu hộ &  &  &  &  &  &  & X \\
     \hline
-    Quản lý đợt quyên góp, kho và danh mục hàng &  &  &  & \textbullet &  &  \\
+    Cập nhật hồ sơ và kỹ năng đội &  &  & X &  &  &  & X \\
     \hline
-    Tạo biên nhận, kiểm đếm hàng nhận &  &  &  & \textbullet & \textbullet &  \\
+    Xem nhiệm vụ của đội mình &  & X & X &  &  &  &  \\
     \hline
-    Đếm xác nhận, duyệt và ghi sổ biên nhận &  &  &  &  & \textbullet &  \\
+    Nhận và cập nhật nhiệm vụ của đội &  &  & X &  &  &  &  \\
     \hline
-    Xác nhận ước tính nhu cầu, cam kết hàng, chấp nhận thiếu hụt &  &  &  & \textbullet &  &  \\
+    Quản lý tài khoản, cấp quyền, xem nhật ký kiểm toán &  &  &  &  &  &  & X \\
     \hline
-    Xem cảnh báo thiếu hụt &  &  & \textbullet & \textbullet &  &  \\
+    Quản lý đợt quyên góp, kho và danh mục hàng &  &  &  &  & X &  &  \\
     \hline
-    Lập, giữ hàng, xác nhận, hủy phiếu lấy hàng &  &  & \textbullet & \textbullet &  &  \\
+    Tạo biên nhận, kiểm đếm hàng nhận &  &  &  &  & X & X &  \\
     \hline
-    Lập phiếu phân phối, xuất kho, ghi nhận bàn giao &  &  &  & \textbullet &  &  \\
+    Đếm xác nhận, duyệt và ghi sổ biên nhận &  &  &  &  &  & X &  \\
     \hline
-    Duyệt phân phối, duyệt thất thoát và điều chỉnh tồn kho &  &  &  & \textbullet & \textbullet &  \\
+    Xác nhận ước tính nhu cầu, cam kết hàng, chấp nhận thiếu hụt &  &  &  &  & X &  &  \\
     \hline
-    Duyệt đóng phiếu lấy hàng &  &  &  & \textbullet & \textbullet &  \\
+    Xem cảnh báo thiếu hụt &  &  &  &  & X &  &  \\
     \hline
-    Xem báo cáo tổng hợp &  &  & \textbullet & \textbullet &  & \textbullet \\
+    Lập, giữ hàng, xác nhận, hủy phiếu lấy hàng &  &  &  &  & X &  &  \\
     \hline
-  \end{tabular}
+    Lập phiếu phân phối, xuất kho, ghi nhận bàn giao &  &  &  &  & X &  &  \\
+    \hline
+    Duyệt phân phối cứu trợ hộ dân và thất thoát &  &  &  &  & X & X &  \\
+    \hline
+    Duyệt phân phối chiến dịch, điều chỉnh tồn kho &  &  &  &  & X &  &  \\
+    \hline
+    Duyệt đóng phiếu lấy hàng &  &  &  &  & X & X &  \\
+    \hline
+    Xem báo cáo tổng hợp &  &  &  & X & X &  & X \\
+    \hline
+  \end{tabularx}
 \end{table}
 
+\clearpage
 \section{Kiến trúc hệ thống}
-Backend gồm ba dịch vụ Identity, Response và Logistics, được triển khai bằng NestJS với TypeScript; mỗi dịch vụ sở hữu một cơ sở dữ liệu riêng trên cùng một máy chủ PostgreSQL có PostGIS. Identity cấp quyền theo phạm vi SYSTEM/CAMPAIGN; Response sở hữu SOS, đội, chiến dịch và nhiệm vụ; Logistics sở hữu hàng, tồn kho, nhu cầu và bàn giao. Nginx là cổng vào, định tuyến API theo tiền tố dịch vụ và giới hạn tần suất các lời gọi công khai. Các dịch vụ trao đổi với nhau qua giao diện REST (Representational State Transfer). Tệp bằng chứng được lưu riêng tư trên MinIO Community thông qua giao thức lưu trữ đối tượng S3 (Simple Storage Service), chỉ bật khi dùng cấu hình lưu trữ. Gemini (gợi ý AI) và Open-Meteo (dự báo thời tiết) là dịch vụ ngoài tùy chọn. Web/Mobile là các giao diện dành cho người dân, đội ứng cứu và nhân viên vận hành.
-
-\begin{diagram}[p]
+\begin{diagram}[H]
   \centering
   \begin{tikzpicture}
     \node[flowbox,minimum width=12.6cm] (actors) at (0,0) {Người dân $\cdot$ Người quyên góp $\cdot$ Tình nguyện viên $\cdot$ Điều phối viên\\Quản lý vận hành $\cdot$ Người thẩm định $\cdot$ Quản trị viên};
@@ -1502,32 +1513,13 @@ Backend gồm ba dịch vụ Identity, Response và Logistics, được triển 
   \caption{Kiến trúc hệ thống}\label{dia:architecture}
 \end{diagram}
 
-\begin{table}[htbp]
-  \centering
-  \caption{Ranh giới sở hữu dữ liệu và công nghệ mục tiêu}\label{tab:architecture}
-  \small
-  \begin{tabularx}{\textwidth}{|L{2.4cm}|Y|L{4.2cm}|}
-    \hline
-    \centering\textbf{Thành phần} & \centering\textbf{Dữ liệu/trách nhiệm sở hữu} & \centering\arraybackslash\textbf{Công nghệ/ranh giới} \\
-    \hline
-    Identity & Tài khoản, liên kết định danh, thông tin xác thực, quyền SYSTEM/CAMPAIGN và phiên làm mới. & NestJS/TypeScript, TypeORM; cơ sở dữ liệu và thông tin xác thực riêng. \\
-    \hline
-    Response & Yêu cầu trợ giúp, xác minh/ưu tiên, đội và thành viên đội, vị trí, nhiệm vụ, chiến dịch, gợi ý AI và dòng thời gian nghiệp vụ. & NestJS/TypeScript, TypeORM, PostgreSQL/PostGIS; sở hữu trạng thái yêu cầu và nhiệm vụ. \\
-    \hline
-    Logistics & Danh mục hàng và kho, đợt nhận có vị trí, khai báo, kiểm đếm, duyệt biên nhận, sổ tồn, nhu cầu, cam kết, thiếu hụt, phiếu lấy hàng, phân phối trực tiếp đến hộ và đối soát hàng trả lại/thất thoát. & NestJS/TypeScript, TypeORM; cơ sở dữ liệu riêng, sở hữu số liệu vật tư và bàn giao. \\
-    \hline
-    Web/Mobile & Hiển thị/nhập liệu theo vai trò; không phải ranh giới bảo mật. & React/Vite/TypeScript và \mbox{React Native}, Expo, TypeScript. \\
-    \hline
-    Lưu tệp & Tệp bằng chứng riêng tư và thông tin kiểm soát tải xuống. & MinIO Community, triển khai một nút và chỉ bật trong cấu hình lưu trữ; quyền riêng tư và khôi phục cần được kiểm tra. \\
-    \hline
-    Triển khai & Các dịch vụ và thành phần hạ tầng. & Docker đóng gói các dịch vụ; Nginx định tuyến yêu cầu đến API tương ứng. \\
-    \hline
-  \end{tabularx}
-\end{table}
+Backend gồm ba dịch vụ Identity, Response và Logistics, được triển khai bằng NestJS với TypeScript; mỗi dịch vụ sở hữu một cơ sở dữ liệu riêng trên cùng máy chủ PostgreSQL có PostGIS. Identity quản lý tài khoản, phiên đăng nhập và quyền theo phạm vi SYSTEM/CAMPAIGN. Response tiếp nhận SOS, xác minh, đặt ưu tiên, quản lý đội, chiến dịch và nhiệm vụ ứng cứu. Logistics quản lý quyên góp hiện vật, kiểm đếm, tồn kho, nhu cầu, phiếu lấy hàng và phân phối trực tiếp đến hộ dân. Các dịch vụ trao đổi qua API REST (Representational State Transfer), không truy cập trực tiếp cơ sở dữ liệu của nhau. Web và Mobile gửi yêu cầu qua Nginx; cổng này định tuyến theo tiền tố dịch vụ và giới hạn tần suất các lời gọi công khai.
 
-Môi trường demo chạy bằng một tệp Docker Compose duy nhất. Chỉ nginx mở cổng ra ngoài; các API, PostgreSQL và MinIO chỉ lắng nghe trên địa chỉ loopback của máy chủ. Dữ liệu nằm trong hai volume riêng (pgdata, minio-data); khôi phục cơ sở dữ liệu chỉ thực hiện bằng lệnh đặt lại tường minh và không xóa dữ liệu MinIO. Cấu hình này chưa chứng minh khả năng sẵn sàng cao.
+NestJS với TypeScript được lựa chọn sau khi so sánh định tính với Spring Boot, Django/DRF (Django REST Framework), FastAPI và Flask. Cách chọn này phù hợp với định hướng dùng TypeScript cho cả máy chủ và ứng dụng khách. PostgreSQL/PostGIS đáp ứng dữ liệu quan hệ, giao dịch tồn kho và truy vấn vị trí. Đây là đánh giá theo nhu cầu đề tài, không phải kết quả so sánh hiệu năng. Tệp bằng chứng được lưu riêng tư trên MinIO Community qua giao thức S3 (Simple Storage Service) khi bật cấu hình lưu trữ; quyền truy cập và khả năng khôi phục tệp vẫn cần được kiểm chứng. Gemini hỗ trợ gợi ý AI và Open-Meteo cung cấp dự báo thời tiết khi các dịch vụ ngoài này được cấu hình.
 
-\begin{diagram}[htbp]
+Hệ thống được đóng gói bằng một tệp Docker Compose. Nginx phục vụ Web và là cổng truy cập API trên cổng 8080; các cổng API, PostgreSQL và MinIO được công bố ở địa chỉ loopback của máy chủ. PostgreSQL và MinIO dùng hai volume riêng để lưu dữ liệu. Lệnh đặt lại cơ sở dữ liệu chỉ tác động đến volume PostgreSQL, không xóa tệp trên MinIO. Cấu hình một máy chủ này phục vụ việc chạy và trình diễn sản phẩm, chưa được đánh giá về khả năng sẵn sàng cao.
+
+\begin{diagram}[H]
   \centering
   \begin{tikzpicture}
     \node[contbox,minimum width=6.0cm] (client) at (0,0) {Trình duyệt $\cdot$ ứng dụng Mobile};
@@ -1559,56 +1551,11 @@ Môi trường demo chạy bằng một tệp Docker Compose duy nhất. Chỉ n
     \draw[flowarrow] (pg) -- (vp);
     \draw[flowarrow] (mn) -- (vm);
   \end{tikzpicture}
-  \caption{Sơ đồ triển khai trên Docker Compose}\label{dia:deployment}
+  \caption{Triển khai các dịch vụ bằng Docker Compose}\label{dia:deployment}
 \end{diagram}
 
-NestJS với TypeScript được lựa chọn sau khi nhóm so sánh định tính với Spring Boot, Django/DRF (Django REST Framework), FastAPI và Flask. Cách chọn này phù hợp với định hướng dùng TypeScript cho backend và các ứng dụng khách, đồng thời cung cấp cấu trúc mô-đun, kiểm tra dữ liệu đầu vào và hỗ trợ mô tả API. PostgreSQL/PostGIS phù hợp với các dữ liệu có quan hệ, giao dịch tồn kho và truy vấn vị trí. Đây là đánh giá theo nhu cầu của đề tài, không phải kết quả so sánh hiệu năng. MinIO Community được chọn cho lưu trữ tệp trong môi trường demo một nút; việc xác nhận quyền truy cập riêng tư và quy trình sao lưu, khôi phục vẫn còn phải thực hiện.
-
-\section{Kết quả xây dựng backend}
-Backend được chia thành ba dịch vụ theo trách nhiệm dữ liệu. Identity quản lý tài khoản, phiên đăng nhập, quyền SYSTEM/CAMPAIGN và nhật ký thao tác. Response tiếp nhận SOS, theo dõi và bổ sung yêu cầu, hỗ trợ xác minh, xem xét báo trùng, đặt ưu tiên, quản lý đội và thành viên đội, giao nhiệm vụ, chiến dịch và kết quả ứng cứu. Logistics quản lý đợt quyên góp, kho và hàng cứu trợ, kiểm đếm và duyệt độc lập, tồn kho, nhu cầu và thiếu hụt, cam kết, phiếu lấy hàng, phân phối trực tiếp đến hộ, trả lại, thất thoát và báo cáo.
-
-\begin{table}[htbp]
-  \centering
-  \caption{Các chức năng backend đã xây dựng}\label{tab:backend-services}
-  \small
-  \begin{tabularx}{\textwidth}{|L{2.5cm}|Y|}
-    \hline
-    \centering\textbf{Dịch vụ} & \centering\arraybackslash\textbf{Chức năng chính} \\
-    \hline
-    Identity & Đăng ký và đăng nhập; quản lý phiên và tài khoản; cấp quyền SYSTEM/CAMPAIGN; ghi nhận thao tác quản trị. \\
-    \hline
-    Response & Tiếp nhận SOS SELF/PROXY; theo dõi và bổ sung yêu cầu; xác minh, xem xét báo trùng và ưu tiên; quản lý đội, nhiệm vụ và tiến độ; hỗ trợ chiến dịch và bản đồ vận hành. \\
-    \hline
-    Logistics & Quản lý đợt nhận hàng; khai báo, kiểm đếm và duyệt độc lập; ghi nhận tồn kho; ước tính nhu cầu, cảnh báo thiếu hụt, cam kết, phiếu lấy hàng, xuất hàng, bàn giao trực tiếp cho hộ, trả lại, thất thoát và báo cáo. \\
-    \hline
-  \end{tabularx}
-\end{table}
-
-\section{Kiểm chứng và kết quả}
-Nhóm đã chạy kiểm thử tự động cho nhiều thao tác của ba dịch vụ và kiểm tra một số luồng tích hợp trên môi trường chạy. Các kiểm tra tập trung vào quản lý tài khoản và quyền, tiếp nhận và xác minh yêu cầu, điều phối nhiệm vụ, kiểm đếm hàng cứu trợ và cập nhật tồn kho. Phía Web đã có kiểm tra trình duyệt cho một số luồng công khai, đăng nhập, SOS và quyên góp. Ngày 23/10/2026, nhóm đăng nhập trực tiếp qua Web bằng bốn tài khoản demo thuộc vai trò điều phối, vận hành, quản trị và đội trưởng cứu hộ; các không gian và màn hình đọc dữ liệu tương ứng đã mở với API thật. Đây là bằng chứng cho việc xác thực, điều hướng và tải dữ liệu ở các màn hình được chụp, chưa phải bằng chứng cho toàn bộ thao tác ghi của các vai trò. Các kiểm tra bố cục trước đó có sử dụng phản hồi chặn tại trình duyệt nên cũng không được tính là kiểm thử nghiệp vụ đầu cuối. Việc lưu trữ, tải lại và khôi phục tệp, tác vụ định kỳ, hiệu năng trên dữ liệu lớn và khả năng tiếp cận vẫn cần được kiểm tra trước khi nghiệm thu toàn bộ sản phẩm.
-
-\begin{table}[htbp]
-  \centering
-  \caption{Các nội dung cần hoàn thiện trước khi nghiệm thu}\label{tab:backend-gates}
-  \small
-  \begin{tabularx}{\textwidth}{|L{3.6cm}|Y|}
-    \hline
-    \centering\textbf{Hạng mục} & \centering\arraybackslash\textbf{Nội dung cần hoàn thiện} \\
-    \hline
-    Lưu trữ tệp & Xác nhận tải lên/tải xuống có phân quyền và khả năng sao lưu, khôi phục tệp. \\
-    \hline
-    Tác vụ định kỳ & Hoàn thiện và kiểm tra các tác vụ tự động, gồm cập nhật thông báo quá hạn khi phù hợp. \\
-    \hline
-    Hiệu năng & Đo thời gian phản hồi của bản đồ và báo cáo với dữ liệu đại diện cho môi trường sử dụng. \\
-    \hline
-    Vận hành & Kiểm tra tải hệ thống, sao lưu và khôi phục dữ liệu trên môi trường mục tiêu. \\
-    \hline
-    Giao diện & Kiểm chứng thao tác ghi Web theo từng vai trò với API thật; kiểm thử khả năng tiếp cận và kiểm thử Mobile trên nhiều thiết bị. \\
-    \hline
-    Tài liệu & Hoàn thiện SRS, SDD, bộ ca kiểm thử, hướng dẫn cài đặt và hướng dẫn người dùng. \\
-    \hline
-  \end{tabularx}
-\end{table}
+\section{Chức năng của các dịch vụ}
+Identity xử lý đăng ký, đăng nhập, quản lý phiên và tài khoản, cấp quyền theo phạm vi hệ thống hoặc chiến dịch và ghi nhận thao tác quản trị. Response tiếp nhận SOS cho bản thân hoặc báo giúp hộ gia đình, cho phép theo dõi và bổ sung thông tin, hỗ trợ điều phối viên xác minh, xem xét báo trùng, chọn ưu tiên, quản lý đội, giao nhiệm vụ và theo dõi kết quả ứng cứu. Logistics tiếp nhận khai báo quyên góp, ghi nhận các lần kiểm đếm và duyệt độc lập trước khi nhập kho; đồng thời quản lý nhu cầu vật tư, cảnh báo thiếu hụt, phiếu lấy hàng, xuất kho, bàn giao trực tiếp cho hộ dân và đối soát hàng trả lại hoặc thất thoát.
 
 \chapter{TỔ CHỨC DỮ LIỆU}\label{ch:data}
 \section{Nguyên tắc tổ chức dữ liệu}
@@ -1709,7 +1656,7 @@ Response lưu vị trí địa lý bằng PostGIS và tự gắn SOS với chi�
 \end{figure}
 
 \chapter{THIẾT KẾ GIAO DIỆN WEB}\label{ch:web}
-Giao diện Web được tổ chức theo quyền của từng vai trò trong cùng một luồng xử lý: người dân gửi và theo dõi SOS; điều phối viên xác minh, ưu tiên và giao nhiệm vụ; đội cứu hộ tiếp nhận, cập nhật tiến độ; quản lý vận hành xem nhu cầu vật tư; quản trị viên quản lý tài khoản. Các ảnh được chụp từ phiên bản Web hiện tại với dữ liệu minh họa. Đề xuất của AI chỉ hỗ trợ người phụ trách xem xét, không tự xác minh SOS, điều đội hay phê duyệt vật tư.
+Giao diện Web được tổ chức theo quyền của từng vai trò trong cùng một luồng xử lý: người dân gửi và theo dõi SOS; điều phối viên xác minh, ưu tiên và giao nhiệm vụ; đội cứu hộ tiếp nhận, cập nhật tiến độ; quản lý vận hành xem nhu cầu vật tư; quản trị viên quản lý tài khoản. Đề xuất của AI chỉ hỗ trợ người phụ trách xem xét, không tự xác minh SOS, điều đội hay phê duyệt vật tư.
 
 \section{Người dân: gửi và theo dõi SOS}
 \begin{figure}[H]
@@ -1748,7 +1695,7 @@ Quản trị viên tra cứu tài khoản, trạng thái và vai trò để qu�
 
 \chapter{THIẾT KẾ ỨNG DỤNG DI ĐỘNG}\label{ch:mobile}
 \section{Mục tiêu và cấu trúc ứng dụng}
-Ứng dụng Mobile được xây dựng bằng React Native, Expo và TypeScript; vị trí hiện trường được lấy qua mô-đun Expo Location. Ứng dụng kết nối các API Identity, Response và Logistics. Hai nhóm thao tác chính là báo cứu trợ của người dân (UR-01, UR-02) và xử lý nhiệm vụ của đội cứu hộ (UR-04); quyên góp hiện vật đáp ứng UR-08 ở phía người tặng. Giao diện hiển thị trạng thái bằng tiếng Việt; mã trạng thái, mã lỗi và tên trường API vẫn là định danh kỹ thuật để ứng dụng xử lý ổn định. Dữ liệu trên các màn hình là dữ liệu demo; việc kiểm thử đầu cuối cho toàn bộ luồng Mobile vẫn đang tiếp tục.
+Ứng dụng Mobile được xây dựng bằng React Native, Expo và TypeScript; vị trí hiện trường được lấy qua mô-đun Expo Location. Ứng dụng kết nối các API Identity, Response và Logistics. Hai nhóm thao tác chính là báo cứu trợ của người dân (UR-01, UR-02) và xử lý nhiệm vụ của đội cứu hộ (UR-04); quyên góp hiện vật đáp ứng UR-08 ở phía người tặng. Giao diện hiển thị trạng thái bằng tiếng Việt; mã trạng thái, mã lỗi và tên trường API vẫn là định danh kỹ thuật để ứng dụng xử lý ổn định.
 
 \begin{table}[htbp]
   \centering
@@ -1830,19 +1777,19 @@ Người quyên góp xem các đợt tiếp nhận và khai báo số lượng h
 % Kết luận, kiến nghị là phần riêng sau chương cuối, không đánh số chương.
 \frontchapter{KẾT LUẬN, KIẾN NGHỊ}\label{ch:conclusion}
 \section*{Kết quả đạt được}
-Nhóm đã phân tích nhu cầu của các tác nhân, xác định yêu cầu, xây dựng kiến trúc ba dịch vụ và mô hình dữ liệu cho các nghiệp vụ chính. Backend hiện thực các chức năng quản lý tài khoản và quyền SYSTEM/CAMPAIGN, tiếp nhận và điều phối yêu cầu SOS, theo dõi nhiệm vụ ứng cứu, quản lý chiến dịch, tiếp nhận hàng cứu trợ, kiểm đếm, tồn kho và phân phối trực tiếp từ kho đến hộ dân; phương tiện và điểm cứu trợ không còn trong migration Logistics hiện hành. Web đã tích hợp các luồng chính theo vai trò, với kiểm tra trình duyệt giới hạn cho một số luồng công khai và tài khoản. Mobile đã xây dựng các màn hình báo cứu trợ, theo dõi, quyên góp và nhiệm vụ đội; bộ ảnh demo minh họa giao diện của các luồng đó. Các thao tác quan trọng được lưu lại để hỗ trợ kiểm tra và đối soát.
+Nhóm đã phân tích nhu cầu của các tác nhân, xác định yêu cầu, xây dựng kiến trúc ba dịch vụ và mô hình dữ liệu cho các nghiệp vụ chính. Hệ thống đã hỗ trợ quản lý tài khoản và quyền theo phạm vi SYSTEM/CAMPAIGN, tiếp nhận và điều phối yêu cầu SOS, theo dõi nhiệm vụ ứng cứu, quản lý chiến dịch, tiếp nhận hàng cứu trợ, kiểm đếm, tồn kho và phân phối trực tiếp từ kho đến hộ dân. Phương tiện và điểm cứu trợ thuộc yêu cầu ban đầu nhưng chưa được xây dựng. Web đã tích hợp các luồng chính theo vai trò, với kiểm tra trình duyệt giới hạn cho một số luồng công khai và tài khoản. Mobile đã xây dựng các màn hình báo cứu trợ, theo dõi, quyên góp và nhiệm vụ đội. Các thao tác quan trọng được lưu lại để hỗ trợ kiểm tra và đối soát.
 
 \section*{Giới hạn còn lại}
-Sản phẩm hiện phục vụ trình diễn và học tập. Kiểm thử tự động đã bao phủ nhiều luồng nghiệp vụ; kiểm thử đầu cuối theo vai trò, tình huống mất kết nối, gửi lại yêu cầu và khả năng tiếp cận trên nhiều thiết bị là các công việc tiếp theo. Đồng bộ ngoại tuyến nâng cao và thông báo đẩy thuộc hướng phát triển mở rộng.
+Sản phẩm đã hỗ trợ các bước chính từ gửi SOS đến theo dõi nhiệm vụ, nhưng mới được sử dụng trong phạm vi trình diễn. Các thao tác trên Web và Mobile chưa được kiểm tra đầy đủ với nhiều nhóm người dùng, thiết bị và điều kiện mạng khác nhau. Khi mất kết nối, người dùng chưa thể tiếp tục toàn bộ công việc rồi tự đồng bộ khi có mạng trở lại; hệ thống cũng chưa có thông báo đẩy để báo ngay khi tình trạng yêu cầu hoặc nhiệm vụ thay đổi.
 
-Ở tầng vận hành, các công việc tiếp theo gồm hoàn thiện luồng tải tệp, sao lưu và khôi phục, tác vụ định kỳ và hiệu năng với dữ liệu đại diện. Các ngưỡng ưu tiên, phạm vi chia sẻ vị trí, thời hạn lưu dữ liệu và quy trình phối hợp với lực lượng ngoài hệ thống vẫn cần được người có thẩm quyền xác nhận trước khi áp dụng thực tế. Bộ tài liệu SRS, SDD, ca kiểm thử, hướng dẫn cài đặt và hướng dẫn người dùng cũng cần được hoàn thiện để bàn giao đầy đủ.
+Phần cứu trợ hiện vật tập trung vào tiếp nhận, kiểm đếm, tồn kho và bàn giao trực tiếp cho hộ dân; việc quản lý phương tiện và điểm cứu trợ chưa được xây dựng. Khả năng truy cập ảnh, tài liệu đính kèm và khôi phục thông tin sau sự cố cần được kiểm tra thêm. Những quy định như mức ưu tiên, phạm vi chia sẻ vị trí và thời gian lưu thông tin cá nhân cũng cần được người có thẩm quyền thống nhất trước khi sử dụng trong thực tế.
 
 \section*{Kiến nghị}
 \begin{enumerate}
-  \item Kiểm chứng các thao tác ghi Web và Mobile còn lại với API thật; bổ sung biên bản cho tình huống bình thường, lỗi và mất kết nối.
-  \item Kiểm tra quyền truy cập tệp, sao lưu và khôi phục, tác vụ định kỳ, cũng như hiệu năng của API và báo cáo trên dữ liệu đại diện.
-  \item Hoàn thiện SRS, SDD, bộ ca kiểm thử, hướng dẫn cài đặt và hướng dẫn người dùng; duy trì mã UR/FR/NFR/UC/TC để đối chiếu yêu cầu với kết quả.
-  \item Trao đổi với giảng viên hướng dẫn và đơn vị nghiệp vụ để xác nhận các quy tắc ưu tiên, quyền xem vị trí và thời hạn lưu dữ liệu trước khi dùng với tình huống thực tế.
+  \item Bổ sung khả năng lưu tạm nội dung báo SOS và cập nhật nhiệm vụ trên thiết bị, tự gửi khi kết nối được khôi phục; giao diện cần phân biệt rõ thông tin đang chờ gửi với thông tin đã được tiếp nhận.
+  \item Kết hợp thông báo đẩy với dòng thời gian hiện có để người dân và đội cứu hộ biết khi yêu cầu hoặc nhiệm vụ chuyển trạng thái. Nên cho phép người dùng chọn loại thông báo cần nhận để tránh bị làm phiền.
+  \item Tiếp tục cải thiện khả năng sử dụng trên điện thoại: chữ dễ đọc, nút thao tác rõ, biểu mẫu ngắn và có chỉ dẫn khi chọn vị trí trên bản đồ. Kiểm tra giao diện với nhiều kích thước màn hình và trong điều kiện kết nối yếu.
+  \item Nếu mở rộng phạm vi cứu trợ, bổ sung quản lý phương tiện và điểm cứu trợ để theo dõi chặng vận chuyển và nơi bàn giao. Các gợi ý từ AI chỉ nên dùng để hỗ trợ đọc và tổng hợp thông tin; quyết định ứng cứu vẫn thuộc điều phối viên.
 \end{enumerate}
 
 % Mẫu 10: xếp theo abc tên tác giả; đánh số liên tục qua các nhóm.
