@@ -75,6 +75,18 @@ export class TrackingService {
     return this.trackingView(row);
   }
 
+  async trackByPhone(
+    phone: string,
+    request: import('express').Request,
+  ): Promise<Record<string, unknown>> {
+    const normalizedPhone = requestSearchTerms(phone).reporterPhone;
+    if (!normalizedPhone) throw new AppError('VALIDATION_FAILED', { status: 400, fieldErrors: { phone: ['PHONE_INVALID'] } });
+    this.readRateLimiter.assertAllowed(trackingClientIp(request));
+    this.readRateLimiter.assertAllowed(`phone:${normalizedPhone}`);
+    const row = await this.access.byReporterPhone(normalizedPhone);
+    return this.trackingView(row);
+  }
+
   async events(
     requestId: string,
     trackingCode: string | undefined,

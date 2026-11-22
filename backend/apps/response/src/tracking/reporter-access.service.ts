@@ -3,6 +3,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
 import { AppError } from '@c48/technical/errors/errors';
+import { requestSearchTerms } from '../requests/request-search';
 
 export interface ReporterRequestRow {
   id: string;
@@ -57,6 +58,22 @@ export class ReporterAccessService {
     const row = rows[0];
     const matchesCode = trackingCodeMatches(row?.tracking_code ?? dummyTrackingCode, trackingCode);
     if (!row || !matchesCode) throw new AppError('NOT_FOUND', { status: 404 });
+    return row;
+  }
+
+  async byReporterPhone(phone: string, queryable: Queryable = this.dataSource): Promise<ReporterRequestRow> {
+    const normalizedPhone = requestSearchTerms(phone).reporterPhone;
+    if (!normalizedPhone) throw new AppError('VALIDATION_FAILED', { status: 400, fieldErrors: { phone: ['PHONE_INVALID'] } });
+    const rows = await queryable.query(
+      `SELECT id, tracking_code, reporter_user_id, status, version, review_lane, received_at,
+              campaign_id, incident_category_code, description,
+              reporter_declared_danger,needs_rescue,needs_relief_supplies
+         FROM assistance_request WHERE reporter_user_id IS NULL AND reporter_contact_phone = $1
+        ORDER BY received_at DESC,id DESC LIMIT 1`,
+      [normalizedPhone],
+    ) as ReporterRequestRow[];
+    const row = rows[0];
+    if (!row) throw new AppError('NOT_FOUND', { status: 404 });
     return row;
   }
 

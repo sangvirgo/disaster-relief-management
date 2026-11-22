@@ -782,6 +782,7 @@ function Tracking({
   onNewSos: () => void;
 }) {
   const [code, setCode] = useState(initialCode);
+  const [searchMode, setSearchMode] = useState<'code' | 'phone'>('code');
   const [data, setData] = useState<ResponseComponents['schemas']['ReporterTracking'] | null>(null);
   const [verified, setVerified] = useState<{ code: string } | null>(null);
   const lookupVersion = useRef(0);
@@ -797,10 +798,15 @@ function Tracking({
   const codeError = !code.trim() ? 'Mã theo dõi là bắt buộc.'
     : code.trim().length > 10 ? 'Mã theo dõi không được vượt quá 10 ký tự.'
       : !/^[0-9A-HJKMNP-TV-Z]{10}$/i.test(code.trim()) ? 'Mã theo dõi cần gồm 10 ký tự hợp lệ.' : '';
+  const normalizedPhone = code.trim().replace(/[ ()-]/g, '');
+  const phoneError = !code.trim() ? 'Số điện thoại là bắt buộc.'
+    : !/^\+?[0-9]{8,15}$/.test(normalizedPhone) ? 'Số điện thoại cần gồm từ 8 đến 15 chữ số.' : '';
   const recoveryError = !recoveryCode.trim() ? 'Mã khôi phục một lần là bắt buộc.'
     : recoveryCode.length > 43 ? 'Mã khôi phục không được vượt quá 43 ký tự.'
       : !/^[A-Za-z0-9_-]{43}$/.test(recoveryCode.trim()) ? 'Mã khôi phục không đúng định dạng.' : '';
-  const lookupInvalid = Boolean(codeError);
+  const lookupError = searchMode === 'phone' ? phoneError : codeError;
+  const lookupInvalid = Boolean(lookupError);
+  const recoveryTrackingCode = verified?.code ?? (searchMode === 'code' && !codeError ? code.trim().toUpperCase() : '');
   useEffect(() => {
     if (!user || !initialCode.trim()) return;
     let active = true;
@@ -844,13 +850,25 @@ function Tracking({
     setLookupAttempted(true);
     if (lookupInvalid) return;
     const version = ++lookupVersion.current;
-    const credentials = { code: code.trim().toUpperCase() };
+    const lookupValue = code.trim();
+    const credentials = { code: lookupValue.toUpperCase() };
     setBusy(true);
     setError('');
     setData(null);
     setVerified(null);
     try {
-      await refreshTracking(credentials);
+      if (searchMode === 'phone') {
+        const result = await api<ResponseComponents['schemas']['ReporterTracking']>('response', '/requests/track/by-phone', {
+          method: 'POST',
+          body: { phone: lookupValue },
+        });
+        if (version === lookupVersion.current) {
+          setVerified({ code: result.tracking_code });
+          setData(result);
+        }
+      } else {
+        await refreshTracking(credentials);
+      }
     } catch (cause) {
       if (version === lookupVersion.current)
         setError(cause instanceof Error ? cause.message : 'Không thể tra cứu.');
@@ -868,14 +886,14 @@ function Tracking({
   async function recover(event: React.FormEvent) {
     event.preventDefault();
     setRecoveryTouched(true);
-    if (codeError || recoveryError) return;
+    if (!recoveryTrackingCode || recoveryError) return;
     setBusy(true);
     setRecoveryMessage('');
     try {
       recoveryKey.current ||= newCommandKey();
       await api('response', '/requests/recover', {
         method: 'POST',
-        body: { tracking_code: code.trim() },
+        body: { tracking_code: recoveryTrackingCode },
         headers: { 'X-Recovery-Code': recoveryCode.trim() },
         idempotencyKey: recoveryKey.current,
       });
@@ -909,29 +927,47 @@ function Tracking({
               <span aria-hidden="true">←</span> Quay lại danh sách
             </button>
           )}
-          <h2>Tra cứu SOS bằng mã</h2>
-          <p>
-            Nhập mã theo dõi đã nhận khi gửi SOS.
-          </p>
+          <h2>Tra cứu SOS bằng mã hoặc số điện thoại</h2>
+          <p>Nhập mã SOS hoặc số điện thoại đã cung cấp khi gửi SOS.</p>
           <form onSubmit={lookup} className="form-stack" noValidate>
           <label>
-            <span>Mã theo dõi <span className="required-mark" aria-hidden="true">*</span></span>
+            <span>Tìm theo</span>
+            <select
+              value={searchMode}
+              onChange={(event) => {
+                setSearchMode(event.target.value as 'code' | 'phone');
+                setLookupAttempted(false);
+                setLookupTouched({});
+                recoveryKey.current = null;
+                invalidateLookup();
+              }}
+            >
+              <option value="code">Mã SOS</option>
+              <option value="phone">Số điện thoại</option>
+            </select>
+          </label>
+          <label>
+            <span>{searchMode === 'code' ? 'Mã theo dõi' : 'Số điện thoại'} <span className="required-mark" aria-hidden="true">*</span></span>
             <input
               required
-              name="tracking_code"
-              maxLength={11}
-              aria-invalid={Boolean((lookupAttempted || lookupTouched.code) && codeError)}
+              name={searchMode === 'code' ? 'tracking_code' : 'phone'}
+              type="text"
+              inputMode={searchMode === 'phone' ? 'tel' : 'text'}
+              maxLength={searchMode === 'phone' ? 32 : 10}
+              placeholder={searchMode === 'phone' ? 'Ví dụ: 0912 345 678' : 'Nhập mã SOS đã nhận'}
+              aria-invalid={Boolean((lookupAttempted || lookupTouched.code) && lookupError)}
               value={code}
               onChange={(e) => {
-                setCode(e.target.value.toUpperCase());
+                setCode(searchMode === 'code' ? e.target.value.toUpperCase() : e.target.value);
                 setLookupTouched((current) => ({ ...current, code: true }));
                 recoveryKey.current = null;
                 invalidateLookup();
               }}
               onBlur={() => setLookupTouched((current) => ({ ...current, code: true }))}
-              autoComplete="off"
+              autoComplete={searchMode === 'phone' ? 'tel' : 'off'}
             />
-            {(lookupAttempted || lookupTouched.code) && codeError && <small className="field-error" role="alert">{codeError}</small>}
+            {(lookupAttempted || lookupTouched.code) && lookupError && <small className="field-error" role="alert">{lookupError}</small>}
+            {searchMode === 'phone' && <small>Nếu số điện thoại có nhiều SOS, hệ thống hiển thị yêu cầu gửi gần nhất.</small>}
           </label>
           <button className="button" disabled={busy || lookupInvalid}>
             {busy ? 'Đang tra cứu…' : 'Xem tiến độ'}
@@ -968,7 +1004,7 @@ function Tracking({
               />
               {recoveryTouched && recoveryError && <small className="field-error" role="alert">{recoveryError}</small>}
             </label>
-            <button className="button secondary" disabled={busy || lookupInvalid || Boolean(recoveryError)}>
+            <button className="button secondary" disabled={busy || !recoveryTrackingCode || Boolean(recoveryError)}>
               Gắn yêu cầu với tài khoản
             </button>
             {recoveryMessage && (

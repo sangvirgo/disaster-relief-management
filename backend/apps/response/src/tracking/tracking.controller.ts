@@ -5,7 +5,7 @@ import type { Request, Response } from 'express';
 import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotency.interceptor';
 import {
   ClaimRequestDto, MineQueryDto, MineSearchDto, RecoverRequestDto, RecoveryIssueDto, RevokeTrackingSecretDto,
-  RequestEventsQueryDto, SupplementRequestDto,
+  RequestEventsQueryDto, SupplementRequestDto, TrackByPhoneDto,
 } from './tracking.dto';
 import { TrackingService } from './tracking.service';
 import { noStore, requireIdempotencyKey as idempotencyKey, markIdempotentReplay as replayHeader } from '@c48/technical/http/response-headers';
@@ -27,6 +27,17 @@ export class TrackingController {
       headerValue(request.headers['x-tracking-code']),
       request,
     );
+  }
+
+  @Post('track/by-phone')
+  @HttpCode(HttpStatus.OK)
+  async trackByPhone(
+    @Body() dto: TrackByPhoneDto,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    noStore(response);
+    return this.tracking.trackByPhone(dto.phone, request);
   }
 
   @Get('mine')

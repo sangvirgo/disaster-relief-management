@@ -192,6 +192,9 @@ const myRequestSearchBody = object({
   cursor: { type: 'string', maxLength: 2000 },
   limit: { type: 'integer', minimum: 1, maximum: 100 },
 }, ['q']);
+const trackingPhoneBody = object({
+  phone: { type: 'string', minLength: 8, maxLength: 32, pattern: '^[+0-9 ()-]+$' },
+}, ['phone']);
 
 const responseDetails = {
   listRequestQueue: {
@@ -215,6 +218,14 @@ const responseDetails = {
     description: 'Search by tracking-code substring or exact normalized reporter phone. The JSON body keeps tracking codes out of URLs and request logs; results remain scoped to the active reporter account.',
     request: request(myRequestSearchBody),
     response: response({ $ref: '#/components/schemas/MyRequestPage' }, 'Matching requests owned by the caller, newest first.', undefined, {
+      'Cache-Control': { $ref: '#/components/headers/CacheControlNoStore' },
+    }),
+  },
+  responseTrackingTrackByPhone: {
+    summary: 'Track the latest SOS by exact reporter phone',
+    description: 'Looks up the newest unclaimed guest SOS with the exact normalized reporter phone. The phone is sent in the JSON body and redacted from logs.',
+    request: request(trackingPhoneBody),
+    response: response({ $ref: '#/components/schemas/ReporterTracking' }, 'The newest unclaimed guest SOS matching the phone number.', undefined, {
       'Cache-Control': { $ref: '#/components/headers/CacheControlNoStore' },
     }),
   },
@@ -1189,6 +1200,7 @@ const routeErrorCodes = {
   createSelfRequest: ['VALIDATION_FAILED', 'TRACKING_SECRET_INVALID', 'TRACKING_SECRET_IN_USE', 'IDEMPOTENCY_KEY_REUSED', 'SOS_RATE_CEILING'],
   createProxyRequest: ['VALIDATION_FAILED', 'IDENTITY_UNAVAILABLE', 'SESSION_EXPIRED'],
   trackSelfRequest: ['NOT_FOUND', 'RATE_LIMITED'],
+  responseTrackingTrackByPhone: ['NOT_FOUND', 'RATE_LIMITED', 'VALIDATION_FAILED'],
   responseTrackingSearchMyRequests: ['CURSOR_INVALID', 'VALIDATION_FAILED'],
   responseRequestOperationsSearchQueue: ['CURSOR_INVALID', 'VALIDATION_FAILED'],
   listReporterEvents: ['NOT_FOUND'],
@@ -1373,6 +1385,7 @@ function routeSecurity(service, routePath, method, operationId) {
   }
   if (service === 'response') {
     if (routePath === '/public/campaigns') return [];
+    if (routePath === '/requests/track/by-phone') return [];
     if (operationId === 'createSelfRequest') return [
       { TrackingSecret: [] }, ...sessionSecurity(service, true),
     ];

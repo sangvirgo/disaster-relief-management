@@ -544,6 +544,18 @@ test('SOS search criteria are sent in request bodies instead of URLs', () => {
   }
 });
 
+test('guest SOS tracking can search by phone in a no-store request body', () => {
+  const response = exportService('response').document;
+  const operation = operationAt(response, 'post', '/requests/track/by-phone');
+  const body = operation.requestBody?.content?.['application/json']?.schema;
+
+  assert.ok(objectSchema(response, body)?.properties?.phone);
+  assert.ok(objectSchema(response, body)?.required?.includes('phone'));
+  assert.match(operation.description, /newest unclaimed guest SOS/);
+  assert.deepEqual(operation.security, []);
+  assert.equal(operation.responses['200']?.headers?.['Cache-Control']?.$ref, '#/components/headers/CacheControlNoStore');
+});
+
 test('snapshots have unique dereferenced parameters and retain pagination constraints', () => {
   for (const service of ['identity', 'response', 'logistics']) {
     const document = JSON.parse(fs.readFileSync(path.join(repositoryRoot, 'contracts/openapi', `${service}.json`), 'utf8'));

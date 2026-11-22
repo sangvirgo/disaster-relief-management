@@ -17542,6 +17542,114 @@
             }
           }
         }
+    },
+    "/requests/track/by-phone": {
+      "post": {
+          "operationId": "responseTrackingTrackByPhone",
+          "summary": "Track the latest SOS by exact reporter phone",
+          "description": "Looks up the newest unclaimed guest SOS with the exact normalized reporter phone. The phone is sent in the JSON body and redacted from logs.",
+          "responses": {
+            "200": {
+              "description": "The newest unclaimed guest SOS matching the phone number.",
+              "headers": {
+                "Cache-Control": {
+                  "$ref": "#/components/headers/CacheControlNoStore"
+                }
+              },
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ReporterTracking"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "VALIDATION_FAILED": {
+                      "summary": "VALIDATION_FAILED",
+                      "value": {
+                        "code": "VALIDATION_FAILED",
+                        "message": "Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại các trường được đánh dấu.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "404": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "NOT_FOUND": {
+                      "summary": "NOT_FOUND",
+                      "value": {
+                        "code": "NOT_FOUND",
+                        "message": "Không tìm thấy dữ liệu yêu cầu.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "429": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "RATE_LIMITED": {
+                      "summary": "RATE_LIMITED",
+                      "value": {
+                        "code": "RATE_LIMITED",
+                        "message": "Bạn thao tác quá nhanh. Vui lòng thử lại sau.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "x-c48-contract-source": "docs/backend/03-response-api.md",
+          "x-c48-controller-source": "backend/apps/response/src/tracking/tracking.controller.ts#TrackingController.trackByPhone",
+          "security": [],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "phone": {
+                      "type": "string",
+                      "minLength": 8,
+                      "maxLength": 32,
+                      "pattern": "^[+0-9 ()-]+$"
+                    }
+                  },
+                  "required": [
+                    "phone"
+                  ]
+                }
+              }
+            }
+          }
+        }
     }
   },
   "components": {
