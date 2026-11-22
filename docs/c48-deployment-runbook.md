@@ -42,11 +42,14 @@ The repository is public and the images contain no secrets (the web bundle only 
 ```bash
 sudo bash backend/scripts/deploy/release deploy <commit-sha>      # or let GitHub Actions do it
 sudo bash backend/scripts/deploy/release status
-# Demo seed: refuses NODE_ENV=production, so override it for this one command only (the stack keeps running as production).
-sudo SEED_PASSWORD='<demo password>' NODE_ENV=demo bash backend/scripts/db/seed
+# Demo seed: it refuses NODE_ENV=production, and NODE_ENV only accepts development, test or production
+# (anything else, such as "demo", fails the services' configuration check). Override it for this one command only.
+# Run as root (`sudo -i`); never `export NODE_ENV` in that shell, or later compose commands would recreate the
+# APIs in development mode. The password is read without echo and is not stored.
+cd /opt/c48 && read -rsp 'Demo password: ' p && echo && SEED_PASSWORD="$p" NODE_ENV=development bash backend/scripts/db/seed; unset p
 ```
 
-The seed hashes `SEED_PASSWORD` into demo accounts. Use it only for the demo, then rotate the demo credentials before the defense.
+The seed hashes the password into every demo account (including coordinator and operations accounts), so on a public URL choose a strong password, share it only with the people who demo, and rotate or remove the demo accounts before the defense. Do **not** use `scripts/db/reset-demo` on this host: it deletes the PostgreSQL volume and is meant for local development.
 
 ## 3. Releasing and rolling back
 
