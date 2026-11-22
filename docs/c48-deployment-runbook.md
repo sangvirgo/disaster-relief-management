@@ -59,6 +59,18 @@ The seed hashes `SEED_PASSWORD` into demo accounts. Use it only for the demo, th
 
 Manual commands: `release rollback` (one step back), `release status`. Only the current and previous tags are kept on disk; older local images are removed after a healthy release.
 
+### Resetting the demo data on the host
+
+The data on this host is synthetic seed data, so it can be wiped and reloaded on purpose. Use the dedicated command, as root (`sudo -i`, because `backend/.env` is mode 600), from `/opt/c48`:
+
+```bash
+bash backend/scripts/deploy/reset-demo-data --reset
+```
+
+It asks you to type the public hostname (not just "ok") and to choose the password every demo account will share (at least 12 characters, typed hidden; or set `SEED_PASSWORD`). Then it: takes a verified dump of the current data in `/var/lib/c48/pre-reset` (latest only; a failed dump stops everything before anything is deleted), stops the stack, removes **only** the `c48_pgdata` volume, recreates the databases, migrates, seeds with a one-command `NODE_ENV=development` override (never written to `.env`), starts the stack and checks health. Existing sign-in sessions end because the database is replaced.
+
+It never touches MinIO or S3: evidence files already uploaded stay in the buckets as orphans. Do not use `scripts/db/reset-demo` on this host: it refuses production on purpose, and it ends by starting MinIO and building images locally. `AGENTS.md` lists only `test-db --reset` and `reset-demo --reset` as reset commands; this one follows the same rules (explicit `--reset`, only `c48_pgdata`, MinIO preserved), and `AGENTS.md` should name it when next updated.
+
 ## 4. GitHub and AWS wiring
 
 **Decision (2026-11-22, user):** the pipeline logs in to AWS with an **IAM access key stored as a GitHub secret**, because the account's IAM "Identity providers" page is locked behind *Activate advanced features*, which the account owner has not enabled (effects on billing not verified). The design's preferred OIDC option stays the upgrade path.
