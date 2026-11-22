@@ -42,7 +42,14 @@ load_backend_env() {
   ' "$ROOT/backend/node_modules/dotenv" "$ROOT/backend/.env")
 }
 require_nonproduction_env() {
-  if [[ "${NODE_ENV:-}" == "production" ]] || awk -F= '
+  if [[ "${NODE_ENV:-}" == "production" ]]; then
+    printf 'Refusing to reset a production environment.\n' >&2
+    exit 1
+  fi
+  # awk exits 0 when backend/.env says production, 1 when it does not and 2 when it cannot read the file. An unreadable
+  # file must stop the script: treating "cannot tell" as "not production" would silently skip this guard.
+  local status=0
+  awk -F= '
     $1 ~ /^[[:space:]]*NODE_ENV[[:space:]]*$/ {
       value = $2
       sub(/[[:space:]]*#.*/, "", value)
@@ -52,10 +59,12 @@ require_nonproduction_env() {
       if (tolower(value) == "production") found = 1
     }
     END { exit !found }
-  ' "$ROOT/backend/.env"; then
-    printf 'Refusing to reset a production environment.\n' >&2
-    exit 1
-  fi
+  ' "$ROOT/backend/.env" || status=$?
+  case "$status" in
+    0) printf 'Refusing to reset a production environment.\n' >&2; exit 1 ;;
+    1) ;;
+    *) printf 'Cannot read backend/.env to check NODE_ENV (run as the file owner or with sudo).\n' >&2; exit 1 ;;
+  esac
 }
 export_smoke_env() {
   local port="${POSTGRES_HOST_PORT:-55432}"
