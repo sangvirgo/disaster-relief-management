@@ -45,6 +45,8 @@ export const MyRequestsScreen: React.FC = () => {
   const [cursor, setCursor] = useState<string | undefined>();
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Modal gắn yêu cầu ẩn danh vào tài khoản
   const [showClaimModal, setShowClaimModal] = useState<boolean>(false);
@@ -57,7 +59,7 @@ export const MyRequestsScreen: React.FC = () => {
     if (append) setLoadingMore(true);
     else if (!retainContent) setLoading(true);
     try {
-      const result = await ResponseApi.getMyRequests(50, nextCursor);
+      const result = await ResponseApi.getMyRequests(50, nextCursor, searchTerm || undefined);
       setItems((current) => append
         ? [...current, ...result.items.filter((item) => !current.some((existing) => existing.id === item.id))]
         : result.items || []);
@@ -73,7 +75,7 @@ export const MyRequestsScreen: React.FC = () => {
       setRefreshing(false);
       setLoadingMore(false);
     }
-  }, []);
+  }, [searchTerm]);
 
   useEffect(() => {
     // Initial loading is already true; this starts the initial request.
@@ -90,6 +92,22 @@ export const MyRequestsScreen: React.FC = () => {
     if (!loadingMore && hasMore && cursor) {
       void fetchMyRequests(cursor, true);
     }
+  };
+
+  const submitSearch = () => {
+    const nextTerm = searchInput.trim();
+    setItems([]);
+    setCursor(undefined);
+    if (nextTerm === searchTerm) void fetchMyRequests();
+    else setSearchTerm(nextTerm);
+  };
+
+  const clearSearch = () => {
+    setSearchInput('');
+    setItems([]);
+    setCursor(undefined);
+    if (!searchTerm) void fetchMyRequests();
+    else setSearchTerm('');
   };
 
   const handleClaim = async () => {
@@ -187,6 +205,32 @@ export const MyRequestsScreen: React.FC = () => {
         <Text style={styles.claimButtonText}>Gắn yêu cầu cứu trợ ẩn danh vào tài khoản</Text>
       </TouchableOpacity>
 
+      <View style={styles.searchGroup}>
+        <CompactTextInput
+          label="Tìm SOS theo mã SOS hoặc số điện thoại"
+          style={styles.searchInput}
+          placeholder="Nhập mã SOS hoặc số điện thoại"
+          editable={!loading && !loadingMore && !refreshing}
+          value={searchInput}
+          onChangeText={setSearchInput}
+          maxLength={32}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="search"
+          onSubmitEditing={submitSearch}
+        />
+        <View style={styles.searchActions}>
+          <TouchableOpacity style={styles.searchButton} onPress={submitSearch} disabled={loading || loadingMore || refreshing} accessibilityRole="button">
+            <Text style={styles.searchButtonText}>Tìm kiếm</Text>
+          </TouchableOpacity>
+          {searchTerm ? (
+            <TouchableOpacity style={styles.clearSearchButton} onPress={clearSearch} disabled={loading || loadingMore || refreshing} accessibilityRole="button">
+              <Text style={styles.clearSearchText}>Xóa lọc</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </View>
+
       {loading ? (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={THEME.colors.primary.main} />
@@ -203,17 +247,29 @@ export const MyRequestsScreen: React.FC = () => {
       ) : items.length === 0 ? (
         <View style={styles.emptyContainer}>
           <ClipboardList size={56} color={THEME.colors.text.muted} />
-          <Text style={styles.emptyTitle}>Chưa có yêu cầu cứu trợ nào</Text>
-          <Text style={styles.emptyDesc}>
-            Các yêu cầu cứu nạn bản thân hoặc báo hộ người thân khi đăng nhập sẽ hiển thị tại đây để bạn tiện theo dõi.
-          </Text>
-          <TouchableOpacity
-            style={styles.createSOSButton}
-            onPress={() => router.replace('/')}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.createSOSText}>GỬI YÊU CẦU CỨU NẠN NGAY</Text>
-          </TouchableOpacity>
+          {searchTerm ? (
+            <>
+              <Text style={styles.emptyTitle}>Không tìm thấy SOS phù hợp</Text>
+              <Text style={styles.emptyDesc}>Hãy kiểm tra lại mã SOS hoặc số điện thoại đã nhập.</Text>
+              <TouchableOpacity style={styles.clearSearchButton} onPress={clearSearch} accessibilityRole="button">
+                <Text style={styles.clearSearchText}>Xóa từ khóa tìm kiếm</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <Text style={styles.emptyTitle}>Chưa có yêu cầu cứu trợ nào</Text>
+              <Text style={styles.emptyDesc}>
+                Các yêu cầu cứu nạn bản thân hoặc báo hộ người thân khi đăng nhập sẽ hiển thị tại đây để bạn tiện theo dõi.
+              </Text>
+              <TouchableOpacity
+                style={styles.createSOSButton}
+                onPress={() => router.replace('/')}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.createSOSText}>GỬI YÊU CẦU CỨU NẠN NGAY</Text>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       ) : (
         <FlatList
@@ -320,6 +376,48 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: THEME.colors.primary.main,
+  },
+  searchGroup: {
+    marginBottom: 8,
+  },
+  searchInput: {
+    backgroundColor: THEME.colors.surface.background,
+    borderWidth: 1,
+    borderColor: THEME.colors.surface.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    fontSize: 13,
+    color: THEME.colors.text.primary,
+  },
+  searchActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+    marginTop: 8,
+  },
+  searchButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 8,
+    backgroundColor: THEME.colors.primary.main,
+  },
+  searchButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  clearSearchButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: THEME.colors.surface.border,
+  },
+  clearSearchText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: THEME.colors.text.secondary,
   },
   loadMoreButton: {
     minHeight: 44,

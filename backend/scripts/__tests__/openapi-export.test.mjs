@@ -527,6 +527,23 @@ test('all controller operations retain source provenance and explicit auth metad
     Object.hasOwn(requirement, 'DonationSecret')));
 });
 
+test('SOS search criteria are sent in request bodies instead of URLs', () => {
+  const response = exportService('response').document;
+  for (const [method, routePath] of [
+    ['get', '/requests'],
+    ['get', '/requests/mine'],
+  ]) {
+    const operation = operationAt(response, method, routePath);
+    assert.ok(!(operation.parameters ?? []).some((parameter) => dereferenceParameter(response, parameter)?.name === 'q'));
+  }
+  for (const routePath of ['/requests/search', '/requests/mine/search']) {
+    const operation = operationAt(response, 'post', routePath);
+    const searchBody = operation.requestBody?.content?.['application/json']?.schema;
+    assert.ok(objectSchema(response, searchBody)?.properties?.q, `${routePath} accepts the search term in its JSON body`);
+    assert.equal(operation.responses['200']?.headers?.['Cache-Control']?.$ref, '#/components/headers/CacheControlNoStore');
+  }
+});
+
 test('snapshots have unique dereferenced parameters and retain pagination constraints', () => {
   for (const service of ['identity', 'response', 'logistics']) {
     const document = JSON.parse(fs.readFileSync(path.join(repositoryRoot, 'contracts/openapi', `${service}.json`), 'utf8'));

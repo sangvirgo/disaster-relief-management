@@ -4,7 +4,7 @@ import {
 import type { Request, Response } from 'express';
 import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotency.interceptor';
 import {
-  ClaimRequestDto, MineQueryDto, RecoverRequestDto, RecoveryIssueDto, RevokeTrackingSecretDto,
+  ClaimRequestDto, MineQueryDto, MineSearchDto, RecoverRequestDto, RecoveryIssueDto, RevokeTrackingSecretDto,
   RequestEventsQueryDto, SupplementRequestDto,
 } from './tracking.dto';
 import { TrackingService } from './tracking.service';
@@ -31,6 +31,13 @@ export class TrackingController {
 
   @Get('mine')
   async mine(@Query() query: MineQueryDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    noStore(response);
+    return this.tracking.mine(query, request);
+  }
+
+  @Post('mine/search')
+  @HttpCode(HttpStatus.OK)
+  async searchMyRequests(@Body() query: MineSearchDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
     noStore(response);
     return this.tracking.mine(query, request);
   }

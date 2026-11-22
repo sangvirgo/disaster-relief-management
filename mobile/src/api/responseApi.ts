@@ -103,10 +103,16 @@ export const ResponseApi = {
     return response.data;
   },
 
-  // Danh sách các yêu cầu cứu trợ của tài khoản đã đăng nhập (GET /response/requests/mine)
-  async getMyRequests(limit = 50, cursor?: string): Promise<{ items: MyRequestItem[]; more: boolean; cursor?: string }> {
+  // Danh sách và tìm kiếm yêu cầu cứu trợ của tài khoản đã đăng nhập.
+  async getMyRequests(limit = 50, cursor?: string, q?: string): Promise<{ items: MyRequestItem[]; more: boolean; cursor?: string }> {
     const params: Record<string, any> = { limit };
     if (cursor) params.cursor = cursor;
+    if (q) {
+      const response = await apiClient.post<{ items: MyRequestItem[]; more: boolean; cursor?: string }>(
+        '/response/requests/mine/search', { ...params, q }
+      );
+      return response.data;
+    }
     const response = await apiClient.get<{ items: MyRequestItem[]; more: boolean; cursor?: string }>('/response/requests/mine', {
       params,
     });

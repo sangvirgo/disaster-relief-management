@@ -8,12 +8,13 @@ import { decodeKeysetCursor, encodeKeysetCursor } from '@c48/technical/paginatio
 import { ROLE_PERMISSIONS } from '@c48/identity-contracts/permissions';
 import { hashPurposeBoundSecret } from '@c48/technical/security/secret-hash';
 import { ReporterSession, ReporterSessionService } from '../requests/reporter-session';
+import { requestSearchTerms } from '../requests/request-search';
 import { RequestIntakeConfig, REQUEST_INTAKE_CONFIG } from '../requests/request-intake.service';
 import { ReporterAccessService, ReporterRequestRow, trackingCodeMatches } from './reporter-access.service';
 import { TrackingReadRateLimiter } from './tracking-read-rate-limiter';
 import { previouslyReportedFacts, unverifiedRequestAssignments, unverifiedSubjectAssignments } from './supplement.update';
 import { invalidField, supplementAllowed, validateSupplement } from './supplement.validation';
-import { MineQueryDto, RecoveryIssueDto, RequestEventsQueryDto, SupplementRequestDto } from './tracking.dto';
+import { MineQueryDto, MineSearchDto, RecoveryIssueDto, RequestEventsQueryDto, SupplementRequestDto } from './tracking.dto';
 import { RequestOperationsService } from '../operations/request-operations.service';
 import { terminalStatuses, unverifiedStatuses } from '../operations/request-operations.helpers';
 import { assessmentFields, enqueueAiAdvisory } from '../ai/ai-advisory-input';
@@ -99,21 +100,23 @@ export class TrackingService {
     throw new AppError('NOT_FOUND', { status: 404 });
   }
 
-  async mine(query: MineQueryDto, request: import('express').Request): Promise<{ items: Array<Record<string, unknown>>; more: boolean; cursor?: string }> {
+  async mine(query: MineQueryDto | MineSearchDto, request: import('express').Request): Promise<{ items: Array<Record<string, unknown>>; more: boolean; cursor?: string }> {
     const session = await this.sessions.require(request);
-    const search = query.q?.trim().toUpperCase() ?? '';
-    const filters = { reporter_user_id: session.userId, q: search };
+    const searchQuery = 'q' in query ? query.q : undefined;
+    const search = searchQuery?.trim().toUpperCase() ?? '';
+    const searchTerms = requestSearchTerms(searchQuery);
+    const filters = { reporter_user_id: session.userId, q: search, reporter_phone: searchTerms.reporterPhone };
     const cursor = query.cursor ? decodeKeysetCursor(query.cursor, filters) : undefined;
-    const codePattern = search ? `%${search.replace(/[!%_]/gu, '!$&')}%` : null;
     const rows = await this.dataSource.query(
       `SELECT id, tracking_code, status, received_at,
               to_char(received_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_received_at
          FROM assistance_request
         WHERE reporter_user_id = $1
-          AND ($2::text IS NULL OR tracking_code ILIKE $2 ESCAPE '!')
-          AND ($3::timestamptz IS NULL OR (received_at, id) < ($3::timestamptz, $4::uuid))
-        ORDER BY received_at DESC, id DESC LIMIT $5`,
-      [session.userId, codePattern, cursor?.sort[0] ?? null, cursor?.id ?? null, (query.limit ?? 50) + 1],
+          AND (($2::text IS NULL AND $3::text IS NULL) OR tracking_code ILIKE $2 ESCAPE '!' OR reporter_contact_phone=$3)
+          AND ($4::timestamptz IS NULL OR (received_at, id) < ($4::timestamptz, $5::uuid))
+        ORDER BY received_at DESC, id DESC LIMIT $6`,
+      [session.userId, searchTerms.trackingCodePattern, searchTerms.reporterPhone,
+        cursor?.sort[0] ?? null, cursor?.id ?? null, (query.limit ?? 50) + 1],
     ) as Array<{ id: string; tracking_code: string; status: string; received_at: Date | string; cursor_received_at: string }>;
     const more = rows.length > (query.limit ?? 50);
     const page = rows.slice(0, query.limit ?? 50);

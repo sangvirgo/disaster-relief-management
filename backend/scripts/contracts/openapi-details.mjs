@@ -170,12 +170,53 @@ const campaignHistoryItemSchema = object({
   payload: { anyOf: [{ type: 'object', additionalProperties: true }, { type: 'null' }] },
 }, ['occurred_at', 'event_type', 'actor', 'request_id', 'mission_id', 'payload']);
 
+const requestQueueSearchBody = object({
+  q: { type: 'string', minLength: 1, maxLength: 32 },
+  cursor: { type: 'string', maxLength: 2000 },
+  limit: { type: 'integer', minimum: 1, maximum: 100 },
+  campaign_id: id,
+  status: { type: 'string', enum: ['SUBMITTED', 'VERIFYING', 'VERIFIED', 'REJECTED', 'DUPLICATE', 'TRIAGED', 'DISPATCHED', 'IN_PROGRESS', 'RESOLVING', 'RESOLVED', 'CLOSED', 'CANCELLED'] },
+  priority: { type: 'string', enum: ['P1', 'P2', 'P3', 'P4'] },
+  review_lane: { type: 'string', enum: ['NORMAL', 'RATE_LIMITED_REVIEW', 'PROXY_QUOTA_REVIEW'] },
+  category: { type: 'string', pattern: '^[A-Z0-9_]{2,32}$' },
+  from: dateTime,
+  to: dateTime,
+  bbox: { type: 'string', maxLength: 128, pattern: '^-?\\d+(?:\\.\\d+)?,-?\\d+(?:\\.\\d+)?,-?\\d+(?:\\.\\d+)?,-?\\d+(?:\\.\\d+)?$' },
+  declared_danger: { type: 'string', enum: ['true', 'false'] },
+  overdue: { type: 'string', enum: ['true', 'false'] },
+  unassigned: { type: 'string', enum: ['true', 'false'] },
+  campaign_match_state: { type: 'string', enum: ['UNMATCHED', 'AUTO_ATTACHED', 'CONFLICT', 'MANUAL'] },
+}, ['q']);
+const myRequestSearchBody = object({
+  q: { type: 'string', minLength: 1, maxLength: 32 },
+  cursor: { type: 'string', maxLength: 2000 },
+  limit: { type: 'integer', minimum: 1, maximum: 100 },
+}, ['q']);
+
 const responseDetails = {
   listRequestQueue: {
+    removeQuery: ['q'],
     query: [
       { name: 'campaign_id', in: 'query', schema: id },
       { name: 'campaign_match_state', in: 'query', schema: { type: 'string', enum: ['UNMATCHED', 'AUTO_ATTACHED', 'CONFLICT', 'MANUAL'] } },
     ],
+  },
+  listMyRequests: { removeQuery: ['q'] },
+  responseRequestOperationsSearchQueue: {
+    summary: 'Search scoped coordinator SOS requests',
+    description: 'Search by tracking-code substring or exact normalized reporter phone. Search criteria are sent in the JSON body so SOS tracking codes never appear in URLs or request logs.',
+    request: request(requestQueueSearchBody),
+    response: response({ $ref: '#/components/schemas/RequestQueuePage' }, 'Matching requests within the caller\'s coordinator scope, newest first.', undefined, {
+      'Cache-Control': { $ref: '#/components/headers/CacheControlNoStore' },
+    }),
+  },
+  responseTrackingSearchMyRequests: {
+    summary: 'Search requests owned by the active reporter account',
+    description: 'Search by tracking-code substring or exact normalized reporter phone. The JSON body keeps tracking codes out of URLs and request logs; results remain scoped to the active reporter account.',
+    request: request(myRequestSearchBody),
+    response: response({ $ref: '#/components/schemas/MyRequestPage' }, 'Matching requests owned by the caller, newest first.', undefined, {
+      'Cache-Control': { $ref: '#/components/headers/CacheControlNoStore' },
+    }),
   },
   createCampaign: {
     summary: 'Create a campaign with an optional spatial matching area.',
@@ -1148,6 +1189,8 @@ const routeErrorCodes = {
   createSelfRequest: ['VALIDATION_FAILED', 'TRACKING_SECRET_INVALID', 'TRACKING_SECRET_IN_USE', 'IDEMPOTENCY_KEY_REUSED', 'SOS_RATE_CEILING'],
   createProxyRequest: ['VALIDATION_FAILED', 'IDENTITY_UNAVAILABLE', 'SESSION_EXPIRED'],
   trackSelfRequest: ['NOT_FOUND', 'RATE_LIMITED'],
+  responseTrackingSearchMyRequests: ['CURSOR_INVALID', 'VALIDATION_FAILED'],
+  responseRequestOperationsSearchQueue: ['CURSOR_INVALID', 'VALIDATION_FAILED'],
   listReporterEvents: ['NOT_FOUND'],
   supplementSelfRequest: ['STATE_TRANSITION_INVALID', 'VERSION_CONFLICT'],
   responseTrackingUpdateReport: ['NOT_FOUND', 'VALIDATION_FAILED', 'STATE_TRANSITION_INVALID', 'VERSION_CONFLICT', 'IDEMPOTENCY_KEY_INVALID', 'IDEMPOTENCY_KEY_REUSED'],
@@ -1690,6 +1733,7 @@ export function applyOpenApiDetails(document, service) {
       ];
       const managedQueryNames = new Set([
         ...(detail.query ?? []).map((parameter) => parameter.name),
+        ...(detail.removeQuery ?? []),
         ...paginationQueries,
         ...(logisticsQueries[operation.operationId] ?? []),
       ]);

@@ -1,7 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize, Equals, IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsObject, IsOptional, IsString, IsUUID,
-  Matches, Max, MaxLength, Min, ValidateNested,
+  Matches, Max, MaxLength, Min, MinLength, ValidateNested,
 } from 'class-validator';
 
 const statuses = ['SUBMITTED', 'VERIFYING', 'VERIFIED', 'REJECTED', 'DUPLICATE', 'TRIAGED', 'DISPATCHED', 'IN_PROGRESS', 'RESOLVING', 'RESOLVED', 'CLOSED', 'CANCELLED'];
@@ -59,6 +59,11 @@ export class RequestQueueQueryDto extends RequestOperationPageDto {
 
   @IsOptional() @IsIn(campaignMatchStates)
   declare campaign_match_state?: string;
+}
+
+export class RequestQueueSearchDto extends RequestQueueQueryDto {
+  @IsString() @MinLength(1) @MaxLength(32) @Matches(/\S/u)
+  q!: string;
 }
 
 export class RequestVersionDto {

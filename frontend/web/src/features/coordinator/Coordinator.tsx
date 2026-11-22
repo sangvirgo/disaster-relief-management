@@ -558,6 +558,8 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
   const [reviewLane, setReviewLane] = useState(restoredView.current.reviewLane);
   const [overdue, setOverdue] = useState(restoredView.current.overdue);
   const [unassignedOnly, setUnassignedOnly] = useState(initialUnassignedOnly);
+  const [queueSearch, setQueueSearch] = useState('');
+  const [queueSearchTerm, setQueueSearchTerm] = useState('');
   const [error, setError] = useState('');
   const [detailError, setDetailError] = useState('');
   const [updateMessage, setUpdateMessage] = useState('');
@@ -697,7 +699,13 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
     if (unassignedOnly && canSeeUnassigned) params.set('unassigned', 'true');
     if (campaignId) params.set('campaign_id', campaignId);
     if (campaignMatchState && canSeeUnassigned) params.set('campaign_match_state', campaignMatchState);
-    api<Queue>('response', `/requests${params.size ? '?' + params : ''}`)
+    const request = queueSearchTerm
+      ? api<Queue>('response', '/requests/search', {
+        method: 'POST',
+        body: { ...Object.fromEntries(params.entries()), q: queueSearchTerm },
+      })
+      : api<Queue>('response', `/requests${params.size ? '?' + params : ''}`);
+    request
       .then((value) => {
         if (live) setQueue({ ...value, items: value.items.filter((item) => !claimBlockedBy(item, currentUserId)) });
       })
@@ -710,7 +718,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
     return () => {
       live = false;
     };
-  }, [page, queueStatus, cursor, revision, reviewLane, overdue, unassignedOnly, canSeeUnassigned, campaignId, campaignMatchState, currentUserId]);
+  }, [page, queueStatus, cursor, revision, reviewLane, overdue, unassignedOnly, canSeeUnassigned, campaignId, campaignMatchState, currentUserId, queueSearchTerm]);
   useEffect(() => {
     if (!selected) return;
     let live = true;
@@ -997,6 +1005,15 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
     setUpdateMessage('');
     window.scrollTo({ top: 0 });
   }
+  function submitQueueSearch(event: React.FormEvent) {
+    event.preventDefault();
+    const nextTerm = queueSearch.trim();
+    setCursor('');
+    setSelected(null);
+    setDetail(null);
+    if (nextTerm === queueSearchTerm) setRevision((value) => value + 1);
+    else setQueueSearchTerm(nextTerm);
+  }
   function returnToList() {
     const url = new URL(window.location.href);
     url.searchParams.delete('sos_id');
@@ -1030,6 +1047,25 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
           </button>
           <TeamReadinessQueue refreshRevision={revision} onChanged={() => { setRevision(value => value + 1); setDetailRevision(value => value + 1); }} />
         </div>
+        <form className="queue-search-form" onSubmit={submitQueueSearch} role="search">
+          <label htmlFor="coordinator-sos-search">Tìm SOS theo mã SOS hoặc số điện thoại</label>
+          <div className="queue-search-row">
+            <input
+              id="coordinator-sos-search"
+              type="search"
+              value={queueSearch}
+              maxLength={32}
+              onChange={(event) => setQueueSearch(event.target.value)}
+              placeholder="Nhập mã SOS hoặc số điện thoại"
+              autoComplete="off"
+            />
+            <button type="submit" className="button secondary" disabled={loading}>Tìm kiếm</button>
+            {queueSearchTerm && <button type="button" className="button secondary" disabled={loading}
+              onClick={() => { setQueueSearch(''); setQueueSearchTerm(''); setCursor(''); setSelected(null); setDetail(null); }}>
+              Xóa lọc
+            </button>}
+          </div>
+        </form>
         <div className="queue-filter-fields queue-filter-quick">
             <label className="queue-status-field">
             <span>Trạng thái yêu cầu</span>
@@ -1103,7 +1139,9 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
           <>
             <p className="muted">Cập nhật: {timeLabel(queue.generated_at)}</p>
             {queue.items.length === 0 && (
-              <div className="empty">Không có SOS nào khả dụng trên trang này. Những SOS đang do điều phối viên khác tiếp nhận đã được ẩn.</div>
+              <div className="empty">{queueSearchTerm
+                ? 'Không tìm thấy SOS phù hợp với mã hoặc số điện thoại đã nhập.'
+                : 'Không có SOS nào khả dụng trên trang này. Những SOS đang do điều phối viên khác tiếp nhận đã được ẩn.'}</div>
             )}
             {queue.items.length > 0 && <div className="sos-table-scroll" role="region" aria-label="Bảng danh sách SOS" tabIndex={0}>
               <table className="sos-table">

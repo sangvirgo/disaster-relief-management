@@ -7,7 +7,7 @@ import { RequestOperationsAiAdvisoryService } from './request-operations.ai-advi
 import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotency.interceptor';
 import {
   AuthorityReferralDto, ContactAttemptDto, ConcurRequestDto, DuplicateRequestDto,
-  AttachCampaignDto, RejectRequestDto, RequestQueueQueryDto, RequestOperationPageDto, RequestVersionDto, TeamCandidatesQueryDto,
+  AttachCampaignDto, RejectRequestDto, RequestQueueQueryDto, RequestQueueSearchDto, RequestOperationPageDto, RequestVersionDto, TeamCandidatesQueryDto,
   SupplementReviewDto, TriageRequestDto, VerifyRequestDto, FastTrackRequestDto,
 } from './request-operations.dto';
 import { RequestOperationsService } from './request-operations.service';
@@ -26,6 +26,13 @@ export class RequestOperationsController {
 
   @Get('requests')
   async queue(@Query() query: RequestQueueQueryDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    noStore(response);
+    return this.operations.queue(query, request);
+  }
+
+  @Post('requests/search')
+  @HttpCode(HttpStatus.OK)
+  async searchQueue(@Body() query: RequestQueueSearchDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) {
     noStore(response);
     return this.operations.queue(query, request);
   }

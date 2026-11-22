@@ -1857,6 +1857,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/requests/mine/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Search requests owned by the active reporter account
+         * @description Search by tracking-code substring or exact normalized reporter phone. The JSON body keeps tracking codes out of URLs and request logs; results remain scoped to the active reporter account.
+         */
+        post: operations["responseTrackingSearchMyRequests"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/requests/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Search scoped coordinator SOS requests
+         * @description Search by tracking-code substring or exact normalized reporter phone. Search criteria are sent in the JSON body so SOS tracking codes never appear in URLs or request logs.
+         */
+        post: operations["responseRequestOperationsSearchQueue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4091,8 +4131,6 @@ export interface operations {
             query?: {
                 cursor?: components["parameters"]["Cursor"];
                 limit?: components["parameters"]["PageLimit"];
-                /** @description Optional substring of the caller's tracking code. The page cursor is bound to this query. */
-                q?: string;
             };
             header?: never;
             path?: never;
@@ -9309,6 +9347,140 @@ export interface operations {
                         more: boolean;
                         cursor?: string;
                     };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    responseTrackingSearchMyRequests: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    q: string;
+                    cursor?: string;
+                    limit?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Matching requests owned by the caller, newest first. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControlNoStore"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyRequestPage"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    responseRequestOperationsSearchQueue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    q: string;
+                    cursor?: string;
+                    limit?: number;
+                    /** Format: uuid */
+                    campaign_id?: string;
+                    /** @enum {string} */
+                    status?: "SUBMITTED" | "VERIFYING" | "VERIFIED" | "REJECTED" | "DUPLICATE" | "TRIAGED" | "DISPATCHED" | "IN_PROGRESS" | "RESOLVING" | "RESOLVED" | "CLOSED" | "CANCELLED";
+                    /** @enum {string} */
+                    priority?: "P1" | "P2" | "P3" | "P4";
+                    /** @enum {string} */
+                    review_lane?: "NORMAL" | "RATE_LIMITED_REVIEW" | "PROXY_QUOTA_REVIEW";
+                    category?: string;
+                    /** Format: date-time */
+                    from?: string;
+                    /** Format: date-time */
+                    to?: string;
+                    bbox?: string;
+                    /** @enum {string} */
+                    declared_danger?: "true" | "false";
+                    /** @enum {string} */
+                    overdue?: "true" | "false";
+                    /** @enum {string} */
+                    unassigned?: "true" | "false";
+                    /** @enum {string} */
+                    campaign_match_state?: "UNMATCHED" | "AUTO_ATTACHED" | "CONFLICT" | "MANUAL";
+                };
+            };
+        };
+        responses: {
+            /** @description Matching requests within the caller's coordinator scope, newest first. */
+            200: {
+                headers: {
+                    "Cache-Control": components["headers"]["CacheControlNoStore"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestQueuePage"];
                 };
             };
             /** @description Documented error response; clients branch on the stable code. */

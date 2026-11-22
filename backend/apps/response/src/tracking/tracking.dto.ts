@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsBoolean, IsInt, IsObject, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { IsBoolean, IsInt, IsObject, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 import { RequestLocationDto } from '../requests/request-intake.dto';
 
 const trackingCode = /^[0-9A-HJKMNP-TV-Z]{10,16}$/;
@@ -15,14 +15,16 @@ export class ClaimRequestDto {
 }
 
 export class MineQueryDto {
-  @IsOptional() @IsString() @MaxLength(16)
-  declare q?: string;
-
   @IsOptional() @IsString() @MaxLength(2_000)
   declare cursor?: string;
 
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
   declare limit?: number;
+}
+
+export class MineSearchDto extends MineQueryDto {
+  @IsString() @MinLength(1) @MaxLength(32) @Matches(/\S/u)
+  q!: string;
 }
 
 export class RequestEventsQueryDto {

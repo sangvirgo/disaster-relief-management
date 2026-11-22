@@ -219,14 +219,15 @@ describe('T1 technical package', () => {
   });
 
   it('uses Pino redaction and never writes supplied secrets to its destination', () => {
-    expect(LOG_REDACT_PATHS).toEqual(expect.arrayContaining(['authorization', 'req.headers.authorization', 'phone', 'location']));
+    expect(LOG_REDACT_PATHS).toEqual(expect.arrayContaining(['authorization', 'req.headers.authorization', 'phone', 'location', 'body.q', 'req.body.q']));
     let output = '';
     const stream = new Writable({ write(chunk, _encoding, callback) { output += chunk.toString(); callback(); } });
     const logger = createPinoLogger('identity', 'info', stream);
-    logger.info({ headers: { authorization: 'bearer-private', 'x-tracking-secret': 'tracking-private' }, phone: '0900000000', location: 'private-location', password: 'private-password', body: { csrf_token: 'csrf-private', tracking_secret_hash: 'hash-private' } }, 'test');
+    logger.info({ headers: { authorization: 'bearer-private', 'x-tracking-secret': 'tracking-private' }, phone: '0900000000', location: 'private-location', password: 'private-password', body: { csrf_token: 'csrf-private', tracking_secret_hash: 'hash-private', q: 'C48SOSCODEPRIVATE' } }, 'test');
     expect(output).not.toContain('private');
     expect(output).not.toContain('csrf-private');
     expect(output).not.toContain('hash-private');
+    expect(output).not.toContain('C48SOSCODEPRIVATE');
     expect(output).toContain('[REDACTED]');
     logger.flush();
     let nestOutput = '';

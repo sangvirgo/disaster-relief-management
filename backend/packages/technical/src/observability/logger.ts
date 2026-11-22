@@ -13,6 +13,7 @@ export const LOG_REDACT_PATHS = [
   'req.headers["x-tracking-secret"]', 'req.headers["x-donation-secret"]', 'req.headers["x-recovery-code"]', 'req.headers["x-csrf-token"]',
   'headers.referer', 'req.headers.referer', 'headers.referrer', 'req.headers.referrer',
   'url', '*.url', '*.*.url', 'req.originalUrl', 'originalUrl', '*.originalUrl', '*.*.originalUrl',
+  'q', '*.q', '*.*.q', 'body.q', 'req.body.q',
   'phone', '*.phone', '*.*.phone', 'body.phone', 'req.body.phone',
   'reporter_contact_phone', '*.reporter_contact_phone', '*.*.reporter_contact_phone',
   'beneficiary_contact_phone', '*.beneficiary_contact_phone', '*.*.beneficiary_contact_phone',

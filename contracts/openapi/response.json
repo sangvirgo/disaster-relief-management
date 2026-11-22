@@ -3217,23 +3217,13 @@
           }
         ],
         "parameters": [
-          {
-            "$ref": "#/components/parameters/Cursor"
-          },
-          {
-            "$ref": "#/components/parameters/PageLimit"
-          },
-          {
-            "in": "query",
-            "name": "q",
-            "required": false,
-            "description": "Optional substring of the caller's tracking code. The page cursor is bound to this query.",
-            "schema": {
-              "type": "string",
-              "maxLength": 16
-            }
-          }
-        ],
+                        {
+                          "$ref": "#/components/parameters/Cursor"
+                        },
+                        {
+                          "$ref": "#/components/parameters/PageLimit"
+                        }
+                      ],
         "responses": {
           "200": {
             "description": "The caller's own requests, newest first.",
@@ -17171,6 +17161,387 @@
           }
         ]
       }
+    },
+    "/requests/mine/search": {
+      "post": {
+          "operationId": "responseTrackingSearchMyRequests",
+          "summary": "Search requests owned by the active reporter account",
+          "description": "Search by tracking-code substring or exact normalized reporter phone. The JSON body keeps tracking codes out of URLs and request logs; results remain scoped to the active reporter account.",
+          "responses": {
+            "200": {
+              "description": "Matching requests owned by the caller, newest first.",
+              "headers": {
+                "Cache-Control": {
+                  "$ref": "#/components/headers/CacheControlNoStore"
+                }
+              },
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/MyRequestPage"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "CURSOR_INVALID": {
+                      "summary": "CURSOR_INVALID",
+                      "value": {
+                        "code": "CURSOR_INVALID",
+                        "message": "Dữ liệu phân trang không còn hợp lệ. Vui lòng tải lại danh sách.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "VALIDATION_FAILED": {
+                      "summary": "VALIDATION_FAILED",
+                      "value": {
+                        "code": "VALIDATION_FAILED",
+                        "message": "Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại các trường được đánh dấu.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "UNAUTHENTICATED": {
+                      "summary": "UNAUTHENTICATED",
+                      "value": {
+                        "code": "UNAUTHENTICATED",
+                        "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "SESSION_EXPIRED": {
+                      "summary": "SESSION_EXPIRED",
+                      "value": {
+                        "code": "SESSION_EXPIRED",
+                        "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "FORBIDDEN": {
+                      "summary": "FORBIDDEN",
+                      "value": {
+                        "code": "FORBIDDEN",
+                        "message": "Bạn không có quyền thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "CSRF_INVALID": {
+                      "summary": "CSRF_INVALID",
+                      "value": {
+                        "code": "CSRF_INVALID",
+                        "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "x-c48-contract-source": "docs/backend/03-response-api.md",
+          "x-c48-controller-source": "backend/apps/response/src/tracking/tracking.controller.ts#TrackingController.searchMyRequests",
+          "security": [
+            {
+              "NativeBearer": []
+            },
+            {
+              "WebAccessCookie": [],
+              "CsrfToken": []
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "q": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 32
+                    },
+                    "cursor": {
+                      "type": "string",
+                      "maxLength": 2000
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 100
+                    }
+                  },
+                  "required": [
+                    "q"
+                  ]
+                }
+              }
+            }
+          }
+        }
+    },
+    "/requests/search": {
+      "post": {
+          "operationId": "responseRequestOperationsSearchQueue",
+          "summary": "Search scoped coordinator SOS requests",
+          "description": "Search by tracking-code substring or exact normalized reporter phone. Search criteria are sent in the JSON body so SOS tracking codes never appear in URLs or request logs.",
+          "responses": {
+            "200": {
+              "description": "Matching requests within the caller's coordinator scope, newest first.",
+              "headers": {
+                "Cache-Control": {
+                  "$ref": "#/components/headers/CacheControlNoStore"
+                }
+              },
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/RequestQueuePage"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "CURSOR_INVALID": {
+                      "summary": "CURSOR_INVALID",
+                      "value": {
+                        "code": "CURSOR_INVALID",
+                        "message": "Dữ liệu phân trang không còn hợp lệ. Vui lòng tải lại danh sách.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "VALIDATION_FAILED": {
+                      "summary": "VALIDATION_FAILED",
+                      "value": {
+                        "code": "VALIDATION_FAILED",
+                        "message": "Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại các trường được đánh dấu.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "UNAUTHENTICATED": {
+                      "summary": "UNAUTHENTICATED",
+                      "value": {
+                        "code": "UNAUTHENTICATED",
+                        "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "SESSION_EXPIRED": {
+                      "summary": "SESSION_EXPIRED",
+                      "value": {
+                        "code": "SESSION_EXPIRED",
+                        "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "403": {
+              "description": "Documented error response; clients branch on the stable code.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/ErrorEnvelope"
+                  },
+                  "examples": {
+                    "FORBIDDEN": {
+                      "summary": "FORBIDDEN",
+                      "value": {
+                        "code": "FORBIDDEN",
+                        "message": "Bạn không có quyền thực hiện thao tác này.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    },
+                    "CSRF_INVALID": {
+                      "summary": "CSRF_INVALID",
+                      "value": {
+                        "code": "CSRF_INVALID",
+                        "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
+                        "correlation_id": "00000000-0000-4000-8000-000000000000"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "x-c48-contract-source": "docs/backend/03-response-api.md",
+          "x-c48-controller-source": "backend/apps/response/src/operations/request-operations.controller.ts#RequestOperationsController.searchQueue",
+          "security": [
+            {
+              "NativeBearer": []
+            },
+            {
+              "WebAccessCookie": [],
+              "CsrfToken": []
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "q": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 32
+                    },
+                    "cursor": {
+                      "type": "string",
+                      "maxLength": 2000
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 100
+                    },
+                    "campaign_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "SUBMITTED",
+                        "VERIFYING",
+                        "VERIFIED",
+                        "REJECTED",
+                        "DUPLICATE",
+                        "TRIAGED",
+                        "DISPATCHED",
+                        "IN_PROGRESS",
+                        "RESOLVING",
+                        "RESOLVED",
+                        "CLOSED",
+                        "CANCELLED"
+                      ]
+                    },
+                    "priority": {
+                      "type": "string",
+                      "enum": [
+                        "P1",
+                        "P2",
+                        "P3",
+                        "P4"
+                      ]
+                    },
+                    "review_lane": {
+                      "type": "string",
+                      "enum": [
+                        "NORMAL",
+                        "RATE_LIMITED_REVIEW",
+                        "PROXY_QUOTA_REVIEW"
+                      ]
+                    },
+                    "category": {
+                      "type": "string",
+                      "pattern": "^[A-Z0-9_]{2,32}$"
+                    },
+                    "from": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "to": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "bbox": {
+                      "type": "string",
+                      "maxLength": 128,
+                      "pattern": "^-?\\d+(?:\\.\\d+)?,-?\\d+(?:\\.\\d+)?,-?\\d+(?:\\.\\d+)?,-?\\d+(?:\\.\\d+)?$"
+                    },
+                    "declared_danger": {
+                      "type": "string",
+                      "enum": [
+                        "true",
+                        "false"
+                      ]
+                    },
+                    "overdue": {
+                      "type": "string",
+                      "enum": [
+                        "true",
+                        "false"
+                      ]
+                    },
+                    "unassigned": {
+                      "type": "string",
+                      "enum": [
+                        "true",
+                        "false"
+                      ]
+                    },
+                    "campaign_match_state": {
+                      "type": "string",
+                      "enum": [
+                        "UNMATCHED",
+                        "AUTO_ATTACHED",
+                        "CONFLICT",
+                        "MANUAL"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "q"
+                  ]
+                }
+              }
+            }
+          }
+        }
     }
   },
   "components": {

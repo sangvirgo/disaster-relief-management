@@ -4,7 +4,7 @@ import type { IdempotentResult } from '@c48/technical/idempotency/idempotency';
 import type { ReporterSession } from '../requests/reporter-session';
 import type {
   AuthorityReferralDto, ContactAttemptDto, ConcurRequestDto, DuplicateRequestDto,
-  AttachCampaignDto, RejectRequestDto, RequestQueueQueryDto, RequestOperationPageDto, RequestVersionDto, TeamCandidatesQueryDto,
+  AttachCampaignDto, RejectRequestDto, RequestQueueQueryDto, RequestQueueSearchDto, RequestOperationPageDto, RequestVersionDto, TeamCandidatesQueryDto,
   SupplementReviewDto, TriageRequestDto, VerifyRequestDto, FastTrackRequestDto,
 } from './request-operations.dto';
 import { loadOperationsConfig } from './request-operations.helpers';
@@ -36,7 +36,7 @@ export class RequestOperationsService {
 
   static config(): RequestOperationsConfig { return loadOperationsConfig(); }
 
-  async queue(query: RequestQueueQueryDto, request: Request): Promise<Record<string, unknown>> {
+  async queue(query: RequestQueueQueryDto | RequestQueueSearchDto, request: Request): Promise<Record<string, unknown>> {
     return this.queries.queue(query, request);
   }
 
