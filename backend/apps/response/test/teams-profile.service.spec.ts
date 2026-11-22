@@ -46,7 +46,7 @@ function fixture(activeMissions: unknown[] = [], currentTeam: TeamRow = team) {
   const sessions = {
     require: jest.fn<(...args: unknown[]) => Promise<ReporterSession>>().mockResolvedValue({
       userId,
-      grants: [{ role_code: 'COORDINATOR', scope_type: 'SYSTEM',}],
+      grants: [{ role_code: 'ADMIN', scope_type: 'SYSTEM',}],
     }),
   } as unknown as ReporterSessionService;
   const idempotency = {

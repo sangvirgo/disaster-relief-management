@@ -12,8 +12,9 @@ describe('team setup authorization', () => {
     expect(hasPermission([admin], 'MISSION_ASSIGN', { campaignId: 'campaign-a' })).toBe(false);
   });
 
-  it('allows a system coordinator to manage shared teams and confines campaign grants to their campaign', () => {
-    expect(hasPermission([coordinator], 'TEAM_MANAGE_ANY', {})).toBe(true);
+  it('keeps a system coordinator read-only on teams and confines campaign grants to their campaign', () => {
+    expect(hasPermission([coordinator], 'TEAM_READ', {})).toBe(true);
+    expect(hasPermission([coordinator], 'TEAM_MANAGE_ANY', {})).toBe(false);
     expect(hasPermission([campaignCoordinator], 'REQUEST_DETAIL_READ', { campaignId: 'campaign-a' })).toBe(true);
     expect(hasPermission([campaignCoordinator], 'REQUEST_DETAIL_READ', { campaignId: 'campaign-b' })).toBe(false);
     expect(hasPermission([campaignCoordinator], 'REQUEST_DETAIL_READ', { campaignId: null })).toBe(false);

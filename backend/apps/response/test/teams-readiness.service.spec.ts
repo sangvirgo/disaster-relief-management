@@ -35,7 +35,7 @@ function fixture(options: { leader?: boolean; manager?: boolean; active?: boolea
   const findTeam = jest.fn<(...args: unknown[]) => Promise<TeamRow | undefined>>()
     .mockImplementation(async () => options.missing ? undefined : { ...row });
   const sessions = { require: jest.fn(async () => ({ userId, grants: options.manager
-    ? [{ role_code: 'COORDINATOR', scope_type: 'SYSTEM',}] : [],
+    ? [{ role_code: 'ADMIN', scope_type: 'SYSTEM',}] : [],
   } as ReporterSession)) } as unknown as ReporterSessionService;
   const idempotency = { execute: jest.fn(async (_: DataSource, command: Parameters<IdempotencyService['execute']>[1]) => {
     if (options.replay) return { value: await command.replay!(manager, { type: 'rescue_team', id: teamId }), replay: true, status: 200 };
@@ -58,7 +58,7 @@ describe('explicit team readiness acknowledgement', () => {
       occurred_at: dto.occurred_at, readiness_required: false });
   });
 
-  it('allows a scoped coordinator to record a named field confirmation for an accountless team', async () => {
+  it('allows an admin team manager to record a named field confirmation for an accountless team', async () => {
     const { service } = fixture({ manager: true, leader: false, team: { reporting_mode: 'COORDINATOR' } });
     await expect(service.ready(teamId, { ...dto, confirmation_basis: 'PHONE', reported_by: '  Đội trưởng demo  ' },
       'key', {} as never)).resolves.toMatchObject({ value: { readiness_required: false, version: 7 } });

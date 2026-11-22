@@ -247,7 +247,7 @@ gap        = demand - supply
 
 **Scheduler:** `SupplyGapScheduler` runs the recompute every 15 minutes through the shared `JobRunner` (advisory lock per job name). Environment `C48_SUPPLY_GAP_JOB_ENABLED`: unset or `true` enables it, `false` disables it, and any other value fails startup. Recompute is not hooked into need or stock commands in this step. The scheduler covers the 15-minute cadence.
 
-**Permissions:** `SUPPLY_GAP_VIEW` (COORDINATOR and OPERATIONS_MANAGER, read-only) for the GET routes. `SUPPLY_GAP_MANAGE` (OPERATIONS_MANAGER, SYSTEM scope) for accept and dismiss. Both need a SYSTEM grant, because a warehouse gap is not scoped to one campaign.
+**Permissions:** `SUPPLY_GAP_VIEW` (OPERATIONS_MANAGER only, read-only; user decision 2026-11-22) for the GET routes. `SUPPLY_GAP_MANAGE` (OPERATIONS_MANAGER, SYSTEM scope) for accept and dismiss. Both need a SYSTEM grant, because a warehouse gap is not scoped to one campaign.
 
 | Method & path | Auth | Behaviour |
 |---|---|---|
@@ -287,7 +287,7 @@ One pickup ticket per Response mission. It hides the need, commitment and distri
 **Catalog flags:** `item.returnable` (default true) and `item.perishable` (default false) are added for Step 6b. Seeded consumables (food, water, first-aid and dressings, and the community first-aid kit) are `returnable=false`. Existing databases keep the default until the seed is re-applied or the catalog changes.
 
 **Known limits (6a):**
-- A coordinator holds `PICKUP_TICKET_MANAGE`, but `reserve` also needs `COMMITMENT_MANAGE` and `DISTRIBUTION_PREPARE`, and `confirm` needs `DISTRIBUTION_REVIEW`. Those are held by `OPERATIONS_MANAGER` (and `REVIEWER` for review) only, so the coordinator gets a 403 from the inner step. The Step 6a demo therefore needs two operations managers: one to reserve, and a different one to confirm and hand over. A coordinator can view and create tickets, and can cancel an OPEN ticket.
+- `PICKUP_TICKET_MANAGE` (create, reserve, confirm, cancel) is held by `OPERATIONS_MANAGER` only (user decision 2026-11-22). A coordinator keeps `PICKUP_TICKET_VIEW` and can read tickets. The Step 6a demo therefore needs two operations managers: one to reserve, and a different one to confirm and hand over. `confirm` also needs `DISTRIBUTION_REVIEW`; the approval rule in [05-permissions](05-permissions.md) section 1 applies (REVIEWER only for `REQUEST_AID` distributions).
 - Cancelling a READY ticket is limited to its preparer or approver by the existing distribution rule. Unattended READY tickets are handled by the expiry sweep.
 - The facade is several transactions, not one. A crash between steps is repaired by retrying with the same `Idempotency-Key`. A retry by a different user, or with a new key, after dispatch has already happened returns `APPROVAL_STALE` (409). An operator must reconcile that case.
 - Stock and commitment locks are taken by the inner services. The facade locks only the ticket row, and never locks a commitment or distribution in its own transaction before calling an inner step, to avoid self-deadlock.

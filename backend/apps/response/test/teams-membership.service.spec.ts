@@ -123,7 +123,7 @@ function fixture(options: { members?: Record<string, Member>; activeTeamId?: str
   const sessions = {
     require: jest.fn(async () => ({
       userId: actorId,
-      grants: options.grants ?? [{ role_code: 'COORDINATOR', scope_type: 'SYSTEM',}],
+      grants: options.grants ?? [{ role_code: 'ADMIN', scope_type: 'SYSTEM',}],
     })),
     activeUserCheck: jest.fn(async () => ({ active: true as const })),
     teamLeaderEligibility: jest.fn(async () => ({ eligible: true as const })),

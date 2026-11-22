@@ -23,6 +23,19 @@ interface WarehouseContext {
   id: string;
 }
 
+/**
+ * REVIEWER approves only citizen aid distributions (REQUEST_AID). Campaign distributions need
+ * the preparer permission (OPERATIONS_MANAGER), so a reviewer-only account is refused here.
+ * User decision 2026-11-22.
+ */
+function assertCanApprovePurpose(
+  grants: Parameters<typeof hasWarehouseScope>[0],
+  distribution: Pick<DistributionContext, 'campaign_id' | 'purpose'>,
+): void {
+  if (distribution.purpose === 'REQUEST_AID') return;
+  requireWarehousePermission(grants, 'DISTRIBUTION_PREPARE', distribution);
+}
+
 function requireScope(
   grants: Parameters<typeof hasWarehouseScope>[0],
   permission: 'DISTRIBUTION_PREPARE' | 'DISTRIBUTION_REVIEW' | 'DISTRIBUTION_DISPATCH',
@@ -179,6 +192,7 @@ export class DistributionCommandsService {
     const key = idempotencyKey(request);
     const current = await loadDistribution(this.dataSource, id);
     requireScope(session.grants, 'DISTRIBUTION_REVIEW', current);
+    assertCanApprovePurpose(session.grants, current);
 
     return this.idempotency.execute(this.dataSource, {
       scopeKey: `user:${session.userId}`,
@@ -188,6 +202,7 @@ export class DistributionCommandsService {
       execute: async (manager) => {
         const locked = await loadDistribution(manager, id, true);
         requireScope(session.grants, 'DISTRIBUTION_REVIEW', locked);
+        assertCanApprovePurpose(session.grants, locked);
         assertExpectedVersion(locked.version, dto.expected_version);
         if (locked.status !== 'DRAFT') throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
         if (locked.preparer_user_id === session.userId) throw new AppError('SELF_APPROVAL_FORBIDDEN', { status: 403 });

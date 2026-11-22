@@ -495,11 +495,14 @@ describe('SupplyGapsService.dismiss', () => {
 });
 
 describe('SupplyGapQueriesService', () => {
-  it('lets a coordinator read a page and a detail, with keyset cursors and Vietnamese reason copy', async () => {
+  it('lets an operations manager read a page and a detail, and refuses a coordinator, with Vietnamese reason copy', async () => {
     const fx = fixtures();
     await fx.service.recompute();
-    const sessions = { require: jest.fn(async () => ({ userId: OPS_USER, grants: [{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }], identityHeaders: {} })) };
+    const sessions = { require: jest.fn(async () => ({ userId: OPS_USER, grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' }], identityHeaders: {} })) };
     const queries = new SupplyGapQueriesService(fx.dataSource as never, sessions as never);
+    const coordinatorSessions = { require: jest.fn(async () => ({ userId: OPS_USER, grants: [{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }], identityHeaders: {} })) };
+    const coordinatorQueries = new SupplyGapQueriesService(fx.dataSource as never, coordinatorSessions as never);
+    await expect(coordinatorQueries.list({ status: 'OPEN', limit: 10 }, fx.request)).rejects.toMatchObject({ code: 'FORBIDDEN' });
     const gapId = fx.db.rows[0]!.id;
     const page = await queries.list({ status: 'OPEN', limit: 10 }, fx.request);
     expect(page).toMatchObject({ more: false, items: [expect.objectContaining({ id: gapId, severity: 'RED', demand: '100', gap_qty: '80' })] });
@@ -511,7 +514,7 @@ describe('SupplyGapQueriesService', () => {
 
   it('rejects a cursor that does not match the filters with CURSOR_INVALID', async () => {
     const fx = fixtures();
-    const sessions = { require: jest.fn(async () => ({ userId: OPS_USER, grants: [{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }], identityHeaders: {} })) };
+    const sessions = { require: jest.fn(async () => ({ userId: OPS_USER, grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' }], identityHeaders: {} })) };
     const queries = new SupplyGapQueriesService(fx.dataSource as never, sessions as never);
     await expect(queries.list({ cursor: 'bm90LWEtY3Vyc29y' }, fx.request)).rejects.toMatchObject({ code: 'CURSOR_INVALID' });
   });

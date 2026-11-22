@@ -5,11 +5,13 @@
  * CAMPAIGN_WAREHOUSE_MANAGE sets a manual primary warehouse and re-evaluates assignments; only OPERATIONS_MANAGER holds it.
  * NEED_ESTIMATE_CONFIRM generates estimated SOS goods needs and confirms or edits them (OPERATIONS_MANAGER only).
  * NEED_NORM_MANAGE reads and changes the per-person norm table; only OPERATIONS_MANAGER holds it, at system scope.
- * SUPPLY_GAP_VIEW reads supply-gap warnings and suggestions (COORDINATOR and OPERATIONS_MANAGER, read-only).
+ * SUPPLY_GAP_VIEW reads supply-gap warnings and suggestions; only OPERATIONS_MANAGER holds it (user decision 2026-11-22).
  * SUPPLY_GAP_MANAGE accepts a suggested donation drive or dismisses a gap; only OPERATIONS_MANAGER holds it, at system scope.
  * PICKUP_TICKET_VIEW reads mission pickup tickets (COORDINATOR, OPERATIONS_MANAGER, and REVIEWER so the independent close-out reviewer can read the ticket).
- * PICKUP_TICKET_MANAGE creates, reserves, confirms and cancels pickup tickets (COORDINATOR and OPERATIONS_MANAGER). Each step
+ * PICKUP_TICKET_MANAGE creates, reserves, confirms and cancels pickup tickets; only OPERATIONS_MANAGER holds it (user decision 2026-11-22). Each step
  * also passes the underlying commitment and distribution permissions, so handover stays with DISTRIBUTION_DISPATCH.
+ * TEAM_MANAGE_ANY (team setup, roster and skills, readiness recording on behalf) is held by ADMIN only. COORDINATOR keeps TEAM_READ and sees team readiness (user decision 2026-11-22).
+ * ADJUSTMENT_REVIEW (approve or reject a stock adjustment) is held by OPERATIONS_MANAGER only (user decision 2026-11-22).
  * PICKUP_CLOSEOUT_SUBMIT drafts and submits a pickup close-out (COORDINATOR and OPERATIONS_MANAGER; the team lead acts through a coordinator in the demo).
  * PICKUP_CLOSEOUT_REVIEW approves or rejects a submitted close-out (OPERATIONS_MANAGER and REVIEWER). The reviewer must differ from the submitter and
  * from the user who handed the goods over. Approval that returns goods also needs DISTRIBUTION_DISPATCH or DONATION_INTAKE in the inner RETURN step.
@@ -20,10 +22,10 @@ export const ROLE_PERMISSIONS = {
   COORDINATOR: [
     'REQUEST_CREATE_PROXY', 'REQUEST_QUEUE_READ', 'REQUEST_DETAIL_READ', 'TEAM_READ', 'MISSION_OVERDUE_READ',
     'CAMPAIGN_READ', 'CAMPAIGN_SETUP_MANAGE', 'REQUEST_VERIFY', 'REQUEST_TRIAGE', 'REQUEST_CANCEL', 'REQUEST_REOPEN', 'REQUEST_RESOLVE',
-    'REQUEST_UNASSIGNED_QUEUE', 'MISSION_ASSIGN', 'MISSION_RECORD_ON_BEHALF', 'TEAM_MANAGE_ANY',
+    'REQUEST_UNASSIGNED_QUEUE', 'MISSION_ASSIGN', 'MISSION_RECORD_ON_BEHALF',
     'TEAM_POSITION_SET_ANY', 'MAP_READ', 'CAMPAIGN_MANAGE', 'REPORT_READ', 'RESPONSE_REPORT_READ', 'NEED_MANAGE',
-    'CAMPAIGN_WAREHOUSE_VIEW', 'SUPPLY_GAP_VIEW',
-    'PICKUP_TICKET_VIEW', 'PICKUP_TICKET_MANAGE', 'PICKUP_CLOSEOUT_SUBMIT',
+    'CAMPAIGN_WAREHOUSE_VIEW',
+    'PICKUP_TICKET_VIEW', 'PICKUP_CLOSEOUT_SUBMIT',
   ],
   OPERATIONS_MANAGER: [
     'REQUEST_CREATE_PROXY', 'MAP_READ', 'CAMPAIGN_READ', 'CAMPAIGN_MANAGE', 'CAMPAIGN_WAREHOUSE_VIEW', 'CAMPAIGN_WAREHOUSE_MANAGE', 'REPORT_READ', 'RESPONSE_REPORT_READ', 'CATALOG_MANAGE',
@@ -32,7 +34,7 @@ export const ROLE_PERMISSIONS = {
     'STOCK_ADJUST_REQUEST', 'HANDOFF_RECORD', 'SUPPLY_GAP_VIEW', 'SUPPLY_GAP_MANAGE',
     'PICKUP_TICKET_VIEW', 'PICKUP_TICKET_MANAGE', 'PICKUP_CLOSEOUT_SUBMIT', 'PICKUP_CLOSEOUT_REVIEW',
   ],
-  REVIEWER: ['DONATION_REVIEW', 'DISTRIBUTION_REVIEW', 'LOSS_APPROVE', 'ADJUSTMENT_REVIEW', 'PICKUP_CLOSEOUT_REVIEW', 'PICKUP_TICKET_VIEW'],
+  REVIEWER: ['DONATION_REVIEW', 'DISTRIBUTION_REVIEW', 'LOSS_APPROVE', 'PICKUP_CLOSEOUT_REVIEW', 'PICKUP_TICKET_VIEW'],
   ADMIN: ['USER_MANAGE', 'GRANT_MANAGE', 'AUDIT_READ', 'REQUEST_CREATE_PROXY', 'REPORT_READ', 'RESPONSE_REPORT_READ', 'TEAM_READ', 'TEAM_MANAGE_ANY'],
 } as const;
 
