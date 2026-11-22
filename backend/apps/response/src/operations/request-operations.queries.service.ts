@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import type { DataSource, EntityManager } from 'typeorm';
+import { requestSearchTerms } from '../requests/request-search';
 import { AppError } from '@c48/technical/errors/errors';
 import { decodeKeysetCursor, encodeKeysetCursor } from '@c48/technical/pagination/keyset';
 import { aiPriorityAdvisory, currentAiAdvisory } from '../ai/ai-priority-advisory';
@@ -64,6 +65,11 @@ export class RequestOperationsQueriesService {
     if (query.from) add((index) => `r.received_at >= $${index}::timestamptz`, query.from);
     if (query.to) add((index) => `r.received_at <= $${index}::timestamptz`, query.to);
     if (query.declared_danger) add((index) => `r.reporter_declared_danger=$${index}`, query.declared_danger === 'true');
+    if (query.q?.trim()) {
+      const search = requestSearchTerms(query.q);
+      values.push(search.trackingCodePattern, search.reporterPhone);
+      conditions.push(`(r.tracking_code ILIKE $${values.length - 1} ESCAPE '!' OR r.reporter_contact_phone=$${values.length})`);
+    }
     if (query.unassigned === 'true') conditions.push("r.campaign_id IS NULL AND r.campaign_match_state IN ('UNMATCHED','CONFLICT')");
     if (query.campaign_match_state) add((index) => `r.campaign_match_state=$${index}`, query.campaign_match_state);
     const bbox = parseBbox(query.bbox);

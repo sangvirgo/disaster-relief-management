@@ -45,4 +45,16 @@ describe('coordinator queue order', () => {
     const [sql] = dataSource.query.mock.calls[0] as unknown as [string, unknown[]];
     expect(sql).toContain('r.campaign_id IS NULL');
   });
+
+  it('finds SOS by tracking code or a normalized exact reporter phone while keeping phones masked', async () => {
+    const { service, dataSource } = makeService();
+
+    await service.queue({ q: '+84 (912) 345-678' } as never, {} as never);
+
+    const [sql, values] = dataSource.query.mock.calls[0] as unknown as [string, unknown[]];
+    expect(sql).toMatch(/r\.tracking_code ILIKE \$\d+.*OR r\.reporter_contact_phone=\$\d+/s);
+    expect(values).toContain('%+84 (912) 345-678%');
+    expect(values).toContain('+84912345678');
+    expect(sql).toContain("'******'||right(r.reporter_contact_phone,4)");
+  });
 });

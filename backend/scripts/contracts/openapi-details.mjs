@@ -173,8 +173,14 @@ const campaignHistoryItemSchema = object({
 const responseDetails = {
   listRequestQueue: {
     query: [
+      { name: 'q', in: 'query', description: 'Optional tracking-code substring or exact normalized reporter phone. The page cursor is bound to this query.', schema: { type: 'string', maxLength: 32 } },
       { name: 'campaign_id', in: 'query', schema: id },
       { name: 'campaign_match_state', in: 'query', schema: { type: 'string', enum: ['UNMATCHED', 'AUTO_ATTACHED', 'CONFLICT', 'MANUAL'] } },
+    ],
+  },
+  listMyRequests: {
+    query: [
+      { name: 'q', in: 'query', description: 'Optional tracking-code substring or exact normalized reporter phone. Results remain scoped to the active reporter account and the page cursor is bound to this query.', schema: { type: 'string', maxLength: 32 } },
     ],
   },
   createCampaign: {

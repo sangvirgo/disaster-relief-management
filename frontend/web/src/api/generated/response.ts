@@ -2813,6 +2813,8 @@ export interface operations {
                 overdue?: string;
                 cursor?: components["parameters"]["Cursor"];
                 limit?: components["parameters"]["PageLimit"];
+                /** @description Optional tracking-code substring or exact normalized reporter phone. The page cursor is bound to this query. */
+                q?: string;
                 campaign_id?: string;
                 campaign_match_state?: "UNMATCHED" | "AUTO_ATTACHED" | "CONFLICT" | "MANUAL";
                 unassigned?: string;
@@ -4091,7 +4093,7 @@ export interface operations {
             query?: {
                 cursor?: components["parameters"]["Cursor"];
                 limit?: components["parameters"]["PageLimit"];
-                /** @description Optional substring of the caller's tracking code. The page cursor is bound to this query. */
+                /** @description Optional tracking-code substring or exact normalized reporter phone. Results remain scoped to the active reporter account and the page cursor is bound to this query. */
                 q?: string;
             };
             header?: never;

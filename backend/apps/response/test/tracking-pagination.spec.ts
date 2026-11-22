@@ -15,7 +15,7 @@ function makeService(rows: unknown[]) {
   const access = {
     validTrackingSecret: jest.fn().mockReturnValue(true),
     forRequest: jest.fn().mockResolvedValue({ id: requestId }),
-    byTrackingCapability: jest.fn().mockRejectedValue({ code: 'NOT_FOUND', status: 404 }),
+    byTrackingCode: jest.fn().mockRejectedValue({ code: 'NOT_FOUND', status: 404 }),
   };
   return {
     service: new TrackingService(dataSource as never, {} as never, access as never, sessions as never, {} as never, {} as never),
@@ -33,8 +33,21 @@ describe('reporter keyset pagination', () => {
 
     const page = await service.mine({ limit: 1 }, {} as never);
     expect(page.items[0]?.received_at).toBe(publicTime);
-    expect(decodeKeysetCursor(page.cursor!, { reporter_user_id: 'reporter-1' }).sort).toEqual([exactTime]);
+    expect(decodeKeysetCursor(page.cursor!, { reporter_user_id: 'reporter-1', q: '', reporter_phone: null }).sort).toEqual([exactTime]);
     expect(dataSource.query.mock.calls[0]?.[0]).toContain('to_char(received_at AT TIME ZONE');
+  });
+
+  it('searches only the signed-in reporter’s SOS by tracking code or normalized exact phone', async () => {
+    const { service, dataSource } = makeService([]);
+
+    await service.mine({ q: '+84 (912) 345-678' }, {} as never);
+
+    const [sql, values] = dataSource.query.mock.calls[0] as unknown as [string, unknown[]];
+    expect(sql).toContain('reporter_user_id = $1');
+    expect(sql).toMatch(/tracking_code ILIKE \$\d+.*OR reporter_contact_phone=\$\d+/s);
+    expect(values[0]).toBe('reporter-1');
+    expect(values).toContain('%+84 (912) 345-678%');
+    expect(values).toContain('+84912345678');
   });
 
   it('preserves PostgreSQL microseconds in the reporter event cursor', async () => {
@@ -44,7 +57,7 @@ describe('reporter keyset pagination', () => {
     ]);
 
     const request = { ip: '203.0.113.40', socket: { remoteAddress: '203.0.113.40' } } as never;
-    const page = await service.events(requestId, '01HJKMNPQR', 'valid-secret', { limit: 1 }, request);
+    const page = await service.events(requestId, '01HJKMNPQR', { limit: 1 }, request);
     expect(page.items[0]?.occurred_at).toBe(publicTime);
     expect(decodeKeysetCursor(page.cursor!, { request_id: requestId, visibility: 'REPORTER' }).sort).toEqual([exactTime]);
     expect(dataSource.query.mock.calls[0]?.[0]).toContain('to_char(occurred_at AT TIME ZONE');
@@ -55,11 +68,11 @@ describe('reporter keyset pagination', () => {
     const request = { ip: '203.0.113.41', socket: { remoteAddress: '203.0.113.41' } } as never;
 
     for (let attempt = 0; attempt < 10; attempt++) {
-      await expect(service.track('01HJKMNPQR', 'secret', request)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+      await expect(service.track('01HJKMNPQR', request)).rejects.toMatchObject({ code: 'NOT_FOUND' });
     }
-    await expect(service.events(requestId, '01HJKMNPQR', 'secret', {}, request))
+    await expect(service.events(requestId, '01HJKMNPQR', {}, request))
       .rejects.toMatchObject({ code: 'RATE_LIMITED', status: 429 });
-    expect(access.byTrackingCapability).toHaveBeenCalledTimes(10);
+    expect(access.byTrackingCode).toHaveBeenCalledTimes(10);
     expect(access.forRequest).not.toHaveBeenCalled();
   });
 
@@ -73,14 +86,14 @@ describe('reporter keyset pagination', () => {
       for (let tenMinuteWindow = 0; tenMinuteWindow < 6; tenMinuteWindow++) {
         if (tenMinuteWindow > 0) now += 10 * 60_000;
         for (let attempt = 0; attempt < 10; attempt++) {
-          await expect(service.track('01HJKMNPQR', 'secret', request)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+          await expect(service.track('01HJKMNPQR', request)).rejects.toMatchObject({ code: 'NOT_FOUND' });
         }
       }
 
-      await expect(service.track('01HJKMNPQR', 'secret', request)).rejects.toMatchObject({ code: 'RATE_LIMITED', status: 429 });
+      await expect(service.track('01HJKMNPQR', request)).rejects.toMatchObject({ code: 'RATE_LIMITED', status: 429 });
       now = 1_000_000 + 60 * 60_000;
-      await expect(service.track('01HJKMNPQR', 'secret', request)).rejects.toMatchObject({ code: 'NOT_FOUND' });
-      expect(access.byTrackingCapability).toHaveBeenCalledTimes(61);
+      await expect(service.track('01HJKMNPQR', request)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+      expect(access.byTrackingCode).toHaveBeenCalledTimes(61);
     } finally {
       dateNow.mockRestore();
     }

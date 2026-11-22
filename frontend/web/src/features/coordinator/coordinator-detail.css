@@ -116,6 +116,11 @@
   background: var(--color-primary-bg);
 }
 .coordinator-sos-layout .queue-filter-toolbar { justify-content: flex-start; }
+.coordinator-sos-layout .queue-search-form { display: grid; gap: var(--space-2); margin: var(--space-3) 0; }
+.coordinator-sos-layout .queue-search-form > label { font-weight: 600; }
+.coordinator-sos-layout .queue-search-row { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.coordinator-sos-layout .queue-search-row input { flex: 1 1 260px; min-width: 0; padding: 10px 12px; border: 1px solid var(--color-surface-border); border-radius: var(--radius-sm); font: inherit; }
+.coordinator-sos-layout .queue-search-row .button { flex: 0 0 auto; }
 .sos-table-scroll { width: 100%; overflow-x: auto; border: 1px solid var(--color-surface-border); border-radius: var(--radius-md); }
 .sos-table { width: 100%; min-width: 920px; border-collapse: collapse; text-align: left; }
 .sos-table th, .sos-table td { padding: 13px 14px; border-bottom: 1px solid var(--color-surface-border); vertical-align: middle; }

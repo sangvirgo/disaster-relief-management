@@ -95,10 +95,10 @@ export function CitizenRequests({
       </div>
       <p>Chọn một yêu cầu để xem tiến độ. Những SOS đã gắn với tài khoản không cần nhập mã.</p>
       <form className="account-request-search" onSubmit={submitSearch} role="search">
-        <label htmlFor="account-request-search-input">Tìm SOS theo mã theo dõi</label>
+        <label htmlFor="account-request-search-input">Tìm SOS theo mã SOS hoặc số điện thoại</label>
         <div className="account-request-search-row">
-          <input id="account-request-search-input" type="search" value={search} maxLength={16}
-            onChange={(event) => setSearch(event.target.value)} placeholder="Nhập mã theo dõi SOS" autoComplete="off" />
+          <input id="account-request-search-input" type="search" value={search} maxLength={32}
+            onChange={(event) => setSearch(event.target.value)} placeholder="Nhập mã SOS hoặc số điện thoại" autoComplete="off" />
           <button type="submit" className="button secondary" disabled={loading}>Tìm kiếm</button>
           {searchTerm && <button type="button" className="button secondary" disabled={loading}
             onClick={() => { setSearch(''); setItems([]); setNext(''); setCursor(''); setSearchTerm(''); }}>Xóa lọc</button>}
@@ -108,7 +108,7 @@ export function CitizenRequests({
       {error && <p className="notice error" role="alert">{error}</p>}
       {!loading && !error && !items.length && (
         <div className="empty">
-          {searchTerm ? <><p>Không tìm thấy SOS phù hợp với mã đã nhập.</p><button className="button secondary" type="button" onClick={() => { setSearch(''); setSearchTerm(''); }}>Xóa từ khóa tìm kiếm</button></>
+          {searchTerm ? <><p>Không tìm thấy SOS phù hợp với mã hoặc số điện thoại đã nhập.</p><button className="button secondary" type="button" onClick={() => { setSearch(''); setSearchTerm(''); }}>Xóa từ khóa tìm kiếm</button></>
             : <><p>Bạn chưa có yêu cầu SOS nào gắn với tài khoản.</p>{onNewSos && <button className="button" type="button" onClick={onNewSos}>Gửi yêu cầu SOS</button>}</>}
         </div>
       )}

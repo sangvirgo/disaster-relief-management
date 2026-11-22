@@ -24,6 +24,9 @@ export class TeamCandidatesQueryDto {
 }
 
 export class RequestQueueQueryDto extends RequestOperationPageDto {
+  @IsOptional() @IsString() @MaxLength(32)
+  declare q?: string;
+
   @IsOptional() @IsUUID('all')
   declare campaign_id?: string;
 

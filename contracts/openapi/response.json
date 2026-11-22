@@ -107,6 +107,16 @@
                           "$ref": "#/components/parameters/PageLimit"
                         },
                         {
+                          "name": "q",
+                          "in": "query",
+                          "description": "Optional tracking-code substring or exact normalized reporter phone. The page cursor is bound to this query.",
+                          "schema": {
+                            "type": "string",
+                            "maxLength": 32
+                          },
+                          "required": false
+                        },
+                        {
                           "name": "campaign_id",
                           "in": "query",
                           "schema": {
@@ -3224,14 +3234,14 @@
             "$ref": "#/components/parameters/PageLimit"
           },
           {
-            "in": "query",
             "name": "q",
-            "required": false,
-            "description": "Optional substring of the caller's tracking code. The page cursor is bound to this query.",
+            "in": "query",
+            "description": "Optional tracking-code substring or exact normalized reporter phone. Results remain scoped to the active reporter account and the page cursor is bound to this query.",
             "schema": {
               "type": "string",
-              "maxLength": 16
-            }
+              "maxLength": 32
+            },
+            "required": false
           }
         ],
         "responses": {
