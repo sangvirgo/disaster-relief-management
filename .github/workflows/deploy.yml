@@ -45,7 +45,11 @@ jobs:
           --testPathIgnorePatterns 'apps/logistics/test/donations-queries.service.spec.ts'
           --testPathIgnorePatterns 'apps/response/test/tracking-pagination.spec.ts'
       - name: Script and deployment tests (node:test)
-        run: node --test --test-skip-pattern 'documented endpoint errors use catalog status' scripts/__tests__/*.test.mjs
+        # The recovery-workflow tests run the real backup/restore scripts, which refuse to start without backend/.env.
+        # Local development copies the example; do the same here (no secrets involved).
+        run: |
+          cp .env.example .env
+          node --test --test-skip-pattern 'documented endpoint errors use catalog status' scripts/__tests__/*.test.mjs
 
   images:
     needs: test
