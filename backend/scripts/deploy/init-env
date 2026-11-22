@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Creates backend/.env for the AWS host from .env.production.example, with generated secrets and no AWS keys.
+set -euo pipefail
+umask 077
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+backend_dir="$(cd -- "$script_dir/../.." && pwd -P)"
+template="$backend_dir/.env.production.example"
+target="$backend_dir/.env"
+
+usage() {
+  cat <<'USAGE'
+Usage: backend/scripts/deploy/init-env DOMAIN BUCKET_SUFFIX [AWS_REGION]
+
+  DOMAIN         public hostname served through Cloudflare, for example reliva.example.com
+  BUCKET_SUFFIX  suffix of the S3 buckets, for example xtri123 (c48-response-evidence-xtri123, ...)
+  AWS_REGION     bucket region (default ap-southeast-2)
+
+Refuses to overwrite an existing backend/.env. Secrets are generated on the host and printed nowhere.
+Afterwards fill the Gmail SMTP values (IDENTITY_EMAIL_*) and the optional Google/Gemini keys by hand.
+USAGE
+}
+
+fail() { printf 'init-env refused: %s\n' "$1" >&2; exit 2; }
+
+[[ "${1:-}" == '--help' ]] && { usage; exit 0; }
+[[ $# -ge 2 && $# -le 3 ]] || { usage >&2; exit 2; }
+domain="$1"; suffix="$2"; region="${3:-ap-southeast-2}"
+[[ "$domain" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ && "$domain" == *.* ]] || fail 'DOMAIN must be a lowercase hostname'
+[[ "$suffix" =~ ^[a-z0-9]{3,24}$ ]] || fail 'BUCKET_SUFFIX must be 3-24 lowercase letters or digits'
+[[ "$region" =~ ^[a-z]{2}(-[a-z]+)+-[0-9]$ ]] || fail 'AWS_REGION looks invalid'
+[[ ! -e "$target" ]] || fail 'backend/.env already exists; edit it by hand or move it away first'
+[[ -f "$template" ]] || fail '.env.production.example is missing'
+command -v docker >/dev/null || fail 'docker is required (key generation runs in a throwaway Node container)'
+
+cp -- "$template" "$target"
+chmod 600 -- "$target"
+finished=0
+# A half-written .env must never stay behind: remove it unless every step succeeded.
+trap 'if [[ "$finished" -ne 1 ]]; then rm -f -- "$target"; fi' EXIT
+
+sed -i -e "s|__DOMAIN__|$domain|g" -e "s|__SUFFIX__|$suffix|g" -e "s|__REGION__|$region|g" "$target"
+
+# RS256 key pair and the shared secrets (same generator as local development, run without installing Node on the host).
+docker run --rm --user "$(id -u):$(id -g)" -v "$backend_dir:/work" -w /work node:24.15.0-bookworm-slim \
+  node scripts/dev/gen-keys.mjs >/dev/null
+
+# Values the generator does not cover.
+otp_pepper="$(openssl rand -hex 32)"
+sed -i -e "s|^EMAIL_OTP_PEPPER=.*|EMAIL_OTP_PEPPER=$otp_pepper|" "$target"
+# The instance IAM role replaces static S3 keys, so the generated MinIO-style S3 secrets are blanked again.
+sed -i -e 's|^S3_RESPONSE_SECRET_KEY=.*|S3_RESPONSE_SECRET_KEY=|' -e 's|^S3_LOGISTICS_SECRET_KEY=.*|S3_LOGISTICS_SECRET_KEY=|' "$target"
+
+if grep -n -E '__(DOMAIN|SUFFIX|REGION)__|=replace-with-|=base64-encoded-' "$target" >/dev/null; then
+  grep -n -o -E '^[A-Z0-9_]+=(replace-with-|base64-encoded-)' "$target" >&2 || true
+  fail 'some placeholders were not replaced (listed above by line)'
+fi
+finished=1
+printf 'Created %s (mode 600).\nNext: set IDENTITY_EMAIL_SMTP_* / IDENTITY_EMAIL_FROM, then run backend/scripts/deploy/release deploy <image-tag>.\n' "$target"
