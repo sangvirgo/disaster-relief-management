@@ -17,7 +17,7 @@ function sandbox() {
   cpSync(join(backend, 'scripts/deploy/release'), join(root, 'backend/scripts/deploy/release'));
   cpSync(join(backend, 'scripts/dev/lib.sh'), join(root, 'backend/scripts/dev/lib.sh'));
   writeFileSync(join(root, 'backend/scripts/db/migrate'), '#!/usr/bin/env bash\nexit "${FAKE_MIGRATE_STATUS:-0}"\n');
-  chmodSync(join(root, 'backend/scripts/db/migrate'), 0o755);
+  // Not executable on purpose: the real db/migrate is not marked executable in Git, so release must run it with bash.
   writeFileSync(join(root, 'backend/.env'), [
     'C48_IMAGE_SOURCE=registry', 'C48_IMAGE_NAMESPACE=ghcr.io/example', 'C48_IMAGE_TAG=latest', 'PUBLIC_PORT=8080', '',
   ].join('\n'));
