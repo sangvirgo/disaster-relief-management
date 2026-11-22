@@ -159,21 +159,3 @@ jobs:
             sleep 10
           done
           echo "::error::https://${{ vars.APP_HOSTNAME }}/health/live did not answer (tunnel, DNS or nginx)"; exit 1
-
-  cleanup:
-    # GHCR has no lifecycle rule: keep the newest versions of each package (current and previous releases among them).
-    needs: deploy
-    if: always() && needs.deploy.result == 'success'
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    permissions:
-      packages: write
-    strategy:
-      matrix:
-        package: [identity-api, response-api, logistics-api, web]
-    steps:
-      - uses: actions/delete-package-versions@v5
-        with:
-          package-name: ${{ matrix.package }}
-          package-type: container
-          min-versions-to-keep: 10
