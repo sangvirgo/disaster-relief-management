@@ -48,7 +48,9 @@ Run the existing Compose stack on one AWS EC2 instance, publish it through a Clo
 - The Cloudflare `grafana` hostname still has an old proxied A record to a stale address; Grafana is not deployed. Other tunnels and the wildcard record in that zone belong to other projects and must not be touched.
 - Workflow action versions (`checkout@v4`, `setup-node@v4`, `docker/*@v3/v6`, `aws-actions/configure-aws-credentials@v4`) were written from memory; the runner already warns that Node 20 actions are deprecated.
 - `GOOGLE_CLIENT_IDS` is empty on the host, so server-side Google sign-in is not usable yet.
-- Demo data is not seeded. The seed refuses `NODE_ENV=production`; run it with `NODE_ENV=demo` for that one command (see the runbook) and a `SEED_PASSWORD` typed at the prompt.
+- Demo data is not seeded. The seed refuses `NODE_ENV=production`; run it with `NODE_ENV=development` for that one command (see the runbook) and a password typed at a hidden prompt. `NODE_ENV=demo` is **invalid** (the services accept only development, test or production); an earlier version of the runbook said otherwise and was corrected.
+- `require_nonproduction_env` in `backend/scripts/dev/lib.sh` fails open: if `backend/.env` cannot be read (for example by a non-root user, since the file is root-owned mode 600), `awk` exits with status 2, which the `if` treats as "not production", so the guard is skipped. In the one observed case the later `docker compose` call also failed on the unreadable file and nothing was reset, but the guard should treat an unreadable file as an error. Not fixed yet.
+- The Session Manager shell runs as `ssm-user` with `sh`, so commands that touch `/opt/c48` need `sudo`; `sudo -i` gives a root bash login shell for the session.
 - An access key was once pasted into a chat during setup; it was deleted and replaced. Never paste keys, tokens or `.env` contents into chats, tickets or screenshots.
 
 ## 6. Not done
