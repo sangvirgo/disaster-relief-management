@@ -100,7 +100,8 @@ predeploy_dump() { # one extra dump before migrations; only the latest is kept, 
   log "pre-deploy dump verified in $STATE_DIR/pre-deploy"
 }
 
-migrate() { "$ROOT/backend/scripts/db/migrate"; }
+# The repository runs its db scripts through bash (they are not marked executable in Git).
+migrate() { bash "$ROOT/backend/scripts/db/migrate"; }
 
 start_stack() {
   main_compose up --no-build -d --wait --wait-timeout "$HEALTH_TIMEOUT_S" "${RUN_SERVICES[@]}"
