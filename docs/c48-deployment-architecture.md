@@ -6,6 +6,7 @@
 | Status | **Proposal**, revised 2026-11-22 after the user's decisions and a peer design review. Nothing here is implemented or benchmarked. |
 | Scope | Where and how the existing Compose stack runs in production-like conditions: domain and edge, storage, reliability, backup, monitoring and logging, capacity, scaling path, cost, rollout. |
 | Out of scope | Application features, schema and API contracts (see `backend/README.md`, `docs/backend/` and the technology plan). |
+| Implementation | [Deployment runbook](c48-deployment-runbook.md): production `.env` template, `release` script, GitHub Actions pipeline, S3 configuration (status 2026-11-22: implemented and unit-tested, not yet run on the real host). |
 | Related | [Technology and delivery plan](c48-technology-and-delivery-plan.md) §6.3, §14, §15; `backend/infra/compose.yaml`; `backend/scripts/db/`; `docs/diagrams/deployment/c48-deployment-architecture.pdf` (diagrams for this document). |
 
 Labels follow the plan's convention: **Decision** (confirmed by the user), **Proposal** (recommended, not yet confirmed), **Needs confirmation** (open question or unverified fact). Prices and provider limits below were not re-verified unless a source is cited; confirm them before relying on them.
@@ -326,6 +327,7 @@ Roughly USD 45–55 per month, so the credit lasts about two months of continuou
 5. **Secrets:** application secrets stay in the host `.env` (or SSM Parameter Store), never in the repository or the image.
 6. **Later (k3s):** the same images are pulled by the cluster; only the deploy step changes.
 7. **Needs confirmation:** the repository is hosted on GitHub with Actions enabled, the host can reach `ghcr.io`, and the package visibility (private or public) is chosen.
+8. **Implemented 2026-11-22** in `.github/workflows/deploy.yml` and `backend/scripts/deploy/release` (see the runbook). The repository is public, so the recommended choice is public packages and no pull token on the host. The pipeline gates on lint, the Compose/nginx/deploy tests and the jest suites, excluding three tests that already fail on a clean `main`.
 
 ## 14. Decisions delegated to the team (common enterprise practice)
 
