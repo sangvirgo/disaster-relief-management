@@ -1,7 +1,8 @@
 # CI/CD for Reliva (design: docs/c48-deployment-architecture.md 13.1).
 #   pull request -> test + build images (nothing is pushed)
 #   push to main -> test, build and push images to ghcr.io tagged with the commit SHA, then deploy to the single
-#                   EC2 host through AWS SSM Run Command (OIDC, no stored AWS keys). Roll-back is automatic on the host.
+#                   EC2 host through AWS SSM Run Command using a narrowly scoped IAM user whose access key lives in the
+#                   `production` environment secrets (readable only by jobs on main). Roll-back is automatic on the host.
 name: ci-cd
 
 on:
@@ -104,9 +105,9 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
 
   deploy:
-    # Runs only after the AWS side is wired (repository variable AWS_DEPLOY_ROLE_ARN), so CI and images work first.
+    # Runs only after the AWS side is wired (repository variable DEPLOY_ENABLED=true), so CI and images work first.
     needs: images
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.AWS_DEPLOY_ROLE_ARN != ''
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: production
@@ -114,7 +115,6 @@ jobs:
       group: deploy-production
       cancel-in-progress: false
     permissions:
-      id-token: write
       contents: read
     env:
       TAG: ${{ github.sha }}
@@ -123,7 +123,10 @@ jobs:
     steps:
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          # Environment secrets of `production` (only jobs on main may read them). The IAM user may only send a shell
+          # command to the one EC2 instance; rotate the key regularly (see docs/c48-deployment-runbook.md section 4).
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ vars.AWS_REGION }}
 
       - name: Deploy through SSM Run Command

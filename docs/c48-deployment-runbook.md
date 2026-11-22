@@ -59,29 +59,13 @@ The seed hashes `SEED_PASSWORD` into demo accounts. Use it only for the demo, th
 
 Manual commands: `release rollback` (one step back), `release status`. Only the current and previous tags are kept on disk; older local images are removed after a healthy release.
 
-## 4. GitHub and AWS wiring (no AWS keys in GitHub)
+## 4. GitHub and AWS wiring
 
-1. **IAM OIDC provider** (once): provider URL `https://token.actions.githubusercontent.com`, audience `sts.amazonaws.com`.
-2. **IAM role** `c48-github-deploy` with this trust policy (bound to the `production` environment of this repository):
+**Decision (2026-11-22, user):** the pipeline logs in to AWS with an **IAM access key stored as a GitHub secret**, because the account's IAM "Identity providers" page is locked behind *Activate advanced features*, which the account owner has not enabled (effects on billing not verified). The design's preferred OIDC option stays the upgrade path.
 
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Principal": { "Federated": "arn:aws:iam::<account-id>:oidc-provider/token.actions.githubusercontent.com" },
-    "Action": "sts:AssumeRoleWithWebIdentity",
-    "Condition": {
-      "StringEquals": {
-        "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
-        "token.actions.githubusercontent.com:sub": "repo:sangvirgo/disaster-relief-management:environment:production"
-      }
-    }
-  }]
-}
-```
+Trade-off, stated plainly: the key is a long-lived credential. Anyone who can run a workflow on `main` (or who steals the key) can run a shell command as root on the host through SSM. Mitigations used here: a dedicated IAM user that can do nothing else, secrets scoped to the `production` environment (restricted to the `main` branch, invisible to pull requests and forks), no key in the repository, logs or chat, and regular rotation.
 
-   and this permission policy (it can only send a shell command to this one instance):
+1. **IAM user** `c48-github-deploy` (no console access) with this inline policy `c48-deploy-ssm`; it can only send a shell command to this one instance and read the result:
 
 ```json
 {
@@ -97,9 +81,18 @@ Manual commands: `release rollback` (one step back), `release status`. Only the 
 }
 ```
 
-3. **GitHub, Settings, Environments:** create `production` (add required reviewers if a manual approval before each deploy is wanted).
-4. **GitHub, Settings, Secrets and variables, Actions, Variables:** `AWS_DEPLOY_ROLE_ARN`, `AWS_REGION` (`ap-southeast-2`), `EC2_INSTANCE_ID`, `APP_HOSTNAME` (`<domain>`, enables the external check), `VITE_GOOGLE_CLIENT_ID`, `VITE_GOOGLE_MAPS_API_KEY` (public browser values). The `deploy` job stays skipped until `AWS_DEPLOY_ROLE_ARN` exists, so CI and image publishing work first.
+2. **Access key** for that user (use case: command line interface). Put it into GitHub from your own terminal so it never appears in a chat or screenshot; `gh` prompts for the value without echoing it:
+
+```bash
+gh secret set AWS_ACCESS_KEY_ID     --env production --repo sangvirgo/disaster-relief-management
+gh secret set AWS_SECRET_ACCESS_KEY --env production --repo sangvirgo/disaster-relief-management
+```
+
+3. **GitHub environment** `production`: restricted to the `main` branch, no manual approval (every merge deploys). **Repository variables:** `AWS_REGION` (`ap-southeast-2`), `EC2_INSTANCE_ID`, `APP_HOSTNAME` (`<domain>`, enables the external check), `VITE_GOOGLE_CLIENT_ID`, optional `VITE_GOOGLE_MAPS_API_KEY`, and finally `DEPLOY_ENABLED=true` (the `deploy` job stays skipped until it exists, so CI and image publishing work first).
+4. **Rotation:** create a second key, update the two secrets, delete the old key; do this at least every 90 days and immediately if a key may have leaked.
 5. Workflow summary: pull request: test and build only. Push to `main`: test, build and push images tagged with the commit SHA, deploy through SSM, wait for the result, check `https://<domain>/health/live`, keep the newest 10 package versions.
+
+**Upgrade path (no stored key):** after *Activate advanced features*, create the IAM OIDC provider (`https://token.actions.githubusercontent.com`, audience `sts.amazonaws.com`) and a role trusted for `repo:sangvirgo/disaster-relief-management:environment:production`, give it the same inline policy, then switch the workflow back to `role-to-assume` with `permissions: id-token: write` and delete the two secrets and the IAM user.
 
 ## 5. Cloudflare Tunnel
 
