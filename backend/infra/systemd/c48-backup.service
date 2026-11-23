@@ -1,0 +1,12 @@
+[Unit]
+Description=Reliva (C48) daily database backup to S3
+Wants=docker.service network-online.target
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
+ExecStart=/usr/bin/bash @ROOT@/backend/scripts/deploy/backup-s3
+TimeoutStartSec=3600
+Nice=10
+IOSchedulingClass=idle
