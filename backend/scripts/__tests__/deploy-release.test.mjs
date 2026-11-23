@@ -183,6 +183,7 @@ test('the observability profile is started only when C48_OBSERVABILITY=on, and i
     const log = readFileSync(on.calls, 'utf8');
     assert.match(log, /--profile observability pull --quiet prometheus alertmanager node-exporter postgres-exporter grafana/u);
     assert.match(log, /--profile observability up --no-build -d prometheus alertmanager node-exporter postgres-exporter grafana/u);
+    assert.match(log, /--profile observability up --no-build -d --force-recreate --no-deps prometheus alertmanager grafana/u, 'config-mounting services are recreated so new rules and dashboards apply');
     assert.match(result.stdout, /observability profile is up/u);
   } finally { on.cleanup(); }
 });

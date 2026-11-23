@@ -153,7 +153,9 @@ observability_up() { # opt-in with C48_OBSERVABILITY=on in backend/.env; never f
   [[ "$(env_value C48_OBSERVABILITY)" == on ]] || return 0
   local -a services=(prometheus alertmanager node-exporter postgres-exporter grafana)
   mkdir -p "$STATE_DIR/metrics" && chmod 755 "$STATE_DIR/metrics" # node_exporter runs as nobody; bind-mounted read-only into node_exporter; backup-s3 and container-metrics write here
-  if main_compose --profile observability pull --quiet "${services[@]}" && main_compose --profile observability up --no-build -d "${services[@]}"; then
+  if main_compose --profile observability pull --quiet "${services[@]}" && main_compose --profile observability up --no-build -d "${services[@]}" \
+     && main_compose --profile observability up --no-build -d --force-recreate --no-deps prometheus alertmanager grafana; then
+    # Recreated on purpose: these mount single config files, and a file replaced by git checkout keeps the old inode inside a running container.
     log 'observability profile is up'
   else
     log 'WARNING: the observability profile did not start; the release itself is healthy'
