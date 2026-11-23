@@ -1,7 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { RequestMethod, ValidationPipe } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
-import { ApiExceptionFilter, correlationMiddleware, createPinoLogger, loadErrorCatalog, PinoNestLogger, validateEnvironment, validationExceptionFactory } from '@c48/technical';
+import { ApiExceptionFilter, correlationMiddleware, createPinoLogger, installMetrics, loadErrorCatalog, PinoNestLogger, validateEnvironment, validationExceptionFactory } from '@c48/technical';
 import { setupOpenApiDocs } from '@c48/technical/openapi-docs';
 import { AppModule } from './app.module';
 import { loadIdentityAuthConfig } from './auth/auth-security';
@@ -12,6 +12,7 @@ async function bootstrap(): Promise<void> {
   const logger = new PinoNestLogger(createPinoLogger('identity', config.logLevel));
   const app = await NestFactory.create(AppModule, { logger });
   app.use(correlationMiddleware());
+  installMetrics(app, 'identity');
   app.use('/api/v1/identity', (_request: Request, response: Response, next: NextFunction) => {
     response.setHeader('Cache-Control', 'no-store');
     next();
