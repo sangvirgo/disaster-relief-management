@@ -1,14 +1,22 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import nodemailer from 'nodemailer';
 
 @Injectable()
 export class EmailSenderService {
+  private readonly logger = new Logger(EmailSenderService.name);
+
   async sendVerificationCode(email: string, code: string): Promise<boolean> {
     const host = process.env.IDENTITY_EMAIL_SMTP_HOST;
     const from = process.env.IDENTITY_EMAIL_FROM;
-    if (!host || !from) return false;
+    if (!host || !from) {
+      this.logger.warn('EMAIL_SEND_FAILED reason=NOT_CONFIGURED');
+      return false;
+    }
     const port = Number(process.env.IDENTITY_EMAIL_SMTP_PORT ?? 587);
-    if (!Number.isInteger(port) || port < 1 || port > 65535) return false;
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      this.logger.warn('EMAIL_SEND_FAILED reason=INVALID_PORT');
+      return false;
+    }
     let transport: ReturnType<typeof nodemailer.createTransport> | undefined;
     try {
       transport = nodemailer.createTransport({
@@ -80,10 +88,23 @@ export class EmailSenderService {
 </html>`,
       });
       return true;
-    } catch {
+    } catch (error) {
+      this.logger.warn(`EMAIL_SEND_FAILED ${EmailSenderService.failureReason(error)}`);
       return false;
     } finally {
       transport?.close();
     }
+  }
+
+  /**
+   * Stable, secret-free description of a transport failure: only the nodemailer/Node error code and the SMTP
+   * response code, each checked against a strict pattern. Never the message, address, host or credentials.
+   */
+  private static failureReason(error: unknown): string {
+    const source = (typeof error === 'object' && error !== null ? error : {}) as { code?: unknown; responseCode?: unknown };
+    const code = typeof source.code === 'string' && /^[A-Z0-9_]{1,40}$/.test(source.code) ? source.code : 'UNKNOWN';
+    const response = typeof source.responseCode === 'number' && Number.isInteger(source.responseCode)
+      && source.responseCode >= 100 && source.responseCode <= 599 ? ` smtp_response=${source.responseCode}` : '';
+    return `code=${code}${response}`;
   }
 }
