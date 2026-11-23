@@ -322,14 +322,12 @@
 .team-member-search label { font-weight: 650; }
 .team-member-search-row { display: flex; gap: 10px; }
 .team-member-search-row input { min-width: 0; flex: 1; }
-.team-member-search-row .button { flex: 0 0 auto; }
 .team-member-candidates { margin-top: 12px; }
 @media (max-width: 620px) {
   .team-members { padding: 16px; }
   .team-member-row { flex-wrap: wrap; }
   .team-member-row .button { width: 100%; }
   .team-member-search-row { flex-direction: column; }
-  .team-member-search-row .button { width: 100%; }
 }
 
 .queue-row:hover {

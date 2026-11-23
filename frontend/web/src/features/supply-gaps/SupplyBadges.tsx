@@ -73,7 +73,7 @@ export function NeedReasonChips({ codes, all = false }: { codes: unknown; all?: 
 }
 
 /**
- * Read-only warning for coordinators (and managers). Shows the open supply-gap count by severity and the
+ * Read-only warning for operations managers. Shows the open supply-gap count by severity and the
  * API's own reason text. It never offers accept or dismiss; the backend enforces that too.
  */
 export function SupplyGapWarningBadge({ user }: { user: Me }) {

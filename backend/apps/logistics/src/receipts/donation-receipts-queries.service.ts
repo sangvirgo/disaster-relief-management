@@ -61,7 +61,36 @@ export class DonationReceiptsQueriesService {
     const session = await this.sessions.require(request);
     const receipt = await readReceiptView(this.dataSource, id);
     assertReceiptRead(session.grants, { campaign_id: receipt.campaign_id });
-    return { ...receipt.value, generated_at: new Date().toISOString() };
+    const value = receipt.value;
+    const count = value.count as { revision: number; declaration_revision: number; note: string | null; lines: Array<Record<string, unknown>> } | null;
+    if (!count) return { ...value, generated_at: new Date().toISOString() };
+    const owners = await this.dataSource.query(
+      `SELECT counted_by_user_id,
+              EXISTS(SELECT 1 FROM receipt_count WHERE receipt_id=$1 AND counted_by_user_id=$3) AS is_count_author
+         FROM receipt_count WHERE receipt_id=$1 AND revision=$2`,
+      [id, count.revision, session.userId],
+    ) as Array<{ counted_by_user_id: string; is_count_author: boolean }>;
+    const isOwnCount = owners[0]?.counted_by_user_id === session.userId;
+    const isCountAuthor = Boolean(owners[0]?.is_count_author);
+    const delivery = value.delivery as { status: string };
+    const blind = delivery.status === 'PENDING_REVIEW' && !value.review && !isOwnCount;
+    return {
+      ...value,
+      count: blind ? {
+        revision: count.revision,
+        declaration_revision: count.declaration_revision,
+        is_own_count: false,
+        is_count_author: isCountAuthor,
+        lines: count.lines.filter((line) => line.has_count_line).map((line) => ({
+          item_id: line.item_id,
+          item_name: line.item_name,
+          unit_name: line.unit_name,
+          unit_scale: line.unit_scale,
+          has_count_line: true,
+        })),
+      } : { ...count, is_own_count: isOwnCount, is_count_author: isCountAuthor },
+      generated_at: new Date().toISOString(),
+    };
   }
 
   async disputes(query: DonationDisputePageQueryDto, request: Request): Promise<Record<string, unknown>> {

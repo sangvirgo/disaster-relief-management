@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { api } from '../../api/client';
 import { LIST_PAGE_SIZE, useCursorNav } from '../../api/useCursorNav';
 import { ListNav } from '../../components/ui/Pager';
@@ -9,9 +9,10 @@ type DriveItem = { item_id: string; item_name: string; unit_name: string; target
 
 const amount = (value?: string) => Number(value || 0).toLocaleString('vi-VN', { maximumFractionDigits: 3 });
 
-export function MapHoverDetails({ warehouse, drive, onClose }: {
+export function MapHoverDetails({ warehouse, drive, actions, onClose }: {
   warehouse: { id: string; name: string; service_radius_m?: number | null };
   drive?: { title: string; status: string; items: DriveItem[] };
+  actions?: ReactNode;
   onClose: () => void;
 }) {
   const [cursor, setCursor, prevPage, pageIndex] = useCursorNav<string>('');
@@ -40,6 +41,7 @@ export function MapHoverDetails({ warehouse, drive, onClose }: {
       <button type="button" className="button secondary small" onClick={onClose} aria-label="Đóng thông tin trên bản đồ">×</button>
     </div>
     <p>{drive ? `Điểm quyên góp · ${warehouse.name}` : `Kho · Bán kính ${warehouse.service_radius_m ? `${(warehouse.service_radius_m / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} km` : 'chưa khai báo'}`}</p>
+    {actions && <div className="warehouse-map-hover__actions">{actions}</div>}
     {error && <p className="notice error" role="alert">{error}</p>}
     {loading && <p role="status">Đang tải tồn kho…</p>}
     {!loading && !error && <div className="warehouse-map-hover__table-wrap" role="region" aria-label={drive ? 'Bảng vật phẩm tiếp nhận' : 'Bảng tồn kho'} tabIndex={0}>

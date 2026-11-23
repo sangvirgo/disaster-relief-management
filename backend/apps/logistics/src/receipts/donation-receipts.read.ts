@@ -96,6 +96,8 @@ export async function readReceiptLines(
   const rows = await query.query(lineSql, [deliveryId, receiptId, countRevision ?? null]) as Array<ReceiptLineFacts & Record<string, unknown>>;
   return rows.map(({ unit_scale: _scale, has_count_line: _hasCount, ...line }) => ({
     ...line,
+    unit_scale: Number(_scale),
+    has_count_line: Boolean(_hasCount),
     ...(line.expiry_date ? { expiry_date: new Date(line.expiry_date as Date | string).toISOString().slice(0, 10) } : {}),
     flags: receiptLineFlags({ ...line, unit_scale: Number(_scale), has_count_line: Boolean(_hasCount) } as ReceiptLineFacts),
   }));

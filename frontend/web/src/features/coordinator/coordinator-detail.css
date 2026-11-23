@@ -32,6 +32,13 @@
 .sos-profile__badges { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .sos-profile__unprioritized { color: var(--color-text-muted); font: 500 var(--text-caption) var(--font-family); }
 .sos-profile__description { margin: 0 0 var(--space-3); line-height: 1.45; overflow-wrap: anywhere; }
+.request-evidence-panel { margin: 0 0 var(--space-4); }
+.request-evidence-panel h3 { margin: 0 0 var(--space-2); }
+.request-evidence-panel__gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: var(--space-3); }
+.request-evidence-panel__item { display: grid; align-content: start; gap: var(--space-2); min-width: 0; padding: var(--space-2); border: 1px solid var(--color-primary-border); border-radius: var(--radius-md); background: #fff; }
+.request-evidence-panel__item img, .request-evidence-panel__item video { display: block; width: 100%; max-height: 260px; object-fit: contain; border-radius: var(--radius-sm); background: #e8eef7; }
+.request-evidence-panel__item small { color: var(--color-text-secondary); }
+.request-evidence-panel__error .notice { margin: 0 0 var(--space-2); }
 .sos-profile__facts { display: grid; gap: 0; margin: 0; border-top: 1px solid var(--color-primary-border); }
 .sos-profile__facts > div { display: grid; grid-template-columns: minmax(100px, 27%) minmax(0, 1fr); gap: var(--space-2); padding: 8px 0; border-bottom: 1px solid var(--color-primary-border); }
 .sos-profile__facts dt { color: var(--color-text-secondary); font: 600 var(--text-caption) var(--font-family); }

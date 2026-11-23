@@ -584,6 +584,13 @@ export function LocationPicker({
         });
       }
       if (controller.signal.aborted) return;
+      const normalized = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').toLocaleLowerCase('vi').replace(/\s+/g, ' ').trim();
+      const distinct = places.filter((place, index, all) => {
+        const label = normalized([place.name, place.address].filter(Boolean).join(', '));
+        return all.findIndex(candidate => normalized([candidate.name, candidate.address].filter(Boolean).join(', ')) === label) === index;
+      });
+      distinct.sort((a, b) => Number(normalized([b.name, b.address].filter(Boolean).join(', ')) === normalized(query)) - Number(normalized([a.name, a.address].filter(Boolean).join(', ')) === normalized(query)));
+      places = distinct;
       searchCacheRef.current.set(cacheKey, places);
       if (places.length > 0) {
         setSuggestions(places);
@@ -789,7 +796,7 @@ export function LocationPicker({
                       className="location-suggestion"
                     >
                       <strong>{item.name}</strong>
-                      {item.address ? ` · ${item.address}` : ''}
+                      <span className="location-suggestion__address">{item.address || 'Chưa có địa chỉ chi tiết'}</span>
                     </button>
                   ))}
                 </div>

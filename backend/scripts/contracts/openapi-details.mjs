@@ -933,12 +933,18 @@ const receiptLineSchema = object({
   item_id: id, item_name: text, unit_code: text, unit_name: text, declared_quantity: nullableValue(quantity),
   counted_quantity: quantity, accepted_quantity: quantity, held_quantity: quantity, rejected_quantity: quantity,
   condition_note: nullableValue(text), expiry_date: { type: 'string', format: 'date' }, flags: array(text),
+  unit_scale: integer(), has_count_line: boolean(),
+});
+const receiptCountSchema = object({ revision: integer(), declaration_revision: integer(), note: nullableValue(text), lines: array(receiptLineSchema) });
+const blindReceiptCountSchema = object({
+  revision: integer(), declaration_revision: integer(), is_own_count: boolean(), is_count_author: boolean(),
+  lines: item({ item_id: id, item_name: text, unit_name: text, unit_scale: integer(), has_count_line: boolean() }),
 });
 const receiptViewSchema = object({
   id, delivery_id: id, warehouse_id: id, version, created_at: dateTime, public_code: text,
   donor_name: text, donor_phone: text, delivery_status: text, drive_id: id, drive_title: text, warehouse_name: text,
   delivery: object({ id, drive_id: id, drive_title: text, public_code: text, donor_name: text, donor_phone: text, status: text }),
-  count: nullableValue(object({ revision: integer(), declaration_revision: integer(), note: nullableValue(text), lines: array(receiptLineSchema) })),
+  count: nullableValue(receiptCountSchema),
   review: nullableValue(object({ decision: text, reason: nullableValue(text), reviewed_at: dateTime })),
 });
 
@@ -1061,7 +1067,9 @@ const sharedLogisticsResponses = {
     id, drive_id: id, drive_title: text, public_code: text, donor_name: text, donor_phone: text,
     status: text, version, receipt_id: nullableValue(id), created_at: dateTime,
   }),
-  logisticsDonationReceiptsReceipt: object({ ...receiptViewSchema.properties, generated_at: dateTime }),
+  logisticsDonationReceiptsReceipt: object({ ...receiptViewSchema.properties,
+    count: { anyOf: [object({ ...receiptCountSchema.properties, is_own_count: boolean(), is_count_author: boolean() }), blindReceiptCountSchema, { type: 'null' }] },
+    generated_at: dateTime }),
   logisticsDonationReceiptsDisputes: page({
     id, delivery_id: id, status: text, opened_by_kind: text, reason: text, resolution_note: nullableValue(text),
     opened_at: dateTime, resolved_at: nullableValue(dateTime), public_code: text, drive_id: id, drive_title: text, donor_phone: text,

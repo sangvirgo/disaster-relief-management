@@ -214,7 +214,7 @@ export function TeamMembers({ teamId, onManageChange, addOpen, onOpenAdd, onClos
       <form className="team-member-search" noValidate onSubmit={(event) => void search(event)}>
         <label htmlFor="team-member-query">Tìm người tham gia</label>
         <div className="team-member-search-row">
-          <input id="team-member-query" autoFocus value={query} maxLength={65} placeholder="Nhập ít nhất 2 ký tự" aria-invalid={Boolean(query.trim() && queryInvalid)}
+          <input id="team-member-query" autoFocus value={query} maxLength={65} placeholder="Nhập ít nhất 2 ký tự để tìm" aria-invalid={Boolean(query.trim() && queryInvalid)}
             onChange={(event) => {
               if (searchDebounce.current !== null) {
                 window.clearTimeout(searchDebounce.current);
@@ -224,12 +224,6 @@ export function TeamMembers({ teamId, onManageChange, addOpen, onOpenAdd, onClos
               setQuery(event.target.value); setCandidates([]); setSelectedCandidate(null); setSearched(false); setCandidateNext(''); setSearchError(''); pendingAdd.current = null;
               setSearching(false);
             }} />
-          <button type="submit" className="button" disabled={searching || queryInvalid}>
-            <svg aria-hidden="true" viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.75">
-              <circle cx="8.5" cy="8.5" r="5.5" /><path d="m13 13 4 4" />
-            </svg>
-            {searching ? 'Đang tìm…' : 'Tìm thành viên'}
-          </button>
         </div>
       </form>
       {searchTerm.length >= 2 && searchTerm.length <= 64 && <div className="team-member-search-results" aria-busy={searching}>

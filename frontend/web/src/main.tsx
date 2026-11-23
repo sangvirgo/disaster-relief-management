@@ -36,7 +36,6 @@ import { DetailSurface } from './components/DetailSurface';
 import { useModalScrollLock } from './components/modalScrollLock';
 import { PageHeader } from './components/ui/PageHeader';
 import { FloatingLabels } from './components/ui/FloatingLabels';
-import { SupplyGapWarningBadge } from './features/supply-gaps/SupplyBadges';
 
 declare global {
   interface Window {
@@ -1036,6 +1035,10 @@ function Tracking({
           <span className={`chip request-status request-status--${requestStatusTone(data.status)}`}>
             {requestStatusLabel(data.status)}
           </span>
+          {data.timeline.some((entry) => entry.event_type === 'MISSION_COMPLETED' || entry.public_text_code === 'MISSION_COMPLETED') &&
+            !['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(data.status) && (
+              <p className="notice" role="status">Đội cứu hộ đã hoàn thành nhiệm vụ. Yêu cầu SOS vẫn đang được xử lý; xem lịch sử bên dưới để theo dõi các bước tiếp theo.</p>
+            )}
           <p>Tiếp nhận lúc: {timeLabel(data.received_at)}</p>
           {data.status === 'DUPLICATE' && data.duplicate_of_code && (
             <p className="notice">Yêu cầu này trùng với hồ sơ {data.duplicate_of_code}. Nếu hồ sơ gốc thuộc tài khoản của bạn, hãy quay lại danh sách để xem tiến độ hồ sơ đó.</p>
@@ -1060,7 +1063,7 @@ function Tracking({
           key={data.id}
           tracking={data}
           code={verified.code}
-          canClaim={Boolean(user)}
+          canClaim={Boolean(user) && !initialCode}
           onUpdated={refreshTracking}
         />
       )}
@@ -2131,10 +2134,7 @@ function App() {
                 ) : workspace === 'citizen' && selected.id === 'drives' ? (
                   <Donations user={user} />
                 ) : workspace === 'coordinator' && selected.id === 'campaigns' ? (
-                  <>
-                    <SupplyGapWarningBadge user={user!} />
-                    <CampaignCoordination key={selectedRequestId} user={user!} initialRequestId={selectedRequestId} />
-                  </>
+                  <CampaignCoordination key={selectedRequestId} user={user!} initialRequestId={selectedRequestId} />
                 ) : workspace === 'coordinator' &&
                   ['queue', 'verify', 'triage', 'assign'].includes(selected.id) ? (
                   <Coordinator key={`${selected.id}:${selectedRequestId}`} page={selected.id} currentUserId={user!.id}

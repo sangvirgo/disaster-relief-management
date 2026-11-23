@@ -107,7 +107,7 @@ export function WarehouseMapManager({ canManage, canManageDrives, warehouseOptio
   }, [placing]);
   function select(id: string, driveId?: string) {
     setSelectedId(id);
-    if (driveId) setHovered({ kind: 'drive', id: driveId, warehouseId: id });
+    setHovered(driveId ? { kind: 'drive', id: driveId, warehouseId: id } : { kind: 'warehouse', id, warehouseId: id });
   }
   const refresh = useCallback(() => { setDialog(null); setRevision((value) => value + 1); onChanged(); }, [onChanged]);
 
@@ -264,12 +264,10 @@ export function WarehouseMapManager({ canManage, canManageDrives, warehouseOptio
   </> : hoveredWarehouse?.id ? <>
     {canManage && <button type="button" className="button secondary small" onClick={() => void openWarehouseEdit(hoveredWarehouse)}>Sửa kho</button>}
     {canManageDrives && <button type="button" className="button small" onClick={() => setDialog({ kind: 'new-drive', warehouseId: hoveredWarehouse.id })}>+ Đợt quyên góp</button>}
-    <a className="button secondary small" href={`?workspace=operations&page=assets&view=warehouses&warehouse_id=${encodeURIComponent(hoveredWarehouse.id)}&warehouse_name=${encodeURIComponent(hoveredWarehouse.name ?? '')}`}>Tồn kho</a>
   </> : null;
-  const contextMenu = selectedId && hoveredWarehouse?.id === selectedId && !creatingWarehouse && !editingWarehouseId && hoverActions &&
-    <details className="warehouse-map-actions"><summary>Thao tác</summary><div className="warehouse-map-actions__menu">{hoverActions}{actionError && <p className="notice error" role="alert">{actionError}</p>}</div></details>;
   const hoverCard = hovered && hoveredWarehouse?.id && hoveredWarehouse.name
-    ? <MapHoverDetails key={`${hovered.kind}:${hovered.id}`} warehouse={{ id: hoveredWarehouse.id, name: hoveredWarehouse.name, service_radius_m: hoveredWarehouse.service_radius_m }} drive={hoveredDrive} onClose={() => setHovered(null)} />
+    ? <MapHoverDetails key={`${hovered.kind}:${hovered.id}`} warehouse={{ id: hoveredWarehouse.id, name: hoveredWarehouse.name, service_radius_m: hoveredWarehouse.service_radius_m }} drive={hoveredDrive}
+        actions={selectedId === hoveredWarehouse.id && <>{hoverActions}{actionError && <p className="notice error" role="alert">{actionError}</p>}</>} onClose={() => setHovered(null)} />
     : null;
   const draftEditor = creatingWarehouse && draft && <form className="warehouse-map-editor" onSubmit={event => void createWarehouse(event)} noValidate>
     <label className="warehouse-map-editor__name"><span>Tên kho</span><input autoFocus required maxLength={201} value={draftName} onChange={event => { setDraftName(event.target.value); draftKey.current = null; }} placeholder="Nhập tên kho" aria-label="Tên kho" /></label>
@@ -287,7 +285,7 @@ export function WarehouseMapManager({ canManage, canManageDrives, warehouseOptio
     <div className="warehouse-manager__layout">
       <div className="warehouse-manager__map">
         <WarehouseCoverageMap placing={placing} onMapClick={placeAt} banner={creatingWarehouse ? (draft ? undefined : 'Chạm vào bản đồ để đặt tâm kho. Sau đó kéo ghim hoặc vòng tròn để điều chỉnh.') : editingWarehouseId ? 'Đang chỉnh kho trên bản đồ. Kéo tâm hoặc nút ở mép vòng tròn, rồi bấm dấu ✓ để lưu.' : placing ? (placeMessage || 'Chạm vào bản đồ, bên trong vòng tròn của một kho, để đặt điểm quyên góp. Nhấn Esc để hủy.') : undefined} rows={rows} campaigns={showCampaigns ? campaignRows : []} loading={state === 'loading'} error={state === 'error'} selectedId={selectedId}
-          onSelectWarehouse={(id) => select(id)} onEditWarehouse={canManage ? beginWarehouseMapEdit : undefined} onSelectDrive={(driveId, warehouseId) => select(warehouseId, driveId)} onHover={target => { if (!creatingWarehouse && !editingWarehouseId && !placing) setHovered(target); }} onEmptyClick={() => { if (!editingWarehouseId) { setHovered(null); setSelectedId(null); } }} toolbar={<>{toolbar}{contextMenu}</>} hoverCard={creatingWarehouse ? draftEditor : editingWarehouseId ? editEditor : hoverCard}
+          onSelectWarehouse={(id) => select(id)} onEditWarehouse={canManage ? beginWarehouseMapEdit : undefined} onSelectDrive={(driveId, warehouseId) => select(warehouseId, driveId)} onHover={target => { if (!creatingWarehouse && !editingWarehouseId && !placing) setHovered(target); }} onEmptyClick={() => { if (!editingWarehouseId) { setHovered(null); setSelectedId(null); } }} toolbar={toolbar} hoverCard={creatingWarehouse ? draftEditor : editingWarehouseId ? editEditor : hoverCard}
           creatingWarehouse={creatingWarehouse} editingWarehouse={Boolean(editingWarehouseId)} draft={draft} onDraftChange={next => { setDraft(next); setDraftError(''); draftKey.current = null; }} />
       </div>
     </div>

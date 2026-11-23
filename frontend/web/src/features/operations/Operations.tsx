@@ -29,6 +29,7 @@ type Row = Record<string, unknown> & {
   public_code?: string;
   receipt_id?: string | null;
 };
+
 type List = {
   items?: Row[];
   cursor?: string | null;
@@ -430,6 +431,8 @@ export function Operations({ page, user }: { page: string; user: Me }) {
       ? string(selected?.receipt_id)
       : '';
   const count = detail?.count as Row | null | undefined;
+  const ownPendingCount = count?.is_own_count === true;
+  const countedBefore = count?.is_count_author === true;
   const canCount = (page === 'intake' && rights.has('OPERATIONS_MANAGER')) ||
     (page === 'review' && reviewTab === 'receipts' && rights.has('REVIEWER'));
   const needCreate: CommandSpec = {
@@ -959,10 +962,10 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             </section>}
             {page === 'reports' && report === 'fulfillment' && <p className="muted">So sánh số lượng đang cần với số đã giao và số còn thiếu ở tab Thông tin. Số liệu này phản ánh phạm vi và thời gian báo cáo đã chọn.</p>}
             {page === 'reports' && report === 'stock-summary' && <p className="muted">Số lượng tồn thực tế, đã giữ và có thể xuất được hiển thị ở tab Thông tin.</p>}
-            {count && (
+            {count && !(page === 'review' && reviewTab === 'receipts' && status === 'PENDING_REVIEW' && rights.has('REVIEWER') && !detail.review && !ownPendingCount) && (
               <div className="candidate">
                 {status === 'POSTED' && !detail.review && <p className="notice warning" role="status">Phiếu đã ghi sổ trước đó. Lần kiểm đếm bổ sung này đang chờ duyệt độc lập; số tiếp nhận mới chưa được cộng vào tồn kho.</p>}
-                <h3>Kết quả kiểm đếm lần {quantity(count.revision)}</h3>
+                <h3>{ownPendingCount && status === 'PENDING_REVIEW' ? 'Kết quả bạn đã kiểm đếm · chờ người thứ hai xác nhận' : `Kết quả kiểm đếm lần ${quantity(count.revision)}`}</h3>
                 {Boolean(count.note) && <p><strong>Ghi chú kiểm đếm:</strong> {string(count.note)}</p>}
                 {Array.isArray(count.lines) && count.lines.length > 0 ? (
                   <>
@@ -978,7 +981,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                           <th scope="col" className="numeric">Tạm giữ</th>
                           <th scope="col" className="numeric">Từ chối</th>
                         </tr></thead>
-                        <tbody>{(count.lines as Row[]).map((line, index) => (
+                        <tbody>{(count.lines as Row[]).filter(line => !ownPendingCount || line.has_count_line !== false).map((line, index) => (
                           <tr key={string(line.item_id) || index}>
                             <th scope="row">
                               {string(line.item_name) || string(line.item_id)}
@@ -1003,6 +1006,8 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             </div>
             <div style={page === 'review' ? { order: -1 } : undefined} hidden={page === 'drives' || inlineActions ? !showActionsTab : detailTab !== 'actions'} role={page === 'drives' || inlineActions ? undefined : 'tabpanel'} aria-labelledby={page === 'drives' || inlineActions ? undefined : 'operations-detail-tab-actions'}>
             <div className="action-grid">
+              {page === 'review' && reviewTab === 'receipts' && status === 'PENDING_REVIEW' && countedBefore &&
+                <p className="notice" role="status">Bạn đã tham gia kiểm đếm biên nhận này. Biên nhận đang chờ một người khác xác nhận độc lập; bạn không thể xác nhận, từ chối hoặc duyệt lượt kiểm đếm.</p>}
               {page === 'drives' &&
                 id &&
                 version != null &&
@@ -1100,7 +1105,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 <p className="notice">Đóng góp đã {status === 'REJECTED' ? 'bị từ chối' : 'hủy'}, không thể gửi kiểm đếm mới hoặc ghi sổ.</p>
               )}
               {page === 'review' && reviewTab === 'receipts' && receiptId && count && version != null &&
-                status === 'PENDING_REVIEW' && rights.has('REVIEWER') && !detail.review && (
+                status === 'PENDING_REVIEW' && rights.has('REVIEWER') && !detail.review && !countedBefore && (
                   <ReceiptCountForm
                     key={`confirm-${receiptId}-${version}`}
                     receiptId={receiptId}
@@ -1109,6 +1114,10 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                     driveTitle={string(detail.drive_title)}
                     version={version}
                     existing={null}
+                    initialItems={Array.isArray(count.lines) ? (count.lines as Row[]).filter(line => string(line.item_id) && line.has_count_line !== false).map(line => ({
+                      id: string(line.item_id), name: string(line.item_name) || string(line.item_id),
+                      unit: { display_name: string(line.unit_name), scale: Number(line.unit_scale ?? 0) },
+                    })) : []}
                     confirm={{ countRevision: Number(count.revision), declarationRevision: Number(count.declaration_revision) }}
                     onSuccess={done}
                   />
@@ -1118,7 +1127,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 count &&
                 version != null &&
                 (['PENDING_REVIEW', 'APPROVED'].includes(status) || (status === 'POSTED' && !detail.review)) &&
-                rights.has('REVIEWER') && (
+                rights.has('REVIEWER') && !(status === 'PENDING_REVIEW' && countedBefore) && (
                   <>
                     {(status === 'PENDING_REVIEW' || status === 'POSTED') && <details><summary>Từ chối hoặc yêu cầu đếm lại</summary>{command({
                       title: 'Duyệt kiểm đếm',
@@ -1132,7 +1141,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                           type: 'select',
                           required: true,
                           options: [
-                            ['APPROVE', 'Duyệt'],
+                            ...(status === 'PENDING_REVIEW' ? [] : [['APPROVE', 'Duyệt']]),
                             ['REJECT', 'Từ chối'],
                             ['REQUEST_RECOUNT', 'Yêu cầu đếm lại'],
                           ].map(([value, title]) => ({ value, label: title })),

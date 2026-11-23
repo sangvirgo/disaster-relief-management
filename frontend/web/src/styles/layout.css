@@ -429,6 +429,12 @@ textarea:focus-visible {
 .location-suggestion:focus-visible {
   background: var(--color-primary-bg);
 }
+.location-suggestion__address {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
 .volunteer-team-list {
   gap: var(--space-3);
   align-items: stretch;

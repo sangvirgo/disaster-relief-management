@@ -50,7 +50,9 @@ export class DonationsQueriesService {
         WHERE dl.delivery_id=$1 AND dl.revision=$2 ORDER BY i.name,dl.item_id`,
       [id, declaration.revision],
     ) as Array<Record<string, unknown>> : [];
-    const receipt = await this.currentReceipt(id);
+    const receipt = delivery.status === 'PENDING_REVIEW'
+      ? await this.currentReceipt(id, true)
+      : await this.currentReceipt(id);
     const disputes = await this.dataSource.query(
       `SELECT id,status,reason,opened_at,resolution_note FROM donation_dispute WHERE delivery_id=$1 ORDER BY opened_at,id`,
       [id],
@@ -171,7 +173,7 @@ export class DonationsQueriesService {
     return rows[0];
   }
 
-  private async currentReceipt(id: string): Promise<Record<string, unknown> | null> {
+  private async currentReceipt(id: string, hidePendingCount = false): Promise<Record<string, unknown> | null> {
     const rows = await this.dataSource.query(
       `SELECT r.id,rc.revision AS count_revision
          FROM donation_receipt r JOIN receipt_count rc ON rc.receipt_id=r.id
@@ -182,7 +184,7 @@ export class DonationsQueriesService {
     if (!current) return null;
     return {
       count_revision: Number(current.count_revision),
-      lines: (await readReceiptLines(this.dataSource, id, current.id, Number(current.count_revision))).map((line) => ({
+      lines: hidePendingCount ? [] : (await readReceiptLines(this.dataSource, id, current.id, Number(current.count_revision))).map((line) => ({
         item_id: line.item_id,
         declared_quantity: line.declared_quantity,
         counted_quantity: line.counted_quantity,

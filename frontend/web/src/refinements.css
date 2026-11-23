@@ -512,6 +512,8 @@
 .tracking-evidence-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
 .tracking-recent-evidence { margin-top: 22px; }
 .tracking-recent-evidence h3 { margin-bottom: 12px; }
+.tracking-evidence-record { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.tracking-evidence-record img, .tracking-evidence-record video { display: block; width: min(100%, 320px); max-height: 220px; object-fit: contain; border-radius: 10px; background: #e8eef7; }
 .required-mark {
   color: #b42318;
   font-weight: 800;
@@ -1760,8 +1762,8 @@
 .warehouse-map-hover p { margin: 6px 0 10px; font-size: 13px; }
 .warehouse-map-hover__heading .button, .warehouse-map-editor__heading .button { min-width: 32px; min-height: 30px; padding: 2px 8px; }
 .warehouse-map-hover__table-wrap { overflow-x: auto; }
-.warehouse-map-hover__table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.warehouse-map-hover__table th, .warehouse-map-hover__table td { padding: 7px 5px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
+.warehouse-map-hover__table { width: 100%; min-width: 320px; border-collapse: collapse; font-size: 12px; }
+.warehouse-map-hover__table th, .warehouse-map-hover__table td { padding: 7px 5px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; white-space: nowrap; }
 .warehouse-map-hover__table th:first-child { min-width: 125px; }
 .warehouse-map-hover .pager { margin: 10px 0 0; }
 .warehouse-map-editor { display: flex; align-items: end; gap: 5px; }

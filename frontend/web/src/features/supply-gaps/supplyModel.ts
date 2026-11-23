@@ -107,8 +107,8 @@ type RoleSet = ReadonlySet<string>;
 
 /** SUPPLY_GAP_MANAGE: accept and dismiss. */
 export const canManageSupplyGaps = (roles: RoleSet) => roles.has('OPERATIONS_MANAGER');
-/** SUPPLY_GAP_VIEW: read-only warnings for coordinators and managers. */
-export const canViewSupplyGapWarnings = (roles: RoleSet) => roles.has('COORDINATOR') || roles.has('OPERATIONS_MANAGER');
+/** Supply warnings belong to operations management, not rescue coordination. */
+export const canViewSupplyGapWarnings = (roles: RoleSet) => roles.has('OPERATIONS_MANAGER');
 /** CAMPAIGN_WAREHOUSE_MANAGE: change the primary warehouse and re-evaluate. */
 export const canManageCampaignWarehouses = (roles: RoleSet) => roles.has('OPERATIONS_MANAGER');
 /** NEED_NORM_MANAGE: edit the norm table. */

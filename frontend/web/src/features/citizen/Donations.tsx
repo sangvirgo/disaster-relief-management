@@ -725,6 +725,8 @@ export function Donations({ user }: { user: Me | null }) {
               <>
                 <h3>Phiếu tiếp nhận và kết quả kiểm đếm</h3>
                 <p>Mã phiếu: {tracking.public_code} · Lần kiểm đếm: {tracking.receipt.count_revision}</p>
+                {tracking.status === 'PENDING_REVIEW' && <p className="notice" role="status">Đã có lượt kiểm đếm đầu tiên. Số lượng sẽ hiển thị sau khi người thứ hai xác nhận độc lập.</p>}
+                {tracking.status !== 'PENDING_REVIEW' && <>
                 <p className="receipt-count-scroll-hint">Cuộn ngang bảng để xem đủ các cột số lượng.</p>
                 <div className="stock-table-scroll receipt-count-scroll" role="region" aria-label="Kết quả kiểm đếm đóng góp" tabIndex={0}>
                 <table className="stock-table receipt-count-table">
@@ -744,7 +746,7 @@ export function Donations({ user }: { user: Me | null }) {
                       <td className="numeric">{formatQuantity(line.rejected_quantity)} {unitName}</td>
                     </tr>
                   );
-                })}</tbody></table></div>
+                })}</tbody></table></div></>}
               </>
             ) : (
               <p>Chưa có biên nhận kiểm đếm. Bản khai chưa làm tăng tồn kho.</p>

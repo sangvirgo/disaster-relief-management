@@ -35,6 +35,7 @@ export function TrackingActions({
   const fileError = file ? evidenceFileError(file) : null;
   const [evidence, setEvidence] = useState<Evidence[]>(() => tracking.evidence ?? []);
   const [downloadUrls, setDownloadUrls] = useState<Record<string, string>>({});
+  const [evidenceErrors, setEvidenceErrors] = useState<Record<string, boolean>>({});
   const [downloadingId, setDownloadingId] = useState('');
   const [events, setEvents] = useState<Event[]>([]);
   const [cursor, setCursor] = useState<string | null>(tracking.cursor || null);
@@ -47,49 +48,84 @@ export function TrackingActions({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const locationAttempt = useRef(0);
   useEffect(() => () => { locationAttempt.current++; }, []);
+  useEffect(() => {
+    setEvidence(tracking.evidence ?? []);
+    setDownloadUrls({});
+    setEvidenceErrors({});
+  }, [tracking.id, code]);
+  useEffect(() => {
+    let active = true;
+    const files = evidence.filter((item) => item.state === 'READY');
+    if (!files.length) return;
+    void Promise.all(files.map(async (item) => {
+      try {
+        const result = await api<{ url: string }>('response', `/evidence/${item.id}/download`, { headers: headers(code) });
+        if (active) setDownloadUrls((current) => ({ ...current, [item.id]: result.url }));
+      } catch {
+        if (active) setEvidenceErrors((current) => ({ ...current, [item.id]: true }));
+      }
+    }));
+    return () => { active = false; };
+  }, [code, evidence]);
   const descriptionError = description.length > 2000 ? 'Mô tả mới không được vượt quá 2.000 ký tự.' : '';
   const peopleError = people && (!Number.isInteger(Number(people)) || Number(people) < 1 || Number(people) > 10000)
     ? 'Số người cần hỗ trợ phải là số nguyên từ 1 đến 10.000.' : '';
   const hasSupplementChanges = Boolean(description.trim() || people || danger || supplementPoint);
+  const hasSubmission = hasSupplementChanges || Boolean(file);
   const supplementInvalid = Boolean(descriptionError || peopleError);
   async function supplement(event: FormEvent) {
     event.preventDefault();
     setSupplementAttempted(true);
-    if (supplementInvalid || !hasSupplementChanges) return;
+    if (supplementInvalid || fileError || !hasSubmission) return;
     setMessage('');
     setBusy(true);
+    let informationSaved = false;
     try {
-      supplementKey.current ||= newCommandKey();
-      await api('response', `/requests/${tracking.id}/supplements`, {
-        method: 'POST',
-        headers: headers(code),
-        idempotencyKey: supplementKey.current,
-        body: {
-          expected_version: tracking.version,
-          ...(description.trim() ? { description: description.trim() } : {}),
-          ...(people ? { people_affected: Number(people) } : {}),
-          ...(danger ? { reporter_declared_danger: true } : {}),
-          ...(supplementPoint
-            ? {
-                location: {
-                  type: 'Point',
-                  coordinates: [supplementPoint.longitude, supplementPoint.latitude],
-                  source: gpsCapturedAt ? 'GPS' : 'MANUAL_PIN',
-                  ...(gpsCapturedAt ? { accuracy_m: gpsAccuracy, captured_at: gpsCapturedAt } : {}),
-                },
-              }
-            : {}),
-        },
-      });
-      supplementKey.current = null;
-      setDescription('');
-      setPeople('');
-      setDanger(false);
-      locationAttempt.current++;
-      setSupplementPoint(null);
-      setGpsAccuracy(null);
-      setGpsCapturedAt(null);
-      setMessage('Thông tin bổ sung đã được máy chủ tiếp nhận.');
+      if (hasSupplementChanges) {
+        supplementKey.current ||= newCommandKey();
+        await api('response', `/requests/${tracking.id}/supplements`, {
+          method: 'POST',
+          headers: headers(code),
+          idempotencyKey: supplementKey.current,
+          body: {
+            expected_version: tracking.version,
+            ...(description.trim() ? { description: description.trim() } : {}),
+            ...(people ? { people_affected: Number(people) } : {}),
+            ...(danger ? { reporter_declared_danger: true } : {}),
+            ...(supplementPoint ? { location: {
+              type: 'Point', coordinates: [supplementPoint.longitude, supplementPoint.latitude],
+              source: gpsCapturedAt ? 'GPS' : 'MANUAL_PIN',
+              ...(gpsCapturedAt ? { accuracy_m: gpsAccuracy, captured_at: gpsCapturedAt } : {}),
+            } } : {}),
+          },
+        });
+        informationSaved = true;
+        supplementKey.current = null;
+        setDescription('');
+        setPeople('');
+        setDanger(false);
+        locationAttempt.current++;
+        setSupplementPoint(null);
+        setGpsAccuracy(null);
+        setGpsCapturedAt(null);
+      }
+      if (file) {
+        try {
+          fileKey.current ||= newCommandKey();
+          const uploaded = await upload<Evidence>('response', `/requests/${tracking.id}/evidence`, file,
+            { headers: headers(code), idempotencyKey: fileKey.current });
+          fileKey.current = null;
+          setFile(null);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+          if (uploaded?.id) setEvidence((current) => [uploaded, ...current]);
+        } catch (cause) {
+          if (cause instanceof ApiError && cause.code === 'STORAGE_UNAVAILABLE') fileKey.current = null;
+          if (informationSaved) await onUpdated().catch(() => undefined);
+          setMessage(`${informationSaved ? 'Thông tin bổ sung đã được tiếp nhận, nhưng ' : ''}Chưa tải được ảnh hoặc video. ${cause instanceof Error ? cause.message : 'Hãy thử gửi lại tệp.'}`);
+          return;
+        }
+      }
+      setMessage(hasSupplementChanges ? 'Thông tin bổ sung đã được máy chủ tiếp nhận.' : 'Ảnh hoặc video hiện trường đã được máy chủ tiếp nhận.');
       try {
         await onUpdated();
       } catch {
@@ -122,43 +158,16 @@ export function TrackingActions({
       { enableHighAccuracy: true, timeout: 10000 }
     );
   }
-  async function attach(event: FormEvent) {
-    event.preventDefault();
-    if (!file) return;
-    if (fileError) { setMessage(fileError); return; }
-    setMessage('');
-    setBusy(true);
-    try {
-      fileKey.current ||= newCommandKey();
-      const uploaded = await upload<Evidence>(
-        'response',
-        `/requests/${tracking.id}/evidence`,
-        file,
-        { headers: headers(code), idempotencyKey: fileKey.current }
-      );
-      fileKey.current = null;
-      setFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      setMessage('Tệp minh chứng đã được máy chủ tiếp nhận.');
-      if (uploaded?.id) setEvidence((current) => [uploaded, ...current]);
-    } catch (cause) {
-      if (cause instanceof ApiError && cause.code === 'STORAGE_UNAVAILABLE') fileKey.current = null;
-      setMessage(cause instanceof Error ? cause.message : 'Chưa xác nhận được tệp minh chứng.');
-    } finally {
-      setBusy(false);
-    }
-  }
   async function download(id: string) {
     setDownloadingId(id);
-    setMessage('');
+    setEvidenceErrors((current) => ({ ...current, [id]: false }));
     try {
       const result = await api<{ url: string }>('response', `/evidence/${id}/download`, {
         headers: headers(code),
       });
       setDownloadUrls((current) => ({ ...current, [id]: result.url }));
-      setMessage('Đã có liên kết riêng tư. Nhấn Mở tệp để xem minh chứng.');
     } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : 'Không thể mở tệp minh chứng.');
+      setEvidenceErrors((current) => ({ ...current, [id]: true }));
     } finally {
       setDownloadingId('');
     }
@@ -278,50 +287,41 @@ export function TrackingActions({
               </p>
             )}
           </div>
+          <div className="tracking-evidence-section">
+            <h3>Ảnh và video hiện trường (nếu có)</h3>
+            <p>Chỉ điều phối viên và người có quyền theo dõi SOS được xem các tệp này.</p>
+            <label className="tracking-file-picker">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,video/mp4"
+                aria-invalid={Boolean(fileError)}
+                aria-describedby={fileError ? 'sos-evidence-file-error' : undefined}
+                onChange={(event) => {
+                  setFile(event.target.files?.[0] || null);
+                  fileKey.current = null;
+                  setMessage('');
+                }}
+              />
+              <span className="tracking-file-icon" aria-hidden="true">↑</span>
+              <span>
+                <strong>{file ? file.name : 'Chọn ảnh hoặc video'}</strong>
+                <small>JPEG, PNG hoặc MP4</small>
+              </span>
+            </label>
+            <SelectedFiles files={file ? [file] : []} onRemove={() => { setFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; fileKey.current = null; }} />
+            {fileError && <small className="field-error" id="sos-evidence-file-error" role="alert">{fileError}</small>}
+          </div>
           <button
             className="button"
-            disabled={busy || !hasSupplementChanges || supplementInvalid}
+            disabled={busy || !hasSubmission || supplementInvalid || Boolean(fileError)}
           >
-            Gửi thông tin bổ sung
+            {busy ? 'Đang gửi…' : 'Gửi thông tin bổ sung'}
           </button>
         </form>
       ) : (
         <p>Yêu cầu ở trạng thái hiện tại không nhận thông tin bổ sung.</p>
       )}
-      <div className="tracking-evidence-section">
-        <h3>Ảnh và video hiện trường</h3>
-        <p>{tracking.can_supplement
-          ? 'Chỉ điều phối viên và người có quyền theo dõi SOS được xem các tệp này.'
-          : ['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED'].includes(tracking.status)
-            ? 'Yêu cầu đã kết thúc nên không thể gửi thêm tệp minh chứng.'
-            : 'Yêu cầu hiện chưa cho phép gửi thêm tệp minh chứng. Hãy kiểm tra trạng thái hoặc liên hệ điều phối viên.'}</p>
-        {tracking.can_supplement && <form className="form-stack" onSubmit={attach}>
-          <label className="tracking-file-picker">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,video/mp4"
-              aria-invalid={Boolean(fileError)}
-              aria-describedby={fileError ? 'sos-evidence-file-error' : undefined}
-              onChange={(event) => {
-                setFile(event.target.files?.[0] || null);
-                fileKey.current = null;
-                setMessage('');
-              }}
-            />
-            <span className="tracking-file-icon" aria-hidden="true">↑</span>
-            <span>
-              <strong>{file ? file.name : 'Chọn ảnh hoặc video'}</strong>
-              <small>JPEG, PNG hoặc MP4</small>
-            </span>
-          </label>
-          <SelectedFiles files={file ? [file] : []} onRemove={() => { setFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; fileKey.current = null; }} />
-          {fileError && <small className="field-error" id="sos-evidence-file-error" role="alert">{fileError}</small>}
-          <div className="tracking-evidence-actions">
-            <button className="button" disabled={busy || !file || Boolean(fileError)}>Tải minh chứng lên</button>
-          </div>
-        </form>}
-      </div>
       {canClaim && (
         <button className="button secondary" type="button" onClick={claim} disabled={busy}>
           Gắn yêu cầu với tài khoản
@@ -332,26 +332,23 @@ export function TrackingActions({
           <h3>Tệp đã gửi cho SOS này</h3>
           <div className="record-list">
             {evidence.map((item) => (
-              <div className="record" key={item.id}>
+              <div className="record tracking-evidence-record" key={item.id}>
+                {downloadUrls[item.id] && item.detected_mime?.startsWith('image/') &&
+                  <a href={downloadUrls[item.id]} target="_blank" rel="noopener noreferrer" aria-label="Xem ảnh hiện trường cỡ lớn">
+                    <img src={downloadUrls[item.id]} alt="Ảnh hiện trường đã gửi" loading="lazy" onError={() => { setDownloadUrls((current) => ({ ...current, [item.id]: '' })); setEvidenceErrors((current) => ({ ...current, [item.id]: true })); }} />
+                  </a>}
+                {downloadUrls[item.id] && item.detected_mime?.startsWith('video/') &&
+                  <video src={downloadUrls[item.id]} controls preload="metadata" aria-label="Video hiện trường đã gửi" />}
                 <span>
                   {label(item.state)} · {timeLabel(item.created_at)} ·{' '}
                   {Math.ceil(item.size_bytes / 1024)} KB
                 </span>
-                <span>
-                  <button className="button secondary" disabled={downloadingId === item.id} onClick={() => download(item.id)}>
-                    {downloadingId === item.id ? 'Đang lấy liên kết…' : 'Lấy liên kết riêng tư'}
-                  </button>
-                  {downloadUrls[item.id] && (
-                    <a
-                      className="button secondary"
-                      href={downloadUrls[item.id]}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Mở tệp trong 60 giây
-                    </a>
-                  )}
-                </span>
+                {item.state === 'READY' && !downloadUrls[item.id] && !evidenceErrors[item.id] && <span role="status">Đang tải minh chứng…</span>}
+                {evidenceErrors[item.id] && <button className="button secondary" type="button" disabled={downloadingId === item.id} onClick={() => download(item.id)}>
+                  {downloadingId === item.id ? 'Đang tải…' : 'Tải lại minh chứng'}
+                </button>}
+                {downloadUrls[item.id] && !item.detected_mime?.startsWith('image/') && !item.detected_mime?.startsWith('video/') &&
+                  <a className="button secondary" href={downloadUrls[item.id]} target="_blank" rel="noopener noreferrer">Mở tệp</a>}
               </div>
             ))}
           </div>

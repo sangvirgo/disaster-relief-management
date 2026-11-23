@@ -71,6 +71,7 @@ export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, er
   const [draftPoint, setDraftPoint] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const [zoomComplete, setZoomComplete] = useState(false);
   const [draftReady, setDraftReady] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(6);
   const draftMoveToken = useRef(0);
   const selectionTimer = useRef<number | null>(null);
 
@@ -97,7 +98,12 @@ export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, er
         map.stop();
         const radius = draftRef.current?.radiusM ?? 5000;
         draftChangeRef.current?.({ lat: event.latlng.lat, lng: event.latlng.lng, radiusM: radius });
-        map.once('moveend', () => { if (token === draftMoveToken.current && creatingRef.current) setZoomComplete(true); });
+        map.once('moveend', () => {
+          if (token === draftMoveToken.current && creatingRef.current) {
+            setZoomComplete(true);
+            setDraftReady(true);
+          }
+        });
         map.flyTo(event.latlng, map.getSize().x < 450 ? 9 : 11, { duration: 0.55 });
       } else if (placingRef.current) mapClickRef.current?.(event.latlng.lat, event.latlng.lng);
       else emptyClickRef.current?.();
@@ -110,6 +116,7 @@ export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, er
       setDraftPoint({ x: point.x, y: point.y, width: size.x, height: size.y });
     };
     map.on('zoom move resize', updateDraftPoint);
+    map.on('zoomend', () => setZoomLevel(map.getZoom()));
     const timer = window.setTimeout(() => map.invalidateSize(), 250);
     return () => { window.clearTimeout(timer); if (selectionTimer.current !== null) window.clearTimeout(selectionTimer.current); map.remove(); mapRef.current = null; layerRef.current = null; draftLayerRef.current = null; };
   }, []);
@@ -134,6 +141,12 @@ export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, er
     for (const row of rows) {
       const color = colorAt(row.index);
       const selected = row.id === selectedId;
+      const point = map.project([row.lat, row.lng], zoomLevel);
+      const nearby = rows.filter((other) => map.project([other.lat, other.lng], zoomLevel).distanceTo(point) < 36).sort((a, b) => a.id.localeCompare(b.id));
+      const place = nearby.findIndex((other) => other.id === row.id);
+      const angle = nearby.length > 1 ? place * Math.PI * 2 / nearby.length - Math.PI / 2 : 0;
+      const spread = nearby.length > 1 ? 34 + Math.min(nearby.length, 6) * 3 : 0;
+      const iconAnchor: L.PointTuple = [22 - Math.cos(angle) * spread, 22 - Math.sin(angle) * spread];
       if (row.radiusM && !(editingWarehouse && selected)) {
         L.circle([row.lat, row.lng], {
           radius: row.radiusM, color, weight: selected ? 4 : 2, fillColor: color, fillOpacity: selected ? 0.2 : 0.08, interactive: false,
@@ -144,11 +157,12 @@ export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, er
         icon: L.divIcon({
           className: 'warehouse-map-pin',
           html: warehouseIconHtml(selected),
-          iconSize: [44, 44], iconAnchor: [22, 22],
+          iconSize: [44, 44], iconAnchor,
         }),
-      }).on('mouseover', () => hoverRef.current?.({ kind: 'warehouse', id: row.id, warehouseId: row.id }))
+      }).bindTooltip(escapeHtml(row.name)).on('mouseover', () => hoverRef.current?.({ kind: 'warehouse', id: row.id, warehouseId: row.id }))
         .on('click', (event: L.LeafletMouseEvent) => {
           L.DomEvent.stopPropagation(event.originalEvent);
+          if (creatingRef.current || placingRef.current) { map.fire('click', { latlng: event.latlng }); return; }
           if (selectionTimer.current !== null) window.clearTimeout(selectionTimer.current);
           selectionTimer.current = window.setTimeout(() => {
             selectionTimer.current = null;
@@ -160,6 +174,7 @@ export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, er
           if (selectionTimer.current !== null) window.clearTimeout(selectionTimer.current);
           selectionTimer.current = null;
           L.DomEvent.stop(event.originalEvent);
+          if (creatingRef.current || placingRef.current) return;
           focusWarehouse(map, row);
           editWarehouseRef.current?.(row.id);
         }).addTo(group);
@@ -179,11 +194,15 @@ export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, er
             iconSize: [PIN, PIN], iconAnchor: [PIN / 2 - dx, PIN / 2 - dy],
           }),
         }).on('mouseover', () => hoverRef.current?.({ kind: 'drive', id: drive.id, warehouseId: row.id }))
-          .on('click', () => selectDriveRef.current?.(drive.id, row.id)).addTo(group);
+          .on('click', (event: L.LeafletMouseEvent) => {
+            L.DomEvent.stopPropagation(event.originalEvent);
+            if (creatingRef.current || placingRef.current) map.fire('click', { latlng: event.latlng });
+            else selectDriveRef.current?.(drive.id, row.id);
+          }).addTo(group);
       });
     }
     map.invalidateSize();
-  }, [rows, campaigns, selectedId, editingWarehouse]);
+  }, [rows, campaigns, selectedId, editingWarehouse, creatingWarehouse, placing, zoomLevel]);
 
   useEffect(() => {
     const map = mapRef.current;

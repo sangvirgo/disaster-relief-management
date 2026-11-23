@@ -969,6 +969,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
     </details>;
   }
   const aiFacts = detail?.ai_advisory?.extracted_json?.facts;
+  const hasReadyEvidence = Boolean(detail?.evidence?.items.some((item) => item.state === 'READY'));
   const aiCountMismatches = detail
     ? (['people_affected', 'children_count', 'elderly_count'] as const).filter(key =>
       typeof aiFacts?.[key] === 'number' && aiFacts[key] !== detail.subject[key])
@@ -1160,7 +1161,9 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                     {item.campaign_match_state === 'AUTO_ATTACHED' && <span className="chip">Tự động gắn theo vị trí</span>}
                     {item.handled_by_name && <span className="chip">Đang do {item.handled_by_name} xử lý</span>}
                     {['SUBMITTED', 'VERIFYING'].includes(item.status) && item.fast_track && <>
-                      <span className="chip chip--suggest" data-priority={item.fast_track.suggested_priority}>{item.fast_track.suggestion_confidence === 'LOW' ? 'Tạm gợi ý' : 'Gợi ý'} {item.fast_track.suggested_priority}</span>
+                      {item.fast_track.suggestion_confidence === 'LOW'
+                        ? <span className="chip chip--review">Chưa đủ dữ kiện chọn P</span>
+                        : <span className="chip chip--suggest" data-priority={item.fast_track.suggested_priority}>Gợi ý {item.fast_track.suggested_priority}</span>}
                       {!item.fast_track.eligible && <span className="chip chip--review">Cần rà soát kỹ</span>}
                     </>}
                     {!['SUBMITTED', 'VERIFYING'].includes(item.status) && item.priority_advisory?.level &&
@@ -1214,6 +1217,10 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                   : <span className="sos-head__nopriority">Chưa chọn ưu tiên</span>}
               </div>
               <p className="sos-head__sub">{label(detail.category)} · tiếp nhận {timeLabel(detail.received_at)}</p>
+              {detail.mission_history?.items.some((mission) => mission.status === 'COMPLETED') &&
+                !['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) && (
+                  <p className="notice" role="status">Đội đã hoàn thành nhiệm vụ cứu hộ. SOS chưa kết thúc{detail.needs_relief_supplies ? '; nhu cầu vật tư được theo dõi riêng.' : '.'}</p>
+                )}
             </header>
             <section className="claim-panel" aria-label="Nhận xử lý hồ sơ">
               {detail.handled_by && claimActive(detail) ? (
@@ -1262,6 +1269,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 </div>
               </div>
               <p className="sos-profile__description">{reliefDescription(detail.description).narrative || 'Chưa có mô tả tình huống.'}</p>
+              <RequestEvidencePanel key={detail.id} items={detail.evidence?.items ?? []} />
               <dl className="sos-profile__facts">
                 <div><dt>Sự cố</dt><dd>{label(detail.category)}</dd></div>
                 <div><dt>Cần hỗ trợ</dt><dd>
@@ -1307,12 +1315,13 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
               const aiDone = ai?.status === 'COMPLETED' && ai.review_status !== 'REJECTED';
               const aiStatus = ai?.status;
               const urgentMedicalReview = ft.reason_codes.includes('URGENT_MEDICAL_REVIEW_REQUIRED');
+              const hasPrioritySuggestion = ft.suggestion_confidence !== 'LOW' && ft.sources.length > 0;
               return (
               <section className="sos-decision" data-tone={ft.eligible ? 'ready' : 'review'} aria-label="Quyết định xử lý">
                 <div className="sos-decision__head">
                   <div>
-                    <p className="sos-decision__eyebrow">{ft.suggestion_confidence === 'LOW' ? 'Gợi ý tạm thời' : 'Hệ thống gợi ý mức ưu tiên'}</p>
-                    <p className="sos-decision__priority"><PriorityBadge priority={ft.suggested_priority} /> <span>{priorityMeaning[ft.suggested_priority].split(' · ')[1]}</span></p>
+                    <p className="sos-decision__eyebrow">{hasPrioritySuggestion ? 'Hệ thống gợi ý mức ưu tiên' : 'Chưa đủ căn cứ gợi ý mức ưu tiên'}</p>
+                    {hasPrioritySuggestion && <p className="sos-decision__priority"><PriorityBadge priority={ft.suggested_priority} /> <span>{priorityMeaning[ft.suggested_priority].split(' · ')[1]}</span></p>}
                   </div>
                   {ft.sources.length > 0 && <p className="sos-decision__basis">
                     {ft.sources.includes('AI') ? 'Quy tắc nghiệp vụ + AI' : 'Quy tắc nghiệp vụ'}
@@ -1344,7 +1353,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 </dl>}
                 {aiDone && detail.ai_advisory?.extracted_json?.summary && (
                   <p className="sos-decision__summary">
-                    <strong>AI gợi ý {ai?.suggested_priority ?? 'chưa xác định'}:</strong>{' '}
+                    <strong>{ai?.suggested_priority ? `AI gợi ý ${ai.suggested_priority}` : 'AI chưa xác định mức ưu tiên'}:</strong>{' '}
                     {detail.ai_advisory.extracted_json.summary}
                     {detail.ai_advisory.extracted_json.weather_impact && <> Thời tiết: {detail.ai_advisory.extracted_json.weather_impact}</>}
                   </p>
@@ -1378,6 +1387,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                     })}
                   </>}
                   {(aiStatus === 'QUEUED' || aiStatus === 'PROCESSING') && <p className="sos-decision__hint">AI đang đánh giá, kết quả tự cập nhật sau ít phút.</p>}
+                  {!ft.eligible && aiDone && <p className="sos-decision__hint">Hãy đối chiếu thông tin, bắt đầu xác minh rồi chọn mức ưu tiên theo đánh giá của bạn.</p>}
                   {aiResubmitAction(aiStatus)}
                 </div>
                 {aiDone && aiNeedsMismatch && <p className="sos-alert sos-alert--warning" role="status">AI ghi nhận nhu cầu cứu hộ khác với hồ sơ. Hãy đối chiếu thông tin người báo trước khi quyết định.</p>}
@@ -1569,11 +1579,13 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                       uploadPath: `/requests/${detail.id}/staff-evidence`,
                       version: detail.version,
                       warning:
-                        'Bạn đã đối chiếu vị trí, thông tin và hình ảnh được gắn cờ và thấy phù hợp? Quyết định này do điều phối viên thực hiện.',
+                        hasReadyEvidence
+                          ? 'Bạn đã đối chiếu vị trí, thông tin và tệp minh chứng của SOS? Quyết định này do điều phối viên thực hiện.'
+                          : 'Bạn đã đối chiếu vị trí và thông tin của SOS? Hồ sơ này không có tệp minh chứng để kiểm tra. Quyết định này do điều phối viên thực hiện.',
                       fields: [
                         {
                           name: 'reason',
-                          label: 'Nội dung đã đối chiếu (vị trí, thông tin, hình ảnh)',
+                          label: hasReadyEvidence ? 'Nội dung đã đối chiếu (vị trí, thông tin, tệp minh chứng)' : 'Nội dung đã đối chiếu (vị trí, thông tin)',
                           type: 'textarea',
                           required: true,
                           maxLength: 1000,
@@ -1694,6 +1706,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                       label: 'Mức ưu tiên',
                       type: 'select',
                       required: true,
+                      initialValue: detail.fast_track?.suggested_priority ?? detail.ai_priority_advisory?.suggested_priority ?? undefined,
                       options: [...priorities].sort((a, b) => Number(b.value === detail.fast_track?.suggested_priority) - Number(a.value === detail.fast_track?.suggested_priority))
                         .map((item) => ({ value: item.value, label: item.value === detail.fast_track?.suggested_priority ? `${item.value} (hệ thống gợi ý)` : item.label })),
                     },
@@ -1702,6 +1715,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                       label: 'Mức độ đầy đủ thông tin',
                       type: 'select',
                       required: true,
+                      initialValue: detail.fast_track?.suggested_priority_basis ?? 'COMPLETE',
                       options: [
                         { value: 'COMPLETE', label: 'Đủ thông tin' },
                         { value: 'INCOMPLETE_INFO', label: 'Còn thiếu thông tin' },
@@ -1843,7 +1857,6 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
             </fieldset>
             <div className="sos-tab-group" hidden={activeTab !== 'overview'}>
             {['SUBMITTED', 'VERIFYING'].includes(detail.status) && <>
-              <RequestEvidencePanel items={detail.evidence?.items ?? []} />
               <ContactAttemptPanel
                 key={`contacts-${detail.id}-${detail.version}`}
                 requestId={detail.id}

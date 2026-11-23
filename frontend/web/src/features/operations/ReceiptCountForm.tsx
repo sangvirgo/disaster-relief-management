@@ -36,6 +36,7 @@ export function ReceiptCountForm({
   driveId,
   version,
   existing,
+  initialItems,
   heldRelease = false,
   confirm,
   onSuccess,
@@ -48,6 +49,8 @@ export function ReceiptCountForm({
   driveTitle: string;
   version: number;
   existing: Existing;
+  /** Item identities from the first count, without exposing its quantities to the independent counter. */
+  initialItems?: Item[];
   heldRelease?: boolean;
   /** Independent second count: the figures are compared with the recorded count and a match approves the receipt. */
   confirm?: { countRevision: number; declarationRevision: number };
@@ -80,10 +83,13 @@ export function ReceiptCountForm({
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [attempted, setAttempted] = useState(false);
   const key = useRef<string | null>(null);
-  const existingItems: Item[] = (existing?.lines || []).filter(line => line.item_id).map(line => ({
+  const createKey = useRef<string | null>(null);
+  const evidenceKey = useRef<string | null>(null);
+  const createdReceipt = useRef<{ id: string; version: number } | null>(null);
+  const existingItems: Item[] = [...(initialItems || []), ...(existing?.lines || []).filter(line => line.item_id).map(line => ({
     id: line.item_id!, name: line.item_name || line.item_id!,
     unit: { display_name: line.unit_name || '', scale: Number(line.unit_scale ?? 0) },
-  }));
+  }))];
   const visibleCatalog = catalogItems.filter(item => allowUnexpected || lines.some(line => line.item_id === item.id));
   const items = [...driveItems, ...existingItems.filter(item => !driveItems.some(driveItem => driveItem.id === item.id)),
     ...visibleCatalog.filter(item => !driveItems.some(driveItem => driveItem.id === item.id) && !existingItems.some(existingItem => existingItem.id === item.id))];
@@ -136,7 +142,10 @@ export function ReceiptCountForm({
     fetchAll<Drive & { id: string }>('logistics', '/donation-drives')
       .then(drives => { if (!live) return; const drive = drives.find(candidate => candidate.id === driveId);
         if (!drive) throw new Error('Không tìm thấy đợt quyên góp của biên nhận trong phạm vi được cấp quyền.');
-        if (!existing?.lines?.length && !heldRelease) setLines((confirm ? drive.items : drive.items.slice(0, 1)).map(item => ({ ...empty(), item_id: item.item_id })));
+        if (!existing?.lines?.length && !heldRelease) setLines(
+          (confirm && initialItems?.length ? initialItems.map(item => ({ item_id: item.id })) : confirm ? drive.items : drive.items.slice(0, 1))
+            .map(item => ({ ...empty(), item_id: item.item_id }))
+        );
         setDriveItems(drive.items.map(item => ({
         id: item.item_id, name: item.item_name,
         unit: { display_name: item.unit_name, scale: Number(item.scale) },
@@ -174,19 +183,20 @@ export function ReceiptCountForm({
     setBusy(true);
     try {
       key.current ||= newCommandKey();
-      let targetReceipt = receiptId;
-      let targetVersion = version;
-      if (create && !receiptId) {
+      if (create && !receiptId && !createdReceipt.current) {
+        createKey.current ||= newCommandKey();
         const created = await api<{ id: string; version: number }>('logistics', '/donation-receipts', {
-          method: 'POST', idempotencyKey: `${key.current}-receipt`,
+          method: 'POST', idempotencyKey: createKey.current,
           body: { delivery_id: create.deliveryId, warehouse_id: create.warehouseId },
         });
-        targetReceipt = created.id;
-        targetVersion = Number(created.version);
+        createdReceipt.current = { id: created.id, version: Number(created.version) };
       }
+      const targetReceipt = createdReceipt.current?.id || receiptId;
+      const targetVersion = createdReceipt.current?.version ?? version;
       if (evidence) {
+        evidenceKey.current ||= newCommandKey();
         await upload('logistics', `/public/donations/${encodeURIComponent(deliveryId)}/evidence`, evidence, {
-          idempotencyKey: `${key.current}-evidence`,
+          idempotencyKey: evidenceKey.current,
         });
       }
       const result = await api<{ confirmation?: { matched: boolean; mismatched_items: string[] } }>('logistics', `/donation-receipts/${encodeURIComponent(targetReceipt)}/${confirm ? 'confirmations' : 'counts'}`, {
@@ -218,7 +228,7 @@ export function ReceiptCountForm({
   return (
     <form className="form-stack command-form" onSubmit={submit} noValidate>
       <h3>{heldRelease ? 'Kiểm tra lại hàng tạm giữ' : confirm ? 'Xác nhận kiểm đếm độc lập' : 'Gửi kết quả kiểm đếm'}</h3>
-      <p>{confirm ? 'Tự đếm hàng thực tế rồi nhập số đếm được. Nếu khớp lần đếm trước, biên nhận được duyệt và ghi sổ ngay.' : heldRelease ? 'Chỉ tăng phần tiếp nhận và giảm tương ứng phần tạm giữ.' : 'Nhập số lượng đếm được cho từng vật phẩm.'}</p>
+      <p>{confirm ? 'Tự đếm hàng thực tế rồi nhập số đếm được. Số lượng của lần đếm trước được ẩn đến khi bạn gửi kết quả. Nếu khớp, biên nhận được duyệt và ghi sổ ngay.' : heldRelease ? 'Chỉ tăng phần tiếp nhận và giảm tương ứng phần tạm giữ.' : 'Nhập số lượng đếm được cho từng vật phẩm.'}</p>
       {driveLoading && <p role="status">Đang tải vật phẩm của đợt quyên góp…</p>}
       {itemsError && (
         <p className="notice error" role="alert">
@@ -345,7 +355,7 @@ export function ReceiptCountForm({
       </label>}
       {!heldRelease && <label>
         <span>Kèm minh chứng (không bắt buộc)</span>
-        <input type="file" accept="image/jpeg,image/png,video/mp4" onChange={event => { setEvidence(event.target.files?.[0] || null); key.current = null; }} />
+        <input type="file" accept="image/jpeg,image/png,video/mp4" onChange={event => { setEvidence(event.target.files?.[0] || null); key.current = null; evidenceKey.current = null; }} />
         {evidence && evidenceFileError(evidence) && <small className="field-error" role="alert">{evidenceFileError(evidence)}</small>}
       </label>}
       {error && (

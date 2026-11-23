@@ -101,6 +101,19 @@ describe('Logistics donor tracking queries', () => {
     expect(stranger.query.mock.calls.some(([sql]) => String(sql).includes('logistics_attachment'))).toBe(false);
   });
 
+  it('withholds first-count quantities from donation tracking while independent review is pending', async () => {
+    const query = jest.fn(async (sql: string) => {
+      if (sql.includes('FROM donation_delivery')) return [{ id: deliveryId, public_code: 'ABCDEFGH', status: 'PENDING_REVIEW', version: 2, donor_user_id: null, capability_hash: null }];
+      if (sql.includes('FROM donation_receipt')) return [{ id: '55555555-5555-4555-8555-555555555555', count_revision: 1 }];
+      if (sql.includes('FROM donation_declaration')) return [{ revision: 1, created_by_kind: 'DONOR' }];
+      return [];
+    });
+    const service = new DonationsQueriesService({ query } as never, { require: jest.fn() } as never, config);
+    const result = await service.track(deliveryId, undefined, request());
+    expect(result.receipt).toEqual({ count_revision: 1, lines: [] });
+    expect(query.mock.calls.some(([sql]) => sql.includes('WITH current_declaration'))).toBe(false);
+  });
+
   it('keeps tracking read-only by opaque identifier: an invalid capability only withholds can_manage and exposes no contact data', async () => {
     const dataSource = { query: jest.fn(async () => [{
       id: deliveryId, drive_id: '22222222-2222-4222-8222-222222222222', public_code: 'ABCDEFGH',

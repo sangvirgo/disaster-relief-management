@@ -142,15 +142,6 @@
   border-color: var(--color-primary);
 }
 
-.team-member-search-row .button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  min-height: var(--control-h-lg);
-  white-space: nowrap;
-}
-
 .team-member-search-results {
   box-sizing: border-box;
   display: grid;
@@ -224,17 +215,6 @@
 
 .team-member-dialog .team-member-add-button {
   min-height: var(--control-h);
-}
-
-@media (min-width: 720px) {
-  .team-member-search-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-  }
-
-  .team-member-search-row .button {
-    min-width: 152px;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
