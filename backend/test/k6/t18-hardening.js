@@ -26,12 +26,22 @@ function isLoopbackBaseUrl(value) {
     octets.every((octet) => octet >= 0 && octet <= 255) && octets[0] === 127;
 }
 
+// The access token lives at most 10 minutes (identity access TTL), so run-t18.sh runs the measured interval in
+// segments shorter than that and logs in again between them. Defaults keep the documented 2 min + 10 min shape.
+const vus = Number(__ENV.C48_K6_VUS || 20);
+const warmupDuration = __ENV.C48_K6_WARMUP || '2m';
+const measuredDuration = __ENV.C48_K6_MEASURED || '10m';
+const warmupSeconds = warmupDuration === '0s' ? 0 : undefined;
+
 export const options = {
   scenarios: {
-    warmup: { executor: 'constant-vus', exec: 'warmup', vus: 20, duration: '2m' },
-    measured: { executor: 'constant-vus', exec: 'default', vus: 20, duration: '10m', startTime: '2m' },
+    ...(warmupSeconds === 0 ? {} : { warmup: { executor: 'constant-vus', exec: 'warmup', vus, duration: warmupDuration } }),
+    measured: { executor: 'constant-vus', exec: 'default', vus, duration: measuredDuration, ...(warmupSeconds === 0 ? {} : { startTime: warmupDuration }) },
   },
   thresholds: {
+    // Empty-threshold entries only make k6 print a per-status request count, so failures are attributed in the summary.
+    'http_reqs{status:200}': ['count>=0'], 'http_reqs{status:201}': ['count>=0'], 'http_reqs{status:400}': ['count>=0'],
+    'http_reqs{status:401}': ['count>=0'], 'http_reqs{status:429}': ['count>=0'], 'http_reqs{status:500}': ['count>=0'],
     http_req_failed: ['rate<0.01'],
     checks: ['rate>0.99'],
     read_latency_ms: ['p(95)<2000'],

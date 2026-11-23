@@ -142,9 +142,9 @@ test('restore refuses primary databases and requires an explicitly isolated dest
 test('the performance scenario is gated before it can send SOS writes', () => {
   const k6 = readFileSync(new URL('../../test/k6/t18-hardening.js', import.meta.url), 'utf8');
   assert.match(k6, /K6_ENABLE_SOS_WRITES/u);
-  assert.match(k6, /vus:\s*20/u);
-  assert.match(k6, /duration:\s*['"]2m['"]/u);
-  assert.match(k6, /duration:\s*['"]10m['"]/u);
+  assert.match(k6, /C48_K6_VUS \|\| 20/u);
+  assert.match(k6, /C48_K6_WARMUP \|\| '2m'/u);
+  assert.match(k6, /C48_K6_MEASURED \|\| '10m'/u);
   assert.match(k6, /__ITER\s*%\s*5/u);
   assert.match(k6, /read_latency_ms/u);
   assert.match(k6, /sos_latency_ms/u);
