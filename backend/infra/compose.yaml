@@ -10,6 +10,7 @@ services:
   postgres:
     container_name: reliva-postgres
     restart: unless-stopped
+    mem_limit: 512m
     logging: *default-logging
     image: postgis/postgis:17-3.5@sha256:01a6a70e41e6c4467c8f55f6063555ed72db2d6662cd0d571040d42eadaeb6f6
     environment:
@@ -116,6 +117,7 @@ services:
   identity-api:
     container_name: reliva-identity-api
     restart: unless-stopped
+    mem_limit: 384m
     logging: *default-logging
     image: ${C48_IMAGE_NAMESPACE:-reliva}/identity-api:${C48_IMAGE_TAG:-latest}
     build:
@@ -172,6 +174,7 @@ services:
   response-api:
     container_name: reliva-response-api
     restart: unless-stopped
+    mem_limit: 512m
     logging: *default-logging
     image: ${C48_IMAGE_NAMESPACE:-reliva}/response-api:${C48_IMAGE_TAG:-latest}
     build:
@@ -244,6 +247,7 @@ services:
   logistics-api:
     container_name: reliva-logistics-api
     restart: unless-stopped
+    mem_limit: 512m
     logging: *default-logging
     image: ${C48_IMAGE_NAMESPACE:-reliva}/logistics-api:${C48_IMAGE_TAG:-latest}
     build:
@@ -301,6 +305,7 @@ services:
   web:
     container_name: reliva-web
     restart: unless-stopped
+    mem_limit: 64m
     logging: *default-logging
     image: ${C48_IMAGE_NAMESPACE:-reliva}/web:${C48_IMAGE_TAG:-latest}
     build:
@@ -319,6 +324,7 @@ services:
   nginx:
     container_name: reliva-nginx
     restart: unless-stopped
+    mem_limit: 64m
     logging: *default-logging
     image: nginx:1.30.5
     environment:
@@ -448,6 +454,7 @@ services:
   prometheus:
     container_name: reliva-prometheus
     restart: unless-stopped
+    mem_limit: 256m
     logging: *default-logging
     profiles: [observability]
     image: prom/prometheus:v3.16.0@sha256:e04987641b57704f408e31f6373ba4138ecf27cb4a165d24aabb6c38fddd0f06
@@ -466,6 +473,7 @@ services:
   alertmanager:
     container_name: reliva-alertmanager
     restart: unless-stopped
+    mem_limit: 64m
     logging: *default-logging
     profiles: [observability]
     image: prom/alertmanager:v0.34.2@sha256:39d8bb3966c694a124428a3a88fbcffd40bd069129ecd47c059f8a3f17c55f3b
@@ -482,6 +490,7 @@ services:
   node-exporter:
     container_name: reliva-node-exporter
     restart: unless-stopped
+    mem_limit: 64m
     logging: *default-logging
     profiles: [observability]
     image: prom/node-exporter:v1.12.1@sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0
@@ -498,6 +507,7 @@ services:
   postgres-exporter:
     container_name: reliva-postgres-exporter
     restart: unless-stopped
+    mem_limit: 64m
     logging: *default-logging
     profiles: [observability]
     image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1@sha256:ac5ec343104fae0e2d84a27bb8d69b38430a11910c5382cad85d478d2bab713e
@@ -513,6 +523,7 @@ services:
   grafana:
     container_name: reliva-grafana
     restart: unless-stopped
+    mem_limit: 448m
     logging: *default-logging
     profiles: [observability]
     image: grafana/grafana:13.2.6@sha256:b21409d7951ddcfd63a4b49083e4ef2cc35bc1437d071813bf82bfb238b00bca
