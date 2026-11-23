@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the Reliva (C48) database backup daily at 02:00 Vietnam time
+
+[Timer]
+# 19:00 UTC is 02:00 in Vietnam (UTC+7, no daylight saving time).
+OnCalendar=*-*-* 19:00:00 UTC
+Persistent=true
+Unit=c48-backup.service
+
+[Install]
+WantedBy=timers.target
