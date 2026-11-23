@@ -21501,14 +21501,6 @@
                       "message": "Nhu cầu cho mặt hàng này đã tồn tại.",
                       "correlation_id": "00000000-0000-4000-8000-000000000000"
                     }
-                  },
-                  "NEED_CAMPAIGN_REQUIRED": {
-                    "summary": "NEED_CAMPAIGN_REQUIRED",
-                    "value": {
-                      "code": "NEED_CAMPAIGN_REQUIRED",
-                      "message": "SOS này chưa thuộc chiến dịch nào nên chưa thể xác nhận đề xuất. Điều phối viên cần gắn SOS vào chiến dịch; nếu vừa gắn, hãy chờ vài phút để hệ thống cập nhật.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
                   }
                 }
               }
