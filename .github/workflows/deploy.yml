@@ -36,21 +36,14 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm run lint
       - run: npm run check:compose-env
-      # Known failures that exist on a clean main (tracked separately, not caused by the pipeline):
-      #   jest: apps/logistics/test/donations-queries.service.spec.ts, apps/response/test/tracking-pagination.spec.ts
-      #   node: "documented endpoint errors use catalog status and exact Vietnamese messages"
-      # Remove these exclusions as soon as those tests are fixed so the gate covers everything again.
       - name: Unit tests (jest)
-        run: >
-          node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand
-          --testPathIgnorePatterns 'apps/logistics/test/donations-queries.service.spec.ts'
-          --testPathIgnorePatterns 'apps/response/test/tracking-pagination.spec.ts'
+        run: node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand
       - name: Script and deployment tests (node:test)
         # The recovery-workflow tests run the real backup/restore scripts, which refuse to start without backend/.env.
         # Local development copies the example; do the same here (no secrets involved).
         run: |
           cp .env.example .env
-          node --test --test-skip-pattern 'documented endpoint errors use catalog status' scripts/__tests__/*.test.mjs
+          node --test scripts/__tests__/*.test.mjs
 
   images:
     needs: test

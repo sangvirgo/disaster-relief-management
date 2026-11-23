@@ -30,7 +30,9 @@ test('only /health/live is exposed through nginx for the external uptime check',
 test('the production template lists exactly the variables of .env.example and leaves AWS keys empty', () => {
   const example = read('../../.env.example');
   const production = read('../../.env.production.example');
-  assert.deepEqual(keys(production), keys(example));
+  // S3_BACKUP_BUCKET is read only by the host backup scripts, so the local template has no use for it.
+  assert.deepEqual(keys(production).filter((key) => key !== 'S3_BACKUP_BUCKET'), keys(example));
+  assert.match(production, /^S3_BACKUP_BUCKET=c48-backup-__SUFFIX__$/mu);
   for (const key of ['S3_RESPONSE_ACCESS_KEY', 'S3_LOGISTICS_ACCESS_KEY', 'SEED_PASSWORD']) {
     assert.match(production, new RegExp(`^${key}=$`, 'mu'));
   }
