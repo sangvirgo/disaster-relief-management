@@ -29,7 +29,7 @@ for ((i = 1; i <= $#; i++)); do if [[ "\${!i}" == --env-file ]]; then j=$((i + 1
 case "$*" in
   *"ps --status running --services"*) echo postgres ;;
   *pg_dump*) printf 'PGDMP-fake' ;;
-  *"exec -T nginx nginx -t"*) exit "\${FAKE_NGINX_TEST_STATUS:-0}" ;;
+  *"--force-recreate"*) [[ "$FAKE_NGINX_FAIL" == 1 && -n "$env_file" ]] && grep -q "^C48_IMAGE_TAG=bbb$" "$env_file" && exit 1; exit 0 ;;
   *" up "*) if [[ -n "$env_file" ]] && grep -q "^C48_IMAGE_TAG=$FAKE_FAIL_TAG$" "$env_file"; then exit 1; fi ;;
   *"image ls"*) printf 'ghcr.io/example/web:old1\\nghcr.io/example/web:aaa\\nghcr.io/example/web:bbb\\nother/image:old1\\n' ;;
 esac
@@ -187,20 +187,23 @@ test('the observability profile is started only when C48_OBSERVABILITY=on, and i
   } finally { on.cleanup(); }
 });
 
-test('a release reloads nginx after starting the stack and fails when the configuration is rejected', () => {
-  const ok = sandbox();
+test('a release recreates nginx after starting the stack so it sees the new bind-mounted file', () => {
+  const box = sandbox();
   try {
-    assert.equal(ok.run('deploy', 'aaa').status, 0);
-    const log = readFileSync(ok.calls, 'utf8');
-    assert.ok(log.indexOf('exec -T nginx nginx -t') > log.indexOf(' up '), 'nginx is checked after the stack is up');
-    assert.match(log, /exec -T nginx nginx -s reload/u);
-  } finally { ok.cleanup(); }
+    assert.equal(box.run('deploy', 'aaa').status, 0);
+    const log = readFileSync(box.calls, 'utf8');
+    assert.match(log, /up --no-build -d --no-deps --force-recreate --wait --wait-timeout \d+ nginx/u);
+    assert.ok(log.indexOf('--force-recreate') > log.indexOf('up --no-build -d --wait'), 'nginx is recreated after the main start');
+  } finally { box.cleanup(); }
+});
 
-  const bad = sandbox();
+test('a release fails and rolls back when nginx cannot start with the new configuration', () => {
+  const box = sandbox();
   try {
-    const result = bad.run('deploy', 'aaa', { FAKE_NGINX_TEST_STATUS: '1' });
+    assert.equal(box.run('deploy', 'aaa').status, 0);
+    const result = box.run('deploy', 'bbb', { FAKE_NGINX_FAIL: '1' });
     assert.notEqual(result.status, 0);
-    assert.match(result.stdout + result.stderr, /nginx -t rejected the configuration/u);
-    assert.equal(bad.release('current'), null, 'a release with a broken nginx configuration must not become current');
-  } finally { bad.cleanup(); }
+    assert.match(result.stdout + result.stderr, /nginx did not start/u);
+    assert.equal(box.release('current'), 'aaa');
+  } finally { box.cleanup(); }
 });
