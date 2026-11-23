@@ -76,3 +76,31 @@ Operator machine: AWS CLI v2 and `session-manager-plugin`, a profile with permis
 4. Then monitoring, k6 measurement, and the `AGENTS.md` / plan 6.3 update.
 
 No real blocker. The open choices belong to the operator: enable advanced features (to move to OIDC or another region), enable evidence-bucket versioning, and whether the video limit stays.
+
+## 10. Update 2026-11-23 (second session)
+
+No secret, account number, key id, IP address or mailbox is recorded here.
+
+**Done and merged (PRs #24 to #29), each with CI green on its last commit and a successful CD run**
+
+| PR | What | Verified how |
+|---|---|---|
+| #24 | `EmailSenderService` logs only the nodemailer/SMTP code (`EMAIL_SEND_FAILED code=EAUTH smtp_response=535`), with tests | jest 4 tests; on the host `nodemailer verify()` returned OK. **Mail delivery to an inbox is still not confirmed** (needs a human to register and read the mailbox) |
+| #25 | `backup-s3` (3 dumps, `pg_restore --list`, SHA-256 manifest, S3-verified upload, keep newest 2), `restore-s3` (`--list --verify --counts --reset`), systemd timer 19:00 UTC installed by `release` | Fake-docker/aws tests (7 + 1). **Real host**: 3 consecutive runs left exactly 2 backups (10 objects); drill backup, `reset-demo-data`, `restore-s3 --reset`: 79 tables, row counts identical before and after, health checks passed |
+| #26 | Fixed the 3 known failing tests (two stale tests/snapshots, one already passing) and removed the CI exclusions | Full jest 173 suites / 1180 tests; node tests all pass |
+| #27 | Internal `/metrics` (prom-client) on the 3 APIs, Compose profile `observability` (Prometheus, Alertmanager, node_exporter, postgres_exporter, Grafana; digests pinned), rules, one dashboard, `container-metrics` textfile timer, optional `c48_monitor` role | jest 9 + node tests 150; `promtool check rules` and `amtool check-config`. On the host: `/metrics` answers directly, 404 with a proxy header |
+| #28, #29 | `release` recreates nginx after the stack starts | #28 (reload) did not work: a single-file bind mount keeps the old inode after `git checkout`; #29 recreates the container. Host: `nginx -T` shows the `/metrics` rule, `/metrics` through nginx returns 404 |
+
+**Verified on the host:** `reset-demo-data --reset` runs end to end (first real run). A 4000x3000 JPEG uploaded as a guest SOS evidence was stored as 2048x1536 (368 KB), and the signed 60-second S3 URL (regional S3 endpoint) downloaded it.
+
+**Not done / needs a human**
+- Profile `observability` is **not running yet**: it needs `GRAFANA_ADMIN_PASSWORD`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` typed into `/opt/c48/backend/.env` by the operator and `C48_OBSERVABILITY=on`. `C48_MONITOR_PASSWORD` was generated on the host. Then Cloudflare: public hostname `grafana` to `http://localhost:3000` on tunnel `reliva-ec2`, an Access policy, and the Tunnel health notification. RAM before: about 1.16 GB used, 2.67 GB available (6 containers); after: not measured.
+- Backup bucket lifecycle (expire after 3 days, abort incomplete multipart) not verified: the instance role cannot read it; the operator must check in the S3 console. Offsite copy: download one backup by hand.
+- Logistics evidence upload through the public API not verified (creating a delivery needs a signed-in account).
+- Not started: `mem_limit` values, CloudWatch Logs, k6 runs, AGENTS.md / plan 6.3 update (needs the operator's consent), Node 20 action warnings.
+
+**Lessons**
+- `git stash` is shared by all worktrees: a bare `git stash pop` applied the operator's older stash onto an agent worktree (undone; the stash is intact). Do not use stash in worktrees.
+- Non-interactive SSM: a pty is required (`script -qec`); pass multi-line scripts as `sudo bash -c "echo <base64> | base64 -d | bash"`.
+
+**Next concrete task:** operator sets the four `.env` values; then run `release`-equivalent start of the profile, measure `docker stats` and `free -m`, send a test alert, then Cloudflare Access.
