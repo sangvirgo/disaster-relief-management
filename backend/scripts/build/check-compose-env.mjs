@@ -143,4 +143,7 @@ const production = spawnSync('docker', args, { encoding: 'utf8', env: { ...proce
 if (production.error) throw production.error;
 if (production.status !== 0) throw new Error(`Production Compose config failed (${production.status}): ${production.stderr.trim()}`);
 assert.equal(JSON.parse(production.stdout).services.seed.environment.NODE_ENV, 'production', 'seed must refuse production mode');
+for (const name of ['postgres', 'identity-api', 'response-api', 'logistics-api', 'web', 'nginx', 'prometheus', 'alertmanager', 'node-exporter', 'postgres-exporter', 'grafana']) {
+  assert.ok(Number(compose.services[name].mem_limit) > 0, `${name} must have a mem_limit (the host has 4 GB of RAM)`);
+}
 process.stdout.write(`PASS primary C48 Compose services, loopback ports, and resource names (${expectedServices.length} services)\n`);
