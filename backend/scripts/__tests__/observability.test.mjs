@@ -14,7 +14,7 @@ test('alert rules cover the required conditions and read in Vietnamese', () => {
   const rules = groups.flatMap((group) => group.rules);
   const names = rules.map((rule) => rule.alert);
   for (const required of ['TargetDown', 'DiskAlmostFull', 'MemoryLow', 'SwapHigh', 'ApiServerErrors', 'PostgresConnectionsNearLimit',
-    'ContainerRestarting', 'BackupTooOld', 'ApiLatencyHigh']) assert.ok(names.includes(required), `${required} is missing`);
+    'ContainerRestarting', 'BackupTooOld', 'ApiLatencyHigh', 'GeminiMostCallsFailing', 'GeminiKeyQuotaExceeded', 'GeminiKeyRejected', 'AiDailyLimitNear']) assert.ok(names.includes(required), `${required} is missing`);
   assert.equal(new Set(names).size, names.length, 'alert names must be unique');
   for (const rule of rules) {
     assert.ok(['warning', 'critical'].includes(rule.labels?.severity), `${rule.alert} needs a severity`);

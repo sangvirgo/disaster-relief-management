@@ -1,6 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
+import { registerGeminiMetrics } from './gemini-metrics';
 import { collectDefaultMetrics, Counter, Gauge, Histogram, Registry } from 'prom-client';
 
 export type MetricsService = 'identity' | 'response' | 'logistics';
@@ -92,6 +93,7 @@ export function installMetrics(
   const metrics = createServiceMetrics(service);
   options = { pool: () => typeormPool(app), ...options };
   if (options.pool) registerPoolMetrics(metrics.registry, options.pool);
+  registerGeminiMetrics(metrics.registry);
   options.domain?.(metrics.registry);
   const express = app.getHttpAdapter().getInstance() as { use: (handler: RequestHandler) => void; get: (path: string, handler: RequestHandler) => void };
   express.use(metrics.middleware);

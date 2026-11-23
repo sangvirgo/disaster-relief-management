@@ -4,6 +4,7 @@ import { ApiExceptionFilter, correlationMiddleware, createPinoLogger, installMet
 import { setupOpenApiDocs } from '@c48/technical/openapi-docs';
 import { DataSource } from 'typeorm';
 import { AppModule } from './app.module';
+import { registerAiMetrics } from './metrics/ai-metrics';
 import { registerSosMetrics } from './metrics/sos-metrics';
 
 async function bootstrap(): Promise<void> {
@@ -12,7 +13,7 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { logger });
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
   app.use(correlationMiddleware());
-  installMetrics(app, 'response', { domain: (registry) => registerSosMetrics(registry, app.get(DataSource)) });
+  installMetrics(app, 'response', { domain: (registry) => { registerSosMetrics(registry, app.get(DataSource)); registerAiMetrics(registry, app.get(DataSource)); } });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true, exceptionFactory: validationExceptionFactory }));
   app.useGlobalFilters(new ApiExceptionFilter(loadErrorCatalog(), 'response'));
   app.setGlobalPrefix('api/v1/response', {

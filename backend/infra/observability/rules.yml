@@ -111,3 +111,36 @@ groups:
         annotations:
           summary: 'Không có số liệu sao lưu'
           description: 'Chưa có tệp số liệu sao lưu: hẹn giờ sao lưu có thể chưa được cài hoặc chưa chạy lần nào.'
+
+  - name: c48-ai
+    rules:
+      - alert: GeminiMostCallsFailing
+        expr: |
+          sum(increase(c48_gemini_attempts_total{outcome!="ok"}[15m])) / sum(increase(c48_gemini_attempts_total[15m])) > 0.5
+          and sum(increase(c48_gemini_attempts_total[15m])) >= 5
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: 'Hơn một nửa lần gọi Gemini thất bại'
+          description: 'Trong 15 phút qua {{ $value | humanizePercentage }} lần gọi Gemini không thành công. Xem bảng "AI Gemini" để biết lỗi theo key và mô hình.'
+      - alert: GeminiKeyQuotaExceeded
+        expr: sum by (key_slot, model) (increase(c48_gemini_attempts_total{outcome="quota_429"}[15m])) > 0
+        for: 1m
+        labels: { severity: warning }
+        annotations:
+          summary: 'Key Gemini số {{ $labels.key_slot }} hết hạn mức (429)'
+          description: 'Mô hình {{ $labels.model }}: key vị trí {{ $labels.key_slot }} bị từ chối vì hết hạn mức. Hệ thống tự chuyển sang key kế tiếp nếu còn.'
+      - alert: GeminiKeyRejected
+        expr: sum by (key_slot, model) (increase(c48_gemini_attempts_total{outcome="auth_401_403"}[15m])) > 0
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: 'Key Gemini số {{ $labels.key_slot }} đã bị từ chối (401/403)'
+          description: 'Key vị trí {{ $labels.key_slot }} có thể đã bị thu hồi, sai hoặc bị khoá. Kiểm tra GEMINI_API_KEYS trong backend/.env.'
+      - alert: AiDailyLimitNear
+        expr: c48_ai_daily_call_limit > 0 and c48_ai_daily_calls / c48_ai_daily_call_limit > 0.80
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: 'Số lần gọi AI trong ngày đã quá 80% giới hạn'
+          description: 'Đã dùng {{ $value | humanizePercentage }} của GEMINI_DAILY_CALL_LIMIT. Sau khi hết, yêu cầu AI được hẹn lại sang ngày mới.'

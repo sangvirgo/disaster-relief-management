@@ -20,3 +20,4 @@ export * from './media/evidence-media';
 export * from './uploads/evidence-upload';
 export * from './http/validation-errors';
 export * from './observability/metrics';
+export * from './observability/gemini-metrics';

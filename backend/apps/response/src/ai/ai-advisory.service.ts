@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import type { DataSource } from 'typeorm';
 import { buildAiAssessmentInput } from './ai-risk';
 import { enqueueAiAdvisory, isAiAdvisoryFresh } from './ai-advisory-input';
+import { geminiOutcomeForStatus, recordGeminiAttempt } from '@c48/technical';
 import { getGeminiApiKeys } from './gemini-api-keys';
 import { WeatherService } from '../weather/weather.service';
 
@@ -463,7 +464,7 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
     const deadline = Date.now() + 35_000;
     let lastFailure: string | undefined;
-    for (const apiKey of apiKeys) {
+    for (const [keyIndex, apiKey] of apiKeys.entries()) {
       const remainingMs = deadline - Date.now();
       if (remainingMs <= 0) {
         lastFailure = 'NETWORK';
@@ -477,18 +478,21 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
           body,
           signal: AbortSignal.timeout(Math.min(perAttemptMs, remainingMs)),
         });
-      } catch {
+      } catch (error) {
         lastFailure = 'NETWORK';
+        recordGeminiAttempt(model, keyIndex, error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError') ? 'timeout' : 'network');
         continue;
       }
       if (!response.ok) {
         const status = response.status;
+        recordGeminiAttempt(model, keyIndex, geminiOutcomeForStatus(status));
         if (status === 401 || status === 403 || status === 408 || status === 429 || status >= 500) {
           lastFailure = String(status);
           continue;
         }
         throw new Error(`AI_PROVIDER_ERROR:${status}`);
       }
+      recordGeminiAttempt(model, keyIndex, 'ok');
       const responseBody = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
       return JSON.parse(responseBody.candidates?.[0]?.content?.parts?.[0]?.text ?? '') as unknown;
     }

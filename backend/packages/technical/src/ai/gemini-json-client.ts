@@ -2,6 +2,8 @@
 // advisory queue (Logistics need extraction). It never logs or returns the API key, the prompt or the raw response body.
 // Response keeps its own queue-based client; this module does not change that behaviour.
 
+import { geminiOutcomeForStatus, recordGeminiAttempt } from '../observability/gemini-metrics';
+
 export type GeminiJsonSchema = Record<string, unknown>;
 
 export interface GeminiJsonRequest {
@@ -48,7 +50,7 @@ export async function callGeminiJson(request: GeminiJsonRequest): Promise<unknow
     },
   });
   let last: GeminiCallError = new GeminiCallError('HTTP', 503);
-  for (const apiKey of request.apiKeys) {
+  for (const [keyIndex, apiKey] of request.apiKeys.entries()) {
     const remaining = request.deadlineMs - now();
     if (remaining <= 0) throw new GeminiCallError('TIMEOUT');
     let response: Response;
@@ -63,10 +65,12 @@ export async function callGeminiJson(request: GeminiJsonRequest): Promise<unknow
       last = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')
         ? new GeminiCallError('TIMEOUT')
         : new GeminiCallError('NETWORK');
+      recordGeminiAttempt(request.model, keyIndex, last.kind === 'TIMEOUT' ? 'timeout' : 'network');
       continue;
     }
     if (!response.ok) {
       const status = response.status;
+      recordGeminiAttempt(request.model, keyIndex, geminiOutcomeForStatus(status));
       if (status === 429) last = new GeminiCallError('QUOTA', status);
       else if (status === 401 || status === 403 || status === 408 || status >= 500) last = new GeminiCallError('HTTP', status);
       else throw new GeminiCallError('HTTP', status);
@@ -77,8 +81,10 @@ export async function callGeminiJson(request: GeminiJsonRequest): Promise<unknow
       const payload = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
       parsed = JSON.parse(payload.candidates?.[0]?.content?.parts?.[0]?.text ?? '') as unknown;
     } catch {
+      recordGeminiAttempt(request.model, keyIndex, 'invalid_output');
       throw new GeminiCallError('INVALID_OUTPUT');
     }
+    recordGeminiAttempt(request.model, keyIndex, 'ok');
     return parsed;
   }
   throw last;
