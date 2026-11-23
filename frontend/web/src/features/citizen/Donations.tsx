@@ -53,6 +53,7 @@ type Tracking = {
   public_code: string;
   status: string;
   can_manage: boolean;
+  attachments?: { id: string; size_bytes: number; detected_mime: string; created_at: string; dispute_id: string | null }[];
   declaration?: { lines: { item_id: string; item_name: string; unit_name: string; declared_quantity: string }[] };
   receipt?: {
     id: string;
@@ -805,9 +806,17 @@ export function Donations({ user }: { user: Me | null }) {
                 Tải minh chứng lên
               </button>
             </form>
+            {tracking.can_manage && (tracking.attachments?.length ?? 0) > 0 && <section>
+              <h3>Tệp đã gửi cho lần bàn giao này</h3>
+              {tracking.attachments!.map(item => <div key={item.id}>
+                <p>{item.detected_mime === 'video/mp4' ? 'Video' : 'Ảnh'} · {Math.ceil(item.size_bytes / 1024)} KB · {new Date(item.created_at).toLocaleString('vi-VN')}</p>
+                <button type="button" className="button secondary" disabled={loading} onClick={() => void prepareEvidenceDownload(item.id)}>Lấy liên kết mở tệp</button>
+                {evidenceLink?.id === item.id && <p><a href={evidenceLink.url} target="_blank" rel="noopener noreferrer">Mở tệp trong tab mới</a> · Liên kết có thời hạn; lấy lại liên kết nếu đã hết hạn.</p>}
+              </div>)}
+            </section>}
             {uploadedEvidence.some(item => item.donationId === tracking.id && item.owner === (user?.id || null)) && <section>
-              <h3>Tệp vừa tải trong phiên này</h3>
-              <p>Danh sách này không gồm tệp từ phiên trước và sẽ mất khi tải lại trang. Tệp đã được tiếp nhận vẫn lưu trên hệ thống.</p>
+              <h3>Tên tệp vừa tải trong phiên này</h3>
+              <p>Tên tệp gốc chỉ có trong phiên này; danh sách đầy đủ các tệp đã gửi nằm ở mục phía trên.</p>
               {uploadedEvidence.filter(item => item.donationId === tracking.id && item.owner === (user?.id || null)).map(item => <div key={item.id}>
                 <p style={{ overflowWrap: 'anywhere' }}>{item.name}</p>
                 <button type="button" className="button secondary" disabled={loading} onClick={() => void prepareEvidenceDownload(item.id)}>Lấy liên kết mở tệp {item.name}</button>

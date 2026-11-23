@@ -265,7 +265,10 @@ export const SOSTrackingScreen: React.FC = () => {
       const savedEvidence = result?.id
         ? await StorageService.getRequestEvidence(result.id).catch(() => [])
         : [];
-      setUploadedEvidence(savedEvidence);
+      // The server list is authoritative (it survives a reinstall or another device); local entries only fill gaps.
+      const serverEvidence = result.evidence ?? [];
+      const knownIds = new Set(serverEvidence.map((item) => item.id));
+      setUploadedEvidence([...serverEvidence, ...savedEvidence.filter((item) => !knownIds.has(item.id))]);
 
       // Tải danh sách sự kiện chi tiết từ API chuyên biệt GET /requests/:id/events
       if (result?.id) {

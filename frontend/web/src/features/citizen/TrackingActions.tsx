@@ -8,7 +8,7 @@ import { LocationPicker, type Point } from '../../maps/LocationPicker';
 import { confirmAction } from '../../components/confirmAction';
 
 type Tracking = ResponseComponents['schemas']['ReporterTracking'];
-type Evidence = { id: string; state: string; size_bytes: number; created_at: string };
+type Evidence = { id: string; state: string; size_bytes: number; created_at: string; detected_mime?: string };
 type Event = { id?: string; event_type: string; occurred_at: string; public_text_code?: string };
 const headers = (code: string) => ({
   'X-Tracking-Code': code.trim(),
@@ -33,7 +33,7 @@ export function TrackingActions({
   const [gpsCapturedAt, setGpsCapturedAt] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const fileError = file ? evidenceFileError(file) : null;
-  const [evidence, setEvidence] = useState<Evidence[]>([]);
+  const [evidence, setEvidence] = useState<Evidence[]>(() => tracking.evidence ?? []);
   const [downloadUrls, setDownloadUrls] = useState<Record<string, string>>({});
   const [downloadingId, setDownloadingId] = useState('');
   const [events, setEvents] = useState<Event[]>([]);
@@ -329,7 +329,7 @@ export function TrackingActions({
       )}
       {evidence.length > 0 && (
         <div className="tracking-recent-evidence">
-          <h3>Tệp vừa gửi trong phiên này</h3>
+          <h3>Tệp đã gửi cho SOS này</h3>
           <div className="record-list">
             {evidence.map((item) => (
               <div className="record" key={item.id}>

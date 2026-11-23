@@ -420,6 +420,13 @@ export class TrackingService {
          LEFT JOIN assistance_request canonical ON canonical.id=r.canonical_request_id
         WHERE r.id=$1`, [row.id],
     ) as Array<{ rejection_reason: string | null; duplicate_of_code: string | null }>;
+    // Only the reporter's own files: staff and mission uploads (another uploader) never appear here.
+    const evidence = await this.dataSource.query(
+      `SELECT id,state,size_bytes,detected_mime,checksum,created_at FROM evidence_metadata
+        WHERE request_id=$1 AND state='READY' AND (uploader_user_id IS NULL OR uploader_user_id IS NOT DISTINCT FROM $2)
+        ORDER BY created_at DESC,id DESC LIMIT 6`,
+      [row.id, row.reporter_user_id ?? null],
+    ) as Array<{ id: string; state: string; size_bytes: string | number; detected_mime: string; checksum: string; created_at: Date | string }>;
     return {
       id: row.id,
       tracking_code: row.tracking_code,
@@ -433,6 +440,10 @@ export class TrackingService {
       ...(row.status === 'REJECTED' && extra[0]?.rejection_reason ? { rejection_reason: extra[0].rejection_reason } : {}),
       ...(row.status === 'DUPLICATE' && extra[0]?.duplicate_of_code ? { duplicate_of_code: extra[0].duplicate_of_code } : {}),
       can_supplement: supplementAllowed(row.status, row.review_lane),
+      evidence: evidence.map((item) => ({
+        id: item.id, state: item.state, size_bytes: Number(item.size_bytes), detected_mime: item.detected_mime,
+        checksum: item.checksum, created_at: toIso(item.created_at),
+      })),
     };
   }
 

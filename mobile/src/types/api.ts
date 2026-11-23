@@ -144,6 +144,8 @@ export interface RequestTrackingDetail {
   rejection_reason?: string;
   duplicate_of_code?: string;
   can_supplement: boolean;
+  /** The reporter's own READY files, newest first (at most 6). */
+  evidence?: RequestEvidenceReference[];
 }
 
 interface ReporterUpdateFields {

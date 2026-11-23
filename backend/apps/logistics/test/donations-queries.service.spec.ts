@@ -77,6 +77,30 @@ describe('Logistics donor tracking queries', () => {
     expect(lineQuery?.[1]).toEqual([deliveryId, receiptId, 2]);
   });
 
+  it('lists the donor\'s uploaded files only when the caller can manage the declaration', async () => {
+    const attachmentId = '55555555-5555-4555-8555-555555555555';
+    const make = (capabilityHash: string) => ({ query: jest.fn(async (sql: string) => {
+      if (sql.includes('FROM donation_delivery')) return [{
+        id: deliveryId, drive_id: '22222222-2222-4222-8222-222222222222', public_code: 'ABCDEFGH', donor_user_id: null,
+        capability_hash: capabilityHash, status: 'DECLARED', version: 1,
+      }];
+      if (sql.includes('FROM logistics_attachment')) return [{
+        id: attachmentId, state: 'READY', size_bytes: '2048', detected_mime: 'image/jpeg', created_at: new Date('2026-11-23T10:00:00Z'), dispute_id: null,
+      }];
+      return [];
+    }) });
+    const owner = new DonationsQueriesService(make(hashPurposeBoundSecret(secret, 'donation-delivery', config.peppers, 'v1')) as never, { require: jest.fn() } as never, config);
+    expect(await owner.track(deliveryId, secret, request())).toMatchObject({
+      can_manage: true,
+      attachments: [{ id: attachmentId, size_bytes: 2048, detected_mime: 'image/jpeg', created_at: '2026-11-23T10:00:00.000Z', dispute_id: null }],
+    });
+    const stranger = make('v1:wrong');
+    const other = await new DonationsQueriesService(stranger as never, { require: jest.fn() } as never, config).track(deliveryId, secret, request());
+    expect(other).toMatchObject({ can_manage: false });
+    expect(other).not.toHaveProperty('attachments');
+    expect(stranger.query.mock.calls.some(([sql]) => String(sql).includes('logistics_attachment'))).toBe(false);
+  });
+
   it('keeps tracking read-only by opaque identifier: an invalid capability only withholds can_manage and exposes no contact data', async () => {
     const dataSource = { query: jest.fn(async () => [{
       id: deliveryId, drive_id: '22222222-2222-4222-8222-222222222222', public_code: 'ABCDEFGH',

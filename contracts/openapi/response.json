@@ -18410,6 +18410,23 @@
           },
           "can_supplement": {
             "type": "boolean"
+          },
+          "evidence": {
+            "type": "array",
+            "description": "The reporter's own READY evidence files, newest first, at most 6. Download links come from GET /evidence/{id}/download.",
+            "items": {
+              "type": "object",
+              "required": ["id", "state", "size_bytes", "detected_mime", "checksum", "created_at"],
+              "properties": {
+                "id": { "type": "string", "format": "uuid" },
+                "state": { "type": "string", "enum": ["READY"] },
+                "size_bytes": { "type": "integer" },
+                "detected_mime": { "type": "string", "enum": ["image/jpeg", "image/png", "video/mp4"] },
+                "checksum": { "type": "string" },
+                "created_at": { "type": "string", "format": "date-time" }
+              },
+              "additionalProperties": false
+            }
           }
         },
         "additionalProperties": false

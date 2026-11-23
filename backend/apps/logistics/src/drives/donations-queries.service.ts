@@ -55,6 +55,15 @@ export class DonationsQueriesService {
       `SELECT id,status,reason,opened_at,resolution_note FROM donation_dispute WHERE delivery_id=$1 ORDER BY opened_at,id`,
       [id],
     ) as Array<Record<string, unknown>>;
+    // The declaration id is public, so files are listed only for the donor (signed-in owner or holder of the capability).
+    const attachments = canManage ? await this.dataSource.query(
+      `SELECT a.id,a.state,a.size_bytes,a.detected_mime,a.created_at,a.dispute_id
+         FROM logistics_attachment a
+        WHERE a.state='READY' AND a.handoff_id IS NULL
+          AND (a.delivery_id=$1 OR a.dispute_id IN (SELECT id FROM donation_dispute WHERE delivery_id=$1))
+        ORDER BY a.created_at DESC,a.id DESC LIMIT 10`,
+      [id],
+    ) as Array<{ id: string; state: string; size_bytes: string | number; detected_mime: string; created_at: Date | string; dispute_id: string | null }> : [];
     return {
       id: delivery.id,
       public_code: delivery.public_code,
@@ -64,6 +73,12 @@ export class DonationsQueriesService {
       disputes,
       progress: { status: delivery.status },
       can_manage: canManage,
+      ...(canManage ? {
+        attachments: attachments.map((item) => ({
+          id: item.id, state: item.state, size_bytes: Number(item.size_bytes), detected_mime: item.detected_mime,
+          created_at: new Date(item.created_at).toISOString(), dispute_id: item.dispute_id,
+        })),
+      } : {}),
     };
   }
 

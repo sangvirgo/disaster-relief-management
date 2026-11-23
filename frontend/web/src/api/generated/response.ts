@@ -2033,6 +2033,19 @@ export interface components {
             rejection_reason?: string;
             duplicate_of_code?: string;
             can_supplement: boolean;
+            /** @description The reporter's own READY evidence files, newest first, at most 6. Download links come from GET /evidence/{id}/download. */
+            evidence?: {
+                /** Format: uuid */
+                id: string;
+                /** @enum {string} */
+                state: "READY";
+                size_bytes: number;
+                /** @enum {string} */
+                detected_mime: "image/jpeg" | "image/png" | "video/mp4";
+                checksum: string;
+                /** Format: date-time */
+                created_at: string;
+            }[];
         };
         ReporterEventPage: {
             items: components["schemas"]["ReporterEvent"][];
