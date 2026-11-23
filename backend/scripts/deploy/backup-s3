@@ -37,7 +37,9 @@ sha256_b64() { openssl dgst -sha256 -binary "$1" | base64 -w0; }
 write_metrics() { # write_metrics <run success 0|1>; the last-success time only moves forward on success
   local ok="$1" now last_file="$STATE_DIR/backup/last-success" last=0 stamp_text=''
   now="$(date +%s)"
-  mkdir -p -m 700 "$STATE_DIR/backup" "$METRICS_DIR" || return 0
+  mkdir -p -m 700 "$STATE_DIR/backup" || return 0
+  # node_exporter runs as "nobody" and must be able to read this directory
+  mkdir -p "$METRICS_DIR" && chmod 755 "$METRICS_DIR" || return 0
   if [[ "$ok" == 1 ]]; then printf '%s\n' "$now" > "$last_file"; fi
   [[ -f "$last_file" ]] && last="$(tr -dc '0-9' < "$last_file")"
   last="${last:-0}"
