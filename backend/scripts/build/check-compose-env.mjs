@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 
-const args = ['compose', '--profile', 'storage', '--profile', 'seed', '--env-file', '.env.example', '-f', 'infra/compose.yaml', 'config', '--format', 'json'];
+const args = ['compose', '--profile', 'storage', '--profile', 'seed', '--profile', 'observability', '--env-file', '.env.example', '-f', 'infra/compose.yaml', 'config', '--format', 'json'];
 const result = spawnSync('docker', args, { encoding: 'utf8' });
 if (result.error) throw result.error;
 if (result.status !== 0) throw new Error(`Docker Compose config failed (${result.status}): ${result.stderr.trim()}`);
@@ -10,7 +10,7 @@ const expectedEnvironment = {
   postgres: ['POSTGRES_DB', 'POSTGRES_USER', 'POSTGRES_PASSWORD'],
   'db-init': [
     'POSTGRES_PASSWORD', 'IDENTITY_MIGRATOR_PASSWORD', 'IDENTITY_APP_PASSWORD', 'RESPONSE_MIGRATOR_PASSWORD',
-    'RESPONSE_APP_PASSWORD', 'LOGISTICS_MIGRATOR_PASSWORD', 'LOGISTICS_APP_PASSWORD',
+    'RESPONSE_APP_PASSWORD', 'LOGISTICS_MIGRATOR_PASSWORD', 'LOGISTICS_APP_PASSWORD', 'MONITOR_PASSWORD',
   ],
   'identity-migrate': ['NODE_ENV', 'DATABASE_URL', 'DB_POOL_MAX', 'DB_LOCK_TIMEOUT_MS', 'DB_STATEMENT_TIMEOUT_MS', 'LOG_LEVEL', 'C48_SCHEMA_DIR'],
   'response-migrate': ['NODE_ENV', 'DATABASE_URL', 'DB_POOL_MAX', 'DB_LOCK_TIMEOUT_MS', 'DB_STATEMENT_TIMEOUT_MS', 'LOG_LEVEL', 'C48_SCHEMA_DIR'],
@@ -48,6 +48,14 @@ const expectedEnvironment = {
   nginx: ['SOS_SOFT_LIMIT_PER_IP', 'SOS_HARD_LIMIT_PER_IP', 'NGINX_ENVSUBST_FILTER'],
   minio: ['MINIO_ROOT_USER', 'MINIO_ROOT_PASSWORD'],
   'minio-init': ['MINIO_ROOT_USER', 'MINIO_ROOT_PASSWORD', 'S3_RESPONSE_ACCESS_KEY', 'S3_RESPONSE_SECRET_KEY', 'S3_LOGISTICS_ACCESS_KEY', 'S3_LOGISTICS_SECRET_KEY'],
+  prometheus: [],
+  alertmanager: ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID'],
+  'node-exporter': [],
+  'postgres-exporter': ['DATA_SOURCE_URI', 'DATA_SOURCE_USER', 'DATA_SOURCE_PASS'],
+  grafana: [
+    'GF_SECURITY_ADMIN_USER', 'GF_SECURITY_ADMIN_PASSWORD', 'GF_SECURITY_COOKIE_SECURE', 'GF_SERVER_ROOT_URL', 'GF_USERS_ALLOW_SIGN_UP',
+    'GF_AUTH_ANONYMOUS_ENABLED', 'GF_ANALYTICS_REPORTING_ENABLED', 'GF_ANALYTICS_CHECK_FOR_UPDATES', 'GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES',
+  ],
   seed: [
     'NODE_ENV', 'PGHOST', 'PGPORT', 'IDENTITY_MIGRATOR_PASSWORD', 'RESPONSE_MIGRATOR_PASSWORD', 'LOGISTICS_MIGRATOR_PASSWORD',
     'SEED_PASSWORD', 'SECRET_HASH_PEPPER_DONATION', 'ARGON2_MEMORY_KIB', 'ARGON2_TIME_COST', 'ARGON2_PARALLELISM',
@@ -105,10 +113,19 @@ assert.match(compose.services['minio-init'].image, /\/minio-mc:RELEASE\.2025-08-
 assert.ok(!compose.services.minio.volumes.some((volume) => volume.target === '/minio.license'),
   'MinIO Community needs no license mount');
 assert.deepEqual(Object.keys(compose.services.web.build.args).sort(), ['VITE_GOOGLE_CLIENT_ID', 'VITE_GOOGLE_MAPS_API_KEY']);
+for (const name of ['prometheus', 'alertmanager', 'node-exporter', 'postgres-exporter', 'grafana']) {
+  assert.deepEqual(compose.services[name].profiles, ['observability'], `${name} must run only in the observability profile`);
+  assert.match(compose.services[name].image, /@sha256:[0-9a-f]{64}$/u, `${name} image must be pinned by digest`);
+}
+for (const name of ['prometheus', 'alertmanager', 'node-exporter', 'postgres-exporter']) {
+  assert.equal(compose.services[name].ports?.length ?? 0, 0, `${name} must not publish a host port`);
+}
+assert.equal(compose.services.grafana.ports.length, 1, 'Grafana publishes one port for cloudflared');
+assert.equal(compose.services.grafana.ports[0].host_ip, '127.0.0.1', 'Grafana must bind only to loopback');
 assert.equal(compose.services.web.ports?.length ?? 0, 0, 'web must be reachable only through the Nginx ingress');
 assert.equal(compose.services.nginx.depends_on.web.condition, 'service_healthy');
 
-assert.deepEqual(Object.keys(compose.volumes).sort(), ['minio-data', 'pgdata'], 'C48 must keep its two stable volumes');
+assert.deepEqual(Object.keys(compose.volumes).sort(), ['alertmanager-data', 'grafana-data', 'minio-data', 'pgdata', 'prometheus-data'], 'C48 must keep its stable volumes');
 assert.equal(compose.volumes.pgdata.name, 'c48_pgdata', 'PostgreSQL data must use the stable C48 volume');
 assert.equal(compose.volumes['minio-data'].name, 'c48_minio-data', 'MinIO data must use the stable C48 volume');
 assert.deepEqual(Object.keys(compose.networks), ['c48-internal'], 'all services must share the stable C48 network');

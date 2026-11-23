@@ -1,0 +1,11 @@
+[Unit]
+Description=Reliva (C48) container state metrics for node_exporter
+Wants=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
+ExecStart=/usr/bin/bash @ROOT@/backend/scripts/deploy/container-metrics
+TimeoutStartSec=30
+Nice=10

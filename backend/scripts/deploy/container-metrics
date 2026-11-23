@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Writes Docker restart/run state of the long-running C48 containers as node_exporter textfile metrics, so
+# Prometheus can alert on restart loops and stopped containers without cAdvisor (which costs RAM). Run every minute by
+# the c48-container-metrics systemd timer (installed by `release`). Reads only `docker inspect`; changes nothing.
+set -euo pipefail
+umask 022
+
+METRICS_DIR="${C48_METRICS_DIR:-/var/lib/c48/metrics}"
+DOCKER="${C48_DOCKER_BIN:-docker}"
+
+mkdir -p "$METRICS_DIR"
+temporary="$METRICS_DIR/.c48_container.prom.$$"
+trap 'rm -f -- "$temporary"' EXIT
+
+{
+  printf '# HELP c48_container_restart_count Docker restart count of a long-running C48 container.\n# TYPE c48_container_restart_count gauge\n'
+  printf '# HELP c48_container_running 1 when the container is running.\n# TYPE c48_container_running gauge\n'
+  printf '# HELP c48_container_oom_killed 1 when the last stop was an out-of-memory kill.\n# TYPE c48_container_oom_killed gauge\n'
+  ids="$("$DOCKER" ps -a --filter label=com.docker.compose.project=c48 --quiet)"
+  if [[ -n "$ids" ]]; then
+    # shellcheck disable=SC2086 # one word per container id
+    "$DOCKER" inspect --format '{{.Name}} {{.RestartCount}} {{.State.Running}} {{.State.OOMKilled}} {{.HostConfig.RestartPolicy.Name}}' $ids |
+      while read -r name restarts running oom policy; do
+        # one-shot jobs (migrate, db-init, seed) have no restart policy and are expected to exit
+        [[ -n "$policy" && "$policy" != no ]] || continue
+        name="${name#/}"
+        [[ "$name" =~ ^[A-Za-z0-9_.-]+$ ]] || continue
+        printf 'c48_container_restart_count{name="%s"} %s\n' "$name" "$restarts"
+        printf 'c48_container_running{name="%s"} %s\n' "$name" "$([[ "$running" == true ]] && echo 1 || echo 0)"
+        printf 'c48_container_oom_killed{name="%s"} %s\n' "$name" "$([[ "$oom" == true ]] && echo 1 || echo 0)"
+      done
+  fi
+} > "$temporary"
+mv -f -- "$temporary" "$METRICS_DIR/c48_container.prom"

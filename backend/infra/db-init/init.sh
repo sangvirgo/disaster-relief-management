@@ -64,6 +64,18 @@ SELECT format('CREATE DATABASE %I OWNER %I', 'c48_logistics', 'logistics_migrato
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'c48_logistics') \gexec
 SQL
 
+# Optional read-only role for postgres_exporter (profile observability). Created or re-keyed only when
+# C48_MONITOR_PASSWORD is set; pg_monitor grants statistics access and nothing else.
+psql -X -v ON_ERROR_STOP=1 <<'SQL'
+\set monitor_password ''
+\getenv monitor_password MONITOR_PASSWORD
+SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', 'c48_monitor', :'monitor_password')
+WHERE :'monitor_password' <> '' AND NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'c48_monitor') \gexec
+SELECT format('ALTER ROLE %I PASSWORD %L', 'c48_monitor', :'monitor_password')
+WHERE :'monitor_password' <> '' AND EXISTS (SELECT FROM pg_roles WHERE rolname = 'c48_monitor') \gexec
+SELECT 'GRANT pg_monitor TO c48_monitor' WHERE EXISTS (SELECT FROM pg_roles WHERE rolname = 'c48_monitor') \gexec
+SQL
+
 psql -X -v ON_ERROR_STOP=1 -d c48_identity -c 'CREATE EXTENSION IF NOT EXISTS citext'
 psql -X -v ON_ERROR_STOP=1 -d c48_response -c 'CREATE EXTENSION IF NOT EXISTS postgis'
 psql -X -v ON_ERROR_STOP=1 -d c48_logistics -c 'CREATE EXTENSION IF NOT EXISTS postgis'

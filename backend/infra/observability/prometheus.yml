@@ -1,0 +1,31 @@
+# Prometheus for the single-host stack (profile `observability`). Everything is scraped over the internal Docker
+# network; nothing here is published to the Internet. Retention is set on the command line in compose.yaml.
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+rule_files:
+  - /etc/prometheus/rules.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs: [{ targets: ['localhost:9090'] }]
+  - job_name: alertmanager
+    static_configs: [{ targets: ['alertmanager:9093'] }]
+  - job_name: node
+    static_configs: [{ targets: ['node-exporter:9100'] }]
+  - job_name: postgres
+    static_configs: [{ targets: ['postgres-exporter:9187'] }]
+  # The APIs serve /metrics only to direct requests on this network (it answers 404 when a proxy header is present
+  # and nginx never routes the path), and put no identifier in any label.
+  - job_name: identity-api
+    static_configs: [{ targets: ['identity-api:3001'] }]
+  - job_name: response-api
+    static_configs: [{ targets: ['response-api:3002'] }]
+  - job_name: logistics-api
+    static_configs: [{ targets: ['logistics-api:3003'] }]

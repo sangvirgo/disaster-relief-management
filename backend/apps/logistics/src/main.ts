@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { RequestMethod, ValidationPipe } from '@nestjs/common';
-import { ApiExceptionFilter, correlationMiddleware, createPinoLogger, loadErrorCatalog, PinoNestLogger, validateEnvironment, validationExceptionFactory } from '@c48/technical';
+import { ApiExceptionFilter, correlationMiddleware, createPinoLogger, installMetrics, loadErrorCatalog, PinoNestLogger, validateEnvironment, validationExceptionFactory } from '@c48/technical';
 import { setupOpenApiDocs } from '@c48/technical/openapi-docs';
 import { AppModule } from './app.module';
 
@@ -9,6 +9,7 @@ async function bootstrap(): Promise<void> {
   const logger = new PinoNestLogger(createPinoLogger('logistics', config.logLevel));
   const app = await NestFactory.create(AppModule, { logger });
   app.use(correlationMiddleware());
+  installMetrics(app, 'logistics');
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true, exceptionFactory: validationExceptionFactory }));
   app.useGlobalFilters(new ApiExceptionFilter(loadErrorCatalog(), 'logistics'));

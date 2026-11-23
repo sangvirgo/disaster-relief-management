@@ -19,3 +19,4 @@ export * from './persistence/versioned-update';
 export * from './media/evidence-media';
 export * from './uploads/evidence-upload';
 export * from './http/validation-errors';
+export * from './observability/metrics';
