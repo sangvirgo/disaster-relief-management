@@ -23,7 +23,7 @@
     },
     {
       "key": "seedPassword",
-      "value": "C48Demo-2026!Seed",
+      "value": "CHANGE-ME-to-your-SEED_PASSWORD",
       "type": "string"
     },
     {

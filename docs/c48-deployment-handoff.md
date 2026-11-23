@@ -130,6 +130,8 @@ No secret, account number, key id, IP address or mailbox is recorded here. From 
 | AGENTS.md, plan 6.3, architecture section 15 and 13, runbook, diagrams (SVG and 3-page PDF) | Updated for the AWS deployment | Files in the repository |
 | k6 | First 20-VU run recorded in `docs/c48-k6-report-2026-11-23.md`: **not a pass**. Causes: access token lives at most 600 s (verified in code), SOS anti-spam limit about 30/min per IP, and an unexplained nginx `400` on about 12k reads | Prometheus counters, nginx log. `run-t18.sh` now logs in again per segment and the summary prints counts per status code; the **repeat has not been run** |
 
+**Repository front page:** `README.md` was redrawn (live demo, 14 web and 16 mobile screenshots from `report/images`, runtime and deployment diagrams, operations table, test-account table without passwords, run-against-server commands). Six old screenshot links were broken (renamed `-2026` files) and are fixed; every image link was checked. The local demo seed password had been committed in the Postman collection (since commit `a83eaf8`): **replaced by a placeholder, but it stays in git history, so never reuse it anywhere** (set the Postman variable `seedPassword` locally). `TEST_ACCOUNTS.md` is git-ignored (never pushed); its password line was removed too.
+
 **Operator-reported, not verified by the assistant:** email OTP arrives ("ok"), backup bucket lifecycle rule set ("done"), Gmail/SMTP.
 
 **Open items**
