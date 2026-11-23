@@ -121,20 +121,35 @@ prune_images() { # keep the current and previous release; remove older local C48
   done < <(docker image ls --format '{{.Repository}}:{{.Tag}}')
 }
 
-install_systemd_units() { # idempotent: copy the backup units from the release commit, reload only when they changed
+install_systemd_units() { # idempotent: copy the c48-* units from the release commit, reload only when they changed
   # Never fails a release: a missing systemd must not undo a healthy deployment.
-  local dir="${C48_SYSTEMD_DIR:-/etc/systemd/system}" unit changed=0 rendered
-  command -v systemctl >/dev/null 2>&1 || { log 'systemctl not found: backup timer not installed'; return 0; }
-  for unit in c48-backup.service c48-backup.timer; do
-    [[ -f "$ROOT/backend/infra/systemd/$unit" ]] || { log "unit file $unit is missing from the repository"; return 0; }
-    rendered="$(sed "s|@ROOT@|$ROOT|g" "$ROOT/backend/infra/systemd/$unit")"
+  local dir="${C48_SYSTEMD_DIR:-/etc/systemd/system}" source unit changed=0 rendered
+  local -a timers=()
+  command -v systemctl >/dev/null 2>&1 || { log 'systemctl not found: timers not installed'; return 0; }
+  for source in "$ROOT"/backend/infra/systemd/c48-*.service "$ROOT"/backend/infra/systemd/c48-*.timer; do
+    [[ -f "$source" ]] || continue
+    unit="$(basename "$source")"
+    rendered="$(sed "s|@ROOT@|$ROOT|g" "$source")"
     if [[ ! -f "$dir/$unit" || "$(cat "$dir/$unit")" != "$rendered" ]]; then
       printf '%s\n' "$rendered" > "$dir/$unit" && chmod 644 "$dir/$unit" && changed=1 || { log "could not write $dir/$unit"; return 0; }
     fi
+    [[ "$unit" == *.timer ]] && timers+=("$unit")
   done
+  (( ${#timers[@]} )) || { log 'no c48 timer units found in the repository'; return 0; }
   if (( changed )); then systemctl daemon-reload || { log 'systemctl daemon-reload failed'; return 0; }; fi
-  systemctl enable --now c48-backup.timer >/dev/null 2>&1 || { log 'could not enable c48-backup.timer'; return 0; }
-  log "backup timer installed ($( (( changed )) && echo updated || echo unchanged ))"
+  systemctl enable --now "${timers[@]}" >/dev/null 2>&1 || { log "could not enable ${timers[*]}"; return 0; }
+  log "timers installed: ${timers[*]} ($( (( changed )) && echo updated || echo unchanged ))"
+}
+
+observability_up() { # opt-in with C48_OBSERVABILITY=on in backend/.env; never fails a release
+  [[ "$(env_value C48_OBSERVABILITY)" == on ]] || return 0
+  local -a services=(prometheus alertmanager node-exporter postgres-exporter grafana)
+  mkdir -p "$STATE_DIR/metrics" # bind-mounted read-only into node_exporter; backup-s3 and container-metrics write here
+  if main_compose --profile observability pull --quiet "${services[@]}" && main_compose --profile observability up --no-build -d "${services[@]}"; then
+    log 'observability profile is up'
+  else
+    log 'WARNING: the observability profile did not start; the release itself is healthy'
+  fi
 }
 
 restore_previous() { # shared by `rollback` and the automatic rollback inside `deploy`
@@ -175,6 +190,7 @@ cmd_deploy() {
     write_release current "$tag"
     prune_images
     install_systemd_units
+    observability_up
     log "release $tag is live"
     return 0
   fi

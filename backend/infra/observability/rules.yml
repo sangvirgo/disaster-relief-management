@@ -1,0 +1,113 @@
+# Alert rules (design: docs/c48-deployment-architecture.md section 8.1). Thresholds are proposals to tune after the
+# first k6 run; they are not approved policy. Text is Vietnamese because the operators read it in Telegram.
+groups:
+  - name: c48-infrastructure
+    rules:
+      - alert: TargetDown
+        expr: up == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: 'Không lấy được số liệu từ {{ $labels.job }}'
+          description: 'Mục tiêu {{ $labels.job }} không phản hồi trong hơn 2 phút (dịch vụ có thể đã dừng).'
+      - alert: DiskAlmostFull
+        expr: (1 - node_filesystem_avail_bytes{mountpoint="/",fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{mountpoint="/",fstype!~"tmpfs|overlay"}) > 0.80
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: 'Ổ đĩa đã dùng quá 80%'
+          description: 'Ổ đĩa gốc đã dùng {{ $value | humanizePercentage }}. Dọn ảnh Docker cũ, log hoặc bản sao lưu cục bộ.'
+      - alert: MemoryLow
+        expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 0.10
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: 'Bộ nhớ khả dụng dưới 10%'
+          description: 'Chỉ còn {{ $value | humanizePercentage }} RAM khả dụng.'
+      - alert: SwapHigh
+        expr: (node_memory_SwapTotal_bytes - node_memory_SwapFree_bytes) / node_memory_SwapTotal_bytes > 0.50
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: 'Swap đã dùng quá 50%'
+          description: 'Swap dùng {{ $value | humanizePercentage }}: máy đang thiếu RAM.'
+      - alert: ContainerRestarting
+        expr: increase(c48_container_restart_count[30m]) >= 3
+        labels: { severity: critical }
+        annotations:
+          summary: 'Container {{ $labels.name }} khởi động lại liên tục'
+          description: 'Container {{ $labels.name }} đã khởi động lại {{ $value | printf "%.0f" }} lần trong 30 phút.'
+      - alert: ContainerNotRunning
+        expr: c48_container_running == 0
+        for: 3m
+        labels: { severity: critical }
+        annotations:
+          summary: 'Container {{ $labels.name }} không chạy'
+          description: 'Container {{ $labels.name }} đã dừng hơn 3 phút.'
+      - alert: ContainerOomKilled
+        expr: c48_container_oom_killed == 1
+        labels: { severity: warning }
+        annotations:
+          summary: 'Container {{ $labels.name }} bị hệ điều hành dừng do hết bộ nhớ'
+          description: 'Kiểm tra giới hạn bộ nhớ (mem_limit) của {{ $labels.name }}.'
+
+  - name: c48-api
+    rules:
+      - alert: ApiServerErrors
+        expr: |
+          sum by (service) (rate(c48_http_requests_total{status=~"5.."}[5m]))
+            / sum by (service) (rate(c48_http_requests_total[5m])) > 0.05
+          and sum by (service) (rate(c48_http_requests_total[5m])) > 0.1
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: 'API {{ $labels.service }} trả lỗi 5xx nhiều'
+          description: 'Tỷ lệ lỗi 5xx của {{ $labels.service }} là {{ $value | humanizePercentage }} trong 5 phút.'
+      - alert: ApiLatencyHigh
+        expr: histogram_quantile(0.95, sum by (service, le) (rate(c48_http_request_duration_seconds_bucket[5m]))) > 2
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: 'API {{ $labels.service }} phản hồi chậm (p95 trên 2 giây)'
+          description: 'p95 của {{ $labels.service }} là {{ $value | printf "%.2f" }} giây.'
+      - alert: DbPoolWaiting
+        expr: c48_db_pool_waiting_clients > 5
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: 'API {{ $labels.service }} đang xếp hàng chờ kết nối cơ sở dữ liệu'
+          description: '{{ $value | printf "%.0f" }} truy vấn đang chờ kết nối.'
+
+  - name: c48-postgres
+    rules:
+      - alert: PostgresConnectionsNearLimit
+        expr: sum(pg_stat_activity_count) / max(pg_settings_max_connections) > 0.80
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: 'PostgreSQL gần hết số kết nối cho phép'
+          description: 'Đang dùng {{ $value | humanizePercentage }} số kết nối tối đa.'
+
+  - name: c48-backup
+    rules:
+      - alert: BackupTooOld
+        expr: time() - c48_backup_last_success_timestamp_seconds > 26 * 3600
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: 'Bản sao lưu thành công gần nhất đã quá 26 giờ'
+          description: 'Lần sao lưu thành công gần nhất cách đây {{ $value | humanizeDuration }}. Xem: journalctl -u c48-backup.'
+      - alert: BackupLastRunFailed
+        expr: c48_backup_last_run_success == 0
+        for: 1m
+        labels: { severity: warning }
+        annotations:
+          summary: 'Lần sao lưu gần nhất thất bại'
+          description: 'Bản sao lưu cũ vẫn được giữ nguyên. Xem: journalctl -u c48-backup.'
+      - alert: BackupMetricMissing
+        expr: absent(c48_backup_last_success_timestamp_seconds)
+        for: 2h
+        labels: { severity: warning }
+        annotations:
+          summary: 'Không có số liệu sao lưu'
+          description: 'Chưa có tệp số liệu sao lưu: hẹn giờ sao lưu có thể chưa được cài hoặc chưa chạy lần nào.'

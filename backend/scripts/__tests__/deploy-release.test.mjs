@@ -40,7 +40,7 @@ exit 0
   for (const name of ['docker', 'git', 'curl', 'systemctl']) chmodSync(join(bin, name), 0o755);
   mkdirSync(join(root, 'backend/infra/systemd'), { recursive: true });
   mkdirSync(join(root, 'units'));
-  for (const unit of ['c48-backup.service', 'c48-backup.timer']) cpSync(join(backend, 'infra/systemd', unit), join(root, 'backend/infra/systemd', unit));
+  for (const unit of ['c48-backup.service', 'c48-backup.timer', 'c48-container-metrics.service', 'c48-container-metrics.timer']) cpSync(join(backend, 'infra/systemd', unit), join(root, 'backend/infra/systemd', unit));
 
   const run = (...args) => {
     const extraEnv = typeof args.at(-1) === 'object' ? args.pop() : {};
@@ -148,7 +148,7 @@ test('invalid image tags and a missing .env are refused', () => {
   } finally { box.cleanup(); }
 });
 
-test('a release installs the backup timer once and leaves unchanged units alone', () => {
+test('a release installs the c48 timers once and leaves unchanged units alone', () => {
   const box = sandbox();
   try {
     assert.equal(box.run('deploy', 'aaa').status, 0);
@@ -158,10 +158,30 @@ test('a release installs the backup timer once and leaves unchanged units alone'
     assert.match(readFileSync(join(box.root, 'units/c48-backup.timer'), 'utf8'), /OnCalendar=\*-\*-\* 19:00:00 UTC/u);
     let log = readFileSync(box.calls, 'utf8');
     assert.equal((log.match(/systemctl daemon-reload/gu) ?? []).length, 1);
-    assert.match(log, /systemctl enable --now c48-backup\.timer/u);
+    assert.match(log, /systemctl enable --now c48-backup\.timer c48-container-metrics\.timer/u);
+    assert.ok(readFileSync(join(box.root, 'units/c48-container-metrics.service'), 'utf8').includes(`${box.root}/backend/scripts/deploy/container-metrics`));
 
     assert.equal(box.run('deploy', 'bbb').status, 0);
     log = readFileSync(box.calls, 'utf8');
     assert.equal((log.match(/systemctl daemon-reload/gu) ?? []).length, 1, 'unchanged units must not trigger another reload');
   } finally { box.cleanup(); }
+});
+
+test('the observability profile is started only when C48_OBSERVABILITY=on, and its failure never fails the release', () => {
+  const off = sandbox();
+  try {
+    assert.equal(off.run('deploy', 'aaa').status, 0);
+    assert.equal(readFileSync(off.calls, 'utf8').includes('--profile observability'), false);
+  } finally { off.cleanup(); }
+
+  const on = sandbox();
+  try {
+    writeFileSync(join(on.root, 'backend/.env'), `${readFileSync(join(on.root, 'backend/.env'), 'utf8')}C48_OBSERVABILITY=on\n`);
+    const result = on.run('deploy', 'aaa');
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    const log = readFileSync(on.calls, 'utf8');
+    assert.match(log, /--profile observability pull --quiet prometheus alertmanager node-exporter postgres-exporter grafana/u);
+    assert.match(log, /--profile observability up --no-build -d prometheus alertmanager node-exporter postgres-exporter grafana/u);
+    assert.match(result.stdout, /observability profile is up/u);
+  } finally { on.cleanup(); }
 });

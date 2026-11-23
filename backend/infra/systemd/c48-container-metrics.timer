@@ -1,0 +1,10 @@
+[Unit]
+Description=Collect Reliva (C48) container state metrics every minute
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+Unit=c48-container-metrics.service
+
+[Install]
+WantedBy=timers.target
