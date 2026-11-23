@@ -360,7 +360,7 @@ The user asked for the option most enterprises use. These are **Proposals** with
 | 12 | Video limit | Keep MP4 at 50 MiB for now | Not discussed; revisit if videos are dropped (then lower the 55 MiB body limit) |
 | 13 | Release rollback | Keep the previous image tag and `.env` on the host, take one pre-deploy dump (latest only), roll back automatically when health checks fail (§5.3) | Standard release safety; the previous version is always one command away |
 
-## 15. Differences between this proposal and what was built (2026-11-22)
+## 15. Differences between this proposal and what was built (updated 2026-11-23)
 
 | Topic | Proposal | Built | Why |
 |---|---|---|---|
@@ -371,6 +371,12 @@ The user asked for the option most enterprises use. These are **Proposals** with
 | Signed URL host in CSP | Add S3 host to `img-src` / `media-src` | Not changed | The web opens signed links as navigation, which the page CSP does not govern |
 | Evidence bucket versioning | On | **Off** (buckets created with defaults) | Set at creation; enable it if file recovery is wanted |
 | Deploy trigger | OIDC plus SSM | Same flow, key instead of OIDC; first run needed a fix (`db/migrate` is not executable in Git) | See the handoff |
+| Backup | Daily dump with checksums, keep two | Done as designed: systemd timer at 19:00 UTC (02:00 Vietnam), S3-verified SHA-256 per file, manifest uploaded last, keep the 2 newest; `restore-s3` restores; one restore drill passed (row counts identical). The 3-day bucket lifecycle rule was set by the operator and not readable by the instance role | The role has no `GetLifecycleConfiguration` right |
+| Monitoring | Prometheus, Grafana, Alertmanager, exporters; no Loki, no cAdvisor | Done as designed in profile `observability`, images pinned by digest, loopback ports, Telegram alerts, 22 alert rules, one dashboard (including a Gemini row). Added: a container-state exporter script (restart count, OOM) because cAdvisor is excluded. Grafana is reached through the Cloudflare Tunnel; its Access policy is configured in the dashboard by the operator | Measured cost 309 MB RAM (1,092 to 1,401 MB used, 2,430 MB still available) |
+| Memory limits | From `docker stats` after the k6 run | Set from `docker stats` after the monitoring profile was up and before a valid k6 run: 11 services, about 3.0 GB in total | The first k6 run was not a valid measurement; revisit after the repeat |
+| k6 | 50, 100 and 200 VUs, record the first bottleneck | One 20-VU run, not a pass; see `c48-k6-report-2026-11-23.md` | Token expiry and the SOS anti-spam limit distorted it; a repeat is planned |
+| Files in AWS | S3 primary | Same, verified end to end for the public SOS path (image above 2048 px stored at 2048 x 1536, signed link of 60 s downloads). The Logistics upload path is not verified | No signed-in test account was available to the assistant |
+| CloudWatch Logs | 14 days, only after a cost check | **Not done**: the price for Sydney could not be verified from the official page | Cost rule |
 
 ## 16. Sources checked on 2026-11-22
 

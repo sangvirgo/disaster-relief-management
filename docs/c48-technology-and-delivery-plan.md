@@ -868,6 +868,8 @@ Model review checklist: distinguish reporter/beneficiary/donor; show optional ca
 
 #### Selected object storage: MinIO Community (built from source)
 
+**Update 2026-11-23 (deployment):** the AWS deployment stores evidence in private Amazon S3 buckets (region `ap-southeast-2`) through the EC2 instance role; images above 2048 px are reduced by `sharp` before storage and downloads use signed links of 60 seconds. MinIO Community remains the object store of the local and demo stack (profile `storage`) and the code keeps using the S3 client, so both work. Database backup and restore were rehearsed against S3 (see the deployment handoff); an isolated restore of MinIO objects was not. The decision text below is the original record and is kept unchanged.
+
 **Revised choice (2026-10-27): MinIO Community, single-node lab deployment, using synthetic data.** The earlier AIStor Free choice was dropped because AIStor requires a license file that the team does not have. MinIO Community is AGPLv3 and needs no license, but its upstream repository is archived and unmaintained, and no official image is pullable (Docker Hub removed; quay.io returns unauthorized). Reliva therefore builds the server and `mc` from the upstream source tags in `backend/infra/minio/Dockerfile`. This is a lab choice, not a production recommendation. [Community repository](https://github.com/minio/minio)
 
 | Decision | Reliva baseline |
