@@ -77,7 +77,7 @@ describe('Logistics donor tracking queries', () => {
     expect(lineQuery?.[1]).toEqual([deliveryId, receiptId, 2]);
   });
 
-  it('keeps tracking read-only by opaque identifier: an invalid capability only withholds can_manage and exposes no contact data', async () => {
+  it('rejects an invalid capability without exposing whether the identifier exists', async () => {
     const dataSource = { query: jest.fn(async () => [{
       id: deliveryId, drive_id: '22222222-2222-4222-8222-222222222222', public_code: 'ABCDEFGH',
       donor_name: 'Người quyên góp', donor_phone: '0901234567', donor_user_id: null,
@@ -85,10 +85,7 @@ describe('Logistics donor tracking queries', () => {
     }]) };
     const service = new DonationsQueriesService(dataSource as never, { require: jest.fn() } as never, config);
 
-    // docs/backend/04-logistics-api.md: the identifier alone is enough to read; X-Donation-Secret only marks can_manage.
-    const tracked = await service.track(deliveryId, secret, request());
-    expect(tracked).toMatchObject({ id: deliveryId, public_code: 'ABCDEFGH', status: 'DECLARED', can_manage: false });
-    for (const field of ['donor_phone', 'donor_name', 'capability_hash', 'donor_user_id']) expect(tracked).not.toHaveProperty(field);
+    await expect(service.track(deliveryId, secret, request())).rejects.toMatchObject({ code: 'DONATION_SECRET_INVALID', status: 400 });
   });
 
   it('lists only the signed-in donor\'s own deliveries without donor contacts', async () => {
