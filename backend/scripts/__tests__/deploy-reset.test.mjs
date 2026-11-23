@@ -35,8 +35,9 @@ case "$*" in
 esac
 exit 0
 `);
+  writeFileSync(join(bin, 'aws'), `#!/usr/bin/env bash\nprintf 'aws %s\\n' "$*" >> "${calls}"\nexit 0\n`);
   writeFileSync(join(bin, 'curl'), '#!/usr/bin/env bash\nexit "${FAKE_CURL_STATUS:-0}"\n');
-  for (const name of ['docker', 'curl']) chmodSync(join(bin, name), 0o755);
+  for (const name of ['docker', 'aws', 'curl']) chmodSync(join(bin, name), 0o755);
 
   const run = (args, { input = '', env = {} } = {}) => spawnSync('bash', [join(root, 'backend/scripts/deploy/reset-demo-data'), ...args], {
     encoding: 'utf8', input,
@@ -48,6 +49,34 @@ exit 0
 
 const lines = (text) => text.split('\n').filter(Boolean);
 const index = (list, pattern) => list.findIndex((line) => pattern.test(line));
+
+test('a plain reset never touches S3, and --purge-evidence empties only the two evidence buckets after the rebuild', () => {
+  const env = ['NODE_ENV=production', 'C48_IMAGE_SOURCE=registry', 'PUBLIC_PORT=8080', `WEB_ALLOWED_ORIGINS=https://${HOST}`, 'S3_REGION=ap-test-1',
+    'S3_RESPONSE_BUCKET=resp-evidence', 'S3_LOGISTICS_BUCKET=log-evidence', 'S3_BACKUP_BUCKET=the-backups', ''].join('\n');
+  const plain = sandbox({ envText: env });
+  try {
+    assert.equal(plain.run(['--reset'], { input: `${HOST}\n${PASSWORD}\n` }).status, 0);
+    assert.doesNotMatch(plain.log(), /aws /u);
+  } finally { plain.cleanup(); }
+  const purge = sandbox({ envText: env });
+  try {
+    const result = purge.run(['--reset', '--purge-evidence'], { input: `${HOST}\n${PASSWORD}\n` });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stdout, /EVIDENCE BUCKETS will be emptied/u);
+    const entries = lines(purge.log());
+    const seed = index(entries, /^SEED /u);
+    const first = index(entries, /aws .*s3 rm s3:\/\/resp-evidence\/ --recursive/u);
+    const second = index(entries, /aws .*s3 rm s3:\/\/log-evidence\/ --recursive/u);
+    assert.ok(seed >= 0 && first > seed && second > first, 'purge happens after the database was rebuilt');
+    assert.doesNotMatch(purge.log(), /the-backups/u, 'the backup bucket is never touched');
+  } finally { purge.cleanup(); }
+  const unsafe = sandbox({ envText: env.replace('S3_LOGISTICS_BUCKET=log-evidence', 'S3_LOGISTICS_BUCKET=the-backups') });
+  try {
+    const result = unsafe.run(['--reset', '--purge-evidence'], { input: `${HOST}\n${PASSWORD}\n` });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /equals the backup bucket/u);
+  } finally { unsafe.cleanup(); }
+});
 
 test('refuses to run without the explicit --reset flag', () => {
   const box = sandbox();
