@@ -29,6 +29,7 @@ for ((i = 1; i <= $#; i++)); do if [[ "\${!i}" == --env-file ]]; then j=$((i + 1
 case "$*" in
   *"ps --status running --services"*) echo postgres ;;
   *pg_dump*) printf 'PGDMP-fake' ;;
+  *"exec -T nginx nginx -t"*) exit "\${FAKE_NGINX_TEST_STATUS:-0}" ;;
   *" up "*) if [[ -n "$env_file" ]] && grep -q "^C48_IMAGE_TAG=$FAKE_FAIL_TAG$" "$env_file"; then exit 1; fi ;;
   *"image ls"*) printf 'ghcr.io/example/web:old1\\nghcr.io/example/web:aaa\\nghcr.io/example/web:bbb\\nother/image:old1\\n' ;;
 esac
@@ -184,4 +185,22 @@ test('the observability profile is started only when C48_OBSERVABILITY=on, and i
     assert.match(log, /--profile observability up --no-build -d prometheus alertmanager node-exporter postgres-exporter grafana/u);
     assert.match(result.stdout, /observability profile is up/u);
   } finally { on.cleanup(); }
+});
+
+test('a release reloads nginx after starting the stack and fails when the configuration is rejected', () => {
+  const ok = sandbox();
+  try {
+    assert.equal(ok.run('deploy', 'aaa').status, 0);
+    const log = readFileSync(ok.calls, 'utf8');
+    assert.ok(log.indexOf('exec -T nginx nginx -t') > log.indexOf(' up '), 'nginx is checked after the stack is up');
+    assert.match(log, /exec -T nginx nginx -s reload/u);
+  } finally { ok.cleanup(); }
+
+  const bad = sandbox();
+  try {
+    const result = bad.run('deploy', 'aaa', { FAKE_NGINX_TEST_STATUS: '1' });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stdout + result.stderr, /nginx -t rejected the configuration/u);
+    assert.equal(bad.release('current'), null, 'a release with a broken nginx configuration must not become current');
+  } finally { bad.cleanup(); }
 });

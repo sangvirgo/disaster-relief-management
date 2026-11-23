@@ -103,8 +103,16 @@ predeploy_dump() { # one extra dump before migrations; only the latest is kept, 
 # The repository runs its db scripts through bash (they are not marked executable in Git).
 migrate() { bash "$ROOT/backend/scripts/db/migrate"; }
 
+# nginx.conf is bind-mounted, so `up -d` does not recreate nginx when only the file changed. Reload it explicitly so a
+# release always serves the configuration of its own commit (`nginx -t` first: a broken file fails the release).
+reload_nginx() {
+  main_compose exec -T nginx nginx -t >/dev/null 2>&1 || { log 'nginx -t rejected the configuration'; return 1; }
+  main_compose exec -T nginx nginx -s reload >/dev/null 2>&1 || { log 'nginx reload failed'; return 1; }
+  log 'nginx configuration reloaded'
+}
+
 start_stack() {
-  main_compose up --no-build -d --wait --wait-timeout "$HEALTH_TIMEOUT_S" "${RUN_SERVICES[@]}"
+  main_compose up --no-build -d --wait --wait-timeout "$HEALTH_TIMEOUT_S" "${RUN_SERVICES[@]}" && reload_nginx
 }
 
 prune_images() { # keep the current and previous release; remove older local C48 images
