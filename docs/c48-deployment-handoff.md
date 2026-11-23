@@ -79,6 +79,8 @@ No real blocker. The open choices belong to the operator: enable advanced featur
 
 ## 10. Update 2026-11-23 (second session)
 
+*The "Not done" and "Next concrete task" parts of this section are superseded by section 11.*
+
 No secret, account number, key id, IP address or mailbox is recorded here.
 
 **Done and merged (PRs #24 to #29), each with CI green on its last commit and a successful CD run**
@@ -104,3 +106,46 @@ No secret, account number, key id, IP address or mailbox is recorded here.
 - Non-interactive SSM: a pty is required (`script -qec`); pass multi-line scripts as `sudo bash -c "echo <base64> | base64 -d | bash"`.
 
 **Next concrete task:** operator sets the four `.env` values; then run `release`-equivalent start of the profile, measure `docker stats` and `free -m`, send a test alert, then Cloudflare Access.
+
+## 11. Update 2026-11-23 (continuation, same day)
+
+No secret, account number, key id, IP address or mailbox is recorded here. From the operator's instruction on this day, changes go **straight to `main`** (no more feature branches); CI and CD still run on every push. PRs #30 to #33 were merged before that instruction.
+
+**Done, with how it is known**
+
+| Area | State | How it is known |
+|---|---|---|
+| Observability profile | **Running** on the host: Prometheus, Alertmanager, Grafana, node and Postgres exporters; 7 scrape targets `up`; 22 alert rules loaded | Prometheus API on the host; `promtool check rules` (18 rules at the time, 22 now in `rules.yml`, the 4 Gemini rules loaded after a container recreate) |
+| Telegram alerts | A test alert reached the operator's chat | **Operator confirmed** |
+| Memory | Before: 1,092 MB used, 2,739 MB available. After: 1,401 MB used, 2,430 MB available, swap 0 (peak 236 MB during k6) | `free -m` on the host; Prometheus `node_memory_MemAvailable_bytes` minimum 2,062 MB during k6 |
+| `mem_limit` | 11 services, about 3.0 GB in total, from measured `docker stats` | `docker inspect` on the host after the deploy; `check-compose-env` requires them |
+| Grafana | Reached through the Tunnel with its own login; the dashboard renders (operator screenshot) | **Cloudflare Access not set up**: Zero Trust asks for a payment method and the operator declined. Tunnel health alert and external uptime check **dropped** (operator no longer wants email alerts) |
+| Gemini monitoring | `c48_gemini_attempts_total{model,key_slot,outcome}` (key position only, never the key), `c48_ai_daily_calls`, `c48_ai_daily_call_limit`, `c48_ai_advisory_requests`; dashboard row; 4 alert rules | jest (3 suites); on the host the `c48_ai_*` gauges report (148 calls that day). The per-key counter had **no real sample yet** when checked. `GEMINI_DAILY_CALL_LIMIT=0` on the host, so the usage percentage and the 80 % alert stay silent until a limit is set |
+| Metrics directory permission | `/var/lib/c48/metrics` was mode 700, node_exporter (user nobody) could not read it, so backup metrics never reached Prometheus | Fixed in `release` and `backup-s3` (PR #31); Prometheus then returned `c48_backup_last_success_timestamp_seconds` |
+| Monitoring config reload | `release` recreates prometheus, alertmanager and grafana on each deploy (single-file bind mounts keep the old inode) | Host: the new rules loaded only after a recreate |
+| Action versions | checkout v7, setup-node v7, buildx v4, login v4, build-push v7, configure-aws-credentials v6 (all `node24`) | GitHub API for tags and `runs.using`; the deploy job ran green with v6 |
+| Evidence files not shown again after a reload | **Fixed**: the SOS tracking response now returns the reporter's own READY files (`evidence`), the donation tracking response returns `attachments` to the donor only; web and mobile render the server list | Host, public URL: `GET /requests/track` returns the uploaded image. jest 179 suites / 1,201 tests, node tests 153. **Web and mobile screens were not seen by the assistant** |
+| Image upload and view | A 4000x3000 JPEG through the public HTTPS URL: `201`, stored 720 KB, `READY`; the 60 s signed S3 link returned `200` `image/jpeg` | curl from the laptop and from the host |
+| Reset and S3 | `reset-demo-data --reset --purge-evidence` empties only the two evidence buckets, after the rebuild; `restore-s3 --reset` never purges | Fake-docker/aws tests (9). **Not run against real S3** |
+| AGENTS.md, plan 6.3, architecture section 15 and 13, runbook, diagrams (SVG and 3-page PDF) | Updated for the AWS deployment | Files in the repository |
+| k6 | First 20-VU run recorded in `docs/c48-k6-report-2026-11-23.md`: **not a pass**. Causes: access token lives at most 600 s (verified in code), SOS anti-spam limit about 30/min per IP, and an unexplained nginx `400` on about 12k reads | Prometheus counters, nginx log. `run-t18.sh` now logs in again per segment and the summary prints counts per status code; the **repeat has not been run** |
+
+**Operator-reported, not verified by the assistant:** email OTP arrives ("ok"), backup bucket lifecycle rule set ("done"), Gmail/SMTP.
+
+**Open items**
+- **733 synthetic SOS from the k6 run remain in the production database** (with 733 `ai_advisory` and 1,466 `request_event` rows; no missions, no evidence). Deleting them needs a bypass of the append-only `request_event` trigger, which was **not done**. A verified backup `20261123T133620Z` exists. Recommended: after the final k6 run, `reset-demo-data --reset --purge-evidence`.
+- Repeat k6 (operator runs `bash backend/test/k6/run-t18.sh` with the SSM port-forward), find the cause of the nginx `400`, then 50 / 100 / 200 VU steps and the first bottleneck; decide `t3.large` or k3s only from numbers.
+- Logistics evidence upload through a signed-in account is not verified.
+- Evidence bucket versioning is still off (operator has not decided).
+- CloudWatch Logs not done: the Sydney price could not be confirmed from the official page.
+- Offsite copy of a backup: the operator was told how; not confirmed.
+- Rotate the GitHub deploy IAM access key about 90 days after 2026-11-22 (about 2027-02-20).
+- The old proxied `A` record for `grafana` was replaced by the Tunnel hostname by the operator; other zone records are untouched.
+
+**Lessons**
+- `git add -A` after creating a local `node_modules` symlink committed it (PR #32); the ignore pattern `node_modules/` matches directories only. Fixed (`node_modules` pattern, symlink removed). Never `ln -s` into the working tree and then `git add -A`.
+- The shell on the operator's laptop is fish, and scratch files in the agent scratchpad can disappear between steps: keep helper scripts reproducible.
+- A tool refused disabling a trigger to delete audit rows. Clean test data with the reset commands.
+- Costs: nothing new was bought; Cloudflare Zero Trust and an unverified CloudWatch price were declined on purpose.
+
+**Next concrete task:** operator reruns k6 (annotated commands are in the runbook, "Annotated command reference"), pastes both segment summaries and the top of the output (checks, thresholds); update `c48-k6-report-2026-11-23.md`; then reset with `--purge-evidence`, decide bucket versioning, and test a Logistics upload with a signed-in account.

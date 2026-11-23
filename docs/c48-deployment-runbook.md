@@ -75,6 +75,53 @@ It asks you to type the public hostname (not just "ok") and to choose the passwo
 
 By default it never touches MinIO or S3, so evidence files already uploaded stay in the buckets as orphans. To empty the two evidence buckets as well, add the flag: `bash backend/scripts/deploy/reset-demo-data --reset --purge-evidence`. The purge runs only after the database has been rebuilt and seeded, deletes every object in `S3_RESPONSE_BUCKET` and `S3_LOGISTICS_BUCKET` (the buckets have no versioning, so it is permanent), and refuses to run if a bucket name equals `S3_BACKUP_BUCKET`. `restore-s3 --reset` never purges, because the restored data still points at those files. Do not use `scripts/db/reset-demo` on this host: it refuses production on purpose, and it ends by starting MinIO and building images locally. `AGENTS.md` now names this command and `restore-s3 --reset` next to the two local reset commands; they follow the same rules (explicit `--reset`, only `c48_pgdata`, MinIO preserved).
 
+### Annotated command reference
+
+Every command below was run for real on 2026-11-23 unless a note says otherwise. `<instance-id>` is the EC2 instance; the AWS profile is `c48`, region `ap-southeast-2`. **The operator's laptop shell is fish**: run the repository scripts with `bash script`, and do not paste bash-only syntax (`${#VAR}`, `$(...)` in `export`) into fish. Never paste a password, token or `.env` content into a chat; the scripts below ask for the password at a hidden prompt.
+
+```bash
+# --- Reach the host (no inbound port is open) -------------------------------------------------------------
+aws ssm start-session --profile c48 --region ap-southeast-2 --target <instance-id>   # opens a shell as ssm-user
+sudo -i                                                                              # root shell; backend/.env is mode 600
+
+# --- Open a laptop port to a service on the host (keep this terminal open) ---------------------------------
+# nginx (the whole stack), used by the k6 runner:
+aws ssm start-session --profile c48 --region ap-southeast-2 --target <instance-id> \
+  --document-name AWS-StartPortForwardingSession --parameters '{"portNumber":["8080"],"localPortNumber":["8080"]}'
+# Grafana from the laptop without the Tunnel (the Tunnel hostname stays; see "Grafana exposure" below):
+#   same command with "3000" for both ports, then open http://localhost:3000 (user admin)
+
+# --- Backup and restore (run as root on the host, from /opt/c48) -------------------------------------------
+bash backend/scripts/deploy/backup-s3                      # on demand; the timer runs it at 19:00 UTC (02:00 Vietnam); keeps the newest 2
+bash backend/scripts/deploy/restore-s3 --list              # lists complete backups in S3
+bash backend/scripts/deploy/restore-s3 --verify [STAMP]    # downloads and checks SHA-256 and pg_restore --list; changes nothing
+bash backend/scripts/deploy/restore-s3 --reset [STAMP]     # DESTRUCTIVE: replaces the data with that backup (asks for the hostname first)
+#   Offsite copy by hand: S3 console, bucket c48-backup-*, backups/<newest>/, download the 5 files, then on the laptop:
+#   cd <folder> && sha256sum -c manifest.sha256
+
+# --- Reset demo data (DESTRUCTIVE; asks for the public hostname and a seed password) -------------------------
+bash backend/scripts/deploy/reset-demo-data --reset                      # database only; S3 photos stay as orphans
+bash backend/scripts/deploy/reset-demo-data --reset --purge-evidence     # also empties the two evidence buckets (permanent: no versioning)
+#   Why not DELETE FROM ...: request_event is append-only (trigger). Do not bypass it; reset instead.
+
+# --- Monitoring (profile observability; started by `release` when C48_OBSERVABILITY=on) --------------------
+docker ps --format '{{.Names}} {{.Status}}'                              # containers
+docker stats --no-stream --format '{{.Name}} {{.MemUsage}}'              # memory per container (limits are in compose.yaml)
+free -m                                                                  # host memory; keep about 800 MB available
+# After editing a rules or dashboard file by hand, recreate the containers that mount single files:
+source backend/scripts/dev/lib.sh && main_compose --profile observability up --no-build -d --force-recreate --no-deps prometheus alertmanager grafana
+# `release` now does this on every deploy (a plain `up -d` keeps the old inode of a replaced file).
+
+# --- Load test (laptop; Terminal A holds the 8080 port-forward above) ---------------------------------------
+bash backend/test/k6/run-t18.sh        # asks for username and password; 2 segments of 5 min (token lives 10 min); writes synthetic SOS
+#   Anti-spam (about 30 SOS/min per IP) rejects most writes through the port-forward; that is expected. See docs/c48-k6-report-2026-11-23.md.
+#   Clean the synthetic SOS with reset-demo-data above, not with SQL.
+```
+
+#### Grafana exposure (decision 2026-11-23, operator)
+
+The hostname `grafana.<domain>` stays in the Cloudflare Tunnel and Grafana is reached directly over HTTPS. **Cloudflare Access was not set up**: Zero Trust asked for a payment method, which the operator declined. Protection is therefore Grafana's own login only (user `admin`, a strong password in `backend/.env`, sign-up and anonymous access disabled, cookies `Secure`). Keep that password long and unique, rotate it if it leaks (Grafana applies `GRAFANA_ADMIN_PASSWORD` only when its database is first created; change it later with `docker exec -it reliva-grafana grafana cli admin reset-admin-password <new>`, typed by the operator), and consider removing the Tunnel hostname if the dashboard is no longer needed publicly. The Tunnel health notification and the external uptime check were dropped because the operator no longer wants email alerts; Telegram alerts from Alertmanager remain.
+
 ## 4. GitHub and AWS wiring
 
 **Decision (2026-11-22, user):** the pipeline logs in to AWS with an **IAM access key stored as a GitHub secret**, because the account's IAM "Identity providers" page is locked behind *Activate advanced features*, which the account owner has not enabled (effects on billing not verified). The design's preferred OIDC option stays the upgrade path.
