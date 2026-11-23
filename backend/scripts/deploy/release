@@ -121,6 +121,22 @@ prune_images() { # keep the current and previous release; remove older local C48
   done < <(docker image ls --format '{{.Repository}}:{{.Tag}}')
 }
 
+install_systemd_units() { # idempotent: copy the backup units from the release commit, reload only when they changed
+  # Never fails a release: a missing systemd must not undo a healthy deployment.
+  local dir="${C48_SYSTEMD_DIR:-/etc/systemd/system}" unit changed=0 rendered
+  command -v systemctl >/dev/null 2>&1 || { log 'systemctl not found: backup timer not installed'; return 0; }
+  for unit in c48-backup.service c48-backup.timer; do
+    [[ -f "$ROOT/backend/infra/systemd/$unit" ]] || { log "unit file $unit is missing from the repository"; return 0; }
+    rendered="$(sed "s|@ROOT@|$ROOT|g" "$ROOT/backend/infra/systemd/$unit")"
+    if [[ ! -f "$dir/$unit" || "$(cat "$dir/$unit")" != "$rendered" ]]; then
+      printf '%s\n' "$rendered" > "$dir/$unit" && chmod 644 "$dir/$unit" && changed=1 || { log "could not write $dir/$unit"; return 0; }
+    fi
+  done
+  if (( changed )); then systemctl daemon-reload || { log 'systemctl daemon-reload failed'; return 0; }; fi
+  systemctl enable --now c48-backup.timer >/dev/null 2>&1 || { log 'could not enable c48-backup.timer'; return 0; }
+  log "backup timer installed ($( (( changed )) && echo updated || echo unchanged ))"
+}
+
 restore_previous() { # shared by `rollback` and the automatic rollback inside `deploy`
   # NOTE: may run inside `||`, where `set -e` is ignored, so every step checks its own status.
   local previous
@@ -158,6 +174,7 @@ cmd_deploy() {
   if main_compose pull "${APP_IMAGES[@]}" && predeploy_dump && migrate && start_stack && wait_healthy; then
     write_release current "$tag"
     prune_images
+    install_systemd_units
     log "release $tag is live"
     return 0
   fi

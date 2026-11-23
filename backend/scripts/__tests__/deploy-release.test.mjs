@@ -36,13 +36,17 @@ exit 0
 `);
   writeFileSync(join(bin, 'git'), `#!/usr/bin/env bash\nprintf 'git %s\\n' "$*" >> "${calls}"\n[[ "$*" == *rev-parse* ]] && echo abc1234\nexit 0\n`);
   writeFileSync(join(bin, 'curl'), '#!/usr/bin/env bash\nexit "${FAKE_CURL_STATUS:-0}"\n');
-  for (const name of ['docker', 'git', 'curl']) chmodSync(join(bin, name), 0o755);
+  writeFileSync(join(bin, 'systemctl'), `#!/usr/bin/env bash\nprintf 'systemctl %s\\n' "$*" >> "${calls}"\nexit 0\n`);
+  for (const name of ['docker', 'git', 'curl', 'systemctl']) chmodSync(join(bin, name), 0o755);
+  mkdirSync(join(root, 'backend/infra/systemd'), { recursive: true });
+  mkdirSync(join(root, 'units'));
+  for (const unit of ['c48-backup.service', 'c48-backup.timer']) cpSync(join(backend, 'infra/systemd', unit), join(root, 'backend/infra/systemd', unit));
 
   const run = (...args) => {
     const extraEnv = typeof args.at(-1) === 'object' ? args.pop() : {};
     return spawnSync('bash', [join(root, 'backend/scripts/deploy/release'), ...args], {
       encoding: 'utf8',
-      env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, C48_STATE_DIR: state, C48_HEALTH_TIMEOUT_S: '1', HOME: root, ...extraEnv },
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, C48_STATE_DIR: state, C48_HEALTH_TIMEOUT_S: '1', C48_SYSTEMD_DIR: join(root, 'units'), HOME: root, ...extraEnv },
     });
   };
   const envTag = () => readFileSync(join(root, 'backend/.env'), 'utf8').match(/^C48_IMAGE_TAG=(.*)$/mu)[1];
@@ -141,5 +145,23 @@ test('invalid image tags and a missing .env are refused', () => {
     assert.notEqual(box.run('deploy', 'bad tag; rm -rf /').status, 0);
     assert.notEqual(box.run('deploy', '').status, 0);
     assert.notEqual(box.run('unknown').status, 0);
+  } finally { box.cleanup(); }
+});
+
+test('a release installs the backup timer once and leaves unchanged units alone', () => {
+  const box = sandbox();
+  try {
+    assert.equal(box.run('deploy', 'aaa').status, 0);
+    const service = readFileSync(join(box.root, 'units/c48-backup.service'), 'utf8');
+    assert.ok(service.includes(`ExecStart=/usr/bin/bash ${box.root}/backend/scripts/deploy/backup-s3`), 'the repository path is rendered into the unit');
+    assert.ok(!service.includes('@ROOT@'));
+    assert.match(readFileSync(join(box.root, 'units/c48-backup.timer'), 'utf8'), /OnCalendar=\*-\*-\* 19:00:00 UTC/u);
+    let log = readFileSync(box.calls, 'utf8');
+    assert.equal((log.match(/systemctl daemon-reload/gu) ?? []).length, 1);
+    assert.match(log, /systemctl enable --now c48-backup\.timer/u);
+
+    assert.equal(box.run('deploy', 'bbb').status, 0);
+    log = readFileSync(box.calls, 'utf8');
+    assert.equal((log.match(/systemctl daemon-reload/gu) ?? []).length, 1, 'unchanged units must not trigger another reload');
   } finally { box.cleanup(); }
 });

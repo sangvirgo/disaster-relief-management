@@ -1,0 +1,189 @@
+#!/usr/bin/env bash
+# List, verify and restore the S3 database backups made by backup-s3.
+#
+#   restore-s3 --list                 list verified backups in the bucket
+#   restore-s3 --counts               print "database schema.table rows" for every user table (for before/after checks)
+#   restore-s3 --verify [STAMP]       download a backup (default newest) and check every checksum; changes nothing
+#   restore-s3 --reset [STAMP]        REPLACE all data with that backup (see below)
+#
+# --reset follows the AGENTS.md rules: it is explicit, asks for the public hostname (or C48_CONFIRM_HOSTNAME), takes a
+# verified safety dump first, removes ONLY the c48_pgdata volume, recreates the roles and databases (db-init), restores
+# the three dumps with pg_restore, applies any newer migrations and restarts the stack. It never touches MinIO or S3
+# objects. Run as root. Do not run while a release is in progress (they share a lock).
+set -euo pipefail
+umask 077
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=../dev/lib.sh
+source "$SCRIPT_DIR/../dev/lib.sh"
+
+STATE_DIR="${C48_STATE_DIR:-/var/lib/c48}"
+AWS_BIN="${C48_AWS_BIN:-aws}"
+HEALTH_TIMEOUT_S="${C48_HEALTH_TIMEOUT_S:-180}"
+RUN_SERVICES=(identity-api response-api logistics-api web nginx)
+DATABASES=(c48_identity c48_response c48_logistics)
+ENV_FILE="$ROOT/backend/.env"
+
+log() { printf '%s [restore-s3] %s\n' "$(date -u +%FT%TZ)" "$*"; }
+die() { log "ERROR: $*" >&2; exit 1; }
+usage() {
+  printf 'Usage: restore-s3 --list | --counts | --verify [STAMP] | --reset [STAMP]\n' >&2
+  exit 2
+}
+
+env_value() { awk -F= -v key="$1" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "$ENV_FILE"; }
+
+REGION=''; BUCKET=''; STAGING=''
+s3api() { "$AWS_BIN" --region "$REGION" s3api "$@"; }
+sha256_b64() { openssl dgst -sha256 -binary "$1" | base64 -w0; }
+cleanup() { [[ -n "$STAGING" ]] && rm -rf -- "$STAGING"; return 0; }
+trap cleanup EXIT
+
+load_config() {
+  [[ -r "$ENV_FILE" ]] || die 'cannot read backend/.env (run as root)'
+  REGION="$(env_value S3_REGION)"; BUCKET="$(env_value S3_BACKUP_BUCKET)"
+  [[ "$REGION" =~ ^[a-z]{2}-[a-z]+-[0-9]$ ]] || die 'S3_REGION in backend/.env is missing or invalid'
+  [[ "$BUCKET" =~ ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$ ]] || die 'S3_BACKUP_BUCKET in backend/.env is missing or invalid'
+}
+
+complete_stamps() { # newest first
+  local listing prefix
+  listing="$(s3api list-objects-v2 --bucket "$BUCKET" --prefix backups/ --delimiter / --query 'CommonPrefixes[].Prefix' --output text)"
+  [[ "$listing" == None ]] && return 0
+  for prefix in $listing; do
+    [[ "$prefix" =~ ^backups/([0-9]{8}T[0-9]{6}Z)/$ ]] || continue
+    if s3api head-object --bucket "$BUCKET" --key "${prefix}manifest.sha256" >/dev/null 2>&1; then printf '%s\n' "${BASH_REMATCH[1]}"; fi
+  done | sort -r
+  return 0
+}
+
+pick_stamp() { # pick_stamp [requested] -> a complete stamp
+  local wanted="${1:-}" stamp
+  if [[ -n "$wanted" ]]; then
+    [[ "$wanted" =~ ^[0-9]{8}T[0-9]{6}Z$ ]] || die 'STAMP must look like 20261123T190000Z'
+    complete_stamps | grep -qx "$wanted" || die "no complete backup $wanted in the bucket"
+    printf '%s\n' "$wanted"; return 0
+  fi
+  stamp="$(complete_stamps | head -n 1)"
+  [[ -n "$stamp" ]] || die 'there is no complete backup in the bucket'
+  printf '%s\n' "$stamp"
+}
+
+download_verified() { # download_verified <stamp> -> STAGING holds a verified copy
+  local stamp="$1" name want got
+  STAGING="$STATE_DIR/restore-staging"
+  rm -rf -- "$STAGING"; mkdir -p -m 700 "$STATE_DIR" && mkdir -m 700 "$STAGING"
+  for name in manifest.txt manifest.sha256 "${DATABASES[@]/%/.dump}"; do
+    s3api get-object --bucket "$BUCKET" --key "backups/$stamp/$name" "$STAGING/$name" >/dev/null
+    want="$(s3api head-object --bucket "$BUCKET" --key "backups/$stamp/$name" --checksum-mode ENABLED --query ChecksumSHA256 --output text)"
+    got="$(sha256_b64 "$STAGING/$name")"
+    [[ "$want" == "$got" ]] || die "S3 checksum mismatch for $name"
+  done
+  (cd "$STAGING" && sha256sum --check --strict manifest.sha256 >/dev/null) || die 'manifest.sha256 does not match the downloaded files'
+  for name in "${DATABASES[@]}"; do
+    main_compose exec -T postgres pg_restore --list < "$STAGING/$name.dump" >/dev/null || die "pg_restore --list rejected $name.dump"
+  done
+  log "backup $stamp downloaded and verified (S3 checksums, manifest.sha256, pg_restore --list)"
+}
+
+table_counts() {
+  local name
+  for name in "${DATABASES[@]}"; do
+    main_compose exec -T postgres psql --username=postgres --dbname "$name" --no-psqlrc --quiet --tuples-only --no-align --set=ON_ERROR_STOP=1 <<'SQL' | sed "s/^/$name /"
+SELECT format('SELECT %L, count(*) FROM %I.%I', n.nspname || '.' || c.relname, n.nspname, c.relname)
+  FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+ WHERE c.relkind = 'r' AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'tiger', 'tiger_data', 'topology')
+   AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid = 'pg_class'::regclass AND d.objid = c.oid AND d.deptype = 'e')
+ ORDER BY 1 \gexec
+SQL
+  done | tr '|' ' '
+}
+
+safety_dump() { # same verification as the release pre-deploy dump, kept in pre-restore/ (latest only)
+  main_compose ps --status running --services 2>/dev/null | grep -qx postgres || { log 'postgres is not running: no safety dump'; return 0; }
+  local work="$STATE_DIR/pre-restore.new" name
+  rm -rf "$work"; mkdir -m 700 "$work" || return 1
+  for name in "${DATABASES[@]}"; do
+    main_compose exec -T postgres pg_dump --username=postgres --format=custom --dbname "$name" > "$work/$name.dump" || return 1
+    main_compose exec -T postgres pg_restore --list < "$work/$name.dump" >/dev/null || return 1
+  done
+  (cd "$work" && sha256sum ./*.dump > manifest.sha256) || return 1
+  printf 'created_utc=%s\n' "$(date -u +%FT%TZ)" > "$work/manifest.txt" || return 1
+  rm -rf "$STATE_DIR/pre-restore.old"
+  if [[ -d "$STATE_DIR/pre-restore" ]]; then mv "$STATE_DIR/pre-restore" "$STATE_DIR/pre-restore.old" || return 1; fi
+  mv "$work" "$STATE_DIR/pre-restore" || return 1
+  rm -rf "$STATE_DIR/pre-restore.old"
+  log "safety dump verified in $STATE_DIR/pre-restore"
+}
+
+wait_healthy() {
+  local deadline=$((SECONDS + HEALTH_TIMEOUT_S)) public_port url
+  public_port="$(env_value PUBLIC_PORT)"; public_port="${public_port:-8080}"
+  for url in "http://127.0.0.1:3001/health/ready" "http://127.0.0.1:3002/health/ready" \
+             "http://127.0.0.1:3003/health/ready" "http://127.0.0.1:${public_port}/health/live"; do
+    until curl -fsS --max-time 5 "$url" >/dev/null 2>&1; do
+      (( SECONDS < deadline )) || { log "health check failed: $url"; return 1; }
+      sleep 3
+    done
+  done
+  log 'all health checks passed'
+}
+
+cmd_reset() {
+  local stamp host answer name
+  stamp="$(pick_stamp "${1:-}")"
+  host="$(env_value WEB_ALLOWED_ORIGINS | cut -d, -f1 | sed -E 's|^[A-Za-z]+://||; s|[/:].*$||')"
+  [[ -n "$host" ]] || die 'WEB_ALLOWED_ORIGINS is empty in backend/.env'
+
+  mkdir -p -m 700 "$STATE_DIR"
+  exec 9>"$STATE_DIR/release.lock"
+  flock -n 9 || die 'a release, rollback, backup or reset is already running'
+  download_verified "$stamp"
+
+  printf 'This REPLACES every row in the C48 identity, response and logistics databases with backup %s.\n' "$stamp"
+  printf 'MinIO/S3 objects are not touched. A verified dump of the current data is kept in %s/pre-restore.\n' "$STATE_DIR"
+  answer="${C48_CONFIRM_HOSTNAME:-}"
+  if [[ -z "$answer" ]]; then read -r -p "Type the public hostname ($host) to continue: " answer; fi
+  [[ "$answer" == "$host" ]] || die 'cancelled: the hostname did not match, nothing was changed'
+
+  safety_dump || die 'the safety dump failed; nothing was deleted'
+
+  log 'stopping the stack (containers only)'
+  main_compose down
+  if docker volume inspect c48_pgdata >/dev/null 2>&1; then
+    log 'removing the c48_pgdata volume'
+    docker volume rm c48_pgdata
+  fi
+
+  log 'recreating roles and empty databases'
+  main_compose_up -d --wait --wait-timeout 90 postgres
+  main_compose_up --exit-code-from db-init db-init
+  for name in "${DATABASES[@]}"; do
+    log "restoring $name"
+    # --clean --if-exists replaces the extensions db-init pre-created; the whole restore is one transaction per database.
+    main_compose exec -T postgres pg_restore --username=postgres --dbname "$name" --clean --if-exists --exit-on-error --single-transaction < "$STAGING/$name.dump" \
+      || die "pg_restore failed for $name; the safety dump of the previous data is in $STATE_DIR/pre-restore"
+  done
+
+  log 'applying migrations newer than the backup, if any'
+  bash "$ROOT/backend/scripts/db/migrate"
+  log 'starting the stack'
+  main_compose_up -d --wait --wait-timeout "$HEALTH_TIMEOUT_S" "${RUN_SERVICES[@]}"
+  wait_healthy
+  log "restored backup $stamp. Sign-in sessions made after that backup are gone."
+}
+
+main() {
+  local command="${1:-}"
+  shift || true
+  case "$command" in
+    --counts) table_counts ;;
+    --list) load_config; complete_stamps ;;
+    --verify) load_config; download_verified "$(pick_stamp "${1:-}")" ;;
+    --reset) load_config; cmd_reset "${1:-}" ;;
+    *) usage ;;
+  esac
+}
+
+main "$@"
+exit $?

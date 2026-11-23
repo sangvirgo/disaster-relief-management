@@ -1,0 +1,161 @@
+#!/usr/bin/env bash
+# Daily database backup to the S3 backup bucket (design: docs/c48-deployment-architecture.md section 7).
+#
+#   backup-s3
+#
+# Sequence: pg_dump -Fc of the three databases through the main Compose postgres service, `pg_restore --list` on each
+# dump, a manifest with SHA-256 and timestamps, upload with an S3-verified SHA-256 checksum, read the checksum back, and
+# ONLY THEN delete older backups so that exactly the newest two remain. A backup that fails at any step deletes nothing.
+# Runs as root from the systemd timer installed by `release` (no Lambda, no extra container). Needs the AWS CLI v2 and the
+# instance role; no access key is stored on the host. Writes /var/lib/c48/metrics/c48_backup.prom for node_exporter.
+set -euo pipefail
+umask 077
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=../dev/lib.sh
+source "$SCRIPT_DIR/../dev/lib.sh"
+
+STATE_DIR="${C48_STATE_DIR:-/var/lib/c48}"
+METRICS_DIR="${C48_METRICS_DIR:-$STATE_DIR/metrics}"
+AWS_BIN="${C48_AWS_BIN:-aws}"
+KEEP="${C48_BACKUP_KEEP:-2}"
+LOCK_WAIT_S="${C48_BACKUP_LOCK_WAIT_S:-900}"
+ENV_FILE="$ROOT/backend/.env"
+DATABASES=(c48_identity c48_response c48_logistics)
+STAMP_RE='^[0-9]{8}T[0-9]{6}Z$'
+
+log() { printf '%s [backup-s3] %s\n' "$(date -u +%FT%TZ)" "$*"; }
+die() { log "ERROR: $*" >&2; exit 1; }
+
+env_value() { awk -F= -v key="$1" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "$ENV_FILE"; }
+
+REGION=''; BUCKET=''; STAGING=''; STARTED=0; BACKUP_BYTES=0; RETAINED=0
+
+s3api() { "$AWS_BIN" --region "$REGION" s3api "$@"; }
+sha256_b64() { openssl dgst -sha256 -binary "$1" | base64 -w0; }
+
+write_metrics() { # write_metrics <run success 0|1>; the last-success time only moves forward on success
+  local ok="$1" now last_file="$STATE_DIR/backup/last-success" last=0 stamp_text=''
+  now="$(date +%s)"
+  mkdir -p -m 700 "$STATE_DIR/backup" "$METRICS_DIR" || return 0
+  if [[ "$ok" == 1 ]]; then printf '%s\n' "$now" > "$last_file"; fi
+  [[ -f "$last_file" ]] && last="$(tr -dc '0-9' < "$last_file")"
+  last="${last:-0}"
+  stamp_text="$METRICS_DIR/.c48_backup.prom.$$"
+  {
+    printf '# HELP c48_backup_last_success_timestamp_seconds Unix time of the last verified backup.\n# TYPE c48_backup_last_success_timestamp_seconds gauge\nc48_backup_last_success_timestamp_seconds %s\n' "$last"
+    printf '# HELP c48_backup_last_run_timestamp_seconds Unix time of the last backup attempt.\n# TYPE c48_backup_last_run_timestamp_seconds gauge\nc48_backup_last_run_timestamp_seconds %s\n' "$now"
+    printf '# HELP c48_backup_last_run_success 1 when the last attempt succeeded.\n# TYPE c48_backup_last_run_success gauge\nc48_backup_last_run_success %s\n' "$ok"
+    printf '# HELP c48_backup_size_bytes Size of the newest uploaded backup.\n# TYPE c48_backup_size_bytes gauge\nc48_backup_size_bytes %s\n' "$BACKUP_BYTES"
+    printf '# HELP c48_backup_retained_count Verified backups kept in S3.\n# TYPE c48_backup_retained_count gauge\nc48_backup_retained_count %s\n' "$RETAINED"
+  } > "$stamp_text" && chmod 644 "$stamp_text" && mv -f "$stamp_text" "$METRICS_DIR/c48_backup.prom" || true
+}
+
+finish() {
+  local status=$?
+  [[ -n "$STAGING" ]] && rm -rf -- "$STAGING"
+  if (( STARTED )); then
+    if (( status == 0 )); then write_metrics 1; else write_metrics 0; log "backup FAILED (exit $status); nothing was deleted"; fi
+  fi
+}
+trap finish EXIT
+
+upload_verified() { # upload_verified <local file> <key>: S3 verifies the SHA-256 on upload, then it is read back
+  local file="$1" key="$2" want got size length
+  want="$(sha256_b64 "$file")"
+  size="$(stat -c %s "$file")"
+  s3api put-object --bucket "$BUCKET" --key "$key" --body "$file" --checksum-sha256 "$want" >/dev/null
+  read -r got length < <(s3api head-object --bucket "$BUCKET" --key "$key" --checksum-mode ENABLED \
+    --query '[ChecksumSHA256, ContentLength]' --output text)
+  [[ "$got" == "$want" && "$length" == "$size" ]] || die "S3 checksum or size mismatch for $key"
+}
+
+complete_prefixes() { # newest first; a backup counts only when its manifest.sha256 (uploaded last) exists
+  local listing prefix
+  listing="$(s3api list-objects-v2 --bucket "$BUCKET" --prefix backups/ --delimiter / \
+    --query 'CommonPrefixes[].Prefix' --output text)"
+  [[ "$listing" == None ]] && return 0
+  for prefix in $listing; do
+    [[ "$prefix" =~ ^backups/[0-9]{8}T[0-9]{6}Z/$ ]] || continue
+    if s3api head-object --bucket "$BUCKET" --key "${prefix}manifest.sha256" >/dev/null 2>&1; then printf '%s\n' "$prefix"; fi
+  done | sort -r
+}
+
+all_prefixes() {
+  local listing prefix
+  listing="$(s3api list-objects-v2 --bucket "$BUCKET" --prefix backups/ --delimiter / \
+    --query 'CommonPrefixes[].Prefix' --output text)"
+  [[ "$listing" == None ]] && return 0
+  for prefix in $listing; do [[ "$prefix" =~ ^backups/[0-9]{8}T[0-9]{6}Z/$ ]] && printf '%s\n' "$prefix"; done | sort -r
+  return 0
+}
+
+rotate() { # rotate <new prefix>: runs only after the new backup is uploaded and verified
+  local new="$1" prefix key keys
+  local -a complete=() keep=() victims=()
+  mapfile -t complete < <(complete_prefixes)
+  [[ "${complete[0]:-}" == "$new" ]] || die 'the new backup is not the newest complete backup; nothing was deleted'
+  keep=("${complete[@]:0:KEEP}")
+  while IFS= read -r prefix; do
+    [[ -n "$prefix" ]] || continue
+    [[ " ${keep[*]} " == *" $prefix "* ]] && continue
+    # never touch anything that is not older than the backup that was just verified
+    [[ "$prefix" < "$new" ]] && victims+=("$prefix")
+  done < <(all_prefixes)
+  for prefix in "${victims[@]}"; do
+    keys="$(s3api list-objects-v2 --bucket "$BUCKET" --prefix "$prefix" --query 'Contents[].Key' --output text)"
+    if [[ "$keys" != None ]]; then
+      for key in $keys; do s3api delete-object --bucket "$BUCKET" --key "$key" >/dev/null; done
+    fi
+    log "deleted old backup $prefix"
+  done
+  RETAINED=${#keep[@]}
+}
+
+main() {
+  [[ -r "$ENV_FILE" ]] || die 'cannot read backend/.env (run as root)'
+  REGION="$(env_value S3_REGION)"; BUCKET="$(env_value S3_BACKUP_BUCKET)"
+  [[ "$REGION" =~ ^[a-z]{2}-[a-z]+-[0-9]$ ]] || die 'S3_REGION in backend/.env is missing or invalid'
+  [[ "$BUCKET" =~ ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$ ]] || die 'S3_BACKUP_BUCKET in backend/.env is missing or invalid'
+  [[ "$KEEP" =~ ^[2-9]$ ]] || die 'C48_BACKUP_KEEP must be between 2 and 9 (two good copies must always exist)'
+
+  mkdir -p -m 700 "$STATE_DIR"
+  exec 9>"$STATE_DIR/release.lock"
+  flock -w "$LOCK_WAIT_S" 9 || die 'a release, rollback or restore is still running; backup skipped'
+  STARTED=1
+
+  main_compose ps --status running --services 2>/dev/null | grep -qx postgres || die 'postgres is not running'
+
+  local stamp name file started finished
+  stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+  [[ "$stamp" =~ $STAMP_RE ]] || die 'could not build a timestamp'
+  STAGING="$STATE_DIR/backup-staging-$stamp"
+  mkdir -m 700 "$STAGING"
+  : > "$STAGING/manifest.txt"
+  printf 'format=c48-backup-v1\ncreated_utc=%s\nrelease=%s\n' "$(date -u +%FT%TZ)" "$(tr -d '[:space:]' < "$STATE_DIR/releases/current" 2>/dev/null || true)" >> "$STAGING/manifest.txt"
+
+  for name in "${DATABASES[@]}"; do
+    file="$STAGING/$name.dump"
+    started="$(date -u +%FT%TZ)"
+    main_compose exec -T postgres pg_dump --username=postgres --format=custom --dbname "$name" > "$file" || die "pg_dump failed for $name"
+    finished="$(date -u +%FT%TZ)"
+    [[ -s "$file" ]] || die "the dump of $name is empty"
+    main_compose exec -T postgres pg_restore --list < "$file" >/dev/null || die "pg_restore --list rejected the dump of $name"
+    printf 'dump=%s size_bytes=%s started_utc=%s finished_utc=%s\n' "$name" "$(stat -c %s "$file")" "$started" "$finished" >> "$STAGING/manifest.txt"
+    BACKUP_BYTES=$((BACKUP_BYTES + $(stat -c %s "$file")))
+  done
+  (cd "$STAGING" && sha256sum ./*.dump manifest.txt > manifest.sha256)
+  (cd "$STAGING" && sha256sum --check --strict manifest.sha256 >/dev/null) || die 'local checksum verification failed'
+  log "dumps verified locally ($BACKUP_BYTES bytes)"
+
+  local prefix="backups/$stamp/"
+  for name in "${DATABASES[@]}"; do upload_verified "$STAGING/$name.dump" "${prefix}$name.dump"; done
+  upload_verified "$STAGING/manifest.txt" "${prefix}manifest.txt"
+  upload_verified "$STAGING/manifest.sha256" "${prefix}manifest.sha256" # completion marker, uploaded last
+  log "uploaded and verified s3://$BUCKET/$prefix"
+
+  rotate "$prefix"
+  log "backup $stamp complete; $RETAINED verified backup(s) retained"
+}
+
+main "$@"
