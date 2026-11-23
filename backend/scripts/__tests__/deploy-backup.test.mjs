@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
@@ -108,6 +108,7 @@ test('three consecutive backups leave exactly the two newest, each fully verifie
     assert.match(box.metrics(), /^c48_backup_last_run_success 1$/mu);
     assert.match(box.metrics(), /^c48_backup_retained_count 2$/mu);
     assert.match(box.metrics(), /^c48_backup_last_success_timestamp_seconds [1-9][0-9]+$/mu);
+    assert.equal(statSync(join(box.state, 'metrics')).mode & 0o777, 0o755, 'node_exporter (user nobody) must be able to read the metrics directory');
   } finally { box.cleanup(); }
 });
 

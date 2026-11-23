@@ -152,7 +152,7 @@ install_systemd_units() { # idempotent: copy the c48-* units from the release co
 observability_up() { # opt-in with C48_OBSERVABILITY=on in backend/.env; never fails a release
   [[ "$(env_value C48_OBSERVABILITY)" == on ]] || return 0
   local -a services=(prometheus alertmanager node-exporter postgres-exporter grafana)
-  mkdir -p "$STATE_DIR/metrics" # bind-mounted read-only into node_exporter; backup-s3 and container-metrics write here
+  mkdir -p "$STATE_DIR/metrics" && chmod 755 "$STATE_DIR/metrics" # node_exporter runs as nobody; bind-mounted read-only into node_exporter; backup-s3 and container-metrics write here
   if main_compose --profile observability pull --quiet "${services[@]}" && main_compose --profile observability up --no-build -d "${services[@]}"; then
     log 'observability profile is up'
   else
