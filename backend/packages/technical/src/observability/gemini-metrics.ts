@@ -4,7 +4,7 @@ import { Counter, Gauge, Histogram, type Registry } from 'prom-client';
 export type GeminiOutcome = 'ok' | 'quota_429' | 'auth_401_403' | 'timeout_408' | 'server_5xx' | 'timeout' | 'network' | 'http_other' | 'invalid_output';
 
 /** What one call to the local fallback model (Ollama) ended with. */
-export type AiFallbackOutcome = 'ok' | 'timeout' | 'network' | 'http_other' | 'invalid_output';
+export type AiFallbackOutcome = 'cancelled' | 'ok' | 'timeout' | 'network' | 'http_other' | 'invalid_output';
 
 /** Which model produced a saved SOS advisory (`none` for a failure or a scheduled retry). */
 export type AiAdvisorySource = 'gemini_primary' | 'gemini_backup' | 'ollama' | 'none';
@@ -36,7 +36,7 @@ export function registerGeminiMetrics(registry: Registry): void {
   });
   fallbackAttempts = new Counter({
     name: 'c48_ai_fallback_attempts_total',
-    help: 'Calls to the local fallback model (Ollama) by model and outcome. Aborted calls after a Gemini success are not counted.',
+    help: 'Calls to the local fallback model (Ollama) by model and outcome. A call aborted because Gemini answered first is counted as `cancelled`.',
     labelNames: ['model', 'outcome'] as const,
     registers: [registry],
   });

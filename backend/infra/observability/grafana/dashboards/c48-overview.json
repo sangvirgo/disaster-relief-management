@@ -6,7 +6,7 @@
   ],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "refresh": "30s",
   "time": {
     "from": "now-6h",
@@ -2114,6 +2114,903 @@
           "legendFormat": "{{name}}"
         }
       ]
+    },
+    {
+      "type": "row",
+      "title": "Chi tiết gọi AI (24 giờ qua, đếm từ cơ sở dữ liệu)",
+      "id": 46,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 91
+      },
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "Gợi ý hoàn tất (24 giờ)",
+      "description": "Số gợi ý AI cho SOS đã có kết quả trong 24 giờ qua, mọi nguồn.",
+      "id": 47,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "c48-prometheus"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 0,
+        "y": 92
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "sum(c48_ai_advisory_last_24h{status=\"COMPLETED\"}) or vector(0)",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Tỷ lệ thành công (24 giờ)",
+      "description": "Hoàn tất / (hoàn tất + thất bại). Không tính gợi ý bị bỏ qua hoặc đang chờ.",
+      "id": 48,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "c48-prometheus"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 4,
+        "y": 92
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.8
+              },
+              {
+                "color": "green",
+                "value": 0.95
+              }
+            ]
+          },
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "sum(c48_ai_advisory_last_24h{status=\"COMPLETED\"}) / sum(c48_ai_advisory_last_24h{status=~\"COMPLETED|FAILED\"})",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Phần do Ollama trả lời (24 giờ)",
+      "description": "Tỷ lệ gợi ý hoàn tất do mô hình dự phòng cục bộ trả lời. Cao nghĩa là Gemini đang lỗi hoặc chậm.",
+      "id": 49,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "c48-prometheus"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 8,
+        "y": 92
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.2
+              },
+              {
+                "color": "red",
+                "value": 0.5
+              }
+            ]
+          },
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "(sum(c48_ai_advisory_last_24h{status=\"COMPLETED\",source=\"ollama\"}) or vector(0)) / sum(c48_ai_advisory_last_24h{status=\"COMPLETED\"})",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Chờ lâu nhất trong hàng đợi",
+      "description": "Tuổi của gợi ý cũ nhất còn đang chờ hoặc đang xử lý (0 khi hàng đợi trống).",
+      "id": 50,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "c48-prometheus"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 12,
+        "y": 92
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 120
+              },
+              {
+                "color": "red",
+                "value": 600
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "max(c48_ai_advisory_oldest_pending_age_seconds)",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Thời gian có gợi ý (trung vị)",
+      "description": "Từ lúc SOS vào hàng đợi đến lúc có gợi ý, trung vị của 24 giờ qua.",
+      "id": 51,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "c48-prometheus"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 16,
+        "y": 92
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "max(c48_ai_advisory_turnaround_seconds{quantile=\"0.5\"})",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Thời gian có gợi ý (p95)",
+      "description": "95% gợi ý trong 24 giờ qua có kết quả trong khoảng thời gian này.",
+      "id": 52,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "c48-prometheus"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 20,
+        "y": 92
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 60
+              },
+              {
+                "color": "red",
+                "value": 180
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto",
+        "justifyMode": "auto",
+        "orientation": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "max(c48_ai_advisory_turnaround_seconds{quantile=\"0.95\"})",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "bargauge",
+      "title": "Nguồn trả lời (24 giờ)",
+      "description": "Gemini chính, Gemini dự phòng hay Ollama đã trả lời bao nhiêu gợi ý.",
+      "id": 53,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "c48-prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 0,
+        "y": 97
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "sum by (source) (c48_ai_advisory_last_24h{status=\"COMPLETED\"})",
+          "legendFormat": "{{source}}",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "bargauge",
+      "title": "Gợi ý thất bại theo mã lỗi (24 giờ)",
+      "description": "AI_PROVIDER_ERROR: nhà cung cấp lỗi hết số lần thử; AI_INVALID_OUTPUT: kết quả không qua kiểm tra; AI_DAILY_LIMIT: hết hạn mức ngày.",
+      "id": 54,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "c48-prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 8,
+        "y": 97
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "sum by (error_code) (c48_ai_advisory_last_24h{status=\"FAILED\"})",
+          "legendFormat": "{{error_code}}",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "bargauge",
+      "title": "Điều phối viên đánh giá gợi ý (24 giờ)",
+      "description": "Chấp nhận (ACCEPTED), điều chỉnh (ADJUSTED), từ chối (REJECTED) hoặc chưa xem (PENDING), theo nguồn trả lời. Dùng để so chất lượng Gemini với Ollama.",
+      "id": 55,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "c48-prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 97
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "sum by (source, review_status) (c48_ai_advisory_last_24h{status=\"COMPLETED\"})",
+          "legendFormat": "{{source}} · {{review_status}}",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Tỷ lệ gọi Gemini thành công theo mô hình",
+      "description": "Phần lần gọi trả về kết quả hợp lệ (outcome ok), tính trên 15 phút.",
+      "id": 56,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "c48-prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 0,
+        "y": 104
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "sum by (model) (rate(c48_gemini_attempts_total{outcome=\"ok\"}[15m])) / sum by (model) (rate(c48_gemini_attempts_total[15m]))",
+          "legendFormat": "{{model}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Thời gian gọi Gemini p50 / p95 / p99",
+      "description": "Thời gian một lần gọi Gemini (một key, một mô hình).",
+      "id": 57,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "c48-prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 8,
+        "y": 104
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "histogram_quantile(0.5, sum by (le, model) (rate(c48_gemini_attempt_duration_seconds_bucket[15m])))",
+          "legendFormat": "p50 {{model}}"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, model) (rate(c48_gemini_attempt_duration_seconds_bucket[15m])))",
+          "legendFormat": "p95 {{model}}"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le, model) (rate(c48_gemini_attempt_duration_seconds_bucket[15m])))",
+          "legendFormat": "p99 {{model}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Ollama: thời gian trung bình và lần bị hủy",
+      "description": "Thời gian trung bình một lần gọi Ollama xong. \"Bị hủy\" là lần Ollama đã chạy nhưng Gemini trả lời trước nên bị dừng.",
+      "id": 58,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "c48-prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 104
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "sum(rate(c48_ai_fallback_duration_seconds_sum{outcome=\"ok\"}[15m])) / sum(rate(c48_ai_fallback_duration_seconds_count{outcome=\"ok\"}[15m]))",
+          "legendFormat": "Trung bình (giây)"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "sum(increase(c48_ai_fallback_attempts_total{outcome=\"cancelled\"}[15m]))",
+          "legendFormat": "Bị hủy (lần / 15 phút)"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Lỗi Gemini theo loại",
+      "description": "Hết hạn mức (quota_429), quá tải (server_5xx), quá thời gian, mạng, sai khóa (auth_401_403), kết quả sai định dạng.",
+      "id": 59,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "c48-prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 111
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 40,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "drawStyle": "bars"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "sum by (outcome) (increase(c48_gemini_attempts_total{outcome!=\"ok\"}[5m]))",
+          "legendFormat": "{{outcome}}"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "Bảng lần gọi AI trong 24 giờ",
+      "description": "Tổng lần gọi Gemini (theo mô hình và kết quả) và Ollama trong 24 giờ qua.",
+      "id": 60,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "c48-prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 111
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Số lần",
+            "desc": true
+          }
+        ]
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "model": "Mô hình",
+              "outcome": "Kết quả",
+              "Value #A": "Số lần",
+              "Value #B": "Số lần"
+            }
+          }
+        }
+      ],
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "sum by (model, outcome) (increase(c48_gemini_attempts_total[24h])) > 0",
+          "instant": true,
+          "format": "table"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "sum by (model, outcome) (increase(c48_ai_fallback_attempts_total[24h])) > 0",
+          "instant": true,
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Quản trị demo",
+      "id": 61,
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 118
+      },
+      "panels": []
+    },
+    {
+      "type": "text",
+      "title": "Đặt lại dữ liệu demo",
+      "id": 62,
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 119
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "**Xóa toàn bộ dữ liệu, nạp lại dữ liệu mẫu và (tuỳ chọn) xóa ảnh/video minh chứng trên S3.** Bucket sao lưu không bị đụng; một bản dump an toàn được giữ ở `/var/lib/c48/pre-reset`.\n\n1. Bấm **[▶ Mở nút đặt lại dữ liệu demo](https://github.com/sangvirgo/disaster-relief-management/actions/workflows/reset-demo.yml)** (GitHub Actions, cần quyền ghi repo).\n2. Bấm **Run workflow**, gõ `RESET`, giữ ô xóa ảnh S3 nếu muốn, rồi **Run workflow**.\n3. Chờ khoảng 3–5 phút. Mọi người bị đăng xuất; Grafana tạm mất kết nối trong lúc chạy.\n\nMật khẩu tài khoản demo lấy từ `SEED_PASSWORD` trong `backend/.env` trên máy chủ (ít nhất 12 ký tự)."
+      }
     }
   ],
   "templating": {
@@ -2121,5 +3018,15 @@
   },
   "annotations": {
     "list": []
-  }
+  },
+  "links": [
+    {
+      "title": "Đặt lại dữ liệu demo",
+      "type": "link",
+      "url": "https://github.com/sangvirgo/disaster-relief-management/actions/workflows/reset-demo.yml",
+      "icon": "external link",
+      "targetBlank": true,
+      "tooltip": "Xóa toàn bộ dữ liệu, nạp lại dữ liệu mẫu và ảnh S3 (GitHub Actions)"
+    }
+  ]
 }

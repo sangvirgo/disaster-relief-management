@@ -1,0 +1,82 @@
+# "Reset demo data" button (linked from the Grafana dashboard): wipes the three C48 databases on the EC2 host, reloads
+# the demo seed and, by default, empties the two evidence buckets (the backup bucket is never touched). It runs the
+# host's own backend/scripts/deploy/reset-demo-data through SSM, exactly like the deploy job, so it keeps the verified
+# safety dump in /var/lib/c48/pre-reset and the release lock. Only people with write access to the repository can run
+# it, only from main, and only after typing RESET. The demo password comes from SEED_PASSWORD in the host's backend/.env.
+name: reset-demo
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Gõ RESET để xác nhận xóa toàn bộ dữ liệu và nạp lại dữ liệu mẫu'
+        required: true
+        type: string
+      purge_evidence:
+        description: 'Xóa luôn ảnh/video minh chứng trên S3 (không đụng bucket sao lưu)'
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  reset:
+    if: github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    concurrency:
+      group: deploy-production # never at the same time as a deploy (the host also holds release.lock)
+      cancel-in-progress: false
+    env:
+      INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+      APP_HOSTNAME: ${{ vars.APP_HOSTNAME }}
+      CONFIRM: ${{ inputs.confirm }}
+      PURGE: ${{ inputs.purge_evidence }}
+    steps:
+      - name: Check the confirmation
+        run: |
+          [ "$CONFIRM" = RESET ] || { echo "::error::Chưa gõ đúng RESET: không có gì bị xóa."; exit 1; }
+          [[ "$APP_HOSTNAME" =~ ^[A-Za-z0-9.-]{1,253}$ ]] || { echo "::error::APP_HOSTNAME is missing or invalid"; exit 1; }
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Reset through SSM Run Command
+        run: |
+          set -euo pipefail
+          flag=''
+          [ "$PURGE" = true ] && flag=' --purge-evidence'
+          # The script asks for the public hostname on stdin; the host compares it with its own WEB_ALLOWED_ORIGINS, so a
+          # wrong instance or variable stops before anything is deleted. APP_HOSTNAME was validated above.
+          jq -n --arg host "$APP_HOSTNAME" --arg flag "$flag" \
+            '{commands: ["bash -c \"set -euo pipefail; export HOME=/root; cd /opt/c48; echo \($host) | bash backend/scripts/deploy/reset-demo-data --reset\($flag)\""]}' > ssm-parameters.json
+          cat ssm-parameters.json
+          command_id="$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --comment "reliva reset demo data" \
+            --timeout-seconds 1500 \
+            --parameters file://ssm-parameters.json \
+            --query Command.CommandId --output text)"
+          echo "SSM command: $command_id"
+          for _ in $(seq 1 150); do
+            status="$(aws ssm get-command-invocation --command-id "$command_id" --instance-id "$INSTANCE_ID" --query Status --output text 2>/dev/null || echo Pending)"
+            case "$status" in Pending|InProgress|Delayed) sleep 10 ;; *) break ;; esac
+          done
+          aws ssm get-command-invocation --command-id "$command_id" --instance-id "$INSTANCE_ID" \
+            --query '{Status:Status,Output:StandardOutputContent,Errors:StandardErrorContent}' --output json | tee ssm-result.json
+          [ "$(jq -r .Status ssm-result.json)" = Success ] || { echo "::error::reset did not succeed (see the output above)"; exit 1; }
+
+      - name: External check through Cloudflare
+        run: |
+          for attempt in $(seq 1 12); do
+            if curl -fsS --max-time 10 "https://${APP_HOSTNAME}/health/live" >/dev/null; then echo "live"; exit 0; fi
+            sleep 10
+          done
+          echo "::error::https://${APP_HOSTNAME}/health/live did not answer"; exit 1

@@ -198,3 +198,29 @@ test('the production guard refuses production, accepts development and fails clo
   assert.doesNotMatch(unreadable.stdout, /PASSED/u);
   assert.match(unreadable.stderr, /Cannot read backend\/\.env/u);
 });
+
+test('the GitHub Actions reset runs without a terminal: the hostname on stdin, the password from backend/.env, optional profiles restarted', () => {
+  const box = sandbox({ envText: ['NODE_ENV=production', 'C48_IMAGE_SOURCE=registry', 'PUBLIC_PORT=8080', `WEB_ALLOWED_ORIGINS=https://${HOST}`,
+    `SEED_PASSWORD=${PASSWORD}`, 'C48_OBSERVABILITY=on', 'C48_AI_FALLBACK=on', ''].join('\n') });
+  try {
+    const result = box.run(['--reset'], { input: `${HOST}\n`, env: { SEED_PASSWORD: '' } });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    const entries = lines(box.log());
+    assert.match(box.log(), new RegExp(`SEED NODE_ENV=development PASSWORD_LENGTH=${PASSWORD.length}`, 'u'));
+    assert.ok(index(entries, /--profile observability --profile ai-fallback down$/u) >= 0, 'the optional profiles stop with the stack');
+    const stack = index(entries, / up .*--wait.* identity-api response-api logistics-api web nginx$/u);
+    const monitoring = index(entries, /--profile observability up --no-build -d prometheus .*grafana$/u);
+    const ollama = index(entries, /--profile ai-fallback up --no-build -d ollama$/u);
+    assert.ok(stack >= 0 && monitoring > stack && ollama > stack, box.log());
+  } finally { box.cleanup(); }
+});
+
+test('without a password anywhere and no terminal, the reset stops before deleting anything', () => {
+  const box = sandbox();
+  try {
+    const result = box.run(['--reset'], { input: `${HOST}\n`, env: { SEED_PASSWORD: '' } });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /at least 12 characters/u);
+    assert.doesNotMatch(box.log(), /volume rm|down|SEED/u);
+  } finally { box.cleanup(); }
+});

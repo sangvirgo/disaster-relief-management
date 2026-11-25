@@ -97,7 +97,8 @@ export async function callOllamaJson(request: OllamaJsonRequest): Promise<unknow
     });
   } catch (error) {
     const aborted = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
-    if (!request.signal?.aborted) recordAiFallbackAttempt(config.model, aborted ? 'timeout' : 'network', seconds());
+    // Aborted by the caller (Gemini answered first): counted as `cancelled`, so the dashboard shows how often the hedge fired for nothing.
+    recordAiFallbackAttempt(config.model, request.signal?.aborted ? 'cancelled' : aborted ? 'timeout' : 'network', seconds());
     throw new OllamaCallError(aborted ? 'TIMEOUT' : 'NETWORK');
   }
   if (!response.ok) {

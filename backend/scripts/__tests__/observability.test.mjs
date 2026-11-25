@@ -40,7 +40,7 @@ test('Prometheus scrapes the services on the internal network with the ports Com
 test('the dashboard is valid, uses the provisioned data source and covers the requested areas', () => {
   const dashboard = JSON.parse(read('observability/grafana/dashboards/c48-overview.json'));
   const datasource = load(read('observability/grafana/provisioning/datasources/prometheus.yml')).datasources[0];
-  const panels = dashboard.panels.filter((panel) => panel.type !== 'row');
+  const panels = dashboard.panels.filter((panel) => panel.type !== 'row' && panel.type !== 'text');
   assert.ok(panels.length >= 20);
   for (const panel of panels) assert.equal(panel.datasource.uid, datasource.uid, `${panel.title} must use the provisioned data source`);
   const titles = dashboard.panels.filter((panel) => panel.type === 'row').map((panel) => panel.title).join('|');
@@ -49,6 +49,11 @@ test('the dashboard is valid, uses the provisioned data source and covers the re
   for (const metric of ['c48_backup_last_success_timestamp_seconds', 'c48_sos_requests', 'c48_http_request_duration_seconds_bucket', 'pg_stat_activity_count']) {
     assert.ok(expressions.includes(metric), `dashboard must chart ${metric}`);
   }
+  // The reset button only links to the GitHub Actions workflow (write access to the repository, typed RESET); Grafana itself never runs it.
+  const resetUrl = /^https:\/\/github\.com\/[^/]+\/[^/]+\/actions\/workflows\/reset-demo\.yml$/u;
+  assert.ok(dashboard.links.some((link) => resetUrl.test(link.url)), 'dashboard link to the reset workflow');
+  const ids = dashboard.panels.map((panel) => panel.id);
+  assert.equal(new Set(ids).size, ids.length, 'panel ids are unique');
 });
 
 test('nginx never routes /metrics to the Internet', () => {
