@@ -37,6 +37,17 @@ const warehouseIconHtml = (selected = false) => `<svg class="${selected ? 'is-se
  * Map of every warehouse with its service radius. Donation drives appear as heart pins around their warehouse
  * (green open, amber paused, grey draft). Clicking a warehouse or a pin selects the warehouse.
  */
+/** Places the warehouse editor card beside the draft pin (never on top of it), clamped inside the map. */
+function draftCardStyle(point: { x: number; y: number; width: number; height: number }): React.CSSProperties {
+  const width = Math.min(310, point.width - 20);
+  const estimatedHeight = 300;
+  if (point.width < 640) return { left: 10, right: 'auto', bottom: 10, top: 'auto', width: point.width - 20 };
+  // The radius handle sits east of the pin, so prefer the west side to keep it reachable.
+  const left = point.x - 40 - width >= 10 ? point.x - 40 - width : Math.min(point.width - width - 10, point.x + 40);
+  const top = Math.max(10, Math.min(point.y - estimatedHeight / 2, point.height - estimatedHeight - 10));
+  return { left, top, width, right: 'auto', bottom: 'auto' };
+}
+
 export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, error = false, selectedId, onSelectWarehouse, onEditWarehouse, onSelectDrive, onHover, onEmptyClick, toolbar, hoverCard, placing = false, onMapClick, banner, creatingWarehouse = false, editingWarehouse = false, draft, onDraftChange }: {
   placing?: boolean; onMapClick?: (lat: number, lng: number) => void; banner?: React.ReactNode;
   rows: Coverage[]; campaigns?: MapCampaign[]; loading?: boolean; error?: boolean; selectedId?: string | null;
@@ -272,7 +283,7 @@ export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, er
     {banner && <div className="warehouse-map-banner" role="status">{banner}</div>}
     {(creatingWarehouse || editingWarehouse) && draft && zoomComplete && !draftReady && <div className="warehouse-map-banner" role="status">Kéo tâm kho hoặc nút bán kính, rồi thả để tiếp tục.</div>}
     {toolbar && <div className="warehouse-map-toolbar">{toolbar}</div>}
-    {hoverCard && ((!creatingWarehouse && !editingWarehouse) || draftReady) && <div className={`warehouse-map-hover${creatingWarehouse || editingWarehouse ? ' warehouse-map-hover--draft' : ''}`} style={(creatingWarehouse || editingWarehouse) && draftPoint ? { left: Math.max(10, Math.min(draftPoint.x - Math.min(280, draftPoint.width - 20) / 2, draftPoint.width - Math.min(280, draftPoint.width - 20) - 10)), top: draftPoint.y > 155 ? draftPoint.y - 118 : draftPoint.y + 34, width: Math.min(280, draftPoint.width - 20), right: 'auto', bottom: 'auto' } : undefined}>{hoverCard}</div>}
+    {hoverCard && ((!creatingWarehouse && !editingWarehouse) || draftReady) && <div className={`warehouse-map-hover${creatingWarehouse || editingWarehouse ? ' warehouse-map-hover--draft' : ''}`} style={(creatingWarehouse || editingWarehouse) && draftPoint ? draftCardStyle(draftPoint) : undefined}>{hoverCard}</div>}
     <div className="warehouse-map-legend" aria-label="Chú giải bản đồ">
       <span><span className="legend-warehouse-icon" dangerouslySetInnerHTML={{ __html: warehouseIconHtml() }} /> Kho và bán kính phục vụ</span>
       <span><i className="legend-dot legend-dot--campaign">⚑</i> Vùng chiến dịch cứu trợ</span>

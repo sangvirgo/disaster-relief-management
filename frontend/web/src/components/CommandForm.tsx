@@ -54,6 +54,8 @@ export interface CommandSpec {
   warning?: string;
   /** Hide the heading when the surrounding UI already names the action. */
   hideTitle?: boolean;
+  /** Visual weight of the submit button; destructive or secondary actions should not look like the main step. */
+  tone?: 'primary' | 'secondary' | 'danger';
   warningFor?: (values: Record<string, string>) => string;
   /** When set, the form offers optional photo/video files uploaded here before the command is sent. */
   uploadPath?: string;
@@ -572,7 +574,7 @@ export function CommandForm({
           {message}
         </p>
       )}
-      <button className="button" disabled={busy || hasInvalidFields}>
+      <button className={`button${spec.tone === 'secondary' ? ' secondary' : spec.tone === 'danger' ? ' secondary command-danger' : ''}`} disabled={busy || hasInvalidFields}>
         {busy ? 'Đang xử lý…' : spec.title}
       </button>
     </form>

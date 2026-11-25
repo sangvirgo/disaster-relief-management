@@ -42,9 +42,10 @@ export function HandoffDetail({ distributionId, initialId, canReview, userId, on
     setId(lookup.trim()); setRevision((value) => value + 1);
   }
   return <section className="form-stack">
-    <h3>Tra cứu bàn giao và thất thoát</h3>
-    <p>Nhập mã bản ghi do người ghi nhận cung cấp. Mã này được hiển thị sau khi ghi nhận thành công.</p>
-    {initialId && <p role="status">Đã ghi nhận. Mã bản ghi để tra cứu hoặc chuyển người duyệt: <strong>{initialId}</strong></p>}
+    <h3>{initialId ? 'Bàn giao vừa ghi nhận' : 'Duyệt báo cáo thất thoát'}</h3>
+    {initialId
+      ? <p role="status" className="notice success">Đã ghi nhận. Nếu đây là báo cáo thất thoát, hãy gửi mã sau cho người duyệt: <strong>{initialId}</strong></p>
+      : <p className="muted">Phiếu có báo cáo thất thoát đang chờ duyệt. Nhập mã bản ghi mà người ghi nhận gửi cho bạn để xem và duyệt.</p>}
     <form className="form-stack" onSubmit={submit}>
       <label><span>Mã bản ghi bàn giao <span className="required-mark" aria-hidden="true">*</span></span><input value={lookup} onChange={(event) => {
         const value = event.target.value;
@@ -53,7 +54,7 @@ export function HandoffDetail({ distributionId, initialId, canReview, userId, on
           setId(''); setDetail(null); setBusy(false);
           try { sessionStorage.removeItem(storageKey); } catch { /* Optional view persistence. */ }
         }
-      }} maxLength={36} required aria-invalid={lookupInvalid} />{lookupInvalid && <small className="field-error">Nhập mã bản ghi bàn giao hợp lệ.</small>}</label>
+      }} maxLength={36} required aria-invalid={Boolean(lookup.trim()) && lookupInvalid} />{lookup.trim() && lookupInvalid && <small className="field-error">Mã bản ghi không hợp lệ (gồm 36 ký tự).</small>}</label>
       <button className="button secondary" disabled={busy || lookupInvalid}>{busy ? 'Đang tải…' : 'Xem bản ghi bàn giao'}</button>
     </form>
     {error && <p role="alert" className="notice error">{error}</p>}

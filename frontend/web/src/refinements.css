@@ -1780,7 +1780,7 @@
 @media (max-width: 700px) { .warehouse-manager__map .warehouse-coverage__map { min-height: 540px; } .warehouse-map-hover { bottom: 48px; max-height: 58vh; } }
 .command-checkbox { display: flex !important; flex-direction: row; align-items: center; gap: 10px; }
 .command-checkbox input[type='checkbox'] { width: 20px; height: 20px; flex: none; margin: 0; }
-.receipt-filter-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; margin: -4px 0 -8px; }
+.receipt-filter-actions { display: flex; align-items: flex-end; margin: 0; }
 .clear-receipt-filters { width: auto; min-height: 36px; padding: 6px 12px; font-size: 13px; }
 .receipt-detail-summary { padding: 12px 16px; border: 1px solid var(--color-surface-border); border-radius: 12px; background: var(--color-surface-subtle); }
 .receipt-detail-summary h3 { margin: 0 0 8px; }
@@ -1795,3 +1795,14 @@
 @media (prefers-reduced-motion: reduce) { .sos-unassigned-alert__icon { animation: none; } }
 .suggestion-code-link { display: inline-flex; align-items: center; gap: 5px; margin: 0; padding: 3px 9px 3px 6px; border: 1px solid transparent; border-radius: 8px; background: var(--color-primary-bg); color: var(--color-primary-dark); font-size: 15px; font-weight: 700; cursor: pointer; }
 .suggestion-code-link:hover { border-color: var(--color-primary); background: #e0ebff; text-decoration: underline; }
+
+/* Destructive command (e.g. cancel a slip): outlined, never the primary blue. */
+.command-danger { border-color: var(--color-emergency-border) !important; color: var(--color-emergency-dark) !important; }
+.command-danger:hover:not(:disabled) { background: var(--color-emergency-bg) !important; }
+
+/* Warehouse create/edit card on the map: labelled fields and text buttons instead of ✓/× icons. */
+.warehouse-map-editor--card { display: grid; gap: 10px; padding: 6px; }
+.warehouse-map-editor--card .warehouse-map-editor__heading strong { font-size: 16px; }
+.warehouse-map-editor__field { display: grid; gap: 4px; font-size: 13px; font-weight: 700; }
+.warehouse-map-editor__field small { font-weight: 400; }
+.warehouse-map-editor--card .warehouse-map-editor__actions .button { min-height: 38px; padding: 6px 16px; }

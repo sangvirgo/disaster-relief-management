@@ -1207,10 +1207,6 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
             <section className="sos-profile" id="request-full-detail" aria-labelledby="request-profile-heading">
               <div className="sos-profile__head">
                 <h3 id="request-profile-heading">Thông tin hồ sơ SOS</h3>
-                <div className="sos-profile__badges" aria-label="Trạng thái và mức ưu tiên">
-                  <StatusBadge status={detail.status} context="sos" />
-                  {detail.priority ? <PriorityBadge priority={detail.priority as 'P1' | 'P2' | 'P3' | 'P4'} /> : <span className="sos-profile__unprioritized">Chưa chọn ưu tiên</span>}
-                </div>
               </div>
               <p className="sos-profile__description">{reliefDescription(detail.description).narrative || 'Chưa có mô tả tình huống.'}</p>
               <RequestEvidencePanel key={detail.id} items={detail.evidence?.items ?? []} />

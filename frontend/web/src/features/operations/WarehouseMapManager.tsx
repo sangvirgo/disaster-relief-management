@@ -53,6 +53,7 @@ export function WarehouseMapManager({ canManage, canManageDrives, warehouseOptio
   const [editingWarehouseId, setEditingWarehouseId] = useState<string | null>(null);
   const [draft, setDraft] = useState<WarehouseDraft | null>(null);
   const [draftName, setDraftName] = useState('');
+  const [draftAddress, setDraftAddress] = useState('');
   const [draftBusy, setDraftBusy] = useState(false);
   const [draftError, setDraftError] = useState('');
   const draftKey = useRef<string | null>(null);
@@ -117,6 +118,7 @@ export function WarehouseMapManager({ canManage, canManageDrives, warehouseOptio
     setEditingWarehouseId(null);
     setDraft(null);
     setDraftName('');
+    setDraftAddress('');
     setDraftError('');
     draftKey.current = null;
   }
@@ -172,7 +174,8 @@ export function WarehouseMapManager({ canManage, canManageDrives, warehouseOptio
       await api('logistics', '/warehouses', {
         method: 'POST', idempotencyKey: draftKey.current,
         body: { name: draftName.trim().normalize('NFC'), location: { type: 'Point', coordinates: [draft.lng, draft.lat] },
-          service_radius_m: Math.round(draft.radiusM), location_public: false },
+          service_radius_m: Math.round(draft.radiusM), location_public: false,
+          ...(draftAddress.trim() ? { address_note: draftAddress.trim().normalize('NFC') } : {}) },
       });
       cancelWarehouseDraft();
       refresh();
@@ -271,22 +274,41 @@ export function WarehouseMapManager({ canManage, canManageDrives, warehouseOptio
     ? <MapHoverDetails key={`${hovered.kind}:${hovered.id}`} warehouse={{ id: hoveredWarehouse.id, name: hoveredWarehouse.name, service_radius_m: hoveredWarehouse.service_radius_m }} drive={hoveredDrive}
         actions={selectedId === hoveredWarehouse.id && <>{hoverActions}{actionError && <p className="notice error" role="alert">{actionError}</p>}</>} onClose={() => setHovered(null)} />
     : null;
-  const draftEditor = creatingWarehouse && draft && <form className="warehouse-map-editor" onSubmit={event => void createWarehouse(event)} noValidate>
-    <label className="warehouse-map-editor__name"><span>Tên kho</span><input autoFocus required maxLength={201} value={draftName} onChange={event => { setDraftName(event.target.value); draftKey.current = null; }} placeholder="Nhập tên kho" aria-label="Tên kho" /></label>
-    <button className="warehouse-map-editor__confirm" aria-label="Tạo kho tại vị trí và vùng đã chọn" title="Tạo kho" disabled={draftBusy || !draftName.trim() || draft.radiusM < 500 || draft.radiusM > 200_000}>{draftBusy ? '…' : '✓'}</button>
-    <button type="button" className="warehouse-map-editor__cancel" aria-label="Hủy thêm kho" title="Hủy" onClick={cancelWarehouseDraft}>×</button>
+  const radiusKm = draft ? Math.round(draft.radiusM / 100) / 10 : 0;
+  const radiusInvalid = Boolean(draft && (draft.radiusM < 500 || draft.radiusM > 200_000));
+  const radiusField = draft && <label className="warehouse-map-editor__field">
+    <span>Bán kính phục vụ (km)</span>
+    <input type="number" inputMode="decimal" min={0.5} max={200} step={0.5} value={radiusKm}
+      aria-invalid={radiusInvalid}
+      onChange={event => { const km = Number(event.target.value); if (Number.isFinite(km)) { setDraft({ ...draft, radiusM: Math.round(km * 1000) }); setDraftError(''); draftKey.current = null; } }} />
+    <small className={radiusInvalid ? 'field-error' : undefined}>{radiusInvalid ? 'Bán kính phải từ 0,5 đến 200 km.' : 'Hoặc kéo nút ↔ ở mép vòng tròn trên bản đồ.'}</small>
+  </label>;
+  const draftEditor = creatingWarehouse && draft && <form className="warehouse-map-editor warehouse-map-editor--card" onSubmit={event => void createWarehouse(event)} noValidate>
+    <div className="warehouse-map-editor__heading"><strong>Thêm kho mới</strong></div>
+    <small>Kéo biểu tượng kho để đổi vị trí. Vị trí: {draft.lat.toFixed(4)}, {draft.lng.toFixed(4)}</small>
+    <label className="warehouse-map-editor__field"><span>Tên kho <span className="required-mark" aria-hidden="true">*</span></span><input autoFocus required maxLength={201} value={draftName} onChange={event => { setDraftName(event.target.value); draftKey.current = null; }} placeholder="Ví dụ: Kho cứu trợ phường Hương Sơ" /></label>
+    {radiusField}
+    <label className="warehouse-map-editor__field"><span>Địa chỉ (không bắt buộc)</span><input maxLength={500} value={draftAddress} onChange={event => { setDraftAddress(event.target.value); draftKey.current = null; }} placeholder="Số nhà, đường, phường/xã" /></label>
     {draftError && <p className="notice error" role="alert">{draftError}</p>}
+    <div className="warehouse-map-editor__actions">
+      <button type="button" className="button secondary" onClick={cancelWarehouseDraft}>Hủy</button>
+      <button type="submit" className="button" disabled={draftBusy || !draftName.trim() || radiusInvalid}>{draftBusy ? 'Đang tạo…' : 'Tạo kho'}</button>
+    </div>
   </form>;
-  const editEditor = editingWarehouseId && draft && <form className="warehouse-map-editor" onSubmit={event => void saveWarehouseMapEdit(event)}>
-    <span className="warehouse-map-editor__name"><strong>{draftName}</strong><small>Kéo kho hoặc mép vòng tròn để chỉnh</small></span>
-    <button className="warehouse-map-editor__confirm" aria-label="Lưu vị trí và bán kính kho" title="Lưu thay đổi" disabled={draftBusy}>{draftBusy ? '…' : '✓'}</button>
-    <button type="button" className="warehouse-map-editor__cancel" aria-label="Hủy chỉnh sửa kho" title="Hủy" onClick={cancelWarehouseDraft}>×</button>
+  const editEditor = editingWarehouseId && draft && <form className="warehouse-map-editor warehouse-map-editor--card" onSubmit={event => void saveWarehouseMapEdit(event)}>
+    <div className="warehouse-map-editor__heading"><strong>{draftName}</strong></div>
+    <small>Kéo biểu tượng kho để đổi vị trí, hoặc kéo nút ↔ ở mép vòng tròn để đổi bán kính.</small>
+    {radiusField}
     {draftError && <p className="notice error" role="alert">{draftError}</p>}
+    <div className="warehouse-map-editor__actions">
+      <button type="button" className="button secondary" onClick={cancelWarehouseDraft}>Hủy</button>
+      <button type="submit" className="button" disabled={draftBusy || radiusInvalid}>{draftBusy ? 'Đang lưu…' : 'Lưu thay đổi'}</button>
+    </div>
   </form>;
   return <div className="warehouse-manager">
     <div className="warehouse-manager__layout">
       <div className="warehouse-manager__map">
-        <WarehouseCoverageMap placing={placing} onMapClick={placeAt} banner={creatingWarehouse ? (draft ? undefined : 'Chạm vào bản đồ để đặt tâm kho. Sau đó kéo ghim hoặc vòng tròn để điều chỉnh.') : editingWarehouseId ? 'Đang chỉnh kho trên bản đồ. Kéo tâm hoặc nút ở mép vòng tròn, rồi bấm dấu ✓ để lưu.' : placing ? (placeMessage || 'Chạm vào bản đồ, bên trong vòng tròn của một kho, để đặt điểm quyên góp. Nhấn Esc để hủy.') : undefined} rows={rows} campaigns={showCampaigns ? campaignRows : []} loading={state === 'loading'} error={state === 'error'} selectedId={selectedId}
+        <WarehouseCoverageMap placing={placing} onMapClick={placeAt} banner={creatingWarehouse ? (draft ? undefined : 'Chạm vào bản đồ để đặt tâm kho. Sau đó kéo ghim hoặc vòng tròn để điều chỉnh.') : editingWarehouseId ? 'Đang chỉnh kho trên bản đồ. Kéo tâm hoặc nút ở mép vòng tròn, rồi bấm “Lưu thay đổi”.' : placing ? (placeMessage || 'Chạm vào bản đồ, bên trong vòng tròn của một kho, để đặt điểm quyên góp. Nhấn Esc để hủy.') : undefined} rows={rows} campaigns={showCampaigns ? campaignRows : []} loading={state === 'loading'} error={state === 'error'} selectedId={selectedId}
           onSelectWarehouse={(id) => select(id)} onEditWarehouse={canManage ? beginWarehouseMapEdit : undefined} onSelectDrive={(driveId, warehouseId) => select(warehouseId, driveId)} onHover={target => { if (!creatingWarehouse && !editingWarehouseId && !placing) setHovered(target); }} onEmptyClick={() => { if (!editingWarehouseId) { setHovered(null); setSelectedId(null); } }} toolbar={toolbar} hoverCard={creatingWarehouse ? draftEditor : editingWarehouseId ? editEditor : hoverCard}
           creatingWarehouse={creatingWarehouse} editingWarehouse={Boolean(editingWarehouseId)} draft={draft} onDraftChange={next => { setDraft(next); setDraftError(''); draftKey.current = null; }} />
       </div>
