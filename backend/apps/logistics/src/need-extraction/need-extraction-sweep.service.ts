@@ -50,17 +50,25 @@ export function needExtractionGemini(env: Record<string, string | undefined> = p
   }
   if (apiKeys.length === 0) return null;
   const model = env.GEMINI_MODEL?.trim() || 'gemini-3.5-flash-lite';
+  const backup = env.GEMINI_BACKUP_MODEL?.trim();
+  const models = backup && backup !== model ? [model, backup] : [model];
   return {
     model,
-    call: (prompt, responseSchema) => callGeminiJson({
-      model,
-      apiKeys,
-      prompt,
-      responseSchema,
-      timeoutMs: 15_000,
-      deadlineMs: Date.now() + 25_000,
-      maxOutputTokens: 1024,
-    }),
+    // The backup model (separate per-model quota) answers when the primary model fails for any reason.
+    call: async (prompt, responseSchema) => {
+      let lastError: unknown;
+      for (const current of models) {
+        try {
+          return await callGeminiJson({
+            model: current, apiKeys, prompt, responseSchema,
+            timeoutMs: 15_000, deadlineMs: Date.now() + 25_000, maxOutputTokens: 1024,
+          });
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      throw lastError;
+    },
   };
 }
 

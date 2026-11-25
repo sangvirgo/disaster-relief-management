@@ -54,6 +54,7 @@ export async function callGeminiJson(request: GeminiJsonRequest): Promise<unknow
     const remaining = request.deadlineMs - now();
     if (remaining <= 0) throw new GeminiCallError('TIMEOUT');
     let response: Response;
+    const startedAt = now();
     try {
       response = await fetchImpl(url, {
         method: 'POST',
@@ -65,12 +66,12 @@ export async function callGeminiJson(request: GeminiJsonRequest): Promise<unknow
       last = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')
         ? new GeminiCallError('TIMEOUT')
         : new GeminiCallError('NETWORK');
-      recordGeminiAttempt(request.model, keyIndex, last.kind === 'TIMEOUT' ? 'timeout' : 'network');
+      recordGeminiAttempt(request.model, keyIndex, last.kind === 'TIMEOUT' ? 'timeout' : 'network', (now() - startedAt) / 1000);
       continue;
     }
     if (!response.ok) {
       const status = response.status;
-      recordGeminiAttempt(request.model, keyIndex, geminiOutcomeForStatus(status));
+      recordGeminiAttempt(request.model, keyIndex, geminiOutcomeForStatus(status), (now() - startedAt) / 1000);
       if (status === 429) last = new GeminiCallError('QUOTA', status);
       else if (status === 401 || status === 403 || status === 408 || status >= 500) last = new GeminiCallError('HTTP', status);
       else throw new GeminiCallError('HTTP', status);
@@ -84,7 +85,7 @@ export async function callGeminiJson(request: GeminiJsonRequest): Promise<unknow
       recordGeminiAttempt(request.model, keyIndex, 'invalid_output');
       throw new GeminiCallError('INVALID_OUTPUT');
     }
-    recordGeminiAttempt(request.model, keyIndex, 'ok');
+    recordGeminiAttempt(request.model, keyIndex, 'ok', (now() - startedAt) / 1000);
     return parsed;
   }
   throw last;

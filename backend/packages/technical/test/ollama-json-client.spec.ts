@@ -106,3 +106,15 @@ describe('hedgeWithFallback', () => {
     await expect(hedgeWithFallback(primary, null, 0)).rejects.toThrow('AI_PROVIDER_ERROR:429');
   });
 });
+
+describe('AI provider duration metrics', () => {
+  it('records the fallback call duration by model and outcome', async () => {
+    const registry = new Registry();
+    registerGeminiMetrics(registry);
+    await callOllamaJson({
+      config, prompt: 'p', responseSchema: {}, maxOutputTokens: 10,
+      fetchImpl: (async () => new Response(JSON.stringify({ message: { content: '{}' } }))) as unknown as typeof fetch,
+    });
+    expect(await registry.metrics()).toMatch(/c48_ai_fallback_duration_seconds_count\{model="qwen3\.5:0\.8b-q8_0",outcome="ok"\} 1/u);
+  });
+});

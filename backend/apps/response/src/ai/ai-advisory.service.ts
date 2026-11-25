@@ -4,7 +4,9 @@ import { randomUUID } from 'node:crypto';
 import type { DataSource } from 'typeorm';
 import { buildAiAssessmentInput } from './ai-risk';
 import { enqueueAiAdvisory, isAiAdvisoryFresh } from './ai-advisory-input';
-import { geminiOutcomeForStatus, recordGeminiAttempt } from '@c48/technical';
+import {
+  geminiOutcomeForStatus, recordAiAdvisoryResult, recordGeminiAttempt, setAiFallbackConfigured, setGeminiCooldown, type AiAdvisorySource,
+} from '@c48/technical';
 import { getGeminiApiKeys } from './gemini-api-keys';
 import { callOllamaJson, getOllamaFallbackConfig, hedgeWithFallback, OllamaCallError } from '@c48/technical/ai/ollama-json-client';
 import { WeatherService } from '../weather/weather.service';
@@ -140,6 +142,23 @@ const batchResponseSchema = {
   required: ['results'],
 };
 
+/** Second Gemini model tried with the same keys when the primary model fails (separate per-model quota). */
+function geminiBackupModel(primary: string): string | null {
+  const value = process.env.GEMINI_BACKUP_MODEL?.trim();
+  return value && value !== primary ? value : null;
+}
+
+/** A job that already failed this many times goes straight to the local fallback instead of Gemini. */
+function fallbackAfterFailures(): number {
+  const parsed = Number(process.env.AI_FALLBACK_AFTER_FAILURES ?? '1');
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : 1;
+}
+
+function sourceOf(value: Record<string, unknown>): AiAdvisorySource {
+  if (value.ai_source === 'FALLBACK') return 'ollama';
+  return value.ai_source === 'GEMINI_BACKUP' ? 'gemini_backup' : 'gemini_primary';
+}
+
 function batchSize(): number {
   const parsed = Number(process.env.GEMINI_BATCH_SIZE ?? '5');
   return Number.isSafeInteger(parsed) && parsed >= 1 ? Math.min(parsed, 10) : 5;
@@ -158,11 +177,14 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
   private timer?: NodeJS.Timeout;
   private backfillTimer?: NodeJS.Timeout;
   private running = false;
-  private providerCooldownUntil = 0;
+  /** Per Gemini model: no call until this time after a 429 (15 min) or 503 (1 min). */
+  private readonly modelCooldownUntil = new Map<string, number>();
   /** Local fallback model (Ollama); null when OLLAMA_BASE_URL or OLLAMA_MODEL is empty. */
   private readonly fallback = getOllamaFallbackConfig();
 
-  constructor(@InjectDataSource() private readonly dataSource: DataSource, private readonly weather?: WeatherService) {}
+  constructor(@InjectDataSource() private readonly dataSource: DataSource, private readonly weather?: WeatherService) {
+    setAiFallbackConfigured(this.fallback !== null);
+  }
 
   onModuleInit(): void {
     this.timer = setInterval(() => void this.processOne(), 2_000);
@@ -232,15 +254,23 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /** Gemini models in order (primary, then backup), without the ones cooling down. */
+  private geminiModels(primary: string): string[] {
+    const now = Date.now();
+    const models = [primary, geminiBackupModel(primary)].filter((model): model is string => model !== null);
+    for (const model of models) setGeminiCooldown(model, (this.modelCooldownUntil.get(model) ?? 0) > now);
+    return models.filter((model) => (this.modelCooldownUntil.get(model) ?? 0) <= now);
+  }
+
   private async processOne(): Promise<void> {
-    // While Gemini cools down after 429/503, the local fallback (when configured) serves one job at a time.
-    const fallbackOnly = Date.now() < this.providerCooldownUntil;
-    if (this.running || (fallbackOnly && !this.fallback)) return;
+    // When every Gemini model cools down after 429/503, the local fallback (when configured) serves one job at a time.
+    const allCooling = this.geminiModels(process.env.GEMINI_MODEL ?? 'gemini-3.5-flash-lite').length === 0;
+    if (this.running || (allCooling && !this.fallback)) return;
     this.running = true;
     try {
-      const jobs = fallbackOnly ? await this.claimJob(true).then((job) => (job ? [job] : [])) : await this.claimBatch();
+      const jobs = allCooling ? await this.claimJob(true).then((job) => (job ? [job] : [])) : await this.claimBatch();
       if (!jobs.length) return;
-      const outcomes = await this.runBatch(jobs, fallbackOnly);
+      const outcomes = await this.runBatch(jobs, allCooling || this.straightToFallback(jobs));
       for (const [index, job] of jobs.entries()) await this.settle(job, outcomes[index]!);
     } catch {
       this.logger.warn('AI_ADVISORY_CLAIM_FAILED');
@@ -254,12 +284,18 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
     const first = await this.claimJob();
     if (!first) return [];
     const jobs = [first];
+    if (this.straightToFallback(jobs)) return jobs; // answered alone by the local fallback
     while (jobs.length < batchSize()) {
       const next = await this.claimJob(true);
       if (!next || jobs.some((job) => job.id === next.id)) break;
       jobs.push(next);
     }
     return jobs;
+  }
+
+  /** One job whose earlier attempts already failed AI_FALLBACK_AFTER_FAILURES times skips Gemini. */
+  private straightToFallback(jobs: AdvisoryJob[]): boolean {
+    return this.fallback !== null && jobs.length === 1 && jobs[0]!.attempts - 1 >= fallbackAfterFailures();
   }
 
   private async runBatch(jobs: AdvisoryJob[], fallbackOnly = false): Promise<Array<Record<string, unknown> | Error>> {
@@ -284,8 +320,11 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
 
   private async settle(job: AdvisoryJob, outcome: Record<string, unknown> | Error): Promise<void> {
     if (!(outcome instanceof Error)) {
-      // A result from the local fallback records that model, so the coordinator view can label it.
-      const model = outcome.ai_source === 'FALLBACK' ? this.fallback?.model ?? null : null;
+      // A result from the Gemini backup or the local fallback records that model, so the coordinator view can label it.
+      const source = sourceOf(outcome);
+      const model = source === 'ollama' ? this.fallback?.model ?? null
+        : source === 'gemini_backup' ? geminiBackupModel(job.model) : null;
+      recordAiAdvisoryResult(source, 'completed');
       await this.persistResult(job.id,
         `UPDATE ai_advisory SET status='COMPLETED',extracted_json=$2::jsonb,error_code=NULL,completed_at=now(),lease_until=NULL,claim_token=NULL,
                 model=COALESCE($4,model)
@@ -297,8 +336,8 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
     const code = invalidOutput ? 'AI_INVALID_OUTPUT' : 'AI_PROVIDER_ERROR';
     const providerStatus = /^AI_PROVIDER_(?:RETRYABLE|ERROR):(\d{3}|NETWORK)$/u.exec(error.message)?.[1];
     const retryableProviderError = error.message.startsWith('AI_PROVIDER_RETRYABLE:');
-    this.noteProviderFailure(error);
     if (retryableProviderError && job.attempts <= maxRetries()) {
+      recordAiAdvisoryResult('none', 'retry_scheduled');
       const delaySeconds = retryDelaySeconds(job.attempts);
       this.logger.warn(
         invalidOutput ? 'AI_INVALID_OUTPUT_RETRY_SCHEDULED' : 'AI_PROVIDER_RETRY_SCHEDULED',
@@ -310,16 +349,38 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
       return;
     }
     this.logger.warn(code, providerStatus ? `job:${job.id} provider_status:${providerStatus}` : `job:${job.id}`);
+    recordAiAdvisoryResult('none', 'failed');
     await this.persistResult(job.id,
       `UPDATE ai_advisory SET status='FAILED',error_code=$2,completed_at=now(),lease_until=NULL,claim_token=NULL
         WHERE id=$1 AND status='PROCESSING' AND claim_token=$3 AND lease_until>now()`, [job.id, code, job.claim_token]);
   }
 
-  /** Gemini quota (429) or overload (503) pauses Gemini calls; the fallback, when configured, keeps serving. */
-  private noteProviderFailure(error: Error): void {
+  /** A Gemini quota (429) or overload (503) pauses that model only; the backup model and the fallback keep serving. */
+  private noteProviderFailure(model: string, error: Error): void {
     const providerStatus = /^AI_PROVIDER_(?:RETRYABLE|ERROR):(\d{3}|NETWORK)$/u.exec(error.message)?.[1];
-    if (providerStatus === '429') this.providerCooldownUntil = Date.now() + 15 * 60_000;
-    else if (providerStatus === '503') this.providerCooldownUntil = Date.now() + 60_000;
+    const pauseMs = providerStatus === '429' ? 15 * 60_000 : providerStatus === '503' ? 60_000 : 0;
+    if (!pauseMs) return;
+    this.modelCooldownUntil.set(model, Date.now() + pauseMs);
+    setGeminiCooldown(model, true);
+  }
+
+  /**
+   * Runs `call` on the primary Gemini model, then on the backup model when the primary fails (quota, outage, invalid
+   * output). The value names the model that answered. Throws the last error when every model fails.
+   */
+  private async withGeminiModels<T>(primaryModel: string, call: (model: string) => Promise<T>): Promise<{ value: T; model: string }> {
+    const models = this.geminiModels(primaryModel);
+    if (!models.length) throw new Error('AI_PROVIDER_RETRYABLE:503');
+    let lastError: Error = new Error('AI_PROVIDER_RETRYABLE:503');
+    for (const model of models) {
+      try {
+        return { value: await call(model), model };
+      } catch (error) {
+        lastError = providerFailure(error);
+        this.noteProviderFailure(model, lastError);
+      }
+    }
+    throw lastError;
   }
 
   private async persistResult(jobId: string, sql: string, parameters: unknown[]): Promise<void> {
@@ -434,29 +495,26 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /** Gemini calls end within 35 s; the fallback may run up to its own timeout after the hedge delay. */
+  /** Each Gemini model ends within 35 s; the fallback may run up to its own timeout after the hedge delay. */
   private leaseSeconds(): number {
-    return this.fallback ? 45 + Math.ceil((this.fallback.hedgeMs + this.fallback.timeoutMs) / 1000) : 45;
+    const gemini = geminiBackupModel(process.env.GEMINI_MODEL ?? 'gemini-3.5-flash-lite') ? 80 : 45;
+    return this.fallback ? gemini + Math.ceil((this.fallback.hedgeMs + this.fallback.timeoutMs) / 1000) : gemini;
   }
 
   private async extract(job: AdvisoryJob, text: string): Promise<Record<string, unknown>> {
-    let primaryError: Error | undefined;
-    const primary = async (): Promise<Record<string, unknown>> => {
-      try {
-        const body = JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: `${ADVISORY_INSTRUCTIONS}\n\nDữ kiện:\n${text}` }] }],
-          generationConfig: { responseMimeType: 'application/json', responseSchema, temperature: 0, maxOutputTokens: 2048 },
-        });
-        const value = normalizeExtraction(await this.generate(job.model, body, 15_000));
-        if (!this.validExtraction(value)) throw new Error('AI_INVALID_OUTPUT');
-        return value;
-      } catch (error) {
-        throw (primaryError = providerFailure(error));
-      }
+    const body = JSON.stringify({
+      contents: [{ role: 'user', parts: [{ text: `${ADVISORY_INSTRUCTIONS}\n\nDữ kiện:\n${text}` }] }],
+      generationConfig: { responseMimeType: 'application/json', responseSchema, temperature: 0, maxOutputTokens: 2048 },
+    });
+    const gemini = async (): Promise<Record<string, unknown>> => {
+      const { value, model } = await this.withGeminiModels(job.model, async (model) => {
+        const extracted = normalizeExtraction(await this.generate(model, body, 15_000));
+        if (!this.validExtraction(extracted)) throw new Error('AI_INVALID_OUTPUT');
+        return extracted;
+      });
+      return model === job.model ? value : { ...value, ai_source: 'GEMINI_BACKUP' };
     };
-    const { value, source } = await hedgeWithFallback(primary, this.fallbackCall(text), this.fallback?.hedgeMs ?? 0);
-    if (source === 'FALLBACK' && primaryError) this.noteProviderFailure(primaryError);
-    return value;
+    return (await hedgeWithFallback(gemini, this.fallbackCall(text), this.fallback?.hedgeMs ?? 0)).value;
   }
 
   private fallbackCall(text: string): ((signal: AbortSignal) => Promise<Record<string, unknown>>) | null {
@@ -490,26 +548,31 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
   private async extractBatch(jobs: AdvisoryJob[], texts: string[]): Promise<Array<Record<string, unknown> | Error>> {
     // The small fallback model takes one SOS: if the batch call fails, it answers the first job and the others keep
     // the Gemini error (requeued or cooled down as before).
-    let primaryError: Error | undefined;
-    const primary = () => this.extractBatchPrimary(jobs, texts).catch((error: unknown) => {
-      throw (primaryError = error instanceof Error ? error : providerFailure(error));
-    });
+    let geminiError: Error | undefined;
+    const gemini = async () => {
+      try {
+        const { value, model } = await this.withGeminiModels(jobs[0]!.model, (model) => this.extractBatchWith(model, texts));
+        return model === jobs[0]!.model ? value
+          : value.map((entry) => (entry instanceof Error ? entry : { ...entry, ai_source: 'GEMINI_BACKUP' }));
+      } catch (error) {
+        throw (geminiError = error instanceof Error ? error : providerFailure(error));
+      }
+    };
     const fallback = this.fallbackCall(texts[0]!);
     const { value, source } = await hedgeWithFallback<Array<Record<string, unknown> | Error>>(
-      primary, fallback ? (signal) => fallback(signal).then((first) => [first]) : null, this.fallback?.hedgeMs ?? 0);
-    if (source === 'PRIMARY' || !primaryError) return value;
-    this.noteProviderFailure(primaryError);
-    return [value[0]!, ...jobs.slice(1).map(() => primaryError!)];
+      gemini, fallback ? (signal) => fallback(signal).then((first) => [first]) : null, this.fallback?.hedgeMs ?? 0);
+    if (source === 'PRIMARY' || !geminiError) return value;
+    return [value[0]!, ...jobs.slice(1).map(() => geminiError!)];
   }
 
-  private async extractBatchPrimary(jobs: AdvisoryJob[], texts: string[]): Promise<Array<Record<string, unknown> | Error>> {
+  private async extractBatchWith(model: string, texts: string[]): Promise<Array<Record<string, unknown> | Error>> {
     try {
       const items = texts.map((text, index) => ({ id: `S${index + 1}`, data: JSON.parse(text) as unknown }));
       const body = JSON.stringify({
         contents: [{ role: 'user', parts: [{ text: `${ADVISORY_INSTRUCTIONS}\n\nDưới đây là ${items.length} SOS độc lập, mỗi SOS có id. Đánh giá riêng từng SOS, không để SOS này ảnh hưởng SOS khác; trả đúng một phần tử trong "results" cho mỗi id và giữ nguyên id.\n\nDữ kiện:\n${JSON.stringify(items)}` }] }],
         generationConfig: { responseMimeType: 'application/json', responseSchema: batchResponseSchema, temperature: 0, maxOutputTokens: Math.min(8192, 1536 * items.length) },
       });
-      const parsed = await this.generate(jobs[0]!.model, body, 25_000) as { results?: unknown };
+      const parsed = await this.generate(model, body, 25_000) as { results?: unknown };
       const results = Array.isArray(parsed?.results) ? parsed.results as Array<Record<string, unknown>> : [];
       return items.map(({ id }) => {
         const found = results.find((entry) => entry && entry.id === id);
@@ -537,6 +600,7 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
         break;
       }
       let response: Response;
+      const startedAt = Date.now();
       try {
         response = await fetch(url, {
           method: 'POST',
@@ -546,19 +610,19 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
         });
       } catch (error) {
         lastFailure = 'NETWORK';
-        recordGeminiAttempt(model, keyIndex, error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError') ? 'timeout' : 'network');
+        recordGeminiAttempt(model, keyIndex, error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError') ? 'timeout' : 'network', (Date.now() - startedAt) / 1000);
         continue;
       }
       if (!response.ok) {
         const status = response.status;
-        recordGeminiAttempt(model, keyIndex, geminiOutcomeForStatus(status));
+        recordGeminiAttempt(model, keyIndex, geminiOutcomeForStatus(status), (Date.now() - startedAt) / 1000);
         if (status === 401 || status === 403 || status === 408 || status === 429 || status >= 500) {
           lastFailure = String(status);
           continue;
         }
         throw new Error(`AI_PROVIDER_ERROR:${status}`);
       }
-      recordGeminiAttempt(model, keyIndex, 'ok');
+      recordGeminiAttempt(model, keyIndex, 'ok', (Date.now() - startedAt) / 1000);
       const responseBody = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
       return JSON.parse(responseBody.candidates?.[0]?.content?.parts?.[0]?.text ?? '') as unknown;
     }

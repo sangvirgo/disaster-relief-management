@@ -78,6 +78,8 @@ export async function callOllamaJson(request: OllamaJsonRequest): Promise<unknow
   const timeout = AbortSignal.timeout(config.timeoutMs);
   const signal = request.signal ? AbortSignal.any([request.signal, timeout]) : timeout;
   let response: Response;
+  const startedAt = Date.now();
+  const seconds = () => (Date.now() - startedAt) / 1000;
   try {
     response = await fetchImpl(`${config.baseUrl}/api/chat`, {
       method: 'POST',
@@ -95,20 +97,20 @@ export async function callOllamaJson(request: OllamaJsonRequest): Promise<unknow
     });
   } catch (error) {
     const aborted = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
-    if (!request.signal?.aborted) recordAiFallbackAttempt(config.model, aborted ? 'timeout' : 'network');
+    if (!request.signal?.aborted) recordAiFallbackAttempt(config.model, aborted ? 'timeout' : 'network', seconds());
     throw new OllamaCallError(aborted ? 'TIMEOUT' : 'NETWORK');
   }
   if (!response.ok) {
-    recordAiFallbackAttempt(config.model, 'http_other');
+    recordAiFallbackAttempt(config.model, 'http_other', seconds());
     throw new OllamaCallError('HTTP', response.status);
   }
   try {
     const payload = await response.json() as { message?: { content?: string } };
     const parsed = JSON.parse(payload.message?.content ?? '') as unknown;
-    recordAiFallbackAttempt(config.model, 'ok');
+    recordAiFallbackAttempt(config.model, 'ok', seconds());
     return parsed;
   } catch {
-    recordAiFallbackAttempt(config.model, 'invalid_output');
+    recordAiFallbackAttempt(config.model, 'invalid_output', seconds());
     throw new OllamaCallError('INVALID_OUTPUT');
   }
 }

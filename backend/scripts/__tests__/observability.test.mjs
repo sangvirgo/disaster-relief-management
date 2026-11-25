@@ -73,6 +73,7 @@ test('container-metrics lists long-running containers only and skips one-shot jo
 case "$1" in
   ps) printf 'id1\\nid2\\nid3\\n' ;;
   inspect) printf '/reliva-web 0 true false unless-stopped\\n/reliva-response-api 4 false true unless-stopped\\n/reliva-identity-migrate 0 false false no\\n' ;;
+  stats) printf 'reliva-web 12.5MiB / 64MiB\\nreliva-ollama 1.375GiB / 1.75GiB\\nbad\\"name 1KiB / 2KiB\\n' ;;
 esac
 `);
     chmodSync(bin, 0o755);
@@ -86,5 +87,8 @@ esac
     assert.match(text, /^c48_container_oom_killed\{name="reliva-response-api"\} 1$/mu);
     assert.match(text, /^c48_container_running\{name="reliva-web"\} 1$/mu);
     assert.doesNotMatch(text, /migrate/u);
+    assert.match(text, /^c48_container_memory_bytes\{name="reliva-web"\} 13107200$/mu);
+    assert.match(text, /^c48_container_memory_bytes\{name="reliva-ollama"\} 1476395008$/mu);
+    assert.doesNotMatch(text, /bad/u);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

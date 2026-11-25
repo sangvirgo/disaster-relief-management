@@ -137,6 +137,47 @@ groups:
         annotations:
           summary: 'Key Gemini số {{ $labels.key_slot }} đã bị từ chối (401/403)'
           description: 'Key vị trí {{ $labels.key_slot }} có thể đã bị thu hồi, sai hoặc bị khoá. Kiểm tra GEMINI_API_KEYS trong backend/.env.'
+      - alert: GeminiModelPaused
+        expr: max by (model) (c48_gemini_model_cooldown) == 1
+        for: 1m
+        labels: { severity: warning }
+        annotations:
+          summary: 'Mô hình Gemini {{ $labels.model }} đang tạm dừng'
+          description: 'Mô hình {{ $labels.model }} vừa trả 429 (dừng 15 phút) hoặc 503 (dừng 1 phút). Mô hình dự phòng gemini-3.1-flash-lite hoặc Ollama trả lời thay trong lúc này.'
+      - alert: AiServedByOllama
+        expr: sum(increase(c48_ai_advisory_results_total{source="ollama",outcome="completed"}[30m])) > 0
+        labels: { severity: warning }
+        annotations:
+          summary: 'Gợi ý AI đang do mô hình dự phòng Ollama trả lời'
+          description: 'Trong 30 phút qua có {{ $value | humanize }} gợi ý SOS từ mô hình nhỏ chạy nội bộ. Các mô hình Gemini đang lỗi hoặc chậm; điều phối viên cần đối chiếu kỹ các gợi ý có nhãn "mô hình dự phòng".'
+      - alert: AiAdvisoriesFailing
+        expr: sum(increase(c48_ai_advisory_results_total{outcome="failed"}[30m])) >= 3
+        labels: { severity: warning }
+        annotations:
+          summary: 'Nhiều gợi ý AI cho SOS thất bại'
+          description: 'Trong 30 phút qua {{ $value | humanize }} SOS không nhận được gợi ý AI sau mọi lần thử (Gemini chính, Gemini dự phòng, Ollama). Điều phối viên vẫn xác minh thủ công được.'
+      - alert: OllamaFallbackDown
+        expr: max(c48_ai_fallback_configured) == 1 unless on() (max(c48_container_running{name="reliva-ollama"}) == 1)
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: 'Mô hình dự phòng Ollama không chạy'
+          description: 'response-api đã cấu hình OLLAMA_BASE_URL nhưng container reliva-ollama không chạy. Kiểm tra C48_AI_FALLBACK, dung lượng đĩa và log release.'
+      - alert: OllamaMemoryHigh
+        expr: max(c48_container_memory_bytes{name="reliva-ollama"}) > 1600 * 1024 * 1024
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: 'Ollama dùng gần hết giới hạn bộ nhớ'
+          description: 'reliva-ollama đang dùng {{ $value | humanize1024 }}B, gần giới hạn 1792 MiB. Có thể bị dừng do hết bộ nhớ; giảm OLLAMA_NUM_CTX hoặc tắt mô hình dự phòng.'
+      - alert: OllamaSlow
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(c48_ai_fallback_duration_seconds_bucket{outcome="ok"}[30m]))) > 75
+          and sum(increase(c48_ai_fallback_duration_seconds_count[30m])) >= 3
+        labels: { severity: warning }
+        annotations:
+          summary: 'Mô hình dự phòng Ollama trả lời quá chậm'
+          description: '95% lần gọi Ollama mất hơn {{ $value | humanizeDuration }}, sát giới hạn 90 giây (OLLAMA_TIMEOUT_MS). Máy chủ có thể đang thiếu CPU.'
       - alert: AiDailyLimitNear
         expr: c48_ai_daily_call_limit > 0 and c48_ai_daily_calls / c48_ai_daily_call_limit > 0.80
         for: 5m

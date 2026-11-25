@@ -5,6 +5,8 @@ import type { DataSource } from 'typeorm';
 import { AiAdvisoryService } from '../src/ai/ai-advisory.service';
 import { aiInputHash } from '../src/ai/ai-risk';
 import { aiAssessmentHash, enqueueAiAdvisory } from '../src/ai/ai-advisory-input';
+import { Registry } from 'prom-client';
+import { registerGeminiMetrics } from '@c48/technical';
 const job = { id: '00000000-0000-4000-8000-000000000001', request_id: 'request', description: 'Cần nước uống', input_hash: aiInputHash('Cần nước uống'), model: 'test', attempts: 1, claim_token: '00000000-0000-4000-8000-000000000099' };
 const extraction = {
   summary: 'Một hộ dân cần nước uống để duy trì sinh hoạt.', suggested_priority: 'P1',
@@ -404,3 +406,89 @@ describe('AI advisory local fallback (Ollama)', () => {
     expect(new AiAdvisoryService({} as DataSource)['leaseSeconds']()).toBe(45 + 90); // hedge 0 s + timeout 90 s
   });
 });
+
+describe('AI advisory Gemini backup model and routing', () => {
+  const geminiModelOf = (url: unknown) => /\/models\/([^:]+):generateContent/u.exec(decodeURIComponent(String(url)))?.[1];
+  const geminiReply = (value: Record<string, unknown>) =>
+    ({ ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(value) }] } }] }) } as Response);
+  const ollamaReply = (value: Record<string, unknown>) => ({ ok: true, json: async () => ({ message: { content: JSON.stringify(value) } }) } as Response);
+  const env = { GEMINI_API_KEY: 'unit-test', GEMINI_BACKUP_MODEL: 'gemini-backup' };
+  beforeEach(() => {
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    Object.assign(process.env, env);
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+    for (const name of [...Object.keys(env), 'OLLAMA_BASE_URL', 'OLLAMA_MODEL', 'AI_FALLBACK_HEDGE_MS', 'AI_FALLBACK_AFTER_FAILURES']) delete process.env[name];
+  });
+
+  it('answers with the backup model when the primary is rate-limited, records it, and skips the paused primary next time', async () => {
+    const registry = new Registry();
+    registerGeminiMetrics(registry);
+    const query = jest.fn<(...args: unknown[]) => Promise<unknown[]>>().mockResolvedValue([]);
+    const worker = new AiAdvisoryService({ query } as unknown as DataSource);
+    jest.spyOn(worker as unknown as { claimJob(): Promise<typeof job> }, 'claimJob').mockResolvedValue({ ...job, model: 'gemini-primary' });
+    const fetch = jest.spyOn(globalThis, 'fetch').mockImplementation(async (url) =>
+      geminiModelOf(url) === 'gemini-primary' ? { ok: false, status: 429 } as Response : geminiReply(extraction));
+
+    await worker['processOne']();
+
+    expect(fetch.mock.calls.map(([url]) => geminiModelOf(url))).toEqual(['gemini-primary', 'gemini-backup']);
+    const completed = query.mock.calls.find(([sql]) => String(sql).includes("status='COMPLETED'"));
+    expect(completed?.[1]?.[3]).toBe('gemini-backup');
+    expect(JSON.parse(String(completed?.[1]?.[1]))).toMatchObject({ ai_source: 'GEMINI_BACKUP' });
+    const metrics = await registry.metrics();
+    expect(metrics).toContain('c48_ai_advisory_results_total{source="gemini_backup",outcome="completed"} 1');
+    expect(metrics).toContain('c48_gemini_model_cooldown{model="gemini-primary"} 1');
+
+    fetch.mockClear();
+    await worker['processOne']();
+    expect(fetch.mock.calls.map(([url]) => geminiModelOf(url))).toEqual(['gemini-backup']);
+  });
+
+  it('uses the primary model alone when it answers', async () => {
+    const query = jest.fn<(...args: unknown[]) => Promise<unknown[]>>().mockResolvedValue([]);
+    const worker = new AiAdvisoryService({ query } as unknown as DataSource);
+    jest.spyOn(worker as unknown as { claimJob(): Promise<typeof job> }, 'claimJob').mockResolvedValue({ ...job, model: 'gemini-primary' });
+    const fetch = jest.spyOn(globalThis, 'fetch').mockResolvedValue(geminiReply(extraction));
+    await worker['processOne']();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const completed = query.mock.calls.find(([sql]) => String(sql).includes("status='COMPLETED'"));
+    expect(completed?.[1]?.[3]).toBeNull();
+  });
+
+  it('also tries the backup model after invalid output, and returns the last error when both fail', async () => {
+    const worker = new AiAdvisoryService({} as DataSource);
+    const fetch = jest.spyOn(globalThis, 'fetch').mockImplementation(async (url) =>
+      geminiModelOf(url) === 'gemini-primary' ? geminiReply({ summary: 'bad' }) : { ok: false, status: 503 } as Response);
+    await expect(worker['extract']({ ...job, model: 'gemini-primary' } as never, '{}')).rejects.toThrow('AI_PROVIDER_RETRYABLE:503');
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('sends a job that already failed straight to the local fallback without calling Gemini', async () => {
+    Object.assign(process.env, { OLLAMA_BASE_URL: 'http://ollama:11434', OLLAMA_MODEL: 'qwen-test', AI_FALLBACK_AFTER_FAILURES: '1' });
+    const query = jest.fn<(...args: unknown[]) => Promise<unknown[]>>().mockResolvedValue([]);
+    const worker = new AiAdvisoryService({ query } as unknown as DataSource);
+    const claim = jest.spyOn(worker as unknown as { claimJob(shares?: boolean): Promise<typeof job> }, 'claimJob')
+      .mockResolvedValue({ ...job, model: 'gemini-primary', attempts: 2 });
+    const fetch = jest.spyOn(globalThis, 'fetch').mockResolvedValue(ollamaReply(extraction));
+
+    await worker['processOne']();
+
+    expect(claim).toHaveBeenCalledTimes(1); // no batch neighbours ride along
+    expect(fetch.mock.calls.some(([url]) => geminiModelOf(url))).toBe(false);
+    const completed = query.mock.calls.find(([sql]) => String(sql).includes("status='COMPLETED'"));
+    expect(completed?.[1]?.[3]).toBe('qwen-test');
+  });
+
+  it('keeps a first attempt on Gemini even when the fallback is configured', async () => {
+    Object.assign(process.env, { OLLAMA_BASE_URL: 'http://ollama:11434', OLLAMA_MODEL: 'qwen-test', AI_FALLBACK_HEDGE_MS: '60000' });
+    const query = jest.fn<(...args: unknown[]) => Promise<unknown[]>>().mockResolvedValue([]);
+    const worker = new AiAdvisoryService({ query } as unknown as DataSource);
+    jest.spyOn(worker as unknown as { claimJob(): Promise<typeof job> }, 'claimJob').mockResolvedValue({ ...job, model: 'gemini-primary', attempts: 1 });
+    const fetch = jest.spyOn(globalThis, 'fetch').mockResolvedValue(geminiReply(extraction));
+    await worker['processOne']();
+    expect(fetch.mock.calls.map(([url]) => geminiModelOf(url))).toEqual(['gemini-primary']);
+  });
+});
+

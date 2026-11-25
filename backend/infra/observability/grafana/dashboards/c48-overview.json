@@ -1324,7 +1324,7 @@
     },
     {
       "type": "row",
-      "title": "AI Gemini",
+      "title": "AI (Gemini chính, Gemini dự phòng, Ollama)",
       "id": 30,
       "collapsed": false,
       "gridPos": {
@@ -1658,6 +1658,460 @@
           },
           "expr": "sum by (model) (increase(c48_gemini_attempts_total[1h]))",
           "legendFormat": "{{model}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Gợi ý SOS theo nguồn trả lời",
+      "description": "Số gợi ý đã lưu trong 15 phút, theo mô hình đã trả lời: gemini_primary (mô hình chính), gemini_backup (gemini-3.1-flash-lite), ollama (mô hình nhỏ chạy nội bộ).",
+      "id": 38,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "c48-prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 0,
+        "y": 70
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "sum by (source) (increase(c48_ai_advisory_results_total{outcome=\"completed\"}[15m]))",
+          "legendFormat": "{{source}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Gợi ý lỗi và hẹn thử lại",
+      "description": "retry_scheduled = mọi mô hình đều lỗi, SOS được xếp hàng thử lại; failed = hết lượt thử, điều phối viên xác minh thủ công.",
+      "id": 39,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "c48-prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 8,
+        "y": 70
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "sum by (outcome) (increase(c48_ai_advisory_results_total{outcome!=\"completed\"}[15m]))",
+          "legendFormat": "{{outcome}}"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Mô hình Gemini tạm dừng",
+      "description": "Một mô hình bị dừng 15 phút sau lỗi 429 (hết hạn mức) hoặc 1 phút sau lỗi 503; mô hình kế tiếp trả lời thay.",
+      "id": 40,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "c48-prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 70
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Đang chạy",
+                  "color": "green"
+                },
+                "1": {
+                  "text": "Tạm dừng",
+                  "color": "orange"
+                }
+              }
+            }
+          ],
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "auto",
+        "orientation": "horizontal"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "max by (model) (c48_gemini_model_cooldown)",
+          "legendFormat": "{{model}}",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Thời gian phản hồi p95",
+      "description": "95% lần gọi xong trong thời gian này. Gemini tính theo từng lần thử một key; Ollama giới hạn 90 giây (OLLAMA_TIMEOUT_MS).",
+      "id": 41,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "c48-prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 0,
+        "y": 77
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, model) (rate(c48_gemini_attempt_duration_seconds_bucket[15m])))",
+          "legendFormat": "Gemini {{model}}"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, model) (rate(c48_ai_fallback_duration_seconds_bucket[15m])))",
+          "legendFormat": "Ollama {{model}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Lần gọi Ollama theo kết quả",
+      "description": "Không tính lần gọi bị huỷ vì Gemini đã trả lời trước. invalid_output = mô hình trả JSON không đọc được.",
+      "id": 42,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "c48-prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 8,
+        "y": 77
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "sum by (outcome) (increase(c48_ai_fallback_attempts_total[15m]))",
+          "legendFormat": "{{outcome}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "RAM của Ollama",
+      "description": "Bộ nhớ container reliva-ollama (docker stats, mỗi phút) so với giới hạn mem_limit 1792 MiB.",
+      "id": 43,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "c48-prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 77
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "max(c48_container_memory_bytes{name=\"reliva-ollama\"})",
+          "legendFormat": "đang dùng"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "vector(1792 * 1024 * 1024)",
+          "legendFormat": "giới hạn"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Trạng thái Ollama",
+      "description": "Đã cấu hình = response-api có OLLAMA_BASE_URL và OLLAMA_MODEL. Container chạy = reliva-ollama đang chạy (bật bằng C48_AI_FALLBACK=on).",
+      "id": 44,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "c48-prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 0,
+        "y": 84
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Không",
+                  "color": "text"
+                },
+                "1": {
+                  "text": "Có",
+                  "color": "green"
+                }
+              }
+            }
+          ],
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "auto",
+        "orientation": "horizontal"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "max(c48_ai_fallback_configured)",
+          "legendFormat": "Đã cấu hình",
+          "instant": true
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "max(c48_container_running{name=\"reliva-ollama\"}) or vector(0)",
+          "legendFormat": "Container chạy",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Bộ nhớ theo container",
+      "description": "Bộ nhớ đang dùng của từng container C48 (docker stats, mỗi phút).",
+      "id": 45,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "c48-prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 16,
+        "x": 8,
+        "y": 84
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "sum by (name) (c48_container_memory_bytes)",
+          "legendFormat": "{{name}}"
         }
       ]
     }

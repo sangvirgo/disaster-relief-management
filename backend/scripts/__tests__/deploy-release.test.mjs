@@ -194,7 +194,7 @@ test('the AI fallback starts and pulls its model only when C48_AI_FALLBACK=on, a
     assert.equal(off.run('deploy', 'aaa').status, 0);
     const log = readFileSync(off.calls, 'utf8');
     assert.doesNotMatch(log, /--profile ai-fallback (?:pull|up|exec)/u);
-    assert.match(log, /--profile ai-fallback stop ollama/u, 'turning it off frees the memory');
+    assert.match(log, /--profile ai-fallback rm --stop --force ollama/u, 'turning it off frees the memory and leaves no stopped container');
   } finally { off.cleanup(); }
 
   const on = sandbox();

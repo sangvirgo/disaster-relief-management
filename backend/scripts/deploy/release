@@ -163,9 +163,10 @@ observability_up() { # opt-in with C48_OBSERVABILITY=on in backend/.env; never f
 }
 
 ai_fallback_up() { # opt-in with C48_AI_FALLBACK=on in backend/.env; never fails a release
-  # Ollama (profile ai-fallback) answers SOS advisories only when Gemini fails or is slow. Off: stop it to free RAM.
+  # Ollama (profile ai-fallback) answers SOS advisories only when Gemini fails or is slow. Off: remove the container
+  # (the ollama-data volume keeps the model) so it frees RAM and no stopped container trips ContainerNotRunning.
   if [[ "$(env_value C48_AI_FALLBACK)" != on ]]; then
-    main_compose --profile ai-fallback stop ollama >/dev/null 2>&1 || true
+    main_compose --profile ai-fallback rm --stop --force ollama >/dev/null 2>&1 || true
     return 0
   fi
   local model free_gb min_gb="${C48_AI_FALLBACK_MIN_FREE_GB:-10}"

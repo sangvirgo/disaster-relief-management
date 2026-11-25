@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Writes Docker restart/run state of the long-running C48 containers as node_exporter textfile metrics, so
 # Prometheus can alert on restart loops and stopped containers without cAdvisor (which costs RAM). Run every minute by
-# the c48-container-metrics systemd timer (installed by `release`). Reads only `docker inspect`; changes nothing.
+# the c48-container-metrics systemd timer (installed by `release`). Reads only `docker inspect` and `docker stats`; changes nothing.
 set -euo pipefail
 umask 022
 
@@ -29,6 +29,15 @@ trap 'rm -f -- "$temporary"' EXIT
         printf 'c48_container_running{name="%s"} %s\n' "$name" "$([[ "$running" == true ]] && echo 1 || echo 0)"
         printf 'c48_container_oom_killed{name="%s"} %s\n' "$name" "$([[ "$oom" == true ]] && echo 1 || echo 0)"
       done
+    # Memory in use per running container (docker stats reports binary units), for the Ollama fallback above all.
+    printf '# HELP c48_container_memory_bytes Memory used by a running C48 container (docker stats).\n# TYPE c48_container_memory_bytes gauge\n'
+    # shellcheck disable=SC2086 # one word per container id
+    "$DOCKER" stats --no-stream --format '{{.Name}} {{.MemUsage}}' $ids 2>/dev/null |
+      awk '$1 ~ /^[A-Za-z0-9_.-]+$/ {
+        value = $2; unit = value; sub(/^[0-9.]+/, "", unit); sub(/[A-Za-z]+$/, "", value)
+        factor = (unit == "KiB" ? 1024 : unit == "MiB" ? 1048576 : unit == "GiB" ? 1073741824 : unit == "B" ? 1 : 0)
+        if (factor > 0 && value != "") printf "c48_container_memory_bytes{name=\"%s\"} %.0f\n", $1, value * factor
+      }'
   fi
 } > "$temporary"
 mv -f -- "$temporary" "$METRICS_DIR/c48_container.prom"
