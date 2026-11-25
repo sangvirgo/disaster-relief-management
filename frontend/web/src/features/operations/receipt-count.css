@@ -1,0 +1,46 @@
+.count-form { display: grid; gap: 14px; min-width: 0; }
+.count-form__intro h3 { margin: 0 0 4px; font-size: 18px; }
+.count-form__intro p { margin: 0; color: var(--color-text-secondary); }
+
+.count-form__options { display: flex; flex-wrap: wrap; gap: 8px 20px; }
+.count-form__toggle { display: inline-flex !important; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.count-form__toggle input { width: 18px; height: 18px; margin: 0; accent-color: var(--color-primary); }
+
+.count-form__table { display: grid; gap: 6px; min-width: 0; overflow-x: auto; padding: 10px 12px; border: 1px solid var(--color-surface-border); border-radius: 12px; background: var(--color-surface-subtle); }
+.count-form__row { display: grid; align-items: center; gap: 10px; min-width: 0; }
+.count-form__row--head { padding: 0 2px 4px; border-bottom: 1px solid var(--color-surface-border); color: var(--color-text-secondary); font-size: 12px; font-weight: 700; }
+.count-form__row--head .numeric { text-align: right; }
+.count-form__line { display: grid; gap: 6px; padding: 6px 0; }
+.count-form__line + .count-form__line { border-top: 1px dashed var(--color-surface-border); }
+.count-form__line--outside { border-left: 3px solid var(--color-warning); padding-left: 8px; }
+.count-form__item { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
+.count-form__item > :first-child:not(strong) { flex: 1 1 100%; min-width: 0; }
+.count-form__item small { color: var(--color-text-secondary); }
+.count-form__flag { padding: 1px 8px; border-radius: 999px; background: var(--color-warning-bg); color: var(--color-warning-dark); font-size: 12px; font-style: normal; font-weight: 700; }
+.count-form__qty input, .count-form__extra input {
+  box-sizing: border-box; width: 100%; min-width: 0; min-height: 42px; padding: 8px 10px;
+  border: 1px solid var(--color-surface-border); border-radius: 10px; background: var(--color-surface-card);
+  color: var(--color-text-primary); font: inherit;
+}
+.count-form__qty input { text-align: right; font-variant-numeric: tabular-nums; }
+.count-form__qty input[readonly] { background: var(--color-surface-subtle); color: var(--color-text-secondary); }
+.count-form__qty input[aria-invalid='true'], .count-form__extra input[aria-invalid='true'] { border-color: var(--color-emergency); }
+.count-form__remove { width: 34px; height: 34px; border: 1px solid var(--color-surface-border); border-radius: 8px; background: var(--color-surface-card); color: var(--color-text-secondary); font-size: 20px; cursor: pointer; }
+.count-form__extra { display: grid; grid-template-columns: minmax(0, 1fr) 190px; gap: 10px; }
+.count-form__date { display: grid; gap: 2px; }
+.count-form__date small { color: var(--color-text-secondary); font-size: 12px; }
+.count-form__error { margin: 0; }
+.count-form__add { justify-self: start; }
+
+.count-form__evidence { display: grid; gap: 6px; font-size: 14px; font-weight: 600; }
+.count-form__evidence small { color: var(--color-text-secondary); font-weight: 400; }
+.count-form__file { position: relative; display: flex !important; align-items: center; gap: 12px; padding: 8px; border: 1px dashed var(--color-surface-border); border-radius: 10px; cursor: pointer; }
+.count-form__file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.count-form__file .button { min-height: 36px; padding: 6px 14px; pointer-events: none; }
+.count-form__file-name { min-width: 0; overflow: hidden; color: var(--color-text-secondary); font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
+.count-form__file:focus-within { outline: 3px solid var(--color-primary-border); outline-offset: 2px; }
+.count-form__submit { width: 100%; }
+
+@media (max-width: 640px) {
+  .count-form__extra { grid-template-columns: 1fr; }
+}

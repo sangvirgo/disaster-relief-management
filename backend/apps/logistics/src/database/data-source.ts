@@ -17,6 +17,7 @@ import { AllowUnusedItemDeletion1796083200000 } from './migrations/AllowUnusedIt
 import { RemoveVehicles1796169600000 } from './migrations/RemoveVehicles1796169600000';
 import { RemoveReliefPoints1796256000000 } from './migrations/RemoveReliefPoints1796256000000';
 import { AddDonationDriveLocation1796342400000 } from './migrations/AddDonationDriveLocation1796342400000';
+import { AllowApproverDispatch1796428800000 } from './migrations/AllowApproverDispatch1796428800000';
 
 export default new DataSource(postgresOptions([
   InitialLogistics1710000000000,
@@ -35,4 +36,5 @@ export default new DataSource(postgresOptions([
   RemoveVehicles1796169600000,
   RemoveReliefPoints1796256000000,
   AddDonationDriveLocation1796342400000,
+  AllowApproverDispatch1796428800000,
 ], 'logistics'));

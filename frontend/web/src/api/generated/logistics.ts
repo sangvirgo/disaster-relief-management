@@ -1992,6 +1992,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/distributions/{id}/approve-and-dispatch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * DistributionsController.approveAndDispatch
+         * @description Route exported from backend/apps/logistics/src/distributions/distributions.controller.ts#DistributionsController.approveAndDispatch. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
+         */
+        post: operations["logisticsDistributionsApproveAndDispatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4371,6 +4391,8 @@ export interface operations {
                                 /** Format: date */
                                 expiry_date?: string;
                                 flags?: string[];
+                                unit_scale?: number;
+                                has_count_line?: boolean;
                             }[];
                         } | null;
                         review?: {
@@ -4480,6 +4502,23 @@ export interface operations {
                                 /** Format: date */
                                 expiry_date?: string;
                                 flags?: string[];
+                                unit_scale?: number;
+                                has_count_line?: boolean;
+                            }[];
+                            is_own_count?: boolean;
+                            is_count_author?: boolean;
+                        } | {
+                            revision?: number;
+                            declaration_revision?: number;
+                            is_own_count?: boolean;
+                            is_count_author?: boolean;
+                            lines?: {
+                                /** Format: uuid */
+                                item_id?: string;
+                                item_name?: string;
+                                unit_name?: string;
+                                unit_scale?: number;
+                                has_count_line?: boolean;
                             }[];
                         } | null;
                         review?: {
@@ -4604,6 +4643,8 @@ export interface operations {
                                 /** Format: date */
                                 expiry_date?: string;
                                 flags?: string[];
+                                unit_scale?: number;
+                                has_count_line?: boolean;
                             }[];
                         } | null;
                         review?: {
@@ -4728,6 +4769,8 @@ export interface operations {
                                 /** Format: date */
                                 expiry_date?: string;
                                 flags?: string[];
+                                unit_scale?: number;
+                                has_count_line?: boolean;
                             }[];
                         } | null;
                         review?: {
@@ -4846,6 +4889,8 @@ export interface operations {
                                 /** Format: date */
                                 expiry_date?: string;
                                 flags?: string[];
+                                unit_scale?: number;
+                                has_count_line?: boolean;
                             }[];
                         } | null;
                         review?: {
@@ -4966,6 +5011,8 @@ export interface operations {
                                 /** Format: date */
                                 expiry_date?: string;
                                 flags?: string[];
+                                unit_scale?: number;
+                                has_count_line?: boolean;
                             }[];
                         } | null;
                         review?: {
@@ -11898,6 +11945,104 @@ export interface operations {
             };
             /** @description Documented error response; clients branch on the stable code. */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsDistributionsApproveAndDispatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expected_version: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id?: string;
+                        /** Format: uuid */
+                        warehouse_id?: string;
+                        campaign_id?: string | null;
+                        purpose?: string;
+                        status?: string;
+                        /** Format: uuid */
+                        preparer_user_id?: string;
+                        approver_user_id?: string | null;
+                        approved_version?: number | null;
+                        dispatch_actor_user_id?: string | null;
+                        dispatched_at?: string | null;
+                        reconciled_at?: string | null;
+                        /** Format: date-time */
+                        created_at?: string;
+                        version?: number;
+                        lines?: {
+                            /** Format: uuid */
+                            id?: string;
+                            /** Format: uuid */
+                            item_id?: string;
+                            item_name?: string;
+                            unit?: {
+                                code?: string;
+                                scale?: number;
+                            };
+                            commitment_id?: string | null;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            quantity?: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            dispatched?: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            handed_out?: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            returned?: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            lost?: string;
+                            pending_loss_count?: number;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            in_transit?: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

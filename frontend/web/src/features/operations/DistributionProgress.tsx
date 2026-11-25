@@ -43,30 +43,29 @@ export function DistributionProgress({ detail, userId, warehouseName, campaignNa
   const settled = lines.filter(lineSettled).length;
   const steps: { title: string; meta: string; state: StepState }[] = [
     { title: 'Lập phiếu', meta: [who(detail.preparer_user_id), detail.created_at ? timeLabel(detail.created_at) : ''].filter(Boolean).join(' · '), state: 'done' },
-    { title: 'Duyệt phiếu', meta: who(detail.approver_user_id) || 'Người khác người lập', state: reached >= 1 ? 'done' : reached === 0 ? 'current' : 'todo' },
-    { title: 'Xuất kho', meta: reached >= 2 ? [who(detail.dispatch_actor_user_id), detail.dispatched_at ? timeLabel(detail.dispatched_at) : ''].filter(Boolean).join(' · ') : 'Người khác người duyệt', state: reached >= 2 ? 'done' : reached === 1 ? 'current' : 'todo' },
-    { title: 'Bàn giao', meta: reached >= 2 ? `${settled}/${lines.length} dòng đã xong` : 'Giao, hoàn kho hoặc thất thoát', state: reached >= 3 ? 'done' : reached === 2 ? 'current' : 'todo' },
+    { title: 'Duyệt và xuất kho',
+      meta: reached >= 2 ? [who(detail.dispatch_actor_user_id), detail.dispatched_at ? timeLabel(detail.dispatched_at) : ''].filter(Boolean).join(' · ')
+        : reached === 1 ? `Đã duyệt (${who(detail.approver_user_id)}), chờ xuất kho` : 'Người khác người lập',
+      state: reached >= 2 ? 'done' : reached >= 0 ? 'current' : 'todo' },
+    { title: 'Bàn giao', meta: reached >= 2 ? `${settled}/${lines.length} dòng đã xong` : 'Người khác người xuất kho', state: reached >= 3 ? 'done' : reached === 2 ? 'current' : 'todo' },
     { title: 'Hoàn tất', meta: detail.reconciled_at ? timeLabel(detail.reconciled_at) : 'Tự đối soát', state: reached >= 3 ? 'done' : 'todo' },
   ];
   if (cancelled) steps.forEach((step, index) => { if (index > 0) step.state = 'cancelled'; });
 
   const preparer = detail.preparer_user_id === userId;
-  const approver = detail.approver_user_id === userId;
   const dispatcher = detail.dispatch_actor_user_id === userId;
   const next = cancelled
     ? { tone: 'neutral', title: 'Phiếu đã hủy', body: 'Hàng chưa rời kho; số lượng đã giữ được trả lại tồn khả dụng.' }
     : status === 'DRAFT'
       ? preparer
-        ? { tone: 'waiting', title: 'Đang chờ người khác duyệt', body: 'Bạn là người lập phiếu nên không tự duyệt được. Hãy nhờ người duyệt hoặc một quản lý vận hành khác kiểm tra các dòng hàng bên dưới.' }
-        : { tone: 'action', title: 'Bước tiếp theo: duyệt phiếu', body: 'Kiểm tra kho, vật phẩm và số lượng. Nếu đúng, bấm “Duyệt phiếu phân phối”.' }
+        ? { tone: 'waiting', title: 'Đang chờ người khác duyệt và xuất kho', body: 'Bạn là người lập phiếu nên không tự duyệt được. Hãy nhờ một quản lý vận hành khác đối chiếu hàng và bấm “Duyệt và xuất kho”.' }
+        : { tone: 'action', title: 'Bước tiếp theo: duyệt và xuất kho', body: 'Đối chiếu kho, vật phẩm và số lượng với hàng thực tế. Nếu khớp, bấm “Duyệt và xuất kho”; tồn kho bị trừ ngay.' }
       : status === 'APPROVED'
-        ? approver
-          ? { tone: 'waiting', title: 'Đang chờ xuất kho', body: 'Bạn đã duyệt phiếu nên không tự xuất kho được. Một quản lý vận hành khác cần kiểm hàng thực tế và xác nhận xuất kho.' }
-          : { tone: 'action', title: 'Bước tiếp theo: xuất kho', body: 'Đối chiếu hàng thực tế với các dòng bên dưới, sau đó bấm “Xác nhận xuất kho”. Tồn kho sẽ bị trừ ngay.' }
+        ? { tone: 'action', title: 'Bước tiếp theo: xuất kho', body: 'Phiếu đã được duyệt. Quản lý vận hành đối chiếu hàng thực tế rồi bấm “Xác nhận xuất kho”.' }
         : status === 'DISPATCHED'
           ? dispatcher
-            ? { tone: 'waiting', title: 'Đang chờ ghi nhận bàn giao', body: 'Bạn đã xuất kho nên không tự ghi nhận bàn giao được. Người nhận hàng hoặc một quản lý vận hành khác sẽ ghi nhận giao, hoàn kho hoặc thất thoát.' }
-            : { tone: 'action', title: 'Bước tiếp theo: ghi nhận bàn giao', body: 'Với từng dòng hàng, ghi nhận số đã giao cho hộ dân, số hoàn về kho hoặc thất thoát. Phiếu tự hoàn tất khi không còn hàng đang vận chuyển và không còn thất thoát chờ duyệt.' }
+            ? { tone: 'waiting', title: 'Đang chờ ghi nhận bàn giao', body: 'Bạn đã xuất kho nên không tự ghi nhận bàn giao được. Người lập phiếu hoặc một quản lý vận hành khác sẽ xác nhận khi hàng đã đến tay người nhận.' }
+            : { tone: 'action', title: 'Bước tiếp theo: ghi nhận bàn giao', body: 'Khi hàng đã đến tay người nhận, bấm “Xác nhận đã giao đủ”. Nếu giao thiếu, hoàn kho hoặc thất thoát, dùng phần ghi nhận từng dòng.' }
           : { tone: 'done', title: 'Phiếu đã hoàn tất', body: 'Toàn bộ hàng đã có kết quả bàn giao và đã được đối soát.' };
 
   return <section className="distribution-progress" aria-label="Tiến trình phiếu phân phối">

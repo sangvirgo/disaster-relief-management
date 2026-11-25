@@ -1528,6 +1528,7 @@ function normalizeSubview(url: URL, workspace: Workspace, page: string, user: Me
     : workspace === 'volunteer' && page === 'missions' ? missionViews
     : workspace === 'operations' && page === 'assets' ? assetViews
     : workspace === 'operations' && page === 'reports' ? reportViews
+    : (workspace === 'operations' && page === 'overview') || ((workspace === 'coordinator' || workspace === 'admin') && page === 'dashboard') ? ['overview', 'report']
     : workspace === 'operations' && page === 'intake' && roles(user).has('REVIEWER')
       && (url.searchParams.get('step') === 'review' || (!url.searchParams.has('step') && !roles(user).has('OPERATIONS_MANAGER'))) ? reviewViews : [];
   if (!allowedViews.includes(url.searchParams.get('view') || '')) url.searchParams.delete('view');
@@ -2159,7 +2160,7 @@ function App() {
                 ) : (workspace === 'coordinator' || workspace === 'admin') && selected.id === 'dashboard' ? (
                   <RoleDashboard role={workspace} />
                 ) : workspace === 'operations' && selected.id === 'overview' ? (
-                  <RoleDashboard role="operations" showReports={roles(user).has('OPERATIONS_MANAGER')} />
+                  <RoleDashboard role="operations" manages={roles(user).has('OPERATIONS_MANAGER')} reviews={roles(user).has('REVIEWER')} />
                 ) : workspace === 'operations' && selected.id === 'intake' && user ? (
                   <IntakeReview user={user} />
                 ) : workspace === 'operations' && selected.id === 'pickup' && user ? (

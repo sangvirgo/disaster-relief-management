@@ -253,6 +253,25 @@ INSERT INTO distribution_line (id, distribution_id, warehouse_id, item_id, quant
   ('00000000-0000-4000-8000-0000000b4004', '00000000-0000-4000-8000-0000000b3003', '00000000-0000-4000-8000-0000000a2002', '00000000-0000-4000-8000-0000000a1001', 40.000),
   ('00000000-0000-4000-8000-0000000b4005', '00000000-0000-4000-8000-0000000b3003', '00000000-0000-4000-8000-0000000a2002', '00000000-0000-4000-8000-0000000a1007', 20);
 
+-- Distribution 4 (shortened flow, 2026-11-25): preparer ops_seed; ops_mgr approved and dispatched in one step
+-- (approve-and-dispatch). Everything is still in transit, so ops_seed (not the dispatcher) can demo "Đã giao đủ toàn bộ".
+INSERT INTO distribution (id, warehouse_id, campaign_id, purpose, status, preparer_user_id, created_at) VALUES
+  ('00000000-0000-4000-8000-0000000b3004', '00000000-0000-4000-8000-0000000a2001',
+   '00000000-0000-4000-8000-0000000000c1', 'CAMPAIGN_DISTRIBUTION', 'DRAFT', '00000000-0000-4000-8000-000000000112', now() - interval '5 hours');
+INSERT INTO distribution_line (id, distribution_id, warehouse_id, item_id, quantity, in_transit_quantity) VALUES
+  ('00000000-0000-4000-8000-0000000b4006', '00000000-0000-4000-8000-0000000b3004', '00000000-0000-4000-8000-0000000a2001', '00000000-0000-4000-8000-0000000a1003', 20, 20),
+  ('00000000-0000-4000-8000-0000000b4007', '00000000-0000-4000-8000-0000000b3004', '00000000-0000-4000-8000-0000000a2001', '00000000-0000-4000-8000-0000000a1007', 10, 10);
+UPDATE distribution SET status = 'DISPATCHED',
+  approver_user_id = '00000000-0000-4000-8000-000000000105', approved_version = version, approved_at = now() - interval '4 hours',
+  dispatch_actor_user_id = '00000000-0000-4000-8000-000000000105', dispatched_at = now() - interval '4 hours'
+WHERE id = '00000000-0000-4000-8000-0000000b3004';
+INSERT INTO stock_movement (balance_id, movement_type, delta_on_hand, delta_reserved, distribution_line_id, operation_ref, actor_user_id, created_at) VALUES
+  ('00000000-0000-4000-8000-0000000a5a03', 'RESERVE', 0, 20, '00000000-0000-4000-8000-0000000b4006', 'RESERVE:DL:00000000-0000-4000-8000-0000000b4006', '00000000-0000-4000-8000-000000000105', now() - interval '4 hours'),
+  ('00000000-0000-4000-8000-0000000a5a07', 'RESERVE', 0, 10, '00000000-0000-4000-8000-0000000b4007', 'RESERVE:DL:00000000-0000-4000-8000-0000000b4007', '00000000-0000-4000-8000-000000000105', now() - interval '4 hours');
+INSERT INTO stock_movement (balance_id, movement_type, delta_on_hand, delta_reserved, distribution_line_id, operation_ref, actor_user_id, created_at) VALUES
+  ('00000000-0000-4000-8000-0000000a5a03', 'ISSUE', -20, -20, '00000000-0000-4000-8000-0000000b4006', 'ISSUE:DL:00000000-0000-4000-8000-0000000b4006', '00000000-0000-4000-8000-000000000105', now() - interval '4 hours'),
+  ('00000000-0000-4000-8000-0000000a5a07', 'ISSUE', -10, -10, '00000000-0000-4000-8000-0000000b4007', 'ISSUE:DL:00000000-0000-4000-8000-0000000b4007', '00000000-0000-4000-8000-000000000105', now() - interval '4 hours');
+
 -- ---------- pending stock adjustment (requested by ops_seed; awaiting ops_mgr or a reviewer) ----------
 INSERT INTO stock_adjustment (id, balance_id, delta_on_hand, reason, status, requested_by_user_id, requested_at) VALUES
   ('00000000-0000-4000-8000-0000000b8001', '00000000-0000-4000-8000-0000000a5a02', -3,

@@ -94,6 +94,19 @@ export class DistributionsController {
     return this.commandResult(response, this.commands.approve(id, dto, request));
   }
 
+  @Post(':id/approve-and-dispatch')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(IdempotencyKeyInterceptor)
+  approveAndDispatch(
+    @Param('id', new ParseUUIDPipe({ version: 'all' })) id: string,
+    @Body() dto: ExpectedDistributionVersionDto,
+    @Req() request: DistributionCommandRequest,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    noStore(response);
+    return this.commandResult(response, this.commands.approveAndDispatch(id, dto, request));
+  }
+
   @Post(':id/dispatch')
   @HttpCode(HttpStatus.OK)
   @UseInterceptors(IdempotencyKeyInterceptor)

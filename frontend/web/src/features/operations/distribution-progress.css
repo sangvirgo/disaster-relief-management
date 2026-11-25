@@ -4,7 +4,7 @@
 .distribution-progress__facts dt { color: var(--color-text-secondary); font-size: 12px; font-weight: 600; }
 .distribution-progress__facts dd { margin: 2px 0 0; font-weight: 700; overflow-wrap: anywhere; }
 
-.distribution-steps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); margin: 0; padding: 0; list-style: none; counter-reset: none; }
+.distribution-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0; padding: 0; list-style: none; counter-reset: none; }
 .distribution-step { position: relative; display: grid; justify-items: center; gap: 4px; padding: 0 4px; text-align: center; }
 .distribution-step::before { content: ''; position: absolute; top: 15px; left: calc(-50% + 18px); right: calc(50% + 18px); height: 2px; background: var(--color-surface-border); }
 .distribution-step:first-child::before { display: none; }
@@ -78,3 +78,13 @@
   .distribution-create__line { grid-template-columns: 28px minmax(0, 1fr) 36px; }
   .distribution-create__qty { grid-column: 2 / 3; }
 }
+
+.distribution-status-tabs { margin: 4px 0 12px; }
+.distribution-my-turn { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 999px; background: var(--color-primary); color: #fff; font-size: 12px; font-weight: 700; vertical-align: middle; white-space: nowrap; }
+
+.distribution-handoff { display: grid; gap: 12px; }
+.distribution-handoff__quick { display: grid; gap: 6px; padding: 14px 16px; border: 1px solid var(--color-success-border); border-radius: 12px; background: var(--color-success-bg); }
+.distribution-handoff__quick h3 { margin: 0; font-size: 16px; }
+.distribution-handoff__quick p { margin: 0 0 4px; }
+.distribution-handoff__detail { padding: 10px 14px; border: 1px dashed var(--color-surface-border); border-radius: 10px; }
+.distribution-handoff__detail summary { cursor: pointer; font-weight: 600; }

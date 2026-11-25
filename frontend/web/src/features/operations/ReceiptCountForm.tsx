@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, newCommandKey, upload } from '../../api/client';
 import { fetchAll } from '../../api/fetchAll';
 import { evidenceFileError } from '../../i18n/evidence';
+import './receipt-count.css';
 
 type Item = { id: string; name: string; unit: { display_name: string; scale: number } };
 type Drive = { items: { item_id: string; item_name: string; unit_name: string; scale: number }[] };
@@ -225,146 +226,138 @@ export function ReceiptCountForm({
       setBusy(false);
     }
   }
+  const columns = (advanced || heldRelease ? [
+    ['counted_quantity', 'Đã đếm'],
+    ['accepted_quantity', 'Tiếp nhận'],
+    ['held_quantity', 'Tạm giữ'],
+    ['rejected_quantity', 'Từ chối'],
+  ] : [['counted_quantity', 'Số đếm được']]) as readonly (readonly [keyof Line & `${string}_quantity`, string])[];
+  const canAddLine = !heldRelease && lines.length < (allowUnexpected ? items.length : driveItems.length);
+  const fixedItem = (line: Line) => heldRelease || (Boolean(confirm) && !line.outside && Boolean(line.item_id));
   return (
-    <form className="form-stack command-form" onSubmit={submit} noValidate>
-      <h3>{heldRelease ? 'Kiểm tra lại hàng tạm giữ' : confirm ? 'Xác nhận kiểm đếm độc lập' : 'Gửi kết quả kiểm đếm'}</h3>
-      <p>{confirm ? 'Tự đếm hàng thực tế rồi nhập số đếm được. Số lượng của lần đếm trước được ẩn đến khi bạn gửi kết quả. Nếu khớp, biên nhận được duyệt và ghi sổ ngay.' : heldRelease ? 'Chỉ tăng phần tiếp nhận và giảm tương ứng phần tạm giữ.' : 'Nhập số lượng đếm được cho từng vật phẩm.'}</p>
-      {driveLoading && <p role="status">Đang tải vật phẩm của đợt quyên góp…</p>}
-      {itemsError && (
-        <p className="notice error" role="alert">
-          {itemsError}
-        </p>
-      )}
+    <form className="count-form" onSubmit={submit} noValidate>
+      <header className="count-form__intro">
+        <h3>{heldRelease ? 'Kiểm tra lại hàng tạm giữ' : confirm ? 'Xác nhận kiểm đếm độc lập' : 'Nhập kết quả kiểm đếm'}</h3>
+        <p>{confirm
+          ? 'Tự đếm hàng thực tế rồi nhập số đếm được. Số của lần đếm trước được ẩn để bạn đếm độc lập. Nếu khớp, biên nhận được duyệt và ghi vào tồn kho ngay.'
+          : heldRelease ? 'Chỉ tăng phần tiếp nhận và giảm tương ứng phần tạm giữ.' : 'Nhập số lượng đếm được cho từng vật phẩm.'}</p>
+      </header>
+      {driveLoading && <p role="status" className="muted">Đang tải vật phẩm của đợt quyên góp…</p>}
+      {itemsError && <p className="notice error" role="alert">{itemsError}</p>}
       {!driveLoading && !driveItems.length && <button className="button secondary" type="button" onClick={() => { setItemsError(''); setDriveRevision(current => current + 1); }}>Tải lại vật phẩm của đợt</button>}
-      {!heldRelease && !allowUnexpected && <button className="button secondary" type="button" onClick={() => {
-        setAllowUnexpected(true);
-        setAdvanced(true);
-        setLines(current => [...current, { ...empty(), outside: true }]);
-        setItemsError('');
-        key.current = null;
-      }}>Có vật phẩm thực tế ngoài đợt quyên góp?</button>}
-      {allowUnexpected && !heldRelease && <p className="notice warning">Chỉ chọn vật phẩm ngoài đợt khi hàng thực tế được bàn giao khác danh sách của đợt. Dòng này sẽ được đánh dấu để người duyệt rà soát.</p>}
-      {!heldRelease && <button className="button secondary" type="button" aria-expanded={advanced} onClick={() => setAdvanced((value) => !value)}>
-        {advanced ? 'Thu gọn' : 'Có hàng lỗi, giữ lại hoặc cần ghi chú?'}
-      </button>}
-      {lines.map((line, index) => (
-        <fieldset className="candidate count-line" key={index}>
-          <legend>Vật phẩm {index + 1}</legend>
-          <label>
-            {line.outside ? 'Vật phẩm thực tế ngoài đợt quyên góp' : 'Vật phẩm trong đợt quyên góp'}
-            <Dropdown
-              disabled={heldRelease}
-              value={items.some((item) => item.id === line.item_id) ? line.item_id : ''}
-              onChange={(event) => edit(index, 'item_id', event.target.value)}
-            >
-              <option value="">Chọn vật phẩm</option>
-              {items.filter(item => (item.id === line.item_id || !lines.some(other => other.item_id === item.id)) && (!line.outside || !driveItems.some(driveItem => driveItem.id === item.id))).map((item) => (
-                <option value={item.id} key={item.id}>
-                  {item.name} · {item.unit.display_name}{!driveItems.some(driveItem => driveItem.id === item.id) ? ' · ngoài đợt' : ''}
-                </option>
-              ))}
-            </Dropdown>
-          </label>
-          {showFieldError(`${index}.item_id`, line.item_id) && fieldErrors[`${index}.item_id`] && <small className="field-error" role="alert">{fieldErrors[`${index}.item_id`]}</small>}
-          <div className="form-grid">
-            {(advanced || heldRelease ? (
-              [
-                ['counted_quantity', 'Đã đếm'],
-                ['accepted_quantity', 'Tiếp nhận'],
-                ['held_quantity', 'Tạm giữ'],
-                ['rejected_quantity', 'Từ chối'],
-              ] as const
-            ) : [['counted_quantity', 'Đã đếm']] as const).map(([field, title]) => (
-              <label key={field}>
-                <span>{title} <span className="required-mark" aria-hidden="true">*</span></span>
+
+      {!heldRelease && <div className="count-form__options" role="group" aria-label="Tùy chọn kiểm đếm">
+        <label className="count-form__toggle">
+          <input type="checkbox" checked={advanced} onChange={() => setAdvanced((value) => !value)} />
+          <span>Có hàng lỗi, tạm giữ hoặc cần ghi chú</span>
+        </label>
+        <label className="count-form__toggle">
+          <input type="checkbox" checked={allowUnexpected} disabled={allowUnexpected} onChange={() => {
+            setAllowUnexpected(true);
+            setAdvanced(true);
+            setLines(current => [...current, { ...empty(), outside: true }]);
+            setItemsError('');
+            key.current = null;
+          }} />
+          <span>Có vật phẩm ngoài danh sách của đợt</span>
+        </label>
+      </div>}
+      {allowUnexpected && !heldRelease && <p className="notice warning">Dòng ngoài đợt được đánh dấu để người duyệt rà soát. Chỉ dùng khi hàng thực tế khác danh sách của đợt.</p>}
+
+      <div className="count-form__table" role="table" aria-label="Số lượng kiểm đếm">
+        <div className="count-form__row count-form__row--head" role="row" style={{ gridTemplateColumns: `minmax(180px, 2fr) repeat(${columns.length}, minmax(96px, 1fr)) 36px` }}>
+          <span role="columnheader">Vật phẩm</span>
+          {columns.map(([field, title]) => <span role="columnheader" key={field} className="numeric">{title}</span>)}
+          <span aria-hidden="true" />
+        </div>
+        {lines.map((line, index) => {
+          const item = items.find((candidate) => candidate.id === line.item_id);
+          const rowErrors = [`${index}.item_id`, ...columns.map(([field]) => `${index}.${field}`)]
+            .filter((field) => fieldErrors[field] && showFieldError(field, field.endsWith('item_id') ? line.item_id : line[field.split('.')[1] as keyof Line] as string))
+            .map((field) => fieldErrors[field]);
+          return <div key={index} className={`count-form__line${line.outside ? ' count-form__line--outside' : ''}`}>
+            <div className="count-form__row" role="row" style={{ gridTemplateColumns: `minmax(180px, 2fr) repeat(${columns.length}, minmax(96px, 1fr)) 36px` }}>
+              <span role="cell" className="count-form__item">
+                {fixedItem(line) ? <><strong>{item?.name || 'Vật phẩm'}</strong><small>{item?.unit.display_name}</small></>
+                  : <Dropdown
+                    aria-label={`Vật phẩm dòng ${index + 1}`}
+                    value={items.some((candidate) => candidate.id === line.item_id) ? line.item_id : ''}
+                    onChange={(event) => edit(index, 'item_id', event.target.value)}
+                  >
+                    <option value="">{line.outside ? 'Chọn vật phẩm ngoài đợt' : 'Chọn vật phẩm'}</option>
+                    {items.filter(candidate => (candidate.id === line.item_id || !lines.some(other => other.item_id === candidate.id)) && (!line.outside || !driveItems.some(driveItem => driveItem.id === candidate.id))).map((candidate) => (
+                      <option value={candidate.id} key={candidate.id}>
+                        {candidate.name} · {candidate.unit.display_name}{!driveItems.some(driveItem => driveItem.id === candidate.id) ? ' · ngoài đợt' : ''}
+                      </option>
+                    ))}
+                  </Dropdown>}
+                {line.outside && <em className="count-form__flag">Ngoài đợt</em>}
+              </span>
+              {columns.map(([field, title]) => <span role="cell" key={field} className="count-form__qty">
                 <input
-                  required
-                  type="number"
+                  inputMode="decimal"
+                  aria-label={`${title} · ${item?.name || `dòng ${index + 1}`}`}
                   readOnly={heldRelease && ['counted_quantity', 'rejected_quantity'].includes(field)}
-                  min="0"
-                  step="any"
                   aria-invalid={Boolean(showFieldError(`${index}.${field}`, line[field]) && fieldErrors[`${index}.${field}`])}
                   value={line[field]}
-                  onChange={(event) => edit(index, field, event.target.value)}
+                  placeholder="0"
+                  onChange={(event) => edit(index, field, event.target.value.replace(',', '.'))}
                   onBlur={() => setTouched((current) => ({ ...current, [`${index}.${field}`]: true }))}
                 />
-                {showFieldError(`${index}.${field}`, line[field]) && fieldErrors[`${index}.${field}`] && <small className="field-error" role="alert">{fieldErrors[`${index}.${field}`]}</small>}
-              </label>
-            ))}
-          </div>
-          {(advanced || heldRelease) && <label>
-            Ghi chú tình trạng
-            <input
-              maxLength={1001}
-              aria-invalid={Boolean(showFieldError(`${index}.condition_note`, line.condition_note) && fieldErrors[`${index}.condition_note`])}
-              value={line.condition_note}
-              onChange={(event) => edit(index, 'condition_note', event.target.value)}
-              onBlur={() => setTouched((current) => ({ ...current, [`${index}.condition_note`]: true }))}
-            />
-            {showFieldError(`${index}.condition_note`, line.condition_note) && fieldErrors[`${index}.condition_note`] && <small className="field-error" role="alert">{fieldErrors[`${index}.condition_note`]}</small>}
-          </label>}
-          {(advanced || heldRelease) && <label>
-            Hạn sử dụng nếu có
-            <input
-              type="date"
-              value={line.expiry_date}
-              onChange={(event) => edit(index, 'expiry_date', event.target.value)}
-            />
-          </label>}
-          {!heldRelease && lines.length > 1 && (
-            <button
-              className="button secondary"
-              type="button"
-              onClick={() => {
-                setLines(lines.filter((_, position) => position !== index));
-                key.current = null;
-              }}
-            >
-              Bỏ dòng này
-            </button>
-          )}
-        </fieldset>
-      ))}
-      {!heldRelease && lines.length < (allowUnexpected ? items.length : driveItems.length) && (
-        <button
-          className="button secondary"
-          type="button"
-          onClick={() => {
-            const nextItem = allowUnexpected ? undefined : driveItems.find(item => !lines.some(line => line.item_id === item.id));
-            setLines([...lines, { ...empty(), item_id: nextItem?.id || '', outside: allowUnexpected }]);
-            key.current = null;
-          }}
-        >
-          Thêm vật phẩm
-        </button>
-      )}
-      {(advanced || heldRelease) && <label>
-        Ghi chú chung
+              </span>)}
+              <span role="cell">
+                {!heldRelease && lines.length > 1 && <button className="count-form__remove" type="button" aria-label={`Bỏ dòng ${index + 1}`} title="Bỏ dòng"
+                  onClick={() => { setLines(lines.filter((_, position) => position !== index)); key.current = null; }}>×</button>}
+              </span>
+            </div>
+            {(advanced || heldRelease) && <div className="count-form__extra">
+              <input
+                maxLength={1001}
+                aria-label={`Ghi chú tình trạng · ${item?.name || `dòng ${index + 1}`}`}
+                placeholder="Ghi chú tình trạng (nếu có)"
+                aria-invalid={Boolean(showFieldError(`${index}.condition_note`, line.condition_note) && fieldErrors[`${index}.condition_note`])}
+                value={line.condition_note}
+                onChange={(event) => edit(index, 'condition_note', event.target.value)}
+              />
+              <span className="count-form__date">
+                <small>Hạn sử dụng</small>
+                <input type="date" aria-label={`Hạn sử dụng · ${item?.name || `dòng ${index + 1}`}`} value={line.expiry_date} onChange={(event) => edit(index, 'expiry_date', event.target.value)} />
+              </span>
+            </div>}
+            {rowErrors.length > 0 && <small className="field-error count-form__error" role="alert">{[...new Set(rowErrors)].join(' ')}</small>}
+          </div>;
+        })}
+      </div>
+      {canAddLine && <button className="button secondary count-form__add" type="button" onClick={() => {
+        const nextItem = allowUnexpected ? undefined : driveItems.find(item => !lines.some(line => line.item_id === item.id));
+        setLines([...lines, { ...empty(), item_id: nextItem?.id || '', outside: allowUnexpected }]);
+        key.current = null;
+      }}>+ Thêm vật phẩm</button>}
+
+      {(advanced || heldRelease) && <label className="count-form__note">
+        <span>Ghi chú chung</span>
         <textarea
           maxLength={1001}
+          rows={2}
           aria-invalid={Boolean(showFieldError('note', note) && fieldErrors.note)}
           value={note}
-          onChange={(event) => {
-            setNote(event.target.value);
-            setTouched((current) => ({ ...current, note: true }));
-            key.current = null;
-          }}
+          onChange={(event) => { setNote(event.target.value); setTouched((current) => ({ ...current, note: true })); key.current = null; }}
           onBlur={() => setTouched((current) => ({ ...current, note: true }))}
         />
         {showFieldError('note', note) && fieldErrors.note && <small className="field-error" role="alert">{fieldErrors.note}</small>}
       </label>}
-      {!heldRelease && <label>
-        <span>Kèm minh chứng (không bắt buộc)</span>
-        <input type="file" accept="image/jpeg,image/png,video/mp4" onChange={event => { setEvidence(event.target.files?.[0] || null); key.current = null; evidenceKey.current = null; }} />
+      {!heldRelease && <div className="count-form__evidence">
+        <span>Ảnh hoặc video minh chứng <small>(không bắt buộc)</small></span>
+        <label className="count-form__file">
+          <input type="file" accept="image/jpeg,image/png,video/mp4" onChange={event => { setEvidence(event.target.files?.[0] || null); key.current = null; evidenceKey.current = null; }} />
+          <span className="button secondary">Chọn tệp</span>
+          <span className="count-form__file-name">{evidence ? evidence.name : 'Chưa chọn tệp (JPG, PNG hoặc MP4)'}</span>
+        </label>
         {evidence && evidenceFileError(evidence) && <small className="field-error" role="alert">{evidenceFileError(evidence)}</small>}
-      </label>}
-      {error && (
-        <p className="notice error" role="alert">
-          {error}
-        </p>
-      )}
-      <button className="button" disabled={busy || driveLoading || !driveItems.length || hasInvalidFields || Boolean(evidence && evidenceFileError(evidence))}>
-        {busy ? 'Đang gửi…' : confirm ? 'Gửi xác nhận' : 'Gửi kết quả đếm'}
+      </div>}
+      {error && <p className="notice error" role="alert">{error}</p>}
+      <button className="button count-form__submit" disabled={busy || driveLoading || !driveItems.length || hasInvalidFields || Boolean(evidence && evidenceFileError(evidence))}>
+        {busy ? 'Đang gửi…' : confirm ? 'Gửi xác nhận kiểm đếm' : 'Gửi kết quả đếm'}
       </button>
     </form>
   );

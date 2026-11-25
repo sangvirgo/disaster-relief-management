@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { api } from '../../api/client';
 import { label, requestStatusLabel, timeLabel } from '../../i18n/labels';
-import { statusTone } from '../../components/statusTone';
-import { OperationsDashboard } from '../operations/Dashboard';
+import { useUrlView } from '../../app/useUrlView';
+import { Tabs } from '../../components/ui/Tabs';
+import { distributionStatusLabels } from '../operations/DistributionProgress';
 import './role-dashboard.css';
 
 type Counts = Record<string, number>;
@@ -14,8 +15,6 @@ type ResponseOverview = {
   teams: { total: number; available: number; unavailable: number; awaiting_readiness: number;
     on_mission: number; position_missing_or_stale: number };
   thresholds: { verification_overdue_minutes: number; offer_overdue_minutes: number; team_position_fresh_minutes: number };
-  recent_open_requests: { id: string; status: string; priority: string | null;
-    category: string; received_at: string }[];
   generated_at: string;
 };
 type OperationsOverview = {
@@ -31,20 +30,25 @@ type AdminOverview = {
   users: { total: number; by_status: Counts; pending_email_verification: number; must_change_password: number;
     active_last_24h: number };
   active_users_by_role: Counts;
-  recent_audit: { action: string; entity_type: string; created_at: string }[];
   generated_at: string;
 };
 type Suggestions = { open_drives: { id: string; title: string }[];
   suggestions: { code: string; severity: string; item_ids: string[]; message: string }[];
   weather_available: boolean; generated_at: string };
 
-function useSnapshot<T>(service: 'identity' | 'response' | 'logistics', path: string, enabled = true) {
+const dashboardViews = ['overview', 'report'] as const;
+const sum = (counts: Counts | undefined) => Object.values(counts || {}).reduce((total, value) => total + value, 0);
+const roleLabels: Record<string, string> = {
+  ADMIN: 'Quản trị viên', COORDINATOR: 'Điều phối viên', OPERATIONS_MANAGER: 'Quản lý vận hành',
+  REVIEWER: 'Người duyệt', VOLUNTEER: 'Tình nguyện viên', CITIZEN: 'Người dân',
+};
+
+function useSnapshot<T>(service: 'identity' | 'response' | 'logistics', path: string) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(enabled);
+  const [loading, setLoading] = useState(true);
   const [revision, setRevision] = useState(0);
   useEffect(() => {
-    if (!enabled) return;
     let live = true;
     setLoading(true);
     setError('');
@@ -52,131 +56,232 @@ function useSnapshot<T>(service: 'identity' | 'response' | 'logistics', path: st
       .catch((cause) => { if (live) setError(cause instanceof Error ? cause.message : 'Chưa tải được số liệu.'); })
       .finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
-  }, [service, path, enabled, revision]);
+  }, [service, path, revision]);
   return { data, error, loading, refresh: () => setRevision((value) => value + 1) };
 }
 
-function SnapshotState({ loading, error, onRetry }: { loading: boolean; error: string; onRetry: () => void }) {
-  if (loading) return <p role="status">Đang tải số liệu…</p>;
-  if (error) return <div className="notice error" role="alert">{error} <button type="button" className="button secondary" onClick={onRetry}>Thử lại</button></div>;
-  return null;
-}
-
-function Metric({ title, value, warning, danger }: { title: string; value: number | string; warning?: boolean; danger?: boolean }) {
-  return <div className={`metric-tile${danger ? ' metric-tile-danger' : warning ? ' metric-tile-warning' : ''}`}><span>{title}</span><strong>{value}</strong></div>;
-}
-
-const chartColors = ['#2563eb', '#0d9488', '#f59e0b', '#8b5cf6', '#e11d48', '#0891b2', '#65a30d', '#ea580c', '#4f46e5', '#64748b'];
-
-function Breakdown({ title, counts, requestStatuses = false }: { title: string; counts: Counts; requestStatuses?: boolean }) {
-  const rows = Object.entries(counts).filter(([, count]) => count > 0);
-  const total = rows.reduce((sum, [, count]) => sum + count, 0);
-  let cursor = 0;
-  const stops = rows.map(([, count], index) => {
-    const start = cursor;
-    cursor += count / total * 100;
-    return `${chartColors[index % chartColors.length]} ${start}% ${cursor}%`;
-  });
-  return <section className="dashboard-breakdown"><h3>{title}</h3>
-    {total ? <div className="dashboard-chart-layout">
-      <div className="dashboard-donut" role="img" aria-label={`${title}: tổng ${total}`} style={{ background: `conic-gradient(${stops.join(', ')})` }}>
-        <span><strong>{total}</strong><small>Tổng cộng</small></span>
-      </div>
-      <div className="dashboard-chart-legend">{rows.map(([code, count], index) =>
-        <div className="dashboard-chart-row" key={code}><i aria-hidden="true" style={{ backgroundColor: chartColors[index % chartColors.length] }} />
-          <span>{requestStatuses ? requestStatusLabel(code) : label(code)}</span>
-          <strong>{count}</strong></div>)}</div>
-    </div> : <p className="muted">Chưa có số liệu.</p>}
+function Panel({ title, updated, onRefresh, loading, error, children, className = '' }: {
+  title: string; updated?: string; onRefresh?: () => void; loading?: boolean; error?: string; children?: ReactNode; className?: string;
+}) {
+  return <section className={`card dash-panel ${className}`}>
+    <header className="dash-panel__head">
+      <div><h2>{title}</h2>{updated && <p className="muted">Cập nhật lúc {timeLabel(updated)}</p>}</div>
+      {onRefresh && <button type="button" className="button secondary refresh-action" disabled={loading} onClick={onRefresh}>Làm mới</button>}
+    </header>
+    {loading && !error && <p role="status" className="muted">Đang tải số liệu…</p>}
+    {error && <div className="notice error" role="alert">{error} {onRefresh && <button type="button" className="button secondary" onClick={onRefresh}>Thử lại</button>}</div>}
+    {children}
   </section>;
 }
 
-function ResponseDashboard() {
+type Attention = { count: number; title: string; hint: string; href?: string; tone: 'danger' | 'warning' | 'info' };
+/** Things that need a person now, most urgent first; each opens the page where it is handled. */
+function AttentionList({ items, empty }: { items: Attention[]; empty: string }) {
+  const shown = items.filter((item) => item.count > 0);
+  if (!shown.length) return <p className="dash-all-clear" role="status"><span aria-hidden="true">✓</span>{empty}</p>;
+  return <ul className="dash-attention" aria-label="Việc cần xử lý">
+    {shown.map((item) => {
+      const body = <>
+        <strong className="dash-attention__count">{item.count}</strong>
+        <span className="dash-attention__text"><b>{item.title}</b><small>{item.hint}</small></span>
+        {item.href && <span className="dash-attention__go" aria-hidden="true">›</span>}
+      </>;
+      return <li key={item.title} className={`dash-attention__item dash-attention__item--${item.tone}`}>
+        {item.href ? <a href={item.href}>{body}</a> : <div>{body}</div>}
+      </li>;
+    })}
+  </ul>;
+}
+
+function Kpis({ items }: { items: { title: string; value: ReactNode; hint?: string }[] }) {
+  return <dl className="dash-kpis">{items.map((item) => <div key={item.title} className="dash-kpi">
+    <dt>{item.title}</dt><dd>{item.value}</dd>{item.hint && <small>{item.hint}</small>}
+  </div>)}</dl>;
+}
+
+/** Single-hue horizontal bars: magnitude per category, sorted unless an order is given. */
+function Bars({ title, counts, labelFor = label, order, href }: {
+  title: string; counts: Counts | undefined; labelFor?: (code: string) => string; order?: string[]; href?: string;
+}) {
+  const rows = (order ? order.map((code) => [code, counts?.[code] ?? 0] as [string, number]) : Object.entries(counts || {}).sort((a, b) => b[1] - a[1]))
+    .filter(([, count]) => order || count > 0);
+  const max = Math.max(1, ...rows.map(([, count]) => count));
+  const total = rows.reduce((value, [, count]) => value + count, 0);
+  return <section className="dash-bars">
+    <header><h3>{title}</h3><span className="muted">Tổng {total}</span></header>
+    {total === 0 ? <p className="muted">Chưa có số liệu.</p> : <ul>
+      {rows.map(([code, count]) => <li key={code} title={`${labelFor(code)}: ${count}`}>
+        <span className="dash-bars__label">{labelFor(code)}</span>
+        <span className="dash-bars__track"><span className="dash-bars__fill" style={{ width: `${count ? Math.max(2, count / max * 100) : 0}%` }} /></span>
+        <strong className="dash-bars__value">{count}</strong>
+      </li>)}
+    </ul>}
+    {href && <a className="dash-link" href={href}>Xem chi tiết ›</a>}
+  </section>;
+}
+
+function DashboardTabs({ children }: { children: (view: (typeof dashboardViews)[number]) => ReactNode }) {
+  const [view, setView] = useUrlView('view', dashboardViews, 'overview');
+  return <div className="dash">
+    <Tabs items={[{ id: 'overview', label: 'Việc cần làm' }, { id: 'report', label: 'Báo cáo' }]} value={view}
+      onChange={(next) => setView(next as (typeof dashboardViews)[number])} ariaLabel="Nội dung thống kê" idBase="dashboard" />
+    <div className="dash-stack" role="tabpanel" aria-labelledby={`dashboard-tab-${view}`}>{children(view)}</div>
+  </div>;
+}
+
+const sosQueue = '?workspace=coordinator&page=campaigns&campaign_tab=sos';
+
+function ResponseOverviewPanels({ view, compact = false }: { view: 'overview' | 'report'; compact?: boolean }) {
   const snapshot = useSnapshot<ResponseOverview>('response', '/dashboard/overview');
   const { data } = snapshot;
-  return <section className="card dashboard-section"><div className="section-header"><h2>Tình hình ứng cứu</h2><button type="button" className="button secondary refresh-action" onClick={snapshot.refresh}>Làm mới</button></div>
-    <SnapshotState {...snapshot} onRetry={snapshot.refresh} />
-    {data && !snapshot.error && <>
-      <p className="muted">Cập nhật lúc {timeLabel(data.generated_at)}. Quá hạn xác minh sau {data.thresholds.verification_overdue_minutes} phút; đề nghị nhiệm vụ sau {data.thresholds.offer_overdue_minutes} phút.</p>
-      <div className="report-metrics dashboard-highlight-metrics">
-        <Metric title="SOS đang mở" value={data.requests.open_total} />
-        <Metric title="Quá hạn xác minh" value={data.requests.verification_overdue} warning={data.requests.verification_overdue > 0} />
-        <Metric title="Khai báo nguy hiểm đang chờ" value={data.requests.declared_danger_waiting} danger={data.requests.declared_danger_waiting > 0} />
-        <Metric title="Chờ giao đội" value={data.requests.awaiting_team_assignment} />
-        <Metric title="Nhiệm vụ đang chạy" value={Object.values(data.missions.active_by_status).reduce((sum, count) => sum + count, 0)} />
-        <Metric title="Đề nghị nhiệm vụ quá hạn" value={data.missions.overdue_offers} warning={data.missions.overdue_offers > 0} />
-      </div>
-      <details className="dashboard-more-metrics"><summary>Thêm số liệu về đội và SOS</summary><div className="report-metrics">
-        <Metric title="Đội sẵn sàng" value={`${data.teams.available}/${data.teams.total}`} />
-        <Metric title="Đội đang có nhiệm vụ" value={data.teams.on_mission} />
-        <Metric title="Đội chờ xác nhận sẵn sàng" value={data.teams.awaiting_readiness} />
-        <Metric title="Đội thiếu vị trí mới" value={data.teams.position_missing_or_stale} warning={data.teams.position_missing_or_stale > 0} />
-        <Metric title="SOS nhận trong 24 giờ" value={data.requests.received_last_24h} />
-        <Metric title="SOS đã giải quyết" value={data.requests.resolved_total} />
-      </div></details>
-      <div className="dashboard-breakdowns">
-        <Breakdown title="SOS theo trạng thái" counts={data.requests.open_by_status} requestStatuses />
-        <Breakdown title="Mức ưu tiên" counts={data.requests.open_by_priority} />
-        <Breakdown title="Loại sự cố" counts={data.requests.open_by_category} />
-        <Breakdown title="Nhiệm vụ đang hoạt động" counts={data.missions.active_by_status} />
-      </div>
+  const missions = sum(data?.missions.active_by_status);
+  if (view === 'report') return <Panel title="Báo cáo ứng cứu" updated={data?.generated_at} onRefresh={snapshot.refresh} loading={snapshot.loading} error={snapshot.error}>
+    {data && <div className="dash-grid">
+      <Bars title="SOS đang mở theo trạng thái" counts={data.requests.open_by_status} labelFor={requestStatusLabel} />
+      <Bars title="Mức ưu tiên đã quyết định" counts={data.requests.open_by_priority} order={['P1', 'P2', 'P3', 'P4']} />
+      <Bars title="Loại sự cố" counts={data.requests.open_by_category} />
+      <Bars title="Nhiệm vụ đang hoạt động" counts={data.missions.active_by_status} />
+      <Bars title="Đội cứu hộ" counts={{ AVAILABLE: data.teams.available, ON_MISSION: data.teams.on_mission,
+        AWAITING_READINESS: data.teams.awaiting_readiness, UNAVAILABLE: data.teams.unavailable }}
+        order={['AVAILABLE', 'ON_MISSION', 'AWAITING_READINESS', 'UNAVAILABLE']}
+        labelFor={(code) => ({ AVAILABLE: 'Sẵn sàng', ON_MISSION: 'Đang làm nhiệm vụ', AWAITING_READINESS: 'Chờ xác nhận sẵn sàng', UNAVAILABLE: 'Không sẵn sàng' }[code] || code)} />
+    </div>}
+    {data && <a className="dash-link" href="?workspace=coordinator&page=reports">Xem bản đồ nhiệt SOS ›</a>}
+  </Panel>;
+  return <Panel title={compact ? 'Tình hình ứng cứu' : 'Việc cần xử lý'} updated={data?.generated_at} onRefresh={snapshot.refresh} loading={snapshot.loading} error={snapshot.error}>
+    {data && <>
+      {!compact && <AttentionList empty="Không có SOS nguy hiểm, quá hạn hay chờ giao đội." items={[
+        { count: data.requests.declared_danger_waiting, tone: 'danger', title: 'SOS khai báo nguy hiểm tính mạng đang chờ', hint: 'Kiểm tra và xử lý trước tiên.', href: sosQueue },
+        { count: data.requests.verification_overdue, tone: 'warning', title: 'SOS quá hạn xác minh', hint: `Chờ quá ${data.thresholds.verification_overdue_minutes} phút chưa được xác minh.`, href: sosQueue },
+        { count: data.requests.awaiting_team_assignment, tone: 'warning', title: 'SOS đã xác minh, chờ giao đội', hint: 'Chọn đội phù hợp ở tab Điều phối của SOS.', href: sosQueue },
+        { count: data.missions.overdue_offers, tone: 'warning', title: 'Đề nghị nhiệm vụ chưa được đội nhận', hint: `Quá ${data.thresholds.offer_overdue_minutes} phút; cân nhắc giao đội khác.`, href: sosQueue },
+        { count: data.teams.position_missing_or_stale, tone: 'info', title: 'Đội thiếu vị trí mới', hint: `Không cập nhật vị trí trong ${data.thresholds.team_position_fresh_minutes} phút.`, href: '?workspace=coordinator&page=teams' },
+      ]} />}
+      <Kpis items={[
+        { title: 'SOS đang mở', value: data.requests.open_total },
+        { title: 'Nhận trong 24 giờ', value: data.requests.received_last_24h },
+        { title: 'Nhiệm vụ đang chạy', value: missions },
+        { title: 'Đội sẵn sàng', value: `${data.teams.available}/${data.teams.total}` },
+        ...(compact ? [] : [{ title: 'SOS đã giải quyết', value: data.requests.resolved_total, hint: 'Tổng từ trước đến nay' }]),
+      ]} />
     </>}
-  </section>;
+  </Panel>;
 }
 
-function AdminDashboard() {
+function AdminPanels({ view }: { view: 'overview' | 'report' }) {
   const snapshot = useSnapshot<AdminOverview>('identity', '/dashboard/admin');
   const { data } = snapshot;
-  return <section className="card dashboard-section"><div className="section-header"><h2>Tài khoản và quyền truy cập</h2><button type="button" className="button secondary refresh-action" onClick={snapshot.refresh}>Làm mới</button></div>
-    <SnapshotState {...snapshot} onRetry={snapshot.refresh} />
-    {data && !snapshot.error && <>
-      <p className="muted">Cập nhật lúc {timeLabel(data.generated_at)}</p>
-      <div className="report-metrics"><Metric title="Tổng tài khoản" value={data.users.total} /><Metric title="Chờ xác minh email" value={data.users.pending_email_verification} />
-        <Metric title="Cần đổi mật khẩu" value={data.users.must_change_password} /><Metric title="Hoạt động trong 24 giờ" value={data.users.active_last_24h} /></div>
-    </>}
+  if (view === 'report') return <>
+    <Panel title="Tài khoản" updated={data?.generated_at} onRefresh={snapshot.refresh} loading={snapshot.loading} error={snapshot.error}>
+      {data && <div className="dash-grid">
+        <Bars title="Tài khoản theo trạng thái" counts={data.users.by_status} />
+        <Bars title="Người dùng đang hoạt động theo vai trò" counts={data.active_users_by_role} labelFor={(code) => roleLabels[code] || label(code)} />
+      </div>}
+    </Panel>
+    <ResponseOverviewPanels view="report" />
+  </>;
+  return <>
+    <Panel title="Tài khoản và quyền truy cập" updated={data?.generated_at} onRefresh={snapshot.refresh} loading={snapshot.loading} error={snapshot.error}>
+      {data && <>
+        <AttentionList empty="Không có tài khoản cần xử lý." items={[
+          { count: data.users.pending_email_verification, tone: 'warning', title: 'Tài khoản chờ xác minh email', hint: 'Người dùng chưa hoàn tất đăng ký.', href: '?workspace=admin&page=users' },
+          { count: data.users.must_change_password, tone: 'info', title: 'Tài khoản phải đổi mật khẩu', hint: 'Sẽ được yêu cầu đổi ở lần đăng nhập tới.', href: '?workspace=admin&page=users' },
+        ]} />
+        <Kpis items={[
+          { title: 'Tổng tài khoản', value: data.users.total },
+          { title: 'Hoạt động trong 24 giờ', value: data.users.active_last_24h },
+          { title: 'Vai trò đang dùng', value: Object.keys(data.active_users_by_role).length },
+        ]} />
+        <a className="dash-link" href="?workspace=admin&page=audit">Xem lịch sử thao tác ›</a>
+      </>}
+    </Panel>
+    <ResponseOverviewPanels view="overview" compact />
+  </>;
+}
+
+const intakeHref = (step: string, extra = '') => `?workspace=operations&page=intake&step=${step}${extra}`;
+
+function DistributionPipeline({ counts }: { counts: Counts }) {
+  const steps = ['DRAFT', 'APPROVED', 'DISPATCHED', 'RECONCILED'];
+  return <section className="dash-pipeline" aria-label="Phiếu phân phối theo bước">
+    <header><h3>Phiếu phân phối theo bước</h3><span className="muted">Bấm một bước để mở danh sách</span></header>
+    <ol>{steps.map((status, index) => <li key={status}>
+      <a href={intakeHref('distribution', `&dist_status=${status}`)} className={counts[status] && status !== 'RECONCILED' ? 'has-work' : ''}>
+        <span className="dash-pipeline__index">{index + 1}</span>
+        <strong>{counts[status] ?? 0}</strong>
+        <span>{distributionStatusLabels[status]}</span>
+      </a>
+    </li>)}</ol>
   </section>;
 }
 
-function OperationsSnapshot({ showReports }: { showReports: boolean }) {
+function OperationsPanels({ view, manages, reviews }: { view: 'overview' | 'report'; manages: boolean; reviews: boolean }) {
   const snapshot = useSnapshot<OperationsOverview>('logistics', '/dashboard/operations');
   const { data } = snapshot;
-  return <><section className="card dashboard-section"><div className="section-header"><h2>Vận hành cứu trợ</h2><button type="button" className="button secondary refresh-action" onClick={snapshot.refresh}>Làm mới</button></div>
-    <SnapshotState {...snapshot} onRetry={snapshot.refresh} />
-    {data && !snapshot.error && <><p className="muted">Cập nhật lúc {timeLabel(data.generated_at)}</p>
-      {data.intake && <><h3>Tiếp nhận quyên góp</h3><div className="report-metrics"><Metric title="Chờ kiểm đếm hoặc duyệt" value={data.intake.awaiting_count_or_review} />
-        <Metric title="Chờ duyệt" value={data.intake.pending_review} /><Metric title="Tranh chấp đang mở" value={data.intake.open_disputes} /></div>
-        <Breakdown title="Bản giao nhận" counts={data.intake.deliveries_by_status} /><Breakdown title="Đợt quyên góp" counts={data.intake.drives_by_status} /></>}
-      {data.distribution && <><h3>Phân phối</h3><div className="report-metrics"><Metric title="Đã xuất kho, chờ đối soát" value={data.distribution.dispatched_not_reconciled} />
-        <Metric title="Lượt bàn giao trong 7 ngày" value={data.distribution.handoffs_last_7d} /></div><Breakdown title="Trạng thái phân phối" counts={data.distribution.by_status} /></>}
-      {data.stock && <><h3>Kho và vật phẩm</h3><div className="report-metrics"><Metric title="Kho" value={data.stock.warehouses} />
-        <Metric title="Vật phẩm" value={data.stock.tracked_item_lines} /><Metric title="Hết hàng" value={data.stock.out_of_stock_lines} danger={data.stock.out_of_stock_lines > 0} />
-        <Metric title="Tồn kho" value={data.stock.low_stock_lines} warning={data.stock.low_stock_lines > 0} /><Metric title="Điều chỉnh chờ duyệt" value={data.stock.pending_adjustments} warning={data.stock.pending_adjustments > 0} /></div></>}
-      {data.needs && <><h3>Nhu cầu vật tư</h3><div className="report-metrics"><Metric title="Nhu cầu còn thiếu" value={data.needs.outstanding} /></div>
-        <Breakdown title="Trạng thái nhu cầu" counts={data.needs.by_status} /></>}
+  if (view === 'report') return <>
+    <Panel title="Báo cáo vận hành" updated={data?.generated_at} onRefresh={snapshot.refresh} loading={snapshot.loading} error={snapshot.error}>
+      {data && <div className="dash-grid">
+        {data.intake && <Bars title="Hàng quyên góp theo trạng thái" counts={data.intake.deliveries_by_status} href={intakeHref(manages ? 'intake' : 'review')} />}
+        {data.intake && <Bars title="Đợt quyên góp" counts={data.intake.drives_by_status} href={manages ? '?workspace=operations&page=assets' : undefined} />}
+        {data.distribution && <Bars title="Phiếu phân phối" counts={data.distribution.by_status} order={['DRAFT', 'APPROVED', 'DISPATCHED', 'RECONCILED', 'CANCELLED']}
+          labelFor={(code) => distributionStatusLabels[code] || label(code)} href={intakeHref('distribution')} />}
+        {data.needs && <Bars title="Nhu cầu vật tư" counts={data.needs.by_status} href={intakeHref('supply')} />}
+        {data.intake && <Bars title="Kết quả duyệt biên nhận 7 ngày qua" counts={data.intake.reviews_last_7d} />}
+      </div>}
+      {manages && data && <a className="dash-link" href="?workspace=operations&page=reports">Báo cáo tồn kho, tiến độ và đối soát ›</a>}
+    </Panel>
+    {manages && <DriveSuggestions />}
+  </>;
+  const byStatus = data?.distribution?.by_status || {};
+  return <Panel title="Việc cần xử lý" updated={data?.generated_at} onRefresh={snapshot.refresh} loading={snapshot.loading} error={snapshot.error}>
+    {data && <>
+      <AttentionList empty="Không có việc tồn đọng trong phạm vi của bạn." items={[
+        ...(data.intake ? [
+          { count: data.intake.pending_review, tone: 'warning' as const, title: 'Biên nhận chờ xác nhận kiểm đếm', hint: 'Cần một người khác người đã đếm.', href: reviews ? intakeHref('review') : undefined },
+          { count: Math.max(0, data.intake.awaiting_count_or_review - data.intake.pending_review), tone: 'info' as const, title: 'Hàng quyên góp chờ kiểm đếm', hint: 'Đếm hàng thực tế khi hàng đến kho.', href: intakeHref(manages ? 'intake' : 'review') },
+          { count: data.intake.open_disputes, tone: 'warning' as const, title: 'Khiếu nại đang mở', hint: 'Người đóng góp phản hồi về kết quả kiểm đếm.', href: reviews ? intakeHref('review', '&view=disputes') : undefined },
+        ] : []),
+        ...(data.distribution ? [
+          { count: byStatus.DRAFT ?? 0, tone: 'warning' as const, title: 'Phiếu chờ duyệt và xuất kho', hint: 'Một quản lý vận hành khác người lập bấm “Duyệt và xuất kho”.', href: intakeHref('distribution', '&dist_status=DRAFT') },
+          { count: byStatus.APPROVED ?? 0, tone: 'warning' as const, title: 'Phiếu đã duyệt, chờ xuất kho', hint: 'Quản lý vận hành đối chiếu hàng rồi xác nhận xuất kho.', href: intakeHref('distribution', '&dist_status=APPROVED') },
+          { count: data.distribution.dispatched_not_reconciled, tone: 'info' as const, title: 'Phiếu đang bàn giao', hint: 'Khi hàng đến tay người nhận, bấm “Đã giao đủ toàn bộ”.', href: intakeHref('distribution', '&dist_status=DISPATCHED') },
+        ] : []),
+        ...(data.stock ? [
+          { count: data.stock.out_of_stock_lines, tone: 'danger' as const, title: 'Vật phẩm đã hết hàng tại kho', hint: 'Cân nhắc mở đợt quyên góp hoặc điều chuyển.', href: manages ? '?workspace=operations&page=reports&view=stock-summary' : undefined },
+          { count: data.stock.pending_adjustments, tone: 'info' as const, title: 'Điều chỉnh tồn kho chờ duyệt', hint: 'Cần người duyệt độc lập.' },
+        ] : []),
+      ]} />
+      {data.distribution && manages && <DistributionPipeline counts={byStatus} />}
+      <Kpis items={[
+        ...(data.stock ? [
+          { title: 'Kho đang hoạt động', value: data.stock.warehouses },
+          { title: 'Dòng vật phẩm theo dõi', value: data.stock.tracked_item_lines },
+          { title: 'Sắp hết hàng', value: data.stock.low_stock_lines, hint: `Còn ≤ ${data.stock.low_threshold_units} đơn vị` },
+        ] : []),
+        ...(data.needs ? [{ title: 'Nhu cầu còn thiếu', value: data.needs.outstanding }] : []),
+        ...(data.distribution ? [{ title: 'Lượt bàn giao 7 ngày', value: data.distribution.handoffs_last_7d }] : []),
+      ]} />
     </>}
-  </section>{showReports && <><DriveSuggestions /><details className="card dashboard-more-metrics dashboard-history">
-    <summary>Báo cáo chi tiết và tồn kho</summary><OperationsDashboard />
-  </details></>}</>;
+  </Panel>;
 }
 
 function DriveSuggestions() {
   const snapshot = useSnapshot<Suggestions>('logistics', '/reports/drive-suggestions');
   const { data } = snapshot;
-  return <section className="card dashboard-section dashboard-suggestions"><div className="section-header"><h2>Gợi ý đợt quyên góp</h2><button type="button" className="button secondary refresh-action" onClick={snapshot.refresh}>Làm mới</button></div>
-    <p>Các gợi ý dựa trên tồn kho, nhu cầu và thời tiết; người phụ trách quyết định có mở đợt mới hay không.</p>
-    <SnapshotState {...snapshot} onRetry={snapshot.refresh} />
-    {data && !snapshot.error && <>{!data.weather_available && <p className="notice warning">Chưa có dữ liệu thời tiết; gợi ý về kho vẫn có hiệu lực.</p>}
-      {data.suggestions.length ? <div className="record-list">{data.suggestions.map((item, index) =>
-        <article className="record dashboard-suggestion" data-tone={statusTone(item.code)} key={`${item.code}:${index}`}><div><strong>{label(item.severity)} · {label(item.code)}</strong>
-          <p>{item.message}</p></div></article>)}</div> : <p>Chưa có gợi ý mới.</p>}
-      <p className="muted">Đợt đang mở: {data.open_drives.length}.</p></>}
-  </section>;
+  return <Panel title="Gợi ý mở đợt quyên góp" updated={data?.generated_at} onRefresh={snapshot.refresh} loading={snapshot.loading} error={snapshot.error}>
+    <p className="muted">Gợi ý dựa trên tồn kho, nhu cầu và thời tiết; người phụ trách quyết định có mở đợt mới hay không.</p>
+    {data && <>
+      {!data.weather_available && <p className="notice warning">Chưa có dữ liệu thời tiết; gợi ý về kho vẫn có hiệu lực.</p>}
+      {data.suggestions.length ? <ul className="dash-suggestions">{data.suggestions.map((item, index) =>
+        <li key={`${item.code}:${index}`} data-severity={item.severity}><strong>{label(item.code)}</strong><span>{item.message}</span></li>)}</ul>
+        : <p>Chưa có gợi ý mới.</p>}
+      <p className="muted">Đợt quyên góp đang mở: {data.open_drives.length}.</p>
+    </>}
+  </Panel>;
 }
 
-export function RoleDashboard({ role, showReports = false }: { role: 'coordinator' | 'operations' | 'admin';
-  showReports?: boolean }) {
-  return <div className="dashboard-stack">
-    {role === 'admin' && <AdminDashboard />}
-    {(role === 'admin' || role === 'coordinator') && <ResponseDashboard />}
-    {role === 'operations' && <OperationsSnapshot showReports={showReports} />}
-  </div>;
+export function RoleDashboard({ role, manages = false, reviews = false }: { role: 'coordinator' | 'operations' | 'admin'; manages?: boolean; reviews?: boolean }) {
+  return <DashboardTabs>{(view) => role === 'admin' ? <AdminPanels view={view} />
+    : role === 'coordinator' ? <ResponseOverviewPanels view={view} />
+      : <OperationsPanels view={view} manages={manages} reviews={reviews} />}</DashboardTabs>;
 }

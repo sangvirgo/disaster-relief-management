@@ -269,7 +269,6 @@ CREATE TABLE distribution (
   FOREIGN KEY (vehicle_id, organization_id) REFERENCES vehicle(id, organization_id),
   UNIQUE (id, warehouse_id),
   CHECK (approver_user_id IS NULL OR approver_user_id <> preparer_user_id),
-  CHECK (dispatch_actor_user_id IS NULL OR dispatch_actor_user_id <> approver_user_id),
   CHECK ((approver_user_id IS NULL) = (approved_version IS NULL) AND (approver_user_id IS NULL) = (approved_at IS NULL)),
   CHECK (approved_version IS NULL OR approved_version <= version),
   CHECK (status <> 'APPROVED' OR approved_version = version),          -- any edit bumps version and voids the approval

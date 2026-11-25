@@ -1806,3 +1806,6 @@
 .warehouse-map-editor__field { display: grid; gap: 4px; font-size: 13px; font-weight: 700; }
 .warehouse-map-editor__field small { font-weight: 400; }
 .warehouse-map-editor--card .warehouse-map-editor__actions .button { min-height: 38px; padding: 6px 16px; }
+
+/* Hidden tab panels inside an operations record must never reserve space (a display rule was overriding [hidden]). */
+#operations-detail-tabpanel > [hidden] { display: none !important; }

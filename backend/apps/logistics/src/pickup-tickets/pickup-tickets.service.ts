@@ -37,7 +37,7 @@ const liveNeedStatuses = ['OPEN', 'PARTIALLY_FULFILLED'];
  *
  * Separation of duties: reserve creates the commitments and the DRAFT distribution (the reserving user is the preparer),
  * confirm approves it (the confirming user must differ from the preparer), and handover dispatches it (the dispatcher must
- * differ from the approver and hold DISTRIBUTION_DISPATCH). A volunteer never needs a staff permission: a dispatcher may
+ * hold DISTRIBUTION_DISPATCH; since 2026-11-25 it may be the approver). A volunteer never needs a staff permission: a dispatcher may
  * record the volunteer who collected the goods in collected_by_user_id.
  */
 @Injectable()

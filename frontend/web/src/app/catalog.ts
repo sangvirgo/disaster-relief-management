@@ -48,7 +48,7 @@ export const pages: Record<Workspace, Page[]> = {
   ],
   coordinator: [
     { id: 'campaigns', title: 'Chiến dịch và điều phối', icon: 'campaign', service: 'response', path: '/campaigns/overview' },
-    { id: 'dashboard', title: 'Thống kê', icon: 'report' },
+    { id: 'dashboard', title: 'Bảng điều khiển', icon: 'home' },
     {
       id: 'reports', title: 'Tổng quan và bản đồ', icon: 'report', service: 'response',
       path: '/reports/summary', note: 'Tình hình SOS, nhiệm vụ và bản đồ nhiệt.',
@@ -87,7 +87,7 @@ export const pages: Record<Workspace, Page[]> = {
     },
   ],
   admin: [
-    { id: 'dashboard', title: 'Thống kê', icon: 'report' },
+    { id: 'dashboard', title: 'Bảng điều khiển', icon: 'home' },
     { id: 'users', title: 'Người dùng', icon: 'users', service: 'identity', path: '/users' },
     { id: 'teams', title: 'Đội cứu hộ', icon: 'team', service: 'response', path: '/teams' },
     {

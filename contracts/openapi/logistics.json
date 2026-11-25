@@ -30272,6 +30272,324 @@
         ],
         "x-c48-contract-gap": "The API specification does not define this operation’s JSON request body. The API specification does not define this operation’s success response body."
       }
+    },
+    "/distributions/{id}/approve-and-dispatch": {
+      "post": {
+        "operationId": "logisticsDistributionsApproveAndDispatch",
+        "summary": "DistributionsController.approveAndDispatch",
+        "description": "Route exported from backend/apps/logistics/src/distributions/distributions.controller.ts#DistributionsController.approveAndDispatch. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Documented response projection; see the source API specification for visibility and pagination rules.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "warehouse_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "campaign_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "purpose": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "preparer_user_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "approver_user_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "approved_version": {
+                      "anyOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "dispatch_actor_user_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "dispatched_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "reconciled_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "version": {
+                      "type": "integer"
+                    },
+                    "lines": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "item_id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "item_name": {
+                            "type": "string"
+                          },
+                          "unit": {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string"
+                              },
+                              "scale": {
+                                "type": "integer"
+                              }
+                            }
+                          },
+                          "commitment_id": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "quantity": {
+                            "type": "string",
+                            "description": "Decimal quantity encoded as a string and validated against the unit scale."
+                          },
+                          "dispatched": {
+                            "type": "string",
+                            "description": "Decimal quantity encoded as a string and validated against the unit scale."
+                          },
+                          "handed_out": {
+                            "type": "string",
+                            "description": "Decimal quantity encoded as a string and validated against the unit scale."
+                          },
+                          "returned": {
+                            "type": "string",
+                            "description": "Decimal quantity encoded as a string and validated against the unit scale."
+                          },
+                          "lost": {
+                            "type": "string",
+                            "description": "Decimal quantity encoded as a string and validated against the unit scale."
+                          },
+                          "pending_loss_count": {
+                            "type": "integer"
+                          },
+                          "in_transit": {
+                            "type": "string",
+                            "description": "Decimal quantity encoded as a string and validated against the unit scale."
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "UNAUTHENTICATED": {
+                    "summary": "UNAUTHENTICATED",
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "SESSION_EXPIRED": {
+                    "summary": "SESSION_EXPIRED",
+                    "value": {
+                      "code": "SESSION_EXPIRED",
+                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "SELF_APPROVAL_FORBIDDEN": {
+                    "summary": "SELF_APPROVAL_FORBIDDEN",
+                    "value": {
+                      "code": "SELF_APPROVAL_FORBIDDEN",
+                      "message": "Người lập phiếu không được tự duyệt.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "FORBIDDEN": {
+                    "summary": "FORBIDDEN",
+                    "value": {
+                      "code": "FORBIDDEN",
+                      "message": "Bạn không có quyền thực hiện thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "CSRF_INVALID": {
+                    "summary": "CSRF_INVALID",
+                    "value": {
+                      "code": "CSRF_INVALID",
+                      "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "INSUFFICIENT_STOCK": {
+                    "summary": "INSUFFICIENT_STOCK",
+                    "value": {
+                      "code": "INSUFFICIENT_STOCK",
+                      "message": "Không đủ hàng tồn kho khả dụng.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "VERSION_CONFLICT": {
+                    "summary": "VERSION_CONFLICT",
+                    "value": {
+                      "code": "VERSION_CONFLICT",
+                      "message": "Dữ liệu đã được cập nhật. Vui lòng tải lại trước khi tiếp tục.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "STATE_TRANSITION_INVALID": {
+                    "summary": "STATE_TRANSITION_INVALID",
+                    "value": {
+                      "code": "STATE_TRANSITION_INVALID",
+                      "message": "Trạng thái hiện tại không cho phép thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-c48-contract-source": "docs/backend/04-logistics-api.md",
+        "x-c48-controller-source": "backend/apps/logistics/src/distributions/distributions.controller.ts#DistributionsController.approveAndDispatch",
+        "security": [
+          {
+            "NativeBearer": []
+          },
+          {
+            "WebAccessCookie": [],
+            "CsrfToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expected_version": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "expected_version"
+                ]
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {

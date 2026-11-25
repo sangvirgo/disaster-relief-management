@@ -511,8 +511,8 @@ describe('pickup ticket: step keys and catalog', () => {
   });
 });
 
-describe('DistributionCommandsService.dispatch: existing approver rule used by handover', () => {
-  it('rejects a dispatch by the same user who approved the distribution', async () => {
+describe('DistributionCommandsService.dispatch: approver may hand over since 2026-11-25', () => {
+  it('lets the approver pass the separation check and reach the dispatch lines', async () => {
     const userId = OPS;
     const row = {
       id: DIST, warehouse_id: WH_PRIMARY, warehouse_status: 'ACTIVE',
@@ -523,6 +523,8 @@ describe('DistributionCommandsService.dispatch: existing approver rule used by h
     const query = jest.fn(async (sql: string) => {
       if (sql.includes('FROM distribution d JOIN warehouse w')) return [row];
       if (sql.includes('SELECT status FROM warehouse')) return [{ status: 'ACTIVE' }];
+      // No lines: the command stops after the (removed) approver check, proving that check no longer refuses.
+      if (sql.includes('FROM distribution_line dl')) return [];
       throw new Error(`unexpected: ${sql.slice(0, 80)}`);
     });
     const service = Object.create(DistributionCommandsService.prototype) as DistributionCommandsService;
@@ -534,7 +536,7 @@ describe('DistributionCommandsService.dispatch: existing approver rule used by h
     });
     await expectCode(
       service.dispatch(DIST, { expected_version: 2 }, { idempotencyKey: '30000000-0000-4000-8000-000000000001' } as never),
-      'FORBIDDEN', 403,
+      'STATE_TRANSITION_INVALID', 409,
     );
   });
 });

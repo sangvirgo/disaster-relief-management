@@ -106,7 +106,7 @@ UPDATE relief_need SET requested_quantity = 25 WHERE id = '00000000-0000-0000-00
 DO $$ BEGIN IF (SELECT requested_quantity FROM relief_need WHERE id='00000000-0000-0000-0000-000000000a21') <> 25 THEN RAISE EXCEPTION 'FAIL need increase'; END IF; RAISE NOTICE 'PASS need requested above original accepted'; END $$;
 
 -- distribution approval: approver <> preparer accepted was done above (d11); preparer approval rejected above. Dispatcher cannot equal approver:
-SELECT expect_fail('dispatcher must differ from approver', $$UPDATE distribution SET status='DISPATCHED',dispatch_actor_user_id=approver_user_id,dispatched_at=now() WHERE id='00000000-0000-0000-0000-000000000d11'$$);
+-- 2026-11-25: the approver may dispatch (AllowApproverDispatch1796428800000); no CHECK to test.
 
 -- receipt posting guard
 INSERT INTO donation_delivery (id,public_code,drive_id,organization_id,donor_name,donor_phone) VALUES

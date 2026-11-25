@@ -120,6 +120,16 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   const [receiptCampaign, setReceiptCampaign] = useState('');
   const [receiptWarehouse, setReceiptWarehouse] = useState('');
   const [receiptStatus, setReceiptStatus] = useState('');
+  const [distStatus, setDistStatusState] = useState(() => {
+    const value = new URL(window.location.href).searchParams.get('dist_status') || '';
+    return ['DRAFT', 'APPROVED', 'DISPATCHED', 'RECONCILED', 'CANCELLED'].includes(value) ? value : '';
+  });
+  function setDistStatus(value: string) {
+    setDistStatusState(value);
+    const url = new URL(window.location.href);
+    if (value) url.searchParams.set('dist_status', value); else url.searchParams.delete('dist_status');
+    window.history.replaceState(null, '', url);
+  }
   useEffect(() => { setReceiptStatus(page === 'review' ? 'PENDING_REVIEW' : ''); setCursor(''); }, [page]);
   const [seenFilters, setSeenFilters] = useState<{ campaigns: Record<string, string>; warehouses: Record<string, string> }>({ campaigns: {}, warehouses: {} });
   const initialReportFilters = useRef({ warehouse: false });
@@ -298,6 +308,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   if ((page === 'stock' || (page === 'reports' && report === 'stock-summary')) && warehouse)
     params.set('warehouse_id', warehouse);
   if (cursor) params.set('cursor', cursor);
+  if (distributionPages.has(page) && distStatus) params.set('status', distStatus);
   if (page === 'intake' || (page === 'review' && reviewTab === 'receipts')) {
     if (receiptCampaign) params.set('campaign_id', receiptCampaign);
     if (receiptWarehouse) params.set('warehouse_id', receiptWarehouse);
@@ -398,6 +409,14 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   const id = detail?.id;
   const version = number(detail?.version);
   const status = string(detail?.delivery_status || detail?.status);
+  /** Whether the next step of a slip is one this user may take (same separation rules as the API). */
+  const myTurn = (item: Row) => {
+    const state = string(item.status);
+    if (state === 'DRAFT') return item.preparer_user_id !== user.id && (rights.has('REVIEWER') || rights.has('OPERATIONS_MANAGER'));
+    if (state === 'APPROVED') return rights.has('OPERATIONS_MANAGER');
+    if (state === 'DISPATCHED') return item.dispatch_actor_user_id !== user.id && rights.has('OPERATIONS_MANAGER');
+    return false;
+  };
   const distributionActionAvailable = Boolean(id && version != null && detail && (
     (status === 'DRAFT' && (
       detail.preparer_user_id === user.id ||
@@ -405,9 +424,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
       detail.approver_user_id === user.id
     )) ||
     (status === 'APPROVED' && (
-      detail.approver_user_id === user.id ||
-      (detail.approver_user_id !== user.id && rights.has('OPERATIONS_MANAGER')) ||
-      detail.preparer_user_id === user.id
+      detail.approver_user_id === user.id || rights.has('OPERATIONS_MANAGER') || detail.preparer_user_id === user.id
     )) ||
     (status === 'DISPATCHED' && (
       detail.dispatch_actor_user_id === user.id ||
@@ -483,6 +500,14 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           canManage={rights.has('OPERATIONS_MANAGER')} canManageDrives={rights.has('OPERATIONS_MANAGER') || rights.has('COORDINATOR')}
           warehouseOptions={warehouseOptions} campaigns={references.campaigns || []} items={references.items || []} itemScales={references.itemScales || []}
           refreshKey={revision} onChanged={() => setRevision((value) => value + 1)} onRefresh={() => { setCursor(''); setRevision(value => value + 1); }} />}
+        {distributionPages.has(page) && (
+          <div className="tabs distribution-status-tabs" role="group" aria-label="Lọc phiếu theo bước">
+            {([['', 'Tất cả'], ['DRAFT', 'Chờ duyệt'], ['APPROVED', 'Chờ xuất kho'], ['DISPATCHED', 'Đang bàn giao'], ['RECONCILED', 'Hoàn tất'], ['CANCELLED', 'Đã hủy']] as const).map(([value, title]) => (
+              <button key={value} type="button" className={distStatus === value ? 'active' : ''} aria-pressed={distStatus === value}
+                onClick={() => { setDistStatus(value); setCursor(''); setSelected(null); }}>{title}</button>
+            ))}
+          </div>
+        )}
         {page === 'review' && (
           <div className="tabs">
             <button
@@ -681,7 +706,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
               <tbody>{items.map((item) => <tr key={operationRecordKey(item)}>
                 <th scope="row">{page === 'assets' && asset === 'warehouses' && item.id
                   ? <a className="table-row-link" href={`?workspace=operations&page=assets&view=warehouses&warehouse_id=${encodeURIComponent(item.id)}&warehouse_name=${encodeURIComponent(recordTitle(page, item))}`} aria-label={`Xem tồn kho ${recordTitle(page, item)}`}>{recordTitle(page, item)}</a>
-                  : <button type="button" className="table-row-link" onClick={() => { setDetailTab('overview'); setSelected(item); }}>{recordTitle(page, item)}</button>}{page === 'needs' && <span className="supply-table-cell-stack"><NeedSourceBadge source={item.source} /><NeedReasonChips codes={item.reason_codes} /></span>}</th>
+                  : <button type="button" className="table-row-link" onClick={() => { setDetailTab('overview'); setSelected(item); }}>{recordTitle(page, item)}</button>}{distributionPages.has(page) && myTurn(item) && <span className="distribution-my-turn">Đến lượt bạn</span>}{page === 'needs' && <span className="supply-table-cell-stack"><NeedSourceBadge source={item.source} /><NeedReasonChips codes={item.reason_codes} /></span>}</th>
                 {page !== 'assets' && page !== 'drives' && <td>{distributionPages.has(page) ? distributionItems(item, references.itemUnits)
                   : item.requested != null ? `Cần ${quantityWithUnit(item, item.requested)} · Đã giao ${quantityWithUnit(item, item.delivered)}`
                   : item.active_requested != null ? `Cần ${quantityWithUnit(item, item.active_requested)} · Đã giao ${quantityWithUnit(item, item.delivered)}`
@@ -711,8 +736,8 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           ...(showActionsTab && !inlineActions ? [{ id: 'actions', label: 'Thao tác' }] : []),
         ]} value={detailTab} onChange={setDetailTab} ariaLabel="Nội dung bản ghi" idBase="operations-detail" />}
         {selected && <div id="operations-detail-tabpanel" style={page === 'review' ? { display: 'flex', flexDirection: 'column' } : undefined}>
-        {distributionPages.has(page) && selected.id && detail && (lastHandoff?.distributionId === selected.id ||
-          (Array.isArray(detail.lines) && (detail.lines as Row[]).some((line) => Number(line.pending_loss_count) > 0))) &&
+        {distributionPages.has(page) && selected.id && detail &&
+          Array.isArray(detail.lines) && (detail.lines as Row[]).some((line) => Number(line.pending_loss_count) > 0) &&
           <div style={{ order: 3 }} className="distribution-handoff-lookup"><HandoffDetail key={selected.id + (lastHandoff?.distributionId === selected.id ? lastHandoff.id : '')} distributionId={selected.id} initialId={lastHandoff?.distributionId === selected.id ? lastHandoff.id : undefined} canReview={rights.has('REVIEWER') || rights.has('OPERATIONS_MANAGER')} userId={user.id} onChanged={() => setRevision((value) => value + 1)} /></div>}
         {detail && (
           <>
@@ -1141,6 +1166,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                   <>
                     {(status === 'PENDING_REVIEW' || status === 'POSTED') && <details><summary>Từ chối hoặc yêu cầu đếm lại</summary>{command({
                       title: 'Duyệt kiểm đếm',
+                      hideTitle: true,
                       service: 'logistics',
                       path: `/donation-receipts/${receiptId}/review`,
                       version,
@@ -1282,17 +1308,27 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 <>
                   {status === 'DRAFT' &&
                     detail.preparer_user_id !== user.id &&
-                    (rights.has('REVIEWER') || rights.has('OPERATIONS_MANAGER')) &&
+                    rights.has('OPERATIONS_MANAGER') &&
+                    command({
+                      title: 'Duyệt và xuất kho',
+                      hideTitle: true,
+                      service: 'logistics',
+                      path: `/distributions/${id}/approve-and-dispatch`,
+                      version,
+                      warning: 'Bạn đã đối chiếu kho, vật phẩm và số lượng với hàng thực tế? Phiếu được duyệt và tồn kho bị trừ ngay.',
+                    })}
+                  {status === 'DRAFT' &&
+                    detail.preparer_user_id !== user.id &&
+                    rights.has('REVIEWER') && !rights.has('OPERATIONS_MANAGER') &&
                     command({
                       title: 'Duyệt phiếu phân phối',
                       hideTitle: true,
                       service: 'logistics',
                       path: `/distributions/${id}/approve`,
                       version,
-                      warning: 'Bạn đã kiểm tra kho, vật phẩm và số lượng? Sau khi duyệt, một quản lý vận hành khác sẽ xác nhận xuất kho.',
+                      warning: 'Bạn đã kiểm tra kho, vật phẩm và số lượng? Sau khi duyệt, quản lý vận hành sẽ xác nhận xuất kho.',
                     })}
                   {status === 'APPROVED' &&
-                    detail.approver_user_id !== user.id &&
                     rights.has('OPERATIONS_MANAGER') &&
                     command({
                       title: 'Xác nhận xuất kho',
@@ -1329,9 +1365,38 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 status === 'DISPATCHED' &&
                 detail.dispatch_actor_user_id !== user.id &&
                 Array.isArray(detail.lines) &&
-                rights.has('OPERATIONS_MANAGER') &&
-                command({
-                  title: 'Ghi nhận bàn giao',
+                rights.has('OPERATIONS_MANAGER') && (() => {
+                  const pending = (detail.lines as Row[]).filter((line) => Number(line.in_transit) > 0);
+                  const now = new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+                  return <div className="distribution-handoff">
+                    {pending.length > 0 && <section className="distribution-handoff__quick">
+                      <h3>Đã giao đủ toàn bộ</h3>
+                      <p className="muted">Ghi nhận một lần cho {pending.length} dòng còn đang vận chuyển: {pending.map((line) => `${string(line.item_name) || 'Vật phẩm'} ${lineQuantity(line, line.in_transit)}`).join(', ')}. Phiếu sẽ tự hoàn tất.</p>
+                      {command({
+                        title: 'Xác nhận đã giao đủ',
+                        hideTitle: true,
+                        service: 'logistics',
+                        path: `/distributions/${id}/handoffs`,
+                        fields: [
+                          { name: 'receiver_label', label: 'Người hoặc đơn vị nhận', required: true, maxLength: 200 },
+                          { name: 'confirmation_basis', label: 'Căn cứ xác nhận', required: true, maxLength: 500, placeholder: 'Ví dụ: biên bản giao nhận có chữ ký' },
+                          { name: 'occurred_at', label: 'Thời điểm giao', type: 'datetime-local', required: true, initialValue: now },
+                        ],
+                        build: (values) => ({
+                          handoff_kind: 'DIRECT_HOUSEHOLD',
+                          receiver_label: values.receiver_label,
+                          confirmation_basis: values.confirmation_basis,
+                          occurred_at: new Date(values.occurred_at).toISOString(),
+                          lines: pending.map((line) => ({ distribution_line_id: string(line.id), quantity: string(line.in_transit) })),
+                        }),
+                        warning: 'Xác nhận toàn bộ hàng còn đang vận chuyển đã được giao cho người nhận? Bản ghi này không sửa được.',
+                      })}
+                    </section>}
+                    {pending.length > 0 && <details className="distribution-handoff__detail">
+                      <summary>Giao một phần, hoàn về kho hoặc báo thất thoát</summary>
+                      {command({
+                  title: 'Ghi nhận từng dòng',
+                  hideTitle: true,
                   service: 'logistics',
                   path: `/distributions/${id}/handoffs`,
                   fields: [
@@ -1408,6 +1473,9 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                   warning:
                     'Chỉ xác nhận khi đã kiểm tra việc bàn giao thực tế. Bản ghi này ảnh hưởng số liệu đối soát.',
                 })}
+                    </details>}
+                  </div>;
+                })()}
             </div>
             </div>
           </>
@@ -1425,12 +1493,11 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           page === 'distribution' &&
           rights.has('OPERATIONS_MANAGER') && <>
           <div className="distribution-create-intro">
-            Phiếu phân phối đi qua 4 bước. Cần ít nhất 2 người: người duyệt phải khác người lập, người xuất kho khác người duyệt, người ghi bàn giao khác người xuất kho.
+            Phiếu phân phối đi qua 3 bước, cần 2 người kiểm tra chéo:
             <ol>
               <li><strong>Lập phiếu</strong> (bạn): chọn kho và một hoặc nhiều vật phẩm.</li>
-              <li><strong>Duyệt</strong>: người duyệt hoặc một quản lý vận hành khác kiểm tra phiếu.</li>
-              <li><strong>Xuất kho</strong>: quản lý vận hành khác người duyệt kiểm hàng và xác nhận; tồn kho bị trừ.</li>
-              <li><strong>Bàn giao</strong>: ghi nhận đã giao, hoàn kho hoặc thất thoát; phiếu tự hoàn tất.</li>
+              <li><strong>Duyệt và xuất kho</strong> (một quản lý vận hành khác): đối chiếu hàng thực tế rồi bấm một lần; tồn kho bị trừ.</li>
+              <li><strong>Bàn giao</strong> (người khác người xuất kho, ví dụ bạn): bấm “Đã giao đủ toàn bộ”; phiếu tự hoàn tất.</li>
             </ol>
           </div>
           <DistributionCreateForm warehouses={warehouseOptions} campaigns={references.campaigns || []} items={references.items || []}

@@ -207,12 +207,7 @@ export class DistributionCommandsService {
         if (locked.status !== 'DRAFT') throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
         if (locked.preparer_user_id === session.userId) throw new AppError('SELF_APPROVAL_FORBIDDEN', { status: 403 });
         const before = distributionState(locked);
-        const updated = await manager.query(
-          `UPDATE distribution SET status='APPROVED',approver_user_id=$2,approved_version=version,approved_at=clock_timestamp()
-            WHERE id=$1 AND version=$3 RETURNING id`,
-          [id, session.userId, dto.expected_version],
-        ) as Array<{ id: string }>;
-        if (!updated[0]) throw new AppError('VERSION_CONFLICT', { status: 409 });
+        await this.markApproved(manager, id, session.userId, dto.expected_version);
         const value = await readDistributionView(manager, id);
         await writeDistributionAudit(manager, session.userId, 'DISTRIBUTION_APPROVED', id, before, value);
         return { status: 200, value, resource: { type: 'distribution', id } };
@@ -240,29 +235,80 @@ export class DistributionCommandsService {
         if (locked.status !== 'APPROVED' || locked.approved_version !== locked.version) {
           throw new AppError('APPROVAL_STALE', { status: 409 });
         }
-        if (locked.approver_user_id === session.userId) throw new AppError('FORBIDDEN', { status: 403 });
-        const lines = await loadDispatchLines(manager, id);
-        if (lines.length === 0) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
-        const { commitments, scales } = await this.validateLines(manager, locked, lines, 'DISPATCH');
-        await lockDistributionAssets(manager, locked);
+        // Since 2026-11-25 the approver may dispatch; the handoff recorder must still differ from the dispatcher.
         const before = distributionState(locked);
-        await issueDistributionLines(manager, locked, lines, scales, commitments, session.userId);
-        await manager.query(
-          'UPDATE distribution_line SET in_transit_quantity=quantity WHERE distribution_id=$1',
-          [id],
-        );
-        const updated = await manager.query(
-          `UPDATE distribution SET status='DISPATCHED',dispatch_actor_user_id=$2,dispatched_at=clock_timestamp(),version=version+1
-            WHERE id=$1 AND version=$3 RETURNING id`,
-          [id, session.userId, dto.expected_version],
-        ) as Array<{ id: string }>;
-        if (!updated[0]) throw new AppError('VERSION_CONFLICT', { status: 409 });
+        await this.issueApproved(manager, locked, session.userId, dto.expected_version);
         const value = await readDistributionView(manager, id);
         await writeDistributionAudit(manager, session.userId, 'DISTRIBUTION_DISPATCHED', id, before, value);
         return { status: 200, value, resource: { type: 'distribution', id } };
       },
       replay: (manager, resource) => this.replay(manager, resource, session.userId, session.grants, 'DISTRIBUTION_DISPATCH'),
     });
+  }
+
+  /**
+   * One-step "approve and dispatch" for a reviewer who also holds the dispatch permission (2026-11-25 shortened flow).
+   * The approver must still differ from the preparer, and a later handoff must be recorded by someone else.
+   */
+  async approveAndDispatch(id: string, dto: ExpectedDistributionVersionDto, request: DistributionRequest): Promise<IdempotentResult<Record<string, unknown>>> {
+    const session = await this.sessions.require(request);
+    const key = idempotencyKey(request);
+    const current = await loadDistribution(this.dataSource, id);
+    requireScope(session.grants, 'DISTRIBUTION_REVIEW', current);
+    requireWarehousePermission(session.grants, 'DISTRIBUTION_DISPATCH', current);
+    assertCanApprovePurpose(session.grants, current);
+
+    return this.idempotency.execute(this.dataSource, {
+      scopeKey: `user:${session.userId}`,
+      command: 'logistics.distributions.approve-and-dispatch',
+      key,
+      requestHash: canonicalRequestHash({ distribution_id: id, dto }),
+      databaseErrorMappings: { check: { stock_balance_check: 'INSUFFICIENT_STOCK' } },
+      execute: async (manager) => {
+        const locked = await loadDistribution(manager, id, true);
+        requireScope(session.grants, 'DISTRIBUTION_REVIEW', locked);
+        requireWarehousePermission(session.grants, 'DISTRIBUTION_DISPATCH', locked);
+        assertCanApprovePurpose(session.grants, locked);
+        assertExpectedVersion(locked.version, dto.expected_version);
+        if (locked.status !== 'DRAFT') throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
+        if (locked.preparer_user_id === session.userId) throw new AppError('SELF_APPROVAL_FORBIDDEN', { status: 403 });
+        const before = distributionState(locked);
+        await this.markApproved(manager, id, session.userId, dto.expected_version);
+        const approved = await loadDistribution(manager, id, true);
+        const approvedView = await readDistributionView(manager, id);
+        await writeDistributionAudit(manager, session.userId, 'DISTRIBUTION_APPROVED', id, before, approvedView);
+        await this.issueApproved(manager, approved, session.userId, dto.expected_version);
+        const value = await readDistributionView(manager, id);
+        await writeDistributionAudit(manager, session.userId, 'DISTRIBUTION_DISPATCHED', id, distributionState(approved), value);
+        return { status: 200, value, resource: { type: 'distribution', id } };
+      },
+      replay: (manager, resource) => this.replay(manager, resource, session.userId, session.grants, 'DISTRIBUTION_DISPATCH'),
+    });
+  }
+
+  private async markApproved(manager: EntityManager, id: string, userId: string, expectedVersion: number): Promise<void> {
+    const updated = await manager.query(
+      `UPDATE distribution SET status='APPROVED',approver_user_id=$2,approved_version=version,approved_at=clock_timestamp()
+        WHERE id=$1 AND version=$3 RETURNING id`,
+      [id, userId, expectedVersion],
+    ) as Array<{ id: string }>;
+    if (!updated[0]) throw new AppError('VERSION_CONFLICT', { status: 409 });
+  }
+
+  /** Issues stock for an approved slip and marks it dispatched; the caller has locked the row and checked the approval. */
+  private async issueApproved(manager: EntityManager, locked: DistributionContext, userId: string, expectedVersion: number): Promise<void> {
+    const lines = await loadDispatchLines(manager, locked.id);
+    if (lines.length === 0) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
+    const { commitments, scales } = await this.validateLines(manager, locked, lines, 'DISPATCH');
+    await lockDistributionAssets(manager, locked);
+    await issueDistributionLines(manager, locked, lines, scales, commitments, userId);
+    await manager.query('UPDATE distribution_line SET in_transit_quantity=quantity WHERE distribution_id=$1', [locked.id]);
+    const updated = await manager.query(
+      `UPDATE distribution SET status='DISPATCHED',dispatch_actor_user_id=$2,dispatched_at=clock_timestamp(),version=version+1
+        WHERE id=$1 AND version=$3 RETURNING id`,
+      [locked.id, userId, expectedVersion],
+    ) as Array<{ id: string }>;
+    if (!updated[0]) throw new AppError('VERSION_CONFLICT', { status: 409 });
   }
 
   async cancel(id: string, dto: ExpectedDistributionVersionDto, request: DistributionRequest): Promise<IdempotentResult<Record<string, unknown>>> {

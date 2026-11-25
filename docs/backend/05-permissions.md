@@ -92,16 +92,16 @@ Only a primary system coordinator sees the shared intake queue. `unassigned=true
 
 | Rule | Enforcement | Error |
 |---|---|---|
-| Distribution approver differs from its preparer. The preparer may dispatch the same distribution. | Database CHECK plus service | `SELF_APPROVAL_FORBIDDEN` (403) |
+| Distribution approver differs from its preparer. The preparer may dispatch the same distribution. Since 2026-11-25 the approver may also dispatch, including in one step with `POST /distributions/{id}/approve-and-dispatch` (needs `DISTRIBUTION_REVIEW` and `DISTRIBUTION_DISPATCH`). | Database CHECK plus service | `SELF_APPROVAL_FORBIDDEN` (403) |
 | The user who dispatched a distribution cannot record any handoff for it (direct delivery, point receipt, household handout, return or loss). | Service rule (new) | `SELF_HANDOFF_FORBIDDEN` (403) |
 | A handoff recorder differs from its receiver. | Service rule | — |
 | LOSS approver differs from the LOSS recorder. | Service rule | — |
 | Receipt reviewer differs from every count author. | Service rule and test | — |
-| Pickup ticket: the confirming user approves the draft; the reserving user is its preparer, so the existing self-approval rule applies. Handover dispatches the draft; the dispatcher differs from the approver (existing rule) and holds `DISTRIBUTION_DISPATCH`. A volunteer records no staff permission; the dispatcher may name the collector, who must be an active mission team member. | Existing distribution rules plus pickup-ticket facade (Step 6a). | `SELF_APPROVAL_FORBIDDEN`, `FORBIDDEN`, `PICKUP_COLLECTOR_NOT_MEMBER` |
+| Pickup ticket: the confirming user approves the draft; the reserving user is its preparer, so the existing self-approval rule applies. Handover dispatches the draft; the dispatcher holds `DISTRIBUTION_DISPATCH` and, since 2026-11-25, may be the approver. A volunteer records no staff permission; the dispatcher may name the collector, who must be an active mission team member. | Existing distribution rules plus pickup-ticket facade (Step 6a). | `SELF_APPROVAL_FORBIDDEN`, `FORBIDDEN`, `PICKUP_COLLECTOR_NOT_MEMBER` |
 | Need extraction sweep: a SYSTEM job with a null actor. It creates ESTIMATED lines only (through the same core as the manual estimate) and never confirms, cancels, admits or reviews anything. Its audit rows have a null actor. | Step 7 (need-extraction sweep). | — |
 | Pickup close-out: the reviewer differs from the submitter (`SELF_REVIEW_FORBIDDEN`) and from the user who handed the goods over (`SELF_HANDOFF_FORBIDDEN`). Returns post a RETURN handoff with the reviewer as recorder, so the existing dispatch-actor rule applies as well. | Step 6b (pickup-goods service). | `SELF_REVIEW_FORBIDDEN`, `SELF_HANDOFF_FORBIDDEN` |
 
-A single `OPERATIONS_MANAGER` account can prepare, dispatch and record different distributions, but it cannot approve its own preparation and cannot record the handoff of a distribution it dispatched. Demo seeds keep the four actors of one distribution distinct (see [seed-logistics.sql](seed/seed-logistics.sql)).
+A single `OPERATIONS_MANAGER` account can prepare, dispatch and record different distributions, but it cannot approve its own preparation and cannot record the handoff of a distribution it dispatched. The shortest valid flow therefore needs two people: A prepares, B approves and dispatches in one step, A records the handoff (2026-11-25). Demo seeds keep the actors of one distribution distinct (see [seed-logistics.sql](seed/seed-logistics.sql)).
 
 ## 4. Object-level rules
 
