@@ -6,7 +6,7 @@
 # With --purge-evidence the two evidence buckets (S3_RESPONSE_BUCKET, S3_LOGISTICS_BUCKET) are emptied after the database
 # has been rebuilt, so no orphaned photo outlives its record. The backup bucket is never touched.
 #
-# For the demo deployment, whose data is synthetic seed data. Sequence: confirm by typing the public hostname, take a
+# For the demo deployment, whose data is synthetic seed data. Sequence (no hostname prompt since 2026-11-25, on request): take a
 # verified safety dump, stop the stack, remove ONLY the c48_pgdata volume, recreate the databases, migrate, seed, start
 # the stack and check health. It never touches the MinIO volume, and it leaves S3 objects alone unless
 # --purge-evidence is given (then the evidence files would otherwise stay behind as orphans). Run it as root (`sudo -i`): backend/.env is mode 600.
@@ -35,7 +35,7 @@ Usage: backend/scripts/deploy/reset-demo-data --reset [--purge-evidence]
 --purge-evidence also deletes every object in the response and logistics evidence buckets (not the backup bucket).
 
 Deletes ALL data in the three C48 databases and reseeds the demo data. A verified dump of the current data is kept in
-/var/lib/c48/pre-reset (latest only). Asks you to type the public hostname and to choose the password that every demo
+/var/lib/c48/pre-reset (latest only). Asks you to choose the password that every demo
 account will share (or set SEED_PASSWORD in the environment or in backend/.env, at least 12 characters).
 USAGE
   exit 2
@@ -107,20 +107,14 @@ main() {
   [[ $# -eq 1 && "${1:-}" == --reset ]] || usage
   [[ -r "$ENV_FILE" ]] || die 'cannot read backend/.env (run as root: sudo -i)'
 
-  local host answer
-  host="$(env_value WEB_ALLOWED_ORIGINS | cut -d, -f1 | sed -E 's|^[A-Za-z]+://||; s|[/:].*$||')"
-  [[ -n "$host" ]] || die 'WEB_ALLOWED_ORIGINS is empty in backend/.env'
-
   printf 'This DELETES every row in the C48 identity, response and logistics databases on this host and reloads the demo seed.\n'
   if [[ $PURGE -eq 1 ]]; then printf 'The response and logistics EVIDENCE BUCKETS will be emptied too (every photo and video). The backup bucket is not touched.\n'
   else printf 'MinIO/S3 objects are not touched (add --purge-evidence to empty the evidence buckets). A verified dump of the current data is kept in %s/pre-reset.\n' "$STATE_DIR"; fi
   [[ $PURGE -eq 0 ]] || printf 'A verified dump of the current data is kept in %s/pre-reset.\n' "$STATE_DIR"
-  # `|| true`: a closed stdin (the GitHub Actions button runs this through SSM) must reach the clear error below.
-  read -r -p "Type the public hostname ($host) to continue: " answer || true
-  [[ "$answer" == "$host" ]] || die 'cancelled: the hostname did not match, nothing was changed'
 
   SEED_PASSWORD="${SEED_PASSWORD:-$(env_value SEED_PASSWORD)}" # the non-interactive reset takes it from backend/.env
   if [[ -z "${SEED_PASSWORD:-}" ]]; then
+    # `|| true`: a closed stdin (the GitHub Actions button runs this through SSM) must reach the clear error below.
     read -rs -p 'Password shared by every demo account (at least 12 characters): ' SEED_PASSWORD || true
     printf '\n'
   fi

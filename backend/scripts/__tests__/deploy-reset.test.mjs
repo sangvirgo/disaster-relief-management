@@ -55,12 +55,12 @@ test('a plain reset never touches S3, and --purge-evidence empties only the two 
     'S3_RESPONSE_BUCKET=resp-evidence', 'S3_LOGISTICS_BUCKET=log-evidence', 'S3_BACKUP_BUCKET=the-backups', ''].join('\n');
   const plain = sandbox({ envText: env });
   try {
-    assert.equal(plain.run(['--reset'], { input: `${HOST}\n${PASSWORD}\n` }).status, 0);
+    assert.equal(plain.run(['--reset'], { input: `${PASSWORD}\n` }).status, 0);
     assert.doesNotMatch(plain.log(), /aws /u);
   } finally { plain.cleanup(); }
   const purge = sandbox({ envText: env });
   try {
-    const result = purge.run(['--reset', '--purge-evidence'], { input: `${HOST}\n${PASSWORD}\n` });
+    const result = purge.run(['--reset', '--purge-evidence'], { input: `${PASSWORD}\n` });
     assert.equal(result.status, 0, result.stdout + result.stderr);
     assert.match(result.stdout, /EVIDENCE BUCKETS will be emptied/u);
     const entries = lines(purge.log());
@@ -72,7 +72,7 @@ test('a plain reset never touches S3, and --purge-evidence empties only the two 
   } finally { purge.cleanup(); }
   const unsafe = sandbox({ envText: env.replace('S3_LOGISTICS_BUCKET=log-evidence', 'S3_LOGISTICS_BUCKET=the-backups') });
   try {
-    const result = unsafe.run(['--reset', '--purge-evidence'], { input: `${HOST}\n${PASSWORD}\n` });
+    const result = unsafe.run(['--reset', '--purge-evidence'], { input: `${PASSWORD}\n` });
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /equals the backup bucket/u);
   } finally { unsafe.cleanup(); }
@@ -86,13 +86,10 @@ test('refuses to run without the explicit --reset flag', () => {
   } finally { box.cleanup(); }
 });
 
-test('a wrong hostname or a short password cancels before anything is deleted', () => {
+test('a short password cancels before anything is deleted', () => {
   const box = sandbox();
   try {
-    const wrongHost = box.run(['--reset'], { input: 'something-else\n', env: { SEED_PASSWORD: PASSWORD } });
-    assert.notEqual(wrongHost.status, 0);
-    assert.match(wrongHost.stderr, /cancelled/u);
-    const shortPassword = box.run(['--reset'], { input: `${HOST}\n`, env: { SEED_PASSWORD: 'short' } });
+    const shortPassword = box.run(['--reset'], { env: { SEED_PASSWORD: 'short' } });
     assert.notEqual(shortPassword.status, 0);
     assert.match(shortPassword.stderr, /at least 12 characters/u);
     assert.doesNotMatch(box.log(), /volume rm|pg_dump|down|MIGRATE|SEED/u);
@@ -102,7 +99,7 @@ test('a wrong hostname or a short password cancels before anything is deleted', 
 test('a full reset dumps first, removes only c48_pgdata, migrates, seeds as development and restarts the stack', () => {
   const box = sandbox();
   try {
-    const result = box.run(['--reset'], { input: `${HOST}\n${PASSWORD}\n` });
+    const result = box.run(['--reset'], { input: `${PASSWORD}\n` });
     assert.equal(result.status, 0, result.stdout + result.stderr);
     const entries = lines(box.log());
     const order = [
@@ -131,7 +128,7 @@ test('a full reset dumps first, removes only c48_pgdata, migrates, seeds as deve
 test('the password can be typed at a hidden prompt instead of the environment', () => {
   const box = sandbox();
   try {
-    const result = box.run(['--reset'], { input: `${HOST}\n${PASSWORD}\n` });
+    const result = box.run(['--reset'], { input: `${PASSWORD}\n` });
     assert.equal(result.status, 0, result.stdout + result.stderr);
     assert.doesNotMatch(result.stdout + result.stderr, new RegExp(PASSWORD, 'u'), 'the password must never be printed');
     assert.doesNotMatch(box.log(), new RegExp(PASSWORD, 'u'), 'the password must not reach a docker command line');
@@ -141,7 +138,7 @@ test('the password can be typed at a hidden prompt instead of the environment', 
 test('a failing migration stops the run with a non-zero status and never starts the stack', () => {
   const box = sandbox();
   try {
-    const result = box.run(['--reset'], { input: `${HOST}\n`, env: { SEED_PASSWORD: PASSWORD, FAKE_MIGRATE_STATUS: '1' } });
+    const result = box.run(['--reset'], { env: { SEED_PASSWORD: PASSWORD, FAKE_MIGRATE_STATUS: '1' } });
     assert.notEqual(result.status, 0);
     assert.doesNotMatch(box.log(), /^SEED /mu);
     assert.doesNotMatch(box.log(), /identity-api response-api logistics-api web nginx/u);
@@ -151,7 +148,7 @@ test('a failing migration stops the run with a non-zero status and never starts 
 test('failed health checks after the reseed fail the command', () => {
   const box = sandbox();
   try {
-    const result = box.run(['--reset'], { input: `${HOST}\n`, env: { SEED_PASSWORD: PASSWORD, FAKE_CURL_STATUS: '22' } });
+    const result = box.run(['--reset'], { env: { SEED_PASSWORD: PASSWORD, FAKE_CURL_STATUS: '22' } });
     assert.notEqual(result.status, 0);
     assert.match(result.stdout, /health check failed/u);
   } finally { box.cleanup(); }
@@ -162,7 +159,7 @@ test('an unreadable backend/.env stops the reset before anything runs', (context
   const box = sandbox();
   try {
     chmodSync(join(box.root, 'backend/.env'), 0o000);
-    const result = box.run(['--reset'], { input: `${HOST}\n`, env: { SEED_PASSWORD: PASSWORD } });
+    const result = box.run(['--reset'], { env: { SEED_PASSWORD: PASSWORD } });
     assert.notEqual(result.status, 0);
     assert.equal(box.log(), '');
   } finally { chmodSync(join(box.root, 'backend/.env'), 0o600); box.cleanup(); }
@@ -199,11 +196,11 @@ test('the production guard refuses production, accepts development and fails clo
   assert.match(unreadable.stderr, /Cannot read backend\/\.env/u);
 });
 
-test('the GitHub Actions reset runs without a terminal: the hostname on stdin, the password from backend/.env, optional profiles restarted', () => {
+test('the GitHub Actions reset runs without a terminal: no prompt, the password from backend/.env, optional profiles restarted', () => {
   const box = sandbox({ envText: ['NODE_ENV=production', 'C48_IMAGE_SOURCE=registry', 'PUBLIC_PORT=8080', `WEB_ALLOWED_ORIGINS=https://${HOST}`,
     `SEED_PASSWORD=${PASSWORD}`, 'C48_OBSERVABILITY=on', 'C48_AI_FALLBACK=on', ''].join('\n') });
   try {
-    const result = box.run(['--reset'], { input: `${HOST}\n`, env: { SEED_PASSWORD: '' } });
+    const result = box.run(['--reset'], { env: { SEED_PASSWORD: '' } });
     assert.equal(result.status, 0, result.stdout + result.stderr);
     const entries = lines(box.log());
     assert.match(box.log(), new RegExp(`SEED NODE_ENV=development PASSWORD_LENGTH=${PASSWORD.length}`, 'u'));
@@ -218,7 +215,7 @@ test('the GitHub Actions reset runs without a terminal: the hostname on stdin, t
 test('without a password anywhere and no terminal, the reset stops before deleting anything', () => {
   const box = sandbox();
   try {
-    const result = box.run(['--reset'], { input: `${HOST}\n`, env: { SEED_PASSWORD: '' } });
+    const result = box.run(['--reset'], { env: { SEED_PASSWORD: '' } });
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /at least 12 characters/u);
     assert.doesNotMatch(box.log(), /volume rm|down|SEED/u);

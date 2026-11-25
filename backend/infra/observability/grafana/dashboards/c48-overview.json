@@ -3009,7 +3009,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "**Xóa toàn bộ dữ liệu, nạp lại dữ liệu mẫu và (tuỳ chọn) xóa ảnh/video minh chứng trên S3.** Bucket sao lưu không bị đụng; một bản dump an toàn được giữ ở `/var/lib/c48/pre-reset`.\n\n1. Bấm **[▶ Mở nút đặt lại dữ liệu demo](https://github.com/sangvirgo/disaster-relief-management/actions/workflows/reset-demo.yml)** (GitHub Actions, cần quyền ghi repo).\n2. Bấm **Run workflow**, gõ `RESET`, giữ ô xóa ảnh S3 nếu muốn, rồi **Run workflow**.\n3. Chờ khoảng 3–5 phút. Mọi người bị đăng xuất; Grafana tạm mất kết nối trong lúc chạy.\n\nMật khẩu tài khoản demo lấy từ `SEED_PASSWORD` trong `backend/.env` trên máy chủ (ít nhất 12 ký tự)."
+        "content": "**Xóa toàn bộ dữ liệu, nạp lại dữ liệu mẫu và (tuỳ chọn) xóa ảnh/video minh chứng trên S3.** Bucket sao lưu không bị đụng; một bản dump an toàn được giữ ở `/var/lib/c48/pre-reset`.\n\n1. Bấm **[▶ Mở nút đặt lại dữ liệu demo](https://github.com/sangvirgo/disaster-relief-management/actions/workflows/reset-demo.yml)** (GitHub Actions, cần quyền ghi repo và mật khẩu đặt lại).\n2. Bấm **Run workflow**, nhập mật khẩu đặt lại, giữ ô xóa ảnh S3 nếu muốn, rồi **Run workflow**.\n3. Chờ khoảng 3–5 phút. Mọi người bị đăng xuất; Grafana tạm mất kết nối trong lúc chạy.\n\nMật khẩu tài khoản demo lấy từ `SEED_PASSWORD` trong `backend/.env` trên máy chủ (ít nhất 12 ký tự)."
       }
     }
   ],

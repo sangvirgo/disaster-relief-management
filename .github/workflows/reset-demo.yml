@@ -2,14 +2,14 @@
 # the demo seed and, by default, empties the two evidence buckets (the backup bucket is never touched). It runs the
 # host's own backend/scripts/deploy/reset-demo-data through SSM, exactly like the deploy job, so it keeps the verified
 # safety dump in /var/lib/c48/pre-reset and the release lock. Only people with write access to the repository can run
-# it, only from main, and only after typing RESET. The demo password comes from SEED_PASSWORD in the host's backend/.env.
+# it, only from main, and only with the reset password (environment secret RESET_PASSWORD, never in the repository). The demo password comes from SEED_PASSWORD in the host's backend/.env.
 name: reset-demo
 
 on:
   workflow_dispatch:
     inputs:
-      confirm:
-        description: 'Gõ RESET để xác nhận xóa toàn bộ dữ liệu và nạp lại dữ liệu mẫu'
+      password:
+        description: 'Mật khẩu đặt lại dữ liệu (xóa toàn bộ dữ liệu và nạp lại dữ liệu mẫu)'
         required: true
         type: string
       purge_evidence:
@@ -33,12 +33,15 @@ jobs:
     env:
       INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
       APP_HOSTNAME: ${{ vars.APP_HOSTNAME }}
-      CONFIRM: ${{ inputs.confirm }}
+      PASSWORD: ${{ inputs.password }}
+      RESET_PASSWORD: ${{ secrets.RESET_PASSWORD }}
       PURGE: ${{ inputs.purge_evidence }}
     steps:
-      - name: Check the confirmation
+      - name: Check the reset password
         run: |
-          [ "$CONFIRM" = RESET ] || { echo "::error::Chưa gõ đúng RESET: không có gì bị xóa."; exit 1; }
+          echo "::add-mask::$PASSWORD"
+          [ -n "$RESET_PASSWORD" ] || { echo "::error::Chưa cấu hình secret RESET_PASSWORD trong environment production."; exit 1; }
+          [ "$PASSWORD" = "$RESET_PASSWORD" ] || { echo "::error::Sai mật khẩu đặt lại: không có gì bị xóa."; exit 1; }
           [[ "$APP_HOSTNAME" =~ ^[A-Za-z0-9.-]{1,253}$ ]] || { echo "::error::APP_HOSTNAME is missing or invalid"; exit 1; }
 
       - uses: aws-actions/configure-aws-credentials@v6
@@ -52,10 +55,9 @@ jobs:
           set -euo pipefail
           flag=''
           [ "$PURGE" = true ] && flag=' --purge-evidence'
-          # The script asks for the public hostname on stdin; the host compares it with its own WEB_ALLOWED_ORIGINS, so a
-          # wrong instance or variable stops before anything is deleted. APP_HOSTNAME was validated above.
-          jq -n --arg host "$APP_HOSTNAME" --arg flag "$flag" \
-            '{commands: ["bash -c \"set -euo pipefail; export HOME=/root; cd /opt/c48; echo \($host) | bash backend/scripts/deploy/reset-demo-data --reset\($flag)\""]}' > ssm-parameters.json
+          # stdin is closed: the demo password comes from SEED_PASSWORD in the host's backend/.env.
+          jq -n --arg flag "$flag" \
+            '{commands: ["bash -c \"set -euo pipefail; export HOME=/root; cd /opt/c48; bash backend/scripts/deploy/reset-demo-data --reset\($flag) < /dev/null\""]}' > ssm-parameters.json
           cat ssm-parameters.json
           command_id="$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
