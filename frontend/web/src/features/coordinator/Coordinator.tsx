@@ -188,6 +188,8 @@ type Detail = QueueItem & {
       confidence?: number;
       priority_score?: number;
       priority_reasons?: string[];
+      /** Set by the backend when the local fallback model answered instead of Gemini. */
+      ai_source?: 'FALLBACK';
     } | null;
     review_status?: string | null;
     review_note?: string | null;
@@ -1353,7 +1355,10 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 </dl>}
                 {aiDone && detail.ai_advisory?.extracted_json?.summary && (
                   <p className="sos-decision__summary">
-                    <strong>{ai?.suggested_priority ? `AI gợi ý ${ai.suggested_priority}` : 'AI chưa xác định mức ưu tiên'}:</strong>{' '}
+                    <strong>
+                      {ai?.suggested_priority ? `AI gợi ý ${ai.suggested_priority}` : 'AI chưa xác định mức ưu tiên'}
+                      {detail.ai_advisory.extracted_json.ai_source === 'FALLBACK' ? ' (mô hình dự phòng)' : ''}:
+                    </strong>{' '}
                     {detail.ai_advisory.extracted_json.summary}
                     {detail.ai_advisory.extracted_json.weather_impact && <> Thời tiết: {detail.ai_advisory.extracted_json.weather_impact}</>}
                   </p>
@@ -1421,6 +1426,11 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                       {extracted?.summary && <p>{extracted.summary}</p>}
                       {ai.reasons.length > 0 && <p className="muted">Căn cứ: {ai.reasons.join(' · ')}</p>}
                       {extracted?.weather_impact && <p className="muted">Thời tiết: {extracted.weather_impact}</p>}
+                      {extracted?.ai_source === 'FALLBACK' && (
+                        <p className="muted">
+                          Kết quả từ mô hình dự phòng chạy nội bộ do mô hình chính không phản hồi. Mô hình nhỏ nên độ chính xác thấp hơn; hãy đối chiếu kỹ với lời kể trước khi quyết định.
+                        </p>
+                      )}
                     </>
                   ) : (
                     <p className="muted">

@@ -162,6 +162,32 @@ observability_up() { # opt-in with C48_OBSERVABILITY=on in backend/.env; never f
   fi
 }
 
+ai_fallback_up() { # opt-in with C48_AI_FALLBACK=on in backend/.env; never fails a release
+  # Ollama (profile ai-fallback) answers SOS advisories only when Gemini fails or is slow. Off: stop it to free RAM.
+  if [[ "$(env_value C48_AI_FALLBACK)" != on ]]; then
+    main_compose --profile ai-fallback stop ollama >/dev/null 2>&1 || true
+    return 0
+  fi
+  local model free_gb min_gb="${C48_AI_FALLBACK_MIN_FREE_GB:-10}"
+  model="$(env_value OLLAMA_MODEL)"
+  [[ "$model" =~ ^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$ ]] || { log 'WARNING: OLLAMA_MODEL is empty or invalid: the AI fallback was not started'; return 0; }
+  [[ -n "$(env_value OLLAMA_BASE_URL)" ]] || log 'WARNING: OLLAMA_BASE_URL is empty: Ollama runs but response-api will not call it'
+  if ! main_compose --profile ai-fallback ps --status running --services 2>/dev/null | grep -qx ollama; then
+    free_gb="$(df -Pk / | awk 'NR == 2 { print int($4 / 1048576) }')"
+    if [[ -n "$free_gb" ]] && (( free_gb < min_gb )); then
+      log "WARNING: only ${free_gb} GB free on / (need ${min_gb} GB for the Ollama image and model): the AI fallback was not started"
+      return 0
+    fi
+  fi
+  if main_compose --profile ai-fallback pull --quiet ollama \
+     && main_compose --profile ai-fallback up --no-build -d --wait --wait-timeout "$HEALTH_TIMEOUT_S" ollama \
+     && main_compose --profile ai-fallback exec -T ollama ollama pull "$model" >/dev/null; then
+    log "AI fallback is up with $model"
+  else
+    log 'WARNING: the AI fallback did not start; Gemini still serves advisories and the release itself is healthy'
+  fi
+}
+
 restore_previous() { # shared by `rollback` and the automatic rollback inside `deploy`
   # NOTE: may run inside `||`, where `set -e` is ignored, so every step checks its own status.
   local previous
@@ -201,6 +227,7 @@ cmd_deploy() {
     prune_images
     install_systemd_units
     observability_up
+    ai_fallback_up
     log "release $tag is live"
     return 0
   fi

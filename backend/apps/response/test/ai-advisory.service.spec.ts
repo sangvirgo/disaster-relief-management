@@ -337,6 +337,70 @@ describe('AI advisory worker lifecycle', () => {
     expect(claimed?.claim_token).toMatch(/^[0-9a-f-]{36}$/u);
     const claim = query.mock.calls.find(([sql]) => String(sql).includes('attempts=attempts+1'));
     expect(claim?.[0]).toContain('claim_token=$2');
-    expect(claim?.[1]).toEqual([job.id, claimed?.claim_token]);
+    expect(claim?.[1]).toEqual([job.id, claimed?.claim_token, 45]);
+  });
+});
+
+describe('AI advisory local fallback (Ollama)', () => {
+  const geminiUrl = (url: unknown) => String(url).startsWith('https://generativelanguage.googleapis.com/');
+  const ollamaReply = (value: Record<string, unknown>) => ({ ok: true, json: async () => ({ message: { content: JSON.stringify(value) } }) } as Response);
+  beforeEach(() => {
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    process.env.GEMINI_API_KEY = 'unit-test';
+    process.env.OLLAMA_BASE_URL = 'http://ollama:11434';
+    process.env.OLLAMA_MODEL = 'qwen3.5:0.8b-q8_0';
+    process.env.AI_FALLBACK_HEDGE_MS = '0';
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+    for (const name of ['GEMINI_API_KEY', 'OLLAMA_BASE_URL', 'OLLAMA_MODEL', 'AI_FALLBACK_HEDGE_MS']) delete process.env[name];
+  });
+
+  it('saves the fallback answer with its model when Gemini is rate-limited, then serves from the fallback during the cooldown', async () => {
+    const query = jest.fn<(...args: unknown[]) => Promise<unknown[]>>().mockResolvedValue([]);
+    const worker = new AiAdvisoryService({ query } as unknown as DataSource);
+    const claim = jest.spyOn(worker as unknown as { claimJob(shares?: boolean): Promise<typeof job> }, 'claimJob').mockResolvedValue(job);
+    const fetch = jest.spyOn(globalThis, 'fetch').mockImplementation(async (url) =>
+      geminiUrl(url) ? { ok: false, status: 429 } as Response : ollamaReply(extraction));
+
+    await worker['processOne']();
+
+    const completed = query.mock.calls.find(([sql]) => String(sql).includes("status='COMPLETED'"));
+    expect(completed?.[1]?.[3]).toBe('qwen3.5:0.8b-q8_0');
+    expect(JSON.parse(String(completed?.[1]?.[1]))).toMatchObject({ ...extraction, ai_source: 'FALLBACK' });
+    const ollamaBody = JSON.parse(String(fetch.mock.calls.find(([url]) => !geminiUrl(url))?.[1]?.body)) as Record<string, unknown>;
+    expect(ollamaBody).toMatchObject({ model: 'qwen3.5:0.8b-q8_0', think: false });
+
+    fetch.mockClear();
+    await worker['processOne']();
+    expect(claim).toHaveBeenLastCalledWith(true); // no Gemini call reserved against the daily cap
+    expect(fetch.mock.calls.some(([url]) => geminiUrl(url))).toBe(false);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the Gemini answer and stores no fallback model when Gemini succeeds', async () => {
+    const query = jest.fn<(...args: unknown[]) => Promise<unknown[]>>().mockResolvedValue([]);
+    const worker = new AiAdvisoryService({ query } as unknown as DataSource);
+    jest.spyOn(worker as unknown as { claimJob(): Promise<typeof job> }, 'claimJob').mockResolvedValue(job);
+    jest.spyOn(globalThis, 'fetch').mockImplementation(async (url) => geminiUrl(url)
+      ? { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(extraction) }] } }] }) } as Response
+      : ollamaReply({ ...extraction, summary: 'Kết quả dự phòng không được dùng ở đây.' }));
+
+    await worker['processOne']();
+
+    const completed = query.mock.calls.find(([sql]) => String(sql).includes("status='COMPLETED'"));
+    expect(completed?.[1]?.[3]).toBeNull();
+    expect(JSON.parse(String(completed?.[1]?.[1]))).not.toHaveProperty('ai_source');
+  });
+
+  it('applies the same Vietnamese validation to the fallback and keeps the Gemini error when both fail', async () => {
+    const worker = new AiAdvisoryService({} as DataSource);
+    jest.spyOn(globalThis, 'fetch').mockImplementation(async (url) =>
+      geminiUrl(url) ? { ok: false, status: 503 } as Response : ollamaReply({ ...extraction, summary: 'English only summary without marks' }));
+    await expect(worker['extract'](job as never, '{}')).rejects.toThrow('AI_PROVIDER_RETRYABLE:503');
+  });
+
+  it('extends the claim lease to cover the fallback timeout', () => {
+    expect(new AiAdvisoryService({} as DataSource)['leaseSeconds']()).toBe(45 + 90); // hedge 0 s + timeout 90 s
   });
 });

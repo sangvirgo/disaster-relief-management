@@ -63,6 +63,30 @@ The seed hashes the password into every demo account (including coordinator and 
 
 Manual commands: `release rollback` (one step back), `release status`. Only the current and previous tags are kept on disk; older local images are removed after a healthy release.
 
+### AI fallback model (Ollama, profile `ai-fallback`)
+
+**Off by default.** A local test on 2026-11-25 measured 50-76 s per SOS and saw the 0.8B model miss life-threat cases and invent facts; turn it on only for a demo of the mechanism, and tell coordinators the labelled results need careful checking. Gemini stays the primary model. A small local model answers an SOS advisory only when Gemini fails, or when Gemini has not answered after `AI_FALLBACK_HEDGE_MS`. To turn it on, edit `/opt/c48/backend/.env` once on the host (`sudo -i`, then an editor; keep mode 600):
+
+```bash
+C48_AI_FALLBACK=on
+OLLAMA_BASE_URL=http://ollama:11434
+OLLAMA_MODEL=qwen3.5:0.8b-q8_0
+OLLAMA_TIMEOUT_MS=90000
+OLLAMA_NUM_CTX=4096
+AI_FALLBACK_HEDGE_MS=3000     # 0 starts Gemini and the fallback at the same time
+```
+
+The next release (any push to `main`) pulls the Ollama image (about 3.2 GB compressed) and the model, and starts the container after the stack is healthy. Response-api reads `OLLAMA_*` when it starts, so set them before that release. It skips the start, with a warning in the release log, when less than 10 GB is free on `/` (`C48_AI_FALLBACK_MIN_FREE_GB` changes that). A failed start never fails the release. To start it without a release:
+
+```bash
+cd /opt/c48 && source backend/scripts/dev/lib.sh
+main_compose --profile ai-fallback up -d --wait ollama
+main_compose --profile ai-fallback exec -T ollama ollama pull qwen3.5:0.8b-q8_0
+main_compose up -d --no-deps --force-recreate response-api     # picks up OLLAMA_* from .env
+```
+
+Check: `docker stats --no-stream reliva-ollama` (about 1.4 GB while answering, measured locally) and the `c48_ai_fallback_attempts_total` metric. To turn it off, set `C48_AI_FALLBACK=off` and empty `OLLAMA_BASE_URL`; the next release stops the container. The `ollama-data` volume keeps the model and is never removed by a reset.
+
 ### Resetting the demo data on the host
 
 The data on this host is synthetic seed data, so it can be wiped and reloaded on purpose. Use the dedicated command, as root (`sudo -i`, because `backend/.env` is mode 600), from `/opt/c48`:

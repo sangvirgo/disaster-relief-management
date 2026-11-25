@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 
-const args = ['compose', '--profile', 'storage', '--profile', 'seed', '--profile', 'observability', '--env-file', '.env.example', '-f', 'infra/compose.yaml', 'config', '--format', 'json'];
+const args = ['compose', '--profile', 'storage', '--profile', 'seed', '--profile', 'observability', '--profile', 'ai-fallback', '--env-file', '.env.example', '-f', 'infra/compose.yaml', 'config', '--format', 'json'];
 const result = spawnSync('docker', args, { encoding: 'utf8' });
 if (result.error) throw result.error;
 if (result.status !== 0) throw new Error(`Docker Compose config failed (${result.status}): ${result.stderr.trim()}`);
@@ -35,6 +35,7 @@ const expectedEnvironment = {
     'TEAM_BAND_TOLERANCE_M', 'TEAM_BAND_TOLERANCE_P2_M', 'TEAM_BAND_TOLERANCE_P1_M', 'SIGNED_URL_TTL_S',
     'SCHEDULER_ENABLED', 'RESOLUTION_RECOVERY_ENABLED', 'INTROSPECT_TIMEOUT_MS', 'GEMINI_API_KEYS', 'GEMINI_API_KEY', 'GEMINI_MODEL',
     'GEMINI_MAX_RETRIES', 'GEMINI_DAILY_CALL_LIMIT', 'GEMINI_BACKFILL_OPEN_REQUESTS',
+    'OLLAMA_BASE_URL', 'OLLAMA_MODEL', 'OLLAMA_TIMEOUT_MS', 'OLLAMA_NUM_CTX', 'AI_FALLBACK_HEDGE_MS',
   ],
   'logistics-api': [
     'NODE_ENV', 'PORT', 'DATABASE_URL', 'DB_POOL_MAX', 'DB_LOCK_TIMEOUT_MS', 'DB_STATEMENT_TIMEOUT_MS', 'LOG_LEVEL', 'C48_SCHEMA_DIR',
@@ -48,6 +49,7 @@ const expectedEnvironment = {
   nginx: ['SOS_SOFT_LIMIT_PER_IP', 'SOS_HARD_LIMIT_PER_IP', 'NGINX_ENVSUBST_FILTER'],
   minio: ['MINIO_ROOT_USER', 'MINIO_ROOT_PASSWORD'],
   'minio-init': ['MINIO_ROOT_USER', 'MINIO_ROOT_PASSWORD', 'S3_RESPONSE_ACCESS_KEY', 'S3_RESPONSE_SECRET_KEY', 'S3_LOGISTICS_ACCESS_KEY', 'S3_LOGISTICS_SECRET_KEY'],
+  ollama: ['OLLAMA_HOST', 'OLLAMA_NUM_PARALLEL', 'OLLAMA_MAX_LOADED_MODELS', 'OLLAMA_MAX_QUEUE', 'OLLAMA_KEEP_ALIVE', 'OLLAMA_NO_CLOUD'],
   prometheus: [],
   alertmanager: ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID'],
   'node-exporter': [],
@@ -125,7 +127,11 @@ assert.equal(compose.services.grafana.ports[0].host_ip, '127.0.0.1', 'Grafana mu
 assert.equal(compose.services.web.ports?.length ?? 0, 0, 'web must be reachable only through the Nginx ingress');
 assert.equal(compose.services.nginx.depends_on.web.condition, 'service_healthy');
 
-assert.deepEqual(Object.keys(compose.volumes).sort(), ['alertmanager-data', 'grafana-data', 'minio-data', 'pgdata', 'prometheus-data'], 'C48 must keep its stable volumes');
+assert.deepEqual(compose.services.ollama.profiles, ['ai-fallback'], 'Ollama must run only in the ai-fallback profile');
+assert.match(compose.services.ollama.image, /@sha256:[0-9a-f]{64}$/u, 'Ollama image must be pinned by digest');
+assert.equal(compose.services.ollama.ports?.length ?? 0, 0, 'Ollama must not publish a host port');
+assert.ok(compose.services.ollama.mem_limit, 'Ollama must set mem_limit');
+assert.deepEqual(Object.keys(compose.volumes).sort(), ['alertmanager-data', 'grafana-data', 'minio-data', 'ollama-data', 'pgdata', 'prometheus-data'], 'C48 must keep its stable volumes');
 assert.equal(compose.volumes.pgdata.name, 'c48_pgdata', 'PostgreSQL data must use the stable C48 volume');
 assert.equal(compose.volumes['minio-data'].name, 'c48_minio-data', 'MinIO data must use the stable C48 volume');
 assert.deepEqual(Object.keys(compose.networks), ['c48-internal'], 'all services must share the stable C48 network');

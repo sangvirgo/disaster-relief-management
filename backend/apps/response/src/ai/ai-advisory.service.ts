@@ -6,6 +6,7 @@ import { buildAiAssessmentInput } from './ai-risk';
 import { enqueueAiAdvisory, isAiAdvisoryFresh } from './ai-advisory-input';
 import { geminiOutcomeForStatus, recordGeminiAttempt } from '@c48/technical';
 import { getGeminiApiKeys } from './gemini-api-keys';
+import { callOllamaJson, getOllamaFallbackConfig, hedgeWithFallback, OllamaCallError } from '@c48/technical/ai/ollama-json-client';
 import { WeatherService } from '../weather/weather.service';
 
 interface AdvisoryJob {
@@ -158,6 +159,8 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
   private backfillTimer?: NodeJS.Timeout;
   private running = false;
   private providerCooldownUntil = 0;
+  /** Local fallback model (Ollama); null when OLLAMA_BASE_URL or OLLAMA_MODEL is empty. */
+  private readonly fallback = getOllamaFallbackConfig();
 
   constructor(@InjectDataSource() private readonly dataSource: DataSource, private readonly weather?: WeatherService) {}
 
@@ -230,12 +233,14 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async processOne(): Promise<void> {
-    if (this.running || Date.now() < this.providerCooldownUntil) return;
+    // While Gemini cools down after 429/503, the local fallback (when configured) serves one job at a time.
+    const fallbackOnly = Date.now() < this.providerCooldownUntil;
+    if (this.running || (fallbackOnly && !this.fallback)) return;
     this.running = true;
     try {
-      const jobs = await this.claimBatch();
+      const jobs = fallbackOnly ? await this.claimJob(true).then((job) => (job ? [job] : [])) : await this.claimBatch();
       if (!jobs.length) return;
-      const outcomes = await this.runBatch(jobs);
+      const outcomes = await this.runBatch(jobs, fallbackOnly);
       for (const [index, job] of jobs.entries()) await this.settle(job, outcomes[index]!);
     } catch {
       this.logger.warn('AI_ADVISORY_CLAIM_FAILED');
@@ -257,13 +262,15 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
     return jobs;
   }
 
-  private async runBatch(jobs: AdvisoryJob[]): Promise<Array<Record<string, unknown> | Error>> {
+  private async runBatch(jobs: AdvisoryJob[], fallbackOnly = false): Promise<Array<Record<string, unknown> | Error>> {
     try {
       const weathers = await Promise.all(jobs.map((job) => this.weatherContext(job)));
       const texts = jobs.map((job, index) => JSON.stringify({ sos: buildAiAssessmentInput(job), weather: weathers[index] }));
-      const values: Array<Record<string, unknown> | Error> = jobs.length === 1
-        ? [await this.extract(jobs[0]!, texts[0]!)]
-        : await this.extractBatch(jobs, texts);
+      const values: Array<Record<string, unknown> | Error> = fallbackOnly
+        ? [await this.fallbackExtract(texts[0]!)]
+        : jobs.length === 1
+          ? [await this.extract(jobs[0]!, texts[0]!)]
+          : await this.extractBatch(jobs, texts);
       return values.map((value, index) => {
         if (value instanceof Error) return value;
         value.weather_context = weathers[index];
@@ -277,9 +284,12 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
 
   private async settle(job: AdvisoryJob, outcome: Record<string, unknown> | Error): Promise<void> {
     if (!(outcome instanceof Error)) {
+      // A result from the local fallback records that model, so the coordinator view can label it.
+      const model = outcome.ai_source === 'FALLBACK' ? this.fallback?.model ?? null : null;
       await this.persistResult(job.id,
-        `UPDATE ai_advisory SET status='COMPLETED',extracted_json=$2::jsonb,error_code=NULL,completed_at=now(),lease_until=NULL,claim_token=NULL
-          WHERE id=$1 AND status='PROCESSING' AND claim_token=$3 AND lease_until>now()`, [job.id, JSON.stringify(outcome), job.claim_token]);
+        `UPDATE ai_advisory SET status='COMPLETED',extracted_json=$2::jsonb,error_code=NULL,completed_at=now(),lease_until=NULL,claim_token=NULL,
+                model=COALESCE($4,model)
+          WHERE id=$1 AND status='PROCESSING' AND claim_token=$3 AND lease_until>now()`, [job.id, JSON.stringify(outcome), job.claim_token, model]);
       return;
     }
     const error = outcome;
@@ -287,8 +297,7 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
     const code = invalidOutput ? 'AI_INVALID_OUTPUT' : 'AI_PROVIDER_ERROR';
     const providerStatus = /^AI_PROVIDER_(?:RETRYABLE|ERROR):(\d{3}|NETWORK)$/u.exec(error.message)?.[1];
     const retryableProviderError = error.message.startsWith('AI_PROVIDER_RETRYABLE:');
-    if (providerStatus === '429') this.providerCooldownUntil = Date.now() + 15 * 60_000;
-    else if (providerStatus === '503') this.providerCooldownUntil = Date.now() + 60_000;
+    this.noteProviderFailure(error);
     if (retryableProviderError && job.attempts <= maxRetries()) {
       const delaySeconds = retryDelaySeconds(job.attempts);
       this.logger.warn(
@@ -304,6 +313,13 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
     await this.persistResult(job.id,
       `UPDATE ai_advisory SET status='FAILED',error_code=$2,completed_at=now(),lease_until=NULL,claim_token=NULL
         WHERE id=$1 AND status='PROCESSING' AND claim_token=$3 AND lease_until>now()`, [job.id, code, job.claim_token]);
+  }
+
+  /** Gemini quota (429) or overload (503) pauses Gemini calls; the fallback, when configured, keeps serving. */
+  private noteProviderFailure(error: Error): void {
+    const providerStatus = /^AI_PROVIDER_(?:RETRYABLE|ERROR):(\d{3}|NETWORK)$/u.exec(error.message)?.[1];
+    if (providerStatus === '429') this.providerCooldownUntil = Date.now() + 15 * 60_000;
+    else if (providerStatus === '503') this.providerCooldownUntil = Date.now() + 60_000;
   }
 
   private async persistResult(jobId: string, sql: string, parameters: unknown[]): Promise<void> {
@@ -394,8 +410,8 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
       }
       const claimToken = randomUUID();
       await manager.query(
-        "UPDATE ai_advisory SET status='PROCESSING',attempts=attempts+1,prompt_version='v6',lease_until=now()+interval '45 seconds',claim_token=$2 WHERE id=$1 AND status='QUEUED'",
-        [job.id, claimToken],
+        "UPDATE ai_advisory SET status='PROCESSING',attempts=attempts+1,prompt_version='v6',lease_until=now()+($3 * interval '1 second'),claim_token=$2 WHERE id=$1 AND status='QUEUED'",
+        [job.id, claimToken, this.leaseSeconds()],
       );
       job.attempts = Number(job.attempts) + 1;
       job.claim_token = claimToken;
@@ -418,18 +434,53 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /** Gemini calls end within 35 s; the fallback may run up to its own timeout after the hedge delay. */
+  private leaseSeconds(): number {
+    return this.fallback ? 45 + Math.ceil((this.fallback.hedgeMs + this.fallback.timeoutMs) / 1000) : 45;
+  }
+
   private async extract(job: AdvisoryJob, text: string): Promise<Record<string, unknown>> {
+    let primaryError: Error | undefined;
+    const primary = async (): Promise<Record<string, unknown>> => {
+      try {
+        const body = JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: `${ADVISORY_INSTRUCTIONS}\n\nDữ kiện:\n${text}` }] }],
+          generationConfig: { responseMimeType: 'application/json', responseSchema, temperature: 0, maxOutputTokens: 2048 },
+        });
+        const value = normalizeExtraction(await this.generate(job.model, body, 15_000));
+        if (!this.validExtraction(value)) throw new Error('AI_INVALID_OUTPUT');
+        return value;
+      } catch (error) {
+        throw (primaryError = providerFailure(error));
+      }
+    };
+    const { value, source } = await hedgeWithFallback(primary, this.fallbackCall(text), this.fallback?.hedgeMs ?? 0);
+    if (source === 'FALLBACK' && primaryError) this.noteProviderFailure(primaryError);
+    return value;
+  }
+
+  private fallbackCall(text: string): ((signal: AbortSignal) => Promise<Record<string, unknown>>) | null {
+    return this.fallback ? (signal) => this.fallbackExtract(text, signal) : null;
+  }
+
+  /**
+   * One SOS on the local fallback model, with the same instructions and the same validation as Gemini. The result is
+   * marked `ai_source: FALLBACK`; a coordinator still reviews it like any advisory.
+   */
+  private async fallbackExtract(text: string, signal?: AbortSignal): Promise<Record<string, unknown>> {
+    if (!this.fallback) throw new Error('AI_PROVIDER_ERROR:503');
+    let raw: unknown;
     try {
-      const body = JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: `${ADVISORY_INSTRUCTIONS}\n\nDữ kiện:\n${text}` }] }],
-        generationConfig: { responseMimeType: 'application/json', responseSchema, temperature: 0, maxOutputTokens: 2048 },
+      raw = await callOllamaJson({
+        config: this.fallback, signal, responseSchema, maxOutputTokens: 1024,
+        prompt: `${ADVISORY_INSTRUCTIONS}\n\nDữ kiện:\n${text}`,
       });
-      const value = normalizeExtraction(await this.generate(job.model, body, 15_000));
-      if (!this.validExtraction(value)) throw new Error('AI_INVALID_OUTPUT');
-      return value;
     } catch (error) {
-      throw providerFailure(error);
+      throw new Error(error instanceof OllamaCallError && error.kind === 'INVALID_OUTPUT' ? 'AI_INVALID_OUTPUT' : 'AI_PROVIDER_RETRYABLE:NETWORK');
     }
+    const value = normalizeExtraction(raw);
+    if (!this.validExtraction(value)) throw new Error('AI_INVALID_OUTPUT');
+    return { ...value, ai_source: 'FALLBACK' };
   }
 
   /**
@@ -437,6 +488,21 @@ export class AiAdvisoryService implements OnModuleInit, OnModuleDestroy {
    * one malformed item fails only that job instead of the whole batch.
    */
   private async extractBatch(jobs: AdvisoryJob[], texts: string[]): Promise<Array<Record<string, unknown> | Error>> {
+    // The small fallback model takes one SOS: if the batch call fails, it answers the first job and the others keep
+    // the Gemini error (requeued or cooled down as before).
+    let primaryError: Error | undefined;
+    const primary = () => this.extractBatchPrimary(jobs, texts).catch((error: unknown) => {
+      throw (primaryError = error instanceof Error ? error : providerFailure(error));
+    });
+    const fallback = this.fallbackCall(texts[0]!);
+    const { value, source } = await hedgeWithFallback<Array<Record<string, unknown> | Error>>(
+      primary, fallback ? (signal) => fallback(signal).then((first) => [first]) : null, this.fallback?.hedgeMs ?? 0);
+    if (source === 'PRIMARY' || !primaryError) return value;
+    this.noteProviderFailure(primaryError);
+    return [value[0]!, ...jobs.slice(1).map(() => primaryError!)];
+  }
+
+  private async extractBatchPrimary(jobs: AdvisoryJob[], texts: string[]): Promise<Array<Record<string, unknown> | Error>> {
     try {
       const items = texts.map((text, index) => ({ id: `S${index + 1}`, data: JSON.parse(text) as unknown }));
       const body = JSON.stringify({

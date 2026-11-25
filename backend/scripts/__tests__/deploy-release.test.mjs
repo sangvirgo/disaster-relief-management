@@ -188,6 +188,37 @@ test('the observability profile is started only when C48_OBSERVABILITY=on, and i
   } finally { on.cleanup(); }
 });
 
+test('the AI fallback starts and pulls its model only when C48_AI_FALLBACK=on, and never fails the release', () => {
+  const off = sandbox();
+  try {
+    assert.equal(off.run('deploy', 'aaa').status, 0);
+    const log = readFileSync(off.calls, 'utf8');
+    assert.doesNotMatch(log, /--profile ai-fallback (?:pull|up|exec)/u);
+    assert.match(log, /--profile ai-fallback stop ollama/u, 'turning it off frees the memory');
+  } finally { off.cleanup(); }
+
+  const on = sandbox();
+  try {
+    writeFileSync(join(on.root, 'backend/.env'), `${readFileSync(join(on.root, 'backend/.env'), 'utf8')}C48_AI_FALLBACK=on\nOLLAMA_BASE_URL=http://ollama:11434\nOLLAMA_MODEL=qwen3.5:0.8b-q8_0\n`);
+    const result = on.run('deploy', 'aaa', { C48_AI_FALLBACK_MIN_FREE_GB: '0' });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    const log = readFileSync(on.calls, 'utf8');
+    assert.match(log, /--profile ai-fallback pull --quiet ollama/u);
+    assert.match(log, /--profile ai-fallback up --no-build -d --wait --wait-timeout 1 ollama/u);
+    assert.match(log, /--profile ai-fallback exec -T ollama ollama pull qwen3\.5:0\.8b-q8_0/u);
+    assert.match(result.stdout, /AI fallback is up with qwen3\.5:0\.8b-q8_0/u);
+  } finally { on.cleanup(); }
+
+  const full = sandbox();
+  try {
+    writeFileSync(join(full.root, 'backend/.env'), `${readFileSync(join(full.root, 'backend/.env'), 'utf8')}C48_AI_FALLBACK=on\nOLLAMA_MODEL=qwen3.5:0.8b-q8_0\n`);
+    const result = full.run('deploy', 'aaa', { C48_AI_FALLBACK_MIN_FREE_GB: '999999' });
+    assert.equal(result.status, 0, 'a full disk must not fail the release');
+    assert.doesNotMatch(readFileSync(full.calls, 'utf8'), /--profile ai-fallback pull/u);
+    assert.match(result.stdout, /the AI fallback was not started/u);
+  } finally { full.cleanup(); }
+});
+
 test('a release recreates nginx after starting the stack so it sees the new bind-mounted file', () => {
   const box = sandbox();
   try {
