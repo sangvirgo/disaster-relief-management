@@ -22,6 +22,7 @@ type Drive = {
 };
 type Dialog =
   | { kind: 'edit-warehouse'; warehouse: Warehouse }
+  | { kind: 'opening-stock'; warehouse: Warehouse }
   | { kind: 'new-drive'; warehouseId?: string; location?: { latitude: number; longitude: number } }
   | { kind: 'edit-drive'; drive: Drive }
   | { kind: 'drive-action'; drive: Drive; action: 'pause' | 'close' };
@@ -263,6 +264,7 @@ export function WarehouseMapManager({ canManage, canManageDrives, warehouseOptio
     </>}
   </> : hoveredWarehouse?.id ? <>
     {canManage && <button type="button" className="button secondary small" onClick={() => void openWarehouseEdit(hoveredWarehouse)}>Sửa kho</button>}
+    {canManage && <button type="button" className="button secondary small" onClick={() => setDialog({ kind: 'opening-stock', warehouse: hoveredWarehouse })}>Khai báo tồn đầu kỳ</button>}
     {canManageDrives && <button type="button" className="button small" onClick={() => setDialog({ kind: 'new-drive', warehouseId: hoveredWarehouse.id })}>+ Đợt quyên góp</button>}
   </> : null;
   const hoverCard = hovered && hoveredWarehouse?.id && hoveredWarehouse.name
@@ -290,9 +292,19 @@ export function WarehouseMapManager({ canManage, canManageDrives, warehouseOptio
       </div>
     </div>
     {dialog && <DetailSurface modal open onClose={() => setDialog(null)} className="operations-management-dialog"
-      heading={dialog.kind === 'edit-warehouse' ? 'Sửa kho' : dialog.kind === 'new-drive' ? 'Thêm đợt quyên góp' : dialog.kind === 'edit-drive' ? 'Sửa đợt quyên góp' : dialog.action === 'pause' ? 'Tạm dừng đợt quyên góp' : 'Đóng đợt quyên góp'}
+      heading={dialog.kind === 'edit-warehouse' ? 'Sửa kho' : dialog.kind === 'opening-stock' ? 'Khai báo tồn đầu kỳ' : dialog.kind === 'new-drive' ? 'Thêm đợt quyên góp' : dialog.kind === 'edit-drive' ? 'Sửa đợt quyên góp' : dialog.action === 'pause' ? 'Tạm dừng đợt quyên góp' : 'Đóng đợt quyên góp'}
       label="Quản lý kho và đợt quyên góp">
       {dialog.kind === 'edit-warehouse' && <CommandForm key={`wh-${dialog.warehouse.id}-${dialog.warehouse.version}`} spec={warehouseSpec(dialog.warehouse)} onSuccess={refresh} onStale={refresh} />}
+      {dialog.kind === 'opening-stock' && <CommandForm key={`opening-${dialog.warehouse.id}`} onSuccess={refresh}
+        spec={{ title: 'Khai báo tồn đầu kỳ', hideTitle: true, service: 'logistics', method: 'POST', path: '/stock/opening',
+          fields: [
+            { name: 'item_id', label: 'Vật phẩm', type: 'select', required: true, options: items, searchable: true },
+            { name: 'quantity', label: 'Số lượng nhập đầu kỳ', type: 'number', required: true, min: 0.000001, scaleFor: (values) => Number(itemScales.find((item) => item.value === values.item_id)?.label ?? 0) },
+            { name: 'note', label: 'Ghi chú nguồn tồn đầu kỳ', type: 'textarea', required: true, maxLength: 1000 },
+          ],
+          warning: `Ghi nhận số lượng thực tế vào ${dialog.warehouse.name}. Thao tác sẽ tạo bút toán tồn kho có lưu vết.`,
+          build: (values) => ({ warehouse_id: dialog.warehouse.id, lines: [{ item_id: values.item_id, quantity: values.quantity }], note: values.note.trim() }),
+        }} />}
       {dialog.kind === 'new-drive' && <DriveCreateForm warehouses={warehouseOptions} campaigns={campaigns} items={items} itemScales={itemScales} lockedWarehouseId={dialog.warehouseId} areaFor={areaFor} initialLocation={dialog.location} onSuccess={refresh} />}
       {dialog.kind === 'edit-drive' && <DriveCreateForm warehouses={warehouseOptions} campaigns={campaigns} items={items} itemScales={itemScales} lockedWarehouseId={dialog.drive.intake_warehouse_id} areaFor={areaFor} edit={driveEdit(dialog.drive)} onSuccess={refresh} />}
       {dialog.kind === 'drive-action' && <CommandForm key={`${dialog.action}-${dialog.drive.id}-${dialog.drive.version}`} onSuccess={refresh} onStale={refresh}

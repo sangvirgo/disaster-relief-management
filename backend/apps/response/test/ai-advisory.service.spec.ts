@@ -69,7 +69,15 @@ describe('AI advisory worker lifecycle', () => {
       expect(fetch).toHaveBeenCalledTimes(fixtures.indexOf(fixture) + 1);
       const requestBody = JSON.parse(String(fetch.mock.calls.at(-1)?.[1]?.body)) as Record<string, unknown>;
       expect((requestBody.generationConfig as Record<string, unknown>).maxOutputTokens).toBe(2048);
-      expect(JSON.stringify(requestBody.contents)).toContain('không gọi dự báo là thời tiết hiện tại');
+      expect(JSON.stringify(requestBody.contents)).toContain('dự báo 24 giờ tới');
+      expect(JSON.stringify(requestBody.contents)).toContain('không viết thành mưa hoặc gió đã xảy ra trong 24 giờ qua');
+      expect(JSON.stringify(requestBody.contents)).toContain('Weather_impact gồm đúng 2 câu ngắn');
+      expect(JSON.stringify(requestBody.contents)).toContain('Gắn triệu chứng và nhu cầu với đúng nhóm');
+      expect(JSON.stringify(requestBody.contents)).toContain('không tự đổi thành');
+      expect(JSON.stringify(requestBody.contents)).toContain('không hướng dẫn điều phối viên làm gì');
+      expect(JSON.stringify(requestBody.contents)).toContain('không ghép các trường dữ liệu bằng dấu phẩy');
+      expect(JSON.stringify(requestBody.contents)).toContain('không viết họ mắc kẹt tại tầng trệt');
+      expect(JSON.stringify(requestBody.contents)).toContain('thuộc P1 (70–100)');
       const completed = query.mock.calls.find(([sql]) => String(sql).includes("status='COMPLETED'"));
       expect(completed).toBeDefined();
       expect(String(completed?.[0])).toContain('claim_token=$3');

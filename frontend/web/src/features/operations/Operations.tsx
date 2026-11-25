@@ -203,7 +203,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           }));
       });
       if (!options.warehouses?.length) {
-        const driveResult = results[3];
+        const driveResult = results[1];
         if (driveResult.status === 'fulfilled') {
           options.driveWarehouses = driveResult.value
             .filter((drive) => drive.id && string(drive.intake_warehouse_id))
@@ -212,7 +212,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           for (const drive of driveResult.value) {
             const warehouseId = string(drive.intake_warehouse_id);
             if (warehouseId && !byWarehouse.has(warehouseId)) {
-              byWarehouse.set(warehouseId, `Kho tiếp nhận · …${warehouseId.slice(-8)}`);
+              byWarehouse.set(warehouseId, string(drive.warehouse_name) || `Kho tiếp nhận · …${warehouseId.slice(-8)}`);
             }
           }
           options.warehouses = [...byWarehouse].map(([value, label]) => ({ value, label }));

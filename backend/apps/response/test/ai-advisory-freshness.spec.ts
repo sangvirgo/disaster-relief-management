@@ -36,7 +36,7 @@ describe('advisory input identity and review', () => {
     const query = jest.fn(async (sql: string) => sql.includes('SELECT r.version') ? [facts] : []);
     await enqueueAiAdvisory({ query } as never, 'request');
     expect(query.mock.calls[1]?.[0]).toContain('INSERT INTO ai_advisory');
-    expect(query.mock.calls[1]?.[0]).toContain("'v6','v5'");
+    expect(query.mock.calls[1]?.[0]).toContain("'v19','v5'");
     expect((query.mock.calls[1] as unknown as [string, unknown[]])[1].slice(0, 3)).toEqual(['request', 4, aiAssessmentHash(facts, 4, 1)]);
   });
 

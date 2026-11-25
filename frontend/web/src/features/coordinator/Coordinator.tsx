@@ -80,6 +80,9 @@ function reliefDescription(description: string | null | undefined) {
     items: match?.[1].trim() || '',
   };
 }
+function weatherImpactText(value: string | null | undefined) {
+  return (value ?? '').replace(/(?:,\s*(?:đòi hỏi\s+)?|[.!?]\s*)(?:[Đđ]iều phối viên cần|[Cc]ần xác minh)[^.!?]*[.!?]?$/u, '.').trim();
+}
 type AiPriorityAdvisory = {
   status: string;
   suggested_priority?: 'P1' | 'P2' | 'P3' | 'P4' | null;
@@ -494,11 +497,6 @@ const advisoryLevelLabels: Record<string, string> = {
   ELEVATED: 'Cần ưu tiên rà soát',
   STANDARD: 'Theo dõi thông thường',
 };
-const advisoryReviewLabels: Record<string, string> = {
-  ACCEPTED: 'Ghi nhận',
-  ADJUSTED: 'Điều chỉnh',
-  REJECTED: 'Không sử dụng',
-};
 const advisoryStatusLabels: Record<string, string> = {
   QUEUED: 'Đang chờ AI đánh giá',
   PROCESSING: 'AI đang đánh giá',
@@ -565,8 +563,6 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
   const [error, setError] = useState('');
   const [detailError, setDetailError] = useState('');
   const [updateMessage, setUpdateMessage] = useState('');
-  const [aiReviewNote, setAiReviewNote] = useState('');
-  const [aiReviewBusy, setAiReviewBusy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [revision, setRevision] = useState(0);
   const [detailRevision, setDetailRevision] = useState(0);
@@ -915,60 +911,6 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
       <button type="button" className="button secondary" disabled aria-describedby="sos-ai-resubmit-reason">{title}</button>
       <small id="sos-ai-resubmit-reason">{reason}</small>
     </div>;
-  }
-  async function reviewAiAdvisory(decision: 'ACCEPTED' | 'ADJUSTED' | 'REJECTED') {
-    if (!detail?.ai_advisory || detail.ai_priority_advisory?.status !== 'COMPLETED') return;
-    if (decision === 'ADJUSTED' && !aiReviewNote.trim()) {
-      setError('Vui lòng ghi nội dung điều chỉnh trước khi lưu quyết định.');
-      return;
-    }
-    setAiReviewBusy(true);
-    setError('');
-    try {
-      await api(
-        'response',
-        `/requests/${detail.id}/ai-advisories/${detail.ai_advisory.id}/review`,
-        {
-          method: 'POST',
-          body: {
-            decision,
-            expected_version: detail.version,
-            ...(aiReviewNote.trim() ? { note: aiReviewNote.trim() } : {}),
-          },
-          idempotencyKey: newCommandKey(),
-        }
-      );
-      setAiReviewNote('');
-      done();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Không thể lưu quyết định rà soát AI.');
-      if (cause instanceof ApiError && cause.status === 409) refreshAfterConflict();
-    } finally {
-      setAiReviewBusy(false);
-    }
-  }
-  function aiReviewPanel() {
-    const advisory = detail?.ai_advisory;
-    if (advisory?.status !== 'COMPLETED' || detail?.ai_priority_advisory?.status !== 'COMPLETED') return null;
-    if (advisory.review_status) return <p className="sos-ai-review-result">
-      <strong>Rà soát AI:</strong>{' '}
-      {advisoryReviewLabels[advisory.review_status] || 'Đã rà soát'}
-      {advisory.review_note ? ` · ${advisory.review_note}` : ''}
-    </p>;
-    return <details className="sos-ai-card__review">
-      <summary>Rà soát gợi ý AI</summary>
-      <div className="sos-ai-card__review-content">
-        <label className="ai-review-note">
-          <span>Ghi chú khi điều chỉnh hoặc bác bỏ</span>
-          <textarea rows={2} value={aiReviewNote} onChange={(event) => setAiReviewNote(event.target.value)} maxLength={1000} />
-        </label>
-        <div className="action-grid">
-          <button className="button" disabled={aiReviewBusy} onClick={() => void reviewAiAdvisory('ACCEPTED')}>Ghi nhận gợi ý</button>
-          <button className="button secondary" disabled={aiReviewBusy} onClick={() => void reviewAiAdvisory('ADJUSTED')}>Điều chỉnh và ghi nhận</button>
-          <button className="button secondary" disabled={aiReviewBusy} onClick={() => void reviewAiAdvisory('REJECTED')}>Không sử dụng gợi ý</button>
-        </div>
-      </div>
-    </details>;
   }
   const aiFacts = detail?.ai_advisory?.extracted_json?.facts;
   const hasReadyEvidence = Boolean(detail?.evidence?.items.some((item) => item.state === 'READY'));
@@ -1360,7 +1302,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                       {detail.ai_advisory.extracted_json.ai_source === 'FALLBACK' ? ' (mô hình dự phòng)' : ''}:
                     </strong>{' '}
                     {detail.ai_advisory.extracted_json.summary}
-                    {detail.ai_advisory.extracted_json.weather_impact && <> Thời tiết: {detail.ai_advisory.extracted_json.weather_impact}</>}
+                    {weatherImpactText(detail.ai_advisory.extracted_json.weather_impact) && <> Thời tiết: {weatherImpactText(detail.ai_advisory.extracted_json.weather_impact)}</>}
                   </p>
                 )}
                 <div className={`sos-decision__actions${ft.eligible ? '' : ' sos-decision__actions--single'}`} key={`${aiStatus ?? 'NONE'}:${detail.ai_advisory?.id ?? ''}`}>
@@ -1400,7 +1342,6 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                   <strong>Cần đối chiếu số người:</strong>
                   {aiCountMismatches.map(key => <p key={key}>{advisoryFactLabels[key]} — hồ sơ: {detail.subject[key] ?? 'Chưa rõ'}; AI: {String(aiFacts?.[key])}.</p>)}
                 </div>}
-                {aiReviewPanel()}
               </section>
               );
             })()}
@@ -1425,7 +1366,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                       </p>
                       {extracted?.summary && <p>{extracted.summary}</p>}
                       {ai.reasons.length > 0 && <p className="muted">Căn cứ: {ai.reasons.join(' · ')}</p>}
-                      {extracted?.weather_impact && <p className="muted">Thời tiết: {extracted.weather_impact}</p>}
+                      {weatherImpactText(extracted?.weather_impact) && <p className="muted">Thời tiết: {weatherImpactText(extracted?.weather_impact)}</p>}
                       {extracted?.ai_source === 'FALLBACK' && (
                         <p className="muted">
                           Kết quả từ mô hình dự phòng chạy nội bộ do mô hình chính không phản hồi. Mô hình nhỏ nên độ chính xác thấp hơn; hãy đối chiếu kỹ với lời kể trước khi quyết định.
@@ -1447,7 +1388,6 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                     {aiCountMismatches.map(key => <p key={key}>{advisoryFactLabels[key]} — hồ sơ: {detail.subject[key] ?? 'Chưa rõ'}; AI: {String(aiFacts?.[key])}.</p>)}
                   </div>}
                   <p className="sos-ai-card__note">Chỉ để tham khảo — điều phối viên quyết định mức ưu tiên và giao đội.</p>
-                  {aiReviewPanel()}
                 </section>
               );
             })()}

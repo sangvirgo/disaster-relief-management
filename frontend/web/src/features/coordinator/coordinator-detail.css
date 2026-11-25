@@ -45,14 +45,6 @@
 .sos-profile__facts dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
 .sos-profile__duplicate, .sos-profile__note { margin: var(--space-4) 0 0; }
 .sos-detail-content .sos-ai-card { margin: 0; }
-.sos-ai-card__review { border-top: 1px solid var(--color-primary-border); padding-top: var(--space-3); }
-.sos-ai-card__review > summary { cursor: pointer; color: var(--color-primary-dark); font-weight: 700; }
-.sos-ai-card__review > summary:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 3px; }
-.sos-ai-card__review-content { padding-top: var(--space-3); }
-.sos-ai-review-result { margin: 0; padding-top: var(--space-2); border-top: 1px solid var(--color-primary-border); color: var(--color-text-secondary); }
-.sos-ai-card__review .ai-review-note { display: grid; gap: var(--space-2); }
-.sos-ai-card__review .action-grid { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
-.sos-ai-card__review .action-grid .button { flex: 1 1 160px; white-space: normal; }
 .sos-start-verification { width: min(100%, 240px); align-self: start; }
 .sos-start-verification .command-form { margin: 0; padding: 0; border: 0; }
 .sos-start-verification .command-form > .button { width: 100%; min-height: 44px; height: 44px; padding: 8px 14px; }

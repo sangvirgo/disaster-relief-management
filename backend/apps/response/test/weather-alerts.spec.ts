@@ -1,6 +1,7 @@
-import { deriveAlerts, summarizeForecast, summarizeHourly, WEATHER_LOCATIONS } from '../src/weather/weather.service';
+import { deriveAlerts, summarizeForecast, summarizeHourly, WeatherService, WEATHER_LOCATIONS } from '../src/weather/weather.service';
 import { validationExceptionFactory } from '@c48/technical/http/validation-errors';
 import type { ValidationError } from 'class-validator';
+import { jest } from '@jest/globals';
 
 describe('weather alert derivation', () => {
   it('raises nothing for calm weather', () => {
@@ -55,6 +56,43 @@ describe('hourly series for charts', () => {
     expect(summary.hourly.gust_kmh).toHaveLength(24);
     expect(summary.hourly.rain_mm.slice(0, 3)).toEqual([1, 0, 2.3]);
     expect(summary.hourly.gust_kmh.slice(0, 3)).toEqual([10, 20, 0]);
+  });
+});
+
+describe('weather context for an SOS', () => {
+  it('uses the next 24 hours and exposes the initial temperature separately from rain and gusts', async () => {
+    const originalFetch = global.fetch;
+    const fetchMock = jest.fn(async (input: string | URL | Request) => {
+      const url = new URL(String(input));
+      expect(url.searchParams.get('forecast_hours')).toBe('24');
+      expect(url.searchParams.has('past_hours')).toBe(false);
+      expect(url.searchParams.get('hourly')).toContain('temperature_2m');
+      return { ok: true, json: async () => ({ hourly: {
+        time: Array.from({ length: 24 }, (_, hour) => `2026-11-25T${String(hour).padStart(2, '0')}:00`),
+        precipitation: Array(24).fill(2), wind_gusts_10m: Array(24).fill(30),
+        weather_code: Array(24).fill(3), temperature_2m: [28, ...Array(23).fill(26)],
+      } }) } as Response;
+    });
+    global.fetch = fetchMock as typeof fetch;
+    try {
+      const result = await new WeatherService().forecastAt(16.46, 107.59);
+      expect(result).toMatchObject({ rain_24h_mm: 48, max_gust_kmh: 30, temperature_c: 28, horizon_hours: 24 });
+    } finally { global.fetch = originalFetch; }
+  });
+});
+
+describe('GDACS storm context for an SOS', () => {
+  it('uses only current cyclone centres within 600 km and omits distant or inactive events', async () => {
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ features: [
+      { properties: { eventtype: 'TC', iscurrent: true, name: 'Bão kiểm thử', alertlevel: 'Orange' }, geometry: { type: 'Point', coordinates: [107.5, 16.5] } },
+      { properties: { eventtype: 'TC', iscurrent: false, name: 'Bão cũ' }, geometry: { type: 'Point', coordinates: [107.59, 16.46] } },
+    ] }) })) as typeof fetch;
+    try {
+      const weather = new WeatherService();
+      expect(await weather.nearbyStorm(16.46, 107.59)).toMatchObject({ name: 'Bão kiểm thử', source: 'GDACS', alert_level: 'Orange' });
+      expect(await weather.nearbyStorm(-9.35, 78.29)).toBeNull();
+    } finally { global.fetch = originalFetch; }
   });
 });
 

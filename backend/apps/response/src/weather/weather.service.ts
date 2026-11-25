@@ -37,6 +37,7 @@ export interface WeatherLocationForecast extends WeatherLocation, ForecastSummar
 
 /** Forecast for one arbitrary point (a citizen's chosen location). */
 export interface WeatherPointForecast extends ForecastSummary {
+  temperature_c: number | null;
   latitude: number;
   longitude: number;
   source: string;
@@ -45,6 +46,15 @@ export interface WeatherPointForecast extends ForecastSummary {
   horizon_hours: number;
   fetched_at: string;
   stale: boolean;
+}
+
+/** A current GDACS cyclone centre close to the SOS, not a landfall forecast or official local warning. */
+export interface NearbyStorm {
+  name: string;
+  distance_km: number;
+  alert_level: string;
+  source: 'GDACS';
+  fetched_at: string;
 }
 
 export interface WeatherSnapshot {
@@ -81,6 +91,34 @@ const HORIZON_HOURS = 24;
 const CACHE_MS = 30 * 60_000;
 const FETCH_TIMEOUT_MS = 8_000;
 const ENDPOINT = 'https://api.open-meteo.com/v1/forecast';
+const GDACS_ENDPOINT = 'https://www.gdacs.org/gdacsapi/api/events/geteventlist/EVENTS4APP?eventlist=TC';
+const STORM_RADIUS_KM = 600;
+const STORM_CACHE_MS = 15 * 60_000;
+
+interface StormCentre { name: string; latitude: number; longitude: number; alert_level: string }
+
+export function distanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const radians = (degrees: number): number => degrees * Math.PI / 180;
+  const dLat = radians(lat2 - lat1);
+  const dLon = radians(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(radians(lat1)) * Math.cos(radians(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function parseCurrentStorms(body: unknown): StormCentre[] {
+  const features = (body as { features?: unknown } | null)?.features;
+  if (!Array.isArray(features)) throw new Error('GDACS features malformed');
+  return features.flatMap((feature: unknown) => {
+    const item = feature as { properties?: Record<string, unknown>; geometry?: { type?: string; coordinates?: unknown } };
+    const properties = item?.properties;
+    const coordinates = item?.geometry?.coordinates;
+    if (properties?.eventtype !== 'TC' || String(properties.iscurrent).toLowerCase() !== 'true' ||
+        item.geometry?.type !== 'Point' || !Array.isArray(coordinates) || coordinates.length < 2 ||
+        !finite(coordinates[0]) || !finite(coordinates[1]) || Math.abs(coordinates[0]) > 180 || Math.abs(coordinates[1]) > 90) return [];
+    const name = String(properties.name || properties.eventname || `TC ${properties.eventid ?? ''}`).trim().slice(0, 80);
+    return [{ name, longitude: coordinates[0], latitude: coordinates[1], alert_level: String(properties.alertlevel ?? 'Unknown').slice(0, 20) }];
+  });
+}
 
 const CACHE_MAX_AGE_MS = CACHE_MS;
 const PROVIDER_NOTICE = {
@@ -96,6 +134,7 @@ interface HourlyBlock {
   precipitation: (number | null)[];
   wind_gusts_10m: (number | null)[];
   weather_code: (number | null)[];
+  temperature_2m?: (number | null)[];
 }
 
 const isHourly = (value: HourlyBlock | undefined): value is HourlyBlock =>
@@ -173,7 +212,35 @@ export class WeatherService {
   private inflight: Promise<WeatherSnapshot> | null = null;
   private readonly pointCache = new Map<string, { at: number; forecast: WeatherPointForecast }>();
   private readonly pointInflight = new Map<string, Promise<WeatherPointForecast>>();
+  private stormCache: { at: number; fetched_at: string; centres: StormCentre[] } | null = null;
+  private stormInflight: Promise<{ at: number; fetched_at: string; centres: StormCentre[] }> | null = null;
 
+  async nearbyStorm(latitude: number, longitude: number): Promise<NearbyStorm | null> {
+    try {
+      if (!this.stormCache || Date.now() - this.stormCache.at >= STORM_CACHE_MS) {
+        this.stormInflight ??= this.fetchCurrentStorms().finally(() => { this.stormInflight = null; });
+        this.stormCache = await this.stormInflight;
+      }
+      const closest = this.stormCache.centres.map((centre) => ({
+        centre, distance: distanceKm(latitude, longitude, centre.latitude, centre.longitude),
+      })).sort((a, b) => a.distance - b.distance)[0];
+      if (!closest || closest.distance > STORM_RADIUS_KM) return null;
+      return {
+        name: closest.centre.name, distance_km: Math.round(closest.distance),
+        alert_level: closest.centre.alert_level, source: 'GDACS', fetched_at: this.stormCache.fetched_at,
+      };
+    } catch (error) {
+      this.logger.warn(`GDACS_PROVIDER_FAILED ${error instanceof Error ? error.name : 'unknown'}`);
+      return null;
+    }
+  }
+
+  private async fetchCurrentStorms(): Promise<{ at: number; fetched_at: string; centres: StormCentre[] }> {
+    const response = await fetch(GDACS_ENDPOINT, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS), headers: { Accept: 'application/json' } });
+    if (!response.ok) throw new Error(`GDACS status ${response.status}`);
+    const centres = parseCurrentStorms(await response.json() as unknown);
+    return { at: Date.now(), fetched_at: new Date().toISOString(), centres };
+  }
   /** Public alerts. Serves the cached forecast for 30 minutes. */
   async alerts(onlyActive = false): Promise<WeatherSnapshot> {
     const snapshot = await this.snapshot();
@@ -214,6 +281,7 @@ export class WeatherService {
     if (!isHourly(hourly)) throw new Error('provider hourly block malformed');
     return {
       latitude, longitude, ...summarizeHourly(hourly),
+      temperature_c: finite(hourly.temperature_2m?.[0]) ? round1(hourly.temperature_2m[0]!) : null,
       ...PROVIDER_NOTICE, horizon_hours: HORIZON_HOURS, fetched_at: new Date().toISOString(), stale: false,
     };
   }
@@ -236,7 +304,7 @@ export class WeatherService {
     const url = new URL(ENDPOINT);
     url.searchParams.set('latitude', latitudes.join(','));
     url.searchParams.set('longitude', longitudes.join(','));
-    url.searchParams.set('hourly', 'precipitation,wind_gusts_10m,weather_code');
+    url.searchParams.set('hourly', 'precipitation,wind_gusts_10m,weather_code,temperature_2m');
     url.searchParams.set('forecast_hours', String(HORIZON_HOURS));
     url.searchParams.set('timezone', 'Asia/Bangkok');
     const controller = new AbortController();
