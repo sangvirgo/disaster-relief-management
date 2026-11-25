@@ -113,13 +113,19 @@ main() {
   [[ $PURGE -eq 0 ]] || printf 'A verified dump of the current data is kept in %s/pre-reset.\n' "$STATE_DIR"
 
   if [[ -z "${SEED_PASSWORD:-}" ]]; then # the non-interactive reset takes it from backend/.env (surrounding quotes removed)
-    SEED_PASSWORD="$(env_value SEED_PASSWORD)"
+    # The LAST line wins, like Docker Compose: the production template already has an empty `SEED_PASSWORD=` line, and
+    # an operator usually appends the real one at the end. Spaces around the key and a Windows \r are tolerated.
+    SEED_PASSWORD="$(awk '{ sub(/\r$/, "") } /^[[:space:]]*SEED_PASSWORD[[:space:]]*=/ { sub(/^[^=]*=[[:space:]]*/, ""); value = $0; found = 1 }
+      END { if (found) print value }' "$ENV_FILE")"
     if [[ "$SEED_PASSWORD" =~ ^\"(.*)\"$ || "$SEED_PASSWORD" =~ ^\'(.*)\'$ ]]; then SEED_PASSWORD="${BASH_REMATCH[1]}"; fi
   fi
   if [[ -z "${SEED_PASSWORD:-}" ]]; then
     # `|| true`: a closed stdin (the GitHub Actions button runs this through SSM) must reach the clear error below.
     read -rs -p 'Password shared by every demo account (at least 10 characters): ' SEED_PASSWORD || true
     printf '\n'
+  fi
+  if [[ ${#SEED_PASSWORD} -lt 10 ]]; then # say what was found (length only, never the value)
+    log "SEED_PASSWORD lines in backend/.env: $(grep -c '^[[:space:]]*SEED_PASSWORD[[:space:]]*=' "$ENV_FILE" || true); length used: ${#SEED_PASSWORD}" >&2
   fi
   [[ ${#SEED_PASSWORD} -ge 10 ]] || die 'the demo password must have at least 10 characters (set SEED_PASSWORD in backend/.env); nothing was changed'
 

@@ -198,7 +198,7 @@ test('the production guard refuses production, accepts development and fails clo
 
 test('the GitHub Actions reset runs without a terminal: no prompt, the password from backend/.env, optional profiles restarted', () => {
   const box = sandbox({ envText: ['NODE_ENV=production', 'C48_IMAGE_SOURCE=registry', 'PUBLIC_PORT=8080', `WEB_ALLOWED_ORIGINS=https://${HOST}`,
-    `SEED_PASSWORD="${PASSWORD}"`, 'C48_OBSERVABILITY=on', 'C48_AI_FALLBACK=on', ''].join('\n') });
+    'SEED_PASSWORD=', 'C48_OBSERVABILITY=on', 'C48_AI_FALLBACK=on', `SEED_PASSWORD = "${PASSWORD}"\r`, ''].join('\n') });
   try {
     const result = box.run(['--reset'], { env: { SEED_PASSWORD: '' } });
     assert.equal(result.status, 0, result.stdout + result.stderr);
