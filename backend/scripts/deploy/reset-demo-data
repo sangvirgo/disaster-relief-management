@@ -36,7 +36,7 @@ Usage: backend/scripts/deploy/reset-demo-data --reset [--purge-evidence]
 
 Deletes ALL data in the three C48 databases and reseeds the demo data. A verified dump of the current data is kept in
 /var/lib/c48/pre-reset (latest only). Asks you to choose the password that every demo
-account will share (or set SEED_PASSWORD in the environment or in backend/.env, at least 12 characters).
+account will share (or set SEED_PASSWORD in the environment or in backend/.env, at least 10 characters).
 USAGE
   exit 2
 }
@@ -112,13 +112,16 @@ main() {
   else printf 'MinIO/S3 objects are not touched (add --purge-evidence to empty the evidence buckets). A verified dump of the current data is kept in %s/pre-reset.\n' "$STATE_DIR"; fi
   [[ $PURGE -eq 0 ]] || printf 'A verified dump of the current data is kept in %s/pre-reset.\n' "$STATE_DIR"
 
-  SEED_PASSWORD="${SEED_PASSWORD:-$(env_value SEED_PASSWORD)}" # the non-interactive reset takes it from backend/.env
+  if [[ -z "${SEED_PASSWORD:-}" ]]; then # the non-interactive reset takes it from backend/.env (surrounding quotes removed)
+    SEED_PASSWORD="$(env_value SEED_PASSWORD)"
+    if [[ "$SEED_PASSWORD" =~ ^\"(.*)\"$ || "$SEED_PASSWORD" =~ ^\'(.*)\'$ ]]; then SEED_PASSWORD="${BASH_REMATCH[1]}"; fi
+  fi
   if [[ -z "${SEED_PASSWORD:-}" ]]; then
     # `|| true`: a closed stdin (the GitHub Actions button runs this through SSM) must reach the clear error below.
-    read -rs -p 'Password shared by every demo account (at least 12 characters): ' SEED_PASSWORD || true
+    read -rs -p 'Password shared by every demo account (at least 10 characters): ' SEED_PASSWORD || true
     printf '\n'
   fi
-  [[ ${#SEED_PASSWORD} -ge 12 ]] || die 'the demo password must have at least 12 characters; nothing was changed'
+  [[ ${#SEED_PASSWORD} -ge 10 ]] || die 'the demo password must have at least 10 characters (set SEED_PASSWORD in backend/.env); nothing was changed'
 
   mkdir -p -m 700 "$STATE_DIR"
   exec 9>"$STATE_DIR/release.lock"

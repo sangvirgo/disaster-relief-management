@@ -6,7 +6,7 @@
   ],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 2,
+  "version": 3,
   "refresh": "30s",
   "time": {
     "from": "now-6h",
@@ -2116,19 +2116,6 @@
       ]
     },
     {
-      "type": "row",
-      "title": "Chi tiết gọi AI (24 giờ qua, đếm từ cơ sở dữ liệu)",
-      "id": 46,
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 91
-      },
-      "panels": []
-    },
-    {
       "type": "stat",
       "title": "Gợi ý hoàn tất (24 giờ)",
       "description": "Số gợi ý AI cho SOS đã có kết quả trong 24 giờ qua, mọi nguồn.",
@@ -2607,7 +2594,8 @@
                 "value": null
               }
             ]
-          }
+          },
+          "noValue": "Không có lỗi"
         },
         "overrides": []
       },
@@ -2720,7 +2708,9 @@
           "custom": {
             "lineWidth": 1,
             "fillOpacity": 8
-          }
+          },
+          "min": 0,
+          "max": 1
         },
         "overrides": []
       },
@@ -2830,7 +2820,8 @@
           "custom": {
             "lineWidth": 1,
             "fillOpacity": 8
-          }
+          },
+          "noValue": "Chưa gọi Ollama"
         },
         "overrides": []
       },
@@ -2983,34 +2974,6 @@
           "format": "table"
         }
       ]
-    },
-    {
-      "type": "row",
-      "title": "Quản trị demo",
-      "id": 61,
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 118
-      },
-      "panels": []
-    },
-    {
-      "type": "text",
-      "title": "Đặt lại dữ liệu demo",
-      "id": 62,
-      "gridPos": {
-        "h": 6,
-        "w": 24,
-        "x": 0,
-        "y": 119
-      },
-      "options": {
-        "mode": "markdown",
-        "content": "**Xóa toàn bộ dữ liệu, nạp lại dữ liệu mẫu và (tuỳ chọn) xóa ảnh/video minh chứng trên S3.** Bucket sao lưu không bị đụng; một bản dump an toàn được giữ ở `/var/lib/c48/pre-reset`.\n\n1. Bấm **[▶ Mở nút đặt lại dữ liệu demo](https://github.com/sangvirgo/disaster-relief-management/actions/workflows/reset-demo.yml)** (GitHub Actions, cần quyền ghi repo và mật khẩu đặt lại).\n2. Bấm **Run workflow**, nhập mật khẩu đặt lại, giữ ô xóa ảnh S3 nếu muốn, rồi **Run workflow**.\n3. Chờ khoảng 3–5 phút. Mọi người bị đăng xuất; Grafana tạm mất kết nối trong lúc chạy.\n\nMật khẩu tài khoản demo lấy từ `SEED_PASSWORD` trong `backend/.env` trên máy chủ (ít nhất 12 ký tự)."
-      }
     }
   ],
   "templating": {
