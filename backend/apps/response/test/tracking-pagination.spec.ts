@@ -63,20 +63,20 @@ describe('reporter keyset pagination', () => {
     expect(dataSource.query.mock.calls[0]?.[0]).toContain('to_char(occurred_at AT TIME ZONE');
   });
 
-  it('limits tracking reads to ten per minute across track and event routes for each client IP', async () => {
+  it('limits tracking reads to thirty per minute across track and event routes for each client IP', async () => {
     const { service, access } = makeService([]);
     const request = { ip: '203.0.113.41', socket: { remoteAddress: '203.0.113.41' } } as never;
 
-    for (let attempt = 0; attempt < 10; attempt++) {
+    for (let attempt = 0; attempt < 30; attempt++) {
       await expect(service.track('01HJKMNPQR', request)).rejects.toMatchObject({ code: 'NOT_FOUND' });
     }
     await expect(service.events(requestId, '01HJKMNPQR', {}, request))
       .rejects.toMatchObject({ code: 'RATE_LIMITED', status: 429 });
-    expect(access.byTrackingCode).toHaveBeenCalledTimes(10);
+    expect(access.byTrackingCode).toHaveBeenCalledTimes(30);
     expect(access.forRequest).not.toHaveBeenCalled();
   });
 
-  it('limits tracking reads to sixty per hour and releases the limit when the oldest request expires', async () => {
+  it('limits tracking reads to three hundred per hour and releases the limit when the oldest request expires', async () => {
     let now = 1_000_000;
     const dateNow = jest.spyOn(Date, 'now').mockImplementation(() => now);
     try {
@@ -85,7 +85,8 @@ describe('reporter keyset pagination', () => {
 
       for (let tenMinuteWindow = 0; tenMinuteWindow < 6; tenMinuteWindow++) {
         if (tenMinuteWindow > 0) now += 10 * 60_000;
-        for (let attempt = 0; attempt < 10; attempt++) {
+        for (let attempt = 0; attempt < 50; attempt++) {
+          if (attempt > 0 && attempt % 30 === 0) now += 60_000;
           await expect(service.track('01HJKMNPQR', request)).rejects.toMatchObject({ code: 'NOT_FOUND' });
         }
       }
@@ -93,7 +94,7 @@ describe('reporter keyset pagination', () => {
       await expect(service.track('01HJKMNPQR', request)).rejects.toMatchObject({ code: 'RATE_LIMITED', status: 429 });
       now = 1_000_000 + 60 * 60_000;
       await expect(service.track('01HJKMNPQR', request)).rejects.toMatchObject({ code: 'NOT_FOUND' });
-      expect(access.byTrackingCode).toHaveBeenCalledTimes(61);
+      expect(access.byTrackingCode).toHaveBeenCalledTimes(301);
     } finally {
       dateNow.mockRestore();
     }

@@ -19,6 +19,7 @@ import { RequestOperationsService } from '../operations/request-operations.servi
 import { terminalStatuses, unverifiedStatuses } from '../operations/request-operations.helpers';
 import { assessmentFields, enqueueAiAdvisory } from '../ai/ai-advisory-input';
 import { assertRequestPermission } from '../requests/request-scope';
+import { clientRateKey } from '@c48/technical/http/client-rate-key';
 
 const recoveryCodePattern = /^[A-Za-z0-9_-]{43}$/;
 const cursorFilters = (requestId: string) => ({ request_id: requestId, visibility: 'REPORTER' });
@@ -50,12 +51,13 @@ function versionConflict(actual: number, expected: number): never {
 }
 
 function trackingClientIp(request: import('express').Request): string {
-  return request.ip || request.socket?.remoteAddress || 'unknown';
+  return clientRateKey(request.ip || request.socket?.remoteAddress);
 }
 
 @Injectable()
 export class TrackingService {
-  private readonly readRateLimiter = new TrackingReadRateLimiter();
+  // Lookups need the unguessable tracking code, so families sharing one IPv4 address get a generous budget.
+  private readonly readRateLimiter = new TrackingReadRateLimiter(30, 300);
 
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
@@ -72,18 +74,6 @@ export class TrackingService {
   ): Promise<Record<string, unknown>> {
     this.readRateLimiter.assertAllowed(trackingClientIp(request));
     const row = await this.access.byTrackingCode(trackingCode);
-    return this.trackingView(row);
-  }
-
-  async trackByPhone(
-    phone: string,
-    request: import('express').Request,
-  ): Promise<Record<string, unknown>> {
-    const normalizedPhone = requestSearchTerms(phone).reporterPhone;
-    if (!normalizedPhone) throw new AppError('VALIDATION_FAILED', { status: 400, fieldErrors: { phone: ['PHONE_INVALID'] } });
-    this.readRateLimiter.assertAllowed(trackingClientIp(request));
-    this.readRateLimiter.assertAllowed(`phone:${normalizedPhone}`);
-    const row = await this.access.byReporterPhone(normalizedPhone);
     return this.trackingView(row);
   }
 

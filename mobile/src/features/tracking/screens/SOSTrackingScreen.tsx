@@ -43,8 +43,6 @@ import {
   getTrackingSecretError,
   isValidTrackingCode,
   isValidTrackingSecret,
-  isValidPhone,
-  normalizePhone,
   TRACKING_CODE_MAX_LENGTH,
 } from '../../../utils/formValidation';
 import { getEvidenceSizeLimitBytes, getSupportedEvidenceMimeType } from '../../../utils/evidence';
@@ -107,7 +105,6 @@ export const SOSTrackingScreen: React.FC = () => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   const [trackingCode, setTrackingCode] = useState<string>('');
-  const [trackingSearchMode, setTrackingSearchMode] = useState<'code' | 'phone'>('code');
   const [data, setData] = useState<RequestTrackingDetail | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -239,36 +236,27 @@ export const SOSTrackingScreen: React.FC = () => {
 
   const fetchTrackingData = useCallback(async (codeInput?: string) => {
     const input = (codeInput ?? trackingCode).trim();
-    const normalizedCode = trackingSearchMode === 'code' ? input.toUpperCase() : input;
+    const normalizedCode = input.toUpperCase();
     setUploadedEvidence([]);
     setEventsCursor(undefined);
     setEventsMore(false);
     if (!normalizedCode) {
       setLoading(false);
       setData(null);
-      setErrorMsg(trackingSearchMode === 'phone' ? 'Vui lòng nhập số điện thoại.' : 'Vui lòng nhập mã tra cứu cứu trợ.');
+      setErrorMsg('Vui lòng nhập mã tra cứu cứu trợ.');
       return;
     }
-    if (trackingSearchMode === 'code' && !isValidTrackingCode(normalizedCode)) {
+    if (!isValidTrackingCode(normalizedCode)) {
       setLoading(false);
       setData(null);
       setErrorMsg('Mã tra cứu phải gồm từ 10 đến 16 ký tự hợp lệ.');
       return;
     }
-    if (trackingSearchMode === 'phone' && !isValidPhone(normalizedCode)) {
-      setLoading(false);
-      setData(null);
-      setErrorMsg('Số điện thoại cần gồm từ 8 đến 15 chữ số.');
-      return;
-    }
     setLoading(true);
     setErrorMsg(null);
     try {
-      const result = trackingSearchMode === 'phone'
-        ? await ResponseApi.trackRequestByPhone(normalizePhone(normalizedCode))
-        : await ResponseApi.trackRequest(normalizedCode);
+      const result = await ResponseApi.trackRequest(normalizedCode);
       setTrackingCode(result.tracking_code);
-      setTrackingSearchMode('code');
       setTrackingCodeError(undefined);
       try {
         await StorageService.deleteLegacyGuestTrackingSecret(result.tracking_code);
@@ -301,7 +289,7 @@ export const SOSTrackingScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [trackingCode, trackingSearchMode]);
+  }, [trackingCode]);
 
   const openUploadedEvidence = async (evidence: RequestEvidenceReference) => {
     if (!data?.id || openingEvidenceId) return;
@@ -679,9 +667,7 @@ export const SOSTrackingScreen: React.FC = () => {
       needsRescueChoice !== 'UNCHANGED' || needsReliefChoice !== 'UNCHANGED'
     ))
   );
-  const lookupDisabled = loading || (trackingSearchMode === 'code'
-    ? trackingCode.length > TRACKING_CODE_MAX_LENGTH || !isValidTrackingCode(trackingCode)
-    : !isValidPhone(trackingCode));
+  const lookupDisabled = loading || trackingCode.length > TRACKING_CODE_MAX_LENGTH || !isValidTrackingCode(trackingCode);
   const supplementSubmitDisabled = isSubmittingSupplement ||
     (!supplementNote.trim() && !hasStructuredUpdate && selectedImages.length === 0);
   const recoverySubmitDisabled = isRecovering || recoveryTrackingCode.length > TRACKING_CODE_MAX_LENGTH || recoveryCode.length > 43 ||
@@ -731,60 +717,26 @@ export const SOSTrackingScreen: React.FC = () => {
           {!isAuthenticated ? (
             <View style={styles.lookupNotice}>
               <Text style={styles.lookupNoticeText}>
-                Bạn có thể tra cứu bằng mã SOS hoặc số điện thoại đã cung cấp khi gửi SOS.
+                Nhập mã SOS bạn nhận được khi gửi yêu cầu để xem tiến độ.
               </Text>
             </View>
           ) : null}
-          <View style={styles.lookupModeRow} accessibilityRole="radiogroup" accessibilityLabel="Chọn cách tra cứu">
-            <TouchableOpacity
-              style={[styles.lookupModeButton, trackingSearchMode === 'code' && styles.lookupModeButtonActive]}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: trackingSearchMode === 'code' }}
-              disabled={loading}
-              onPress={() => {
-                setTrackingSearchMode('code');
-                setTrackingCodeError(undefined);
-                setErrorMsg(null);
-              }}
-            >
-              <Text style={[styles.lookupModeText, trackingSearchMode === 'code' && styles.lookupModeTextActive]}>Mã SOS</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.lookupModeButton, trackingSearchMode === 'phone' && styles.lookupModeButtonActive]}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: trackingSearchMode === 'phone' }}
-              disabled={loading}
-              onPress={() => {
-                setTrackingSearchMode('phone');
-                setTrackingCodeError(undefined);
-                setErrorMsg(null);
-              }}
-            >
-              <Text style={[styles.lookupModeText, trackingSearchMode === 'phone' && styles.lookupModeTextActive]}>Số điện thoại</Text>
-            </TouchableOpacity>
-          </View>
           <CompactTextInput
-            label={trackingSearchMode === 'code' ? 'Mã tra cứu' : 'Số điện thoại'}
+            label="Mã tra cứu"
             required
             style={styles.lookupInput}
-            placeholder={trackingSearchMode === 'code' ? 'Nhập mã SOS đã nhận' : 'Ví dụ: 0912 345 678'}
+            placeholder="Nhập mã SOS đã nhận"
             placeholderTextColor={THEME.colors.text.muted}
             value={trackingCode}
             onChangeText={(value) => {
-              const normalized = trackingSearchMode === 'code' ? value.toUpperCase() : value;
+              const normalized = value.toUpperCase();
               setTrackingCode(normalized);
-              setTrackingCodeError(!normalized.trim() ? undefined : trackingSearchMode === 'code'
-                ? getTrackingCodeError(normalized)
-                : isValidPhone(normalized) ? undefined : 'Số điện thoại cần gồm từ 8 đến 15 chữ số.');
+              setTrackingCodeError(!normalized.trim() ? undefined : getTrackingCodeError(normalized));
               setErrorMsg(null);
             }}
             onBlur={async () => {
               const value = trackingCode.trim();
-              if (trackingSearchMode === 'phone') {
-                if (!value) setTrackingCodeError('Số điện thoại là bắt buộc.');
-                else if (!isValidPhone(value)) setTrackingCodeError('Số điện thoại cần gồm từ 8 đến 15 chữ số.');
-                else setTrackingCodeError(undefined);
-              } else if (!value) {
+              if (!value) {
                 setTrackingCodeError('Mã tra cứu là bắt buộc.');
               } else if (!isValidTrackingCode(value)) {
                 setTrackingCodeError(getTrackingCodeError(value));
@@ -792,10 +744,10 @@ export const SOSTrackingScreen: React.FC = () => {
                 setTrackingCodeError(undefined);
               }
             }}
-            keyboardType={trackingSearchMode === 'phone' ? 'phone-pad' : 'default'}
-            autoCapitalize={trackingSearchMode === 'code' ? 'characters' : 'none'}
+            keyboardType="default"
+            autoCapitalize="characters"
             autoCorrect={false}
-            maxLength={trackingSearchMode === 'code' ? TRACKING_CODE_MAX_LENGTH + 1 : 32}
+            maxLength={TRACKING_CODE_MAX_LENGTH + 1}
           />
           <FormFieldError message={trackingCodeError} />
           <FormFieldError message={errorMsg ?? undefined} />
@@ -806,18 +758,16 @@ export const SOSTrackingScreen: React.FC = () => {
           >
             <Text style={styles.retryBtnText}>Tra cứu</Text>
           </TouchableOpacity>
-          {trackingSearchMode === 'code' && (
-            <TouchableOpacity
-              style={styles.recoveryLinkBtn}
-              onPress={() => {
-                setRecoveryTrackingCode(trackingCode);
-                setShowRecoveryModal(true);
-              }}
-            >
-              <KeyRound size={16} color={THEME.colors.primary.main} style={{ marginRight: 6 }} />
-              <Text style={styles.recoveryLinkText}>Gắn hồ sơ SOS vào tài khoản</Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            style={styles.recoveryLinkBtn}
+            onPress={() => {
+              setRecoveryTrackingCode(trackingCode);
+              setShowRecoveryModal(true);
+            }}
+          >
+            <KeyRound size={16} color={THEME.colors.primary.main} style={{ marginRight: 6 }} />
+            <Text style={styles.recoveryLinkText}>Gắn hồ sơ SOS vào tài khoản</Text>
+          </TouchableOpacity>
         </View>
       ) : loading ? (
         <View style={styles.centerBox}>
@@ -1484,33 +1434,6 @@ const styles = StyleSheet.create({
     fontSize: THEME.typography.fontSizes.xs,
     lineHeight: 18,
     color: THEME.colors.text.secondary,
-  },
-  lookupModeRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 8,
-  },
-  lookupModeButton: {
-    flex: 1,
-    minHeight: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: THEME.colors.surface.border,
-    borderRadius: 10,
-    backgroundColor: THEME.colors.surface.background,
-  },
-  lookupModeButtonActive: {
-    borderColor: THEME.colors.primary.main,
-    backgroundColor: THEME.colors.primary.bg,
-  },
-  lookupModeText: {
-    fontSize: THEME.typography.fontSizes.sm,
-    fontWeight: '600',
-    color: THEME.colors.text.secondary,
-  },
-  lookupModeTextActive: {
-    color: THEME.colors.primary.main,
   },
   lookupInput: {
     backgroundColor: THEME.colors.surface.background,

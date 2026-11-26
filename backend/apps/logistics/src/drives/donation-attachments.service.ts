@@ -12,6 +12,7 @@ import {
   DONATION_SECRET_CONFIG, DonationSecretConfig, donationCapabilityHash, verifyDonationCapability,
 } from './donations.helpers';
 import { AttachmentLifecycleService } from '../attachments/attachment-lifecycle.service';
+import { clientRateKey } from '@c48/technical/http/client-rate-key';
 
 const attachmentCountLimit = 5;
 const attachmentBytesLimit = 100 * 1024 * 1024;
@@ -59,7 +60,7 @@ interface GuestQuotaEntry {
 }
 
 function requestIp(request: Request): string {
-  return request.ip || request.socket.remoteAddress || 'unknown';
+  return clientRateKey(request.ip || request.socket.remoteAddress);
 }
 
 function hasCredential(request: Request): boolean {

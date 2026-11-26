@@ -18,7 +18,7 @@ cleanup() {
   local status=$?
   trap - EXIT
   if [[ "$stack_started" == 1 ]]; then
-    unset SCHEDULER_ENABLED SOS_SOFT_LIMIT_PER_IP SOS_HARD_LIMIT_PER_IP SOS_GLOBAL_PER_MIN PROXY_OPEN_CAP PROXY_DAILY_SOFT_LIMIT
+    unset SCHEDULER_ENABLED SOS_SOFT_LIMIT_PER_IP SOS_HARD_LIMIT_PER_IP SOS_SOFT_LIMIT_PER_PHONE PROXY_OPEN_CAP PROXY_DAILY_SOFT_LIMIT
     load_backend_env
     if ! main_compose --profile storage up -d --force-recreate --wait --wait-timeout 120 minio-init nginx; then
       printf 'Could not restore the primary stack settings from backend/.env.\n' >&2
@@ -51,7 +51,7 @@ bash "$ROOT/backend/scripts/db/seed"
 export SCHEDULER_ENABLED=true
 export SOS_SOFT_LIMIT_PER_IP=2
 export SOS_HARD_LIMIT_PER_IP=5
-export SOS_GLOBAL_PER_MIN=4
+export SOS_SOFT_LIMIT_PER_PHONE=2
 export PROXY_OPEN_CAP=3
 export PROXY_DAILY_SOFT_LIMIT=10
 stack_started=1

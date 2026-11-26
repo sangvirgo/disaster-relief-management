@@ -10,6 +10,7 @@ import { CreateProxyRequestDto, CreateSelfRequestDto } from './request-intake.dt
 import { loadReporterTokenConfig, ReporterTokenConfig } from './reporter-token';
 import { CAMPAIGN_CONFLICT_NOTIFIER, CampaignConflictNotifier } from './campaign-conflict-notifier.token';
 import { applyAutomaticCampaignMatch } from '../operations/request-campaign-attribution';
+import { clientRateKey } from '@c48/technical/http/client-rate-key';
 
 export const REQUEST_INTAKE_CONFIG = Symbol('REQUEST_INTAKE_CONFIG');
 const trackingAlphabet = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
@@ -19,8 +20,10 @@ const utcTimestampPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
 export interface RequestIntakeConfig {
   auth: ReporterTokenConfig;
   peppers: PepperSet;
-  globalLimitPerMinute: number;
+  /** SOS per minute from one client (IPv4 address or IPv6 /64) before the next one is held for review. */
   softLimitPerMinute: number;
+  /** SOS per minute from one reporter phone before the next one is held for review. */
+  softLimitPerPhonePerMinute: number;
   proxyOpenCap: number;
   proxyDailySoftLimit: number;
 }
@@ -64,8 +67,8 @@ export function loadRequestIntakeConfig(env: Record<string, string | undefined> 
   return {
     auth: requireReporterConfig(env),
     peppers: { v1: pepper },
-    globalLimitPerMinute: positiveInteger(env, 'SOS_GLOBAL_PER_MIN', 300),
     softLimitPerMinute: positiveInteger(env, 'SOS_SOFT_LIMIT_PER_IP', 30),
+    softLimitPerPhonePerMinute: positiveInteger(env, 'SOS_SOFT_LIMIT_PER_PHONE', 5),
     proxyOpenCap: positiveInteger(env, 'PROXY_OPEN_CAP', 3),
     proxyDailySoftLimit: positiveInteger(env, 'PROXY_DAILY_SOFT_LIMIT', 10),
   };
@@ -250,7 +253,7 @@ export class RequestIntakeService {
       ...(proxy ? { proxy } : {}),
     };
     const requestHash = canonicalRequestHash(canonicalPayload, secretHash ?? undefined);
-    const sourceIpHash = hashPurposeBoundSecret(remoteIp || 'unknown', 'sos-source-ip', this.config.peppers, 'v1');
+    const sourceIpHash = hashPurposeBoundSecret(clientRateKey(remoteIp), 'sos-source-ip', this.config.peppers, 'v1');
     const scopeKey = proxy ? `response.requests.proxy:${reporterUserId}` : 'response.requests.self';
     const command = proxy ? 'response.requests.create-proxy' : 'response.requests.create-self';
 
@@ -264,12 +267,11 @@ export class RequestIntakeService {
         const throttleRows = await manager.query(
           `WITH intake_time AS MATERIALIZED (SELECT clock_timestamp() AS at)
            SELECT intake_time.at AS received_at,
-                  (SELECT count(*) FROM assistance_request r WHERE r.received_at >= intake_time.at - interval '1 minute') AS global_count,
                   (SELECT count(*) FROM assistance_request p WHERE $1::text IS NOT NULL AND p.reporter_contact_phone = $1 AND p.received_at >= intake_time.at - interval '1 minute') AS phone_count,
                   (SELECT count(*) FROM assistance_request i WHERE i.source_ip_hash = $2 AND i.received_at >= intake_time.at - interval '1 minute') AS ip_count
              FROM intake_time`,
           [phone, sourceIpHash],
-        ) as Array<{ received_at: Date; global_count: string; phone_count: string; ip_count: string }>;
+        ) as Array<{ received_at: Date; phone_count: string; ip_count: string }>;
         const throttle = throttleRows[0];
         if (!throttle) throw new AppError('INTERNAL_ERROR', { status: 500 });
         let proxyQuotaReached = false;
@@ -284,9 +286,10 @@ export class RequestIntakeService {
           if (!counts) throw new AppError('INTERNAL_ERROR', { status: 500 });
           proxyQuotaReached = counts.open_count >= this.config.proxyOpenCap || counts.daily_count >= this.config.proxyDailySoftLimit;
         }
+        // A system-wide surge is expected during a disaster and is not a spam signal, so only the same client or the
+        // same phone repeating itself holds an SOS for review. Surges are watched by the SosIntakeSurge alert instead.
         const rateLimited = Number(throttle.ip_count) >= this.config.softLimitPerMinute ||
-          Number(throttle.phone_count) >= this.config.softLimitPerMinute ||
-          Number(throttle.global_count) >= this.config.globalLimitPerMinute;
+          Number(throttle.phone_count) >= this.config.softLimitPerPhonePerMinute;
         const reviewLane = proxy && proxyQuotaReached ? 'PROXY_QUOTA_REVIEW' : rateLimited ? 'RATE_LIMITED_REVIEW' : 'NORMAL';
         let request: { id: string; tracking_code: string; status: string; received_at: Date | string; review_lane: string; version: number } | undefined;
         for (let attempt = 0; attempt < 5 && !request; attempt++) {

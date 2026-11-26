@@ -9,11 +9,6 @@ export class TrackingCodeHeaderDto {
   tracking_code!: string;
 }
 
-export class TrackByPhoneDto {
-  @IsString() @MinLength(8) @MaxLength(32) @Matches(/^[+0-9 ()-]+$/u)
-  phone!: string;
-}
-
 export class ClaimRequestDto {
   @IsString() @Matches(trackingCode)
   tracking_code!: string;

@@ -70,6 +70,15 @@ groups:
         annotations:
           summary: 'API {{ $labels.service }} phản hồi chậm (p95 trên 2 giây)'
           description: 'p95 của {{ $labels.service }} là {{ $value | printf "%.2f" }} giây.'
+      # SOS intake has no system-wide cap (a disaster surge is real traffic), so operators are told instead.
+      - alert: SosIntakeSurge
+        expr: |
+          sum(increase(c48_http_requests_total{service="response", method="POST", status="201", route=~".*/requests(/proxy)?/?"}[5m])) / 5 > 100
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: 'Số yêu cầu SOS tăng đột biến'
+          description: 'Đang nhận khoảng {{ $value | printf "%.0f" }} SOS mỗi phút. Kiểm tra nhân lực điều phối, dung lượng máy chủ và hàng "Báo lặp cần rà soát".'
       - alert: DbPoolWaiting
         expr: c48_db_pool_waiting_clients > 5
         for: 5m

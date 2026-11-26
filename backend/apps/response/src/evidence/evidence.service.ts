@@ -14,6 +14,7 @@ import { EvidenceMime } from '@c48/technical/media/evidence-media';
 import { stageEvidenceMultipart } from '@c48/technical/uploads/evidence-upload';
 import { EvidenceObjectStorage, EvidenceStorageConfig, RESPONSE_EVIDENCE_STORAGE } from './evidence-storage';
 import { assertRequestPermission, canAccessRequest } from '../requests/request-scope';
+import { clientRateKey } from '@c48/technical/http/client-rate-key';
 
 const requestAttachmentCountLimit = 5;
 const ownerAttachmentByteLimit = 100 * 1024 * 1024;
@@ -47,7 +48,7 @@ function storageUnavailable(): AppError {
 }
 
 function requestIp(request: Request): string {
-  return request.ip || request.socket.remoteAddress || 'unknown';
+  return clientRateKey(request.ip || request.socket.remoteAddress);
 }
 
 function uploadEligible(row: Pick<ReporterRequestRow, 'review_lane' | 'status'>): boolean {

@@ -274,7 +274,7 @@ async function main() {
     forwardedIp: '198.51.100.21',
   });
   assert.equal(cookieRequest.status, 201, JSON.stringify(cookieRequest.value));
-  assert.equal(cookieRequest.value.review_lane, 'RATE_LIMITED_REVIEW', 'the global SOS threshold must retain, but flag, the next request');
+  assert.equal(cookieRequest.value.review_lane, 'NORMAL', 'a system-wide SOS surge must not hold a new client for review');
   const cookieRow = await db.query('SELECT reporter_user_id FROM assistance_request WHERE id=$1', [cookieRequest.value.id]);
   assert.equal(cookieRow.rows[0].reporter_user_id, userId);
 
@@ -345,7 +345,7 @@ async function main() {
       if (response.value.review_lane === 'RATE_LIMITED_REVIEW') throttled = true;
     }
   }
-  assert.equal(throttled, true, 'expected Nginx or global soft throttling to put an accepted SOS in review');
+  assert.equal(throttled, true, 'expected the per-IP soft threshold to put an accepted SOS in review');
   assert.equal(acceptedProxyResponses[0]?.review_lane, 'NORMAL');
   assert.equal(acceptedProxyResponses[1]?.review_lane, 'NORMAL');
   assert.equal(acceptedProxyResponses[2]?.review_lane, 'RATE_LIMITED_REVIEW', 'the per-IP soft threshold must flag the third accepted SOS');

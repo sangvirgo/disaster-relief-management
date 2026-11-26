@@ -64,11 +64,6 @@ export const ResponseApi = {
     return response.data;
   },
 
-  async trackRequestByPhone(phone: string): Promise<RequestTrackingDetail> {
-    const response = await apiClient.post<RequestTrackingDetail>('/response/requests/track/by-phone', { phone });
-    return response.data;
-  },
-
   // Bổ sung thông tin cho yêu cầu cứu hộ đang xử lý
   async supplementRequest(
     requestId: string,

@@ -87,6 +87,13 @@ interface RefreshFailure {
   error: 'SESSION_EXPIRED' | 'REFRESH_RACE' | 'REFRESH_REUSED';
 }
 
+// Per-client budgets (IPv4 address or IPv6 /64). Shelters and mobile carriers put many people behind one IPv4
+// address, so these stay generous; the strict 3/hour limits are per email address. There is deliberately no global
+// login limit: a handful of clients could otherwise lock every coordinator out during an incident.
+const registerPerClientPerHour = 20;
+const emailOtpVerifyPerClientPerMinute = 30;
+const emailOtpResendPerClientPerHour = 20;
+
 @Injectable()
 export class AuthService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AuthService.name);
@@ -136,7 +143,7 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
   }
 
   async register(dto: RegisterDto, idempotencyKey: string, ip: string): Promise<IdempotentResult<{ user: { id: string; username: string; display_name: string }; verification: { challenge_id: string }; email_sent: boolean }>> {
-    this.consumeRate(`register:${ip}`, 3, 60 * 60_000);
+    this.consumeRate(`register:${ip}`, registerPerClientPerHour, 60 * 60_000);
     if (!this.config.emailOtpPepper) throw new AppError('EMAIL_OTP_UNAVAILABLE', { status: 503 });
     if (!dto.display_name.trim() || dto.display_name !== dto.display_name.normalize('NFC')) {
       throw new AppError('VALIDATION_FAILED', { status: 400, fieldErrors: { display_name: ['VALIDATION_FAILED'] } });
@@ -180,7 +187,7 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
   }
 
   async verifyEmail(challengeId: string, code: string, ip: string): Promise<{ verified: true; user: { id: string; username: string; display_name: string } }> {
-    this.consumeRate(`email-otp-verify:${ip}`, 10, 60_000);
+    this.consumeRate(`email-otp-verify:${ip}`, emailOtpVerifyPerClientPerMinute, 60_000);
     if (!this.config.emailOtpPepper) throw new AppError('EMAIL_OTP_UNAVAILABLE', { status: 503 });
     const result = await withDatabaseRetry(() => this.dataSource.transaction(async (manager) => {
       const rows = await manager.query('SELECT * FROM email_registration WHERE challenge_id=$1 FOR UPDATE', [challengeId]) as EmailRegistrationRow[];
@@ -209,7 +216,7 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
   }
 
   async resendEmailOtp(challengeId: string, ip: string): Promise<{ challenge_id: string | null; email_sent: boolean }> {
-    this.consumeRate(`email-otp-resend:${ip}`, 3, 60 * 60_000);
+    this.consumeRate(`email-otp-resend:${ip}`, emailOtpResendPerClientPerHour, 60 * 60_000);
     if (!this.config.emailOtpPepper) throw new AppError('EMAIL_OTP_UNAVAILABLE', { status: 503 });
     const nextId = randomUUID();
     const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
@@ -399,7 +406,6 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
     const username = dto.username.toLowerCase();
     this.consumeRate(`login-user:${ip}:${username}`, 5, 60_000);
     this.consumeRate(`login-ip:${ip}`, 30, 60_000);
-    this.consumeRate('login-global', 300, 60_000);
     const users = await this.dataSource.query(
       'SELECT id, username, display_name, password_hash, status, must_change_password, authz_version FROM app_user WHERE username = $1',
       [dto.username],

@@ -19,6 +19,7 @@ import { ChangePasswordDto, GoogleLinkDto, GoogleLoginDto, LoginDto, PasswordRes
 import { AuthTransportGuard, IDENTITY_AUTH_CONFIG, IdentityRequest, IdentitySessionGuard } from './auth.guard';
 import { AuthService } from './auth.service';
 import { createCsrfToken, IdentityAuthConfig, parseCookies } from './auth-security';
+import { clientRateKey } from '@c48/technical/http/client-rate-key';
 
 const accessPath = '/api/v1';
 const authPath = '/api/v1/identity/auth';
@@ -65,7 +66,7 @@ function clearSessionCookies(response: Response): void {
 }
 
 function requestIp(request: Request): string {
-  return request.ip || request.socket.remoteAddress || 'unknown';
+  return clientRateKey(request.ip || request.socket.remoteAddress);
 }
 
 @Controller()

@@ -8,6 +8,8 @@ export class TrackingReadRateLimiter {
   private readonly attempts = new Map<string, number[]>();
   private lastPrunedAt = Number.NEGATIVE_INFINITY;
 
+  constructor(private readonly perMinute: number, private readonly perHour: number) {}
+
   assertAllowed(clientIp: string): void {
     const now = Date.now();
     const key = createHash('sha256').update(clientIp).digest('hex');
@@ -15,8 +17,8 @@ export class TrackingReadRateLimiter {
     const minute = recent.filter((timestamp) => timestamp > now - trackingMinuteMs);
     let retryAfterMs = 0;
 
-    if (recent.length >= 60) retryAfterMs = Math.max(retryAfterMs, recent[0]! + trackingHourMs - now);
-    if (minute.length >= 10) retryAfterMs = Math.max(retryAfterMs, minute[0]! + trackingMinuteMs - now);
+    if (recent.length >= this.perHour) retryAfterMs = Math.max(retryAfterMs, recent[0]! + trackingHourMs - now);
+    if (minute.length >= this.perMinute) retryAfterMs = Math.max(retryAfterMs, minute[0]! + trackingMinuteMs - now);
     if (retryAfterMs > 0) {
       this.attempts.set(key, recent);
       throw new AppError('RATE_LIMITED', { status: 429, retryAfterSeconds: Math.ceil(retryAfterMs / 1_000) });
