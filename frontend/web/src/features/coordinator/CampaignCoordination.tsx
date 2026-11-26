@@ -217,7 +217,7 @@ function PrimaryCampaignCoordination({ user, initialRequestId = '' }: { user: Me
             count={visibleCampaigns.length} noun="chiến dịch" />
 
           <div id="campaign-management-panel" className="campaign-overview__expanded" hidden={!managementOpen}>
-            {managementOpen && <Campaigns canManage canSetup />}
+            {managementOpen && <Campaigns canManage={!isScopedCoordinator} canSetup={!isScopedCoordinator} />}
           </div>
         </section>
       </div>

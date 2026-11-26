@@ -164,6 +164,7 @@ export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, er
         }).addTo(group);
       }
       if (!(editingWarehouse && selected)) L.marker([row.lat, row.lng], {
+        title: `Kho: ${row.name}`,
         zIndexOffset: selected ? 1600 : 1200,
         icon: L.divIcon({
           className: 'warehouse-map-pin',
@@ -198,6 +199,7 @@ export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, er
         const dx = located && !nearWarehouse ? 0 : Math.cos(angle) * 40;
         const dy = located && !nearWarehouse ? 0 : Math.sin(angle) * 40;
         L.marker([located ? drive.lat! : row.lat, located ? drive.lng! : row.lng], {
+          title: `Đợt quyên góp: ${drive.title}`,
           zIndexOffset: 800,
           icon: L.divIcon({
             className: 'warehouse-drive-pin',

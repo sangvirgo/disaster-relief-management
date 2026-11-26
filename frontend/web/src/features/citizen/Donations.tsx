@@ -961,16 +961,14 @@ export function Donations({ user }: { user: Me | null }) {
                   <p className="table-swipe-hint">Vuốt ngang bảng để xem đầy đủ các cột.</p>
                   <div className="stock-table-scroll">
                     <table className="stock-table donation-item-table">
-                      <thead><tr><th scope="col">Vật phẩm</th><th scope="col" className="numeric">Mục tiêu</th><th scope="col" className="numeric">Đã tiếp nhận</th><th scope="col" className="numeric">Còn cần</th></tr></thead>
+                      <thead><tr><th scope="col">Vật phẩm</th><th scope="col" className="numeric">Số lượng mục tiêu</th><th scope="col" className="numeric">Số lượng tiếp nhận</th></tr></thead>
                       <tbody>
                         {selected.items.map((item) => {
                           const compatible = quantityFitsScale(item.target_quantity, item.scale) && quantityFitsScale(item.accepted_total, item.scale);
-                          const remaining = compatible ? remainingQuantity(item.target_quantity, item.accepted_total) : null;
                           return <tr key={item.item_id}>
-                            <th scope="row"><strong>{item.item_name}</strong>{item.acceptance_note && <small>{item.acceptance_note}</small>}</th>
+                            <th scope="row"><strong>{item.item_name}</strong></th>
                             <td className="numeric" data-label="Mục tiêu">{formatQuantity(item.target_quantity)} {item.unit_name}</td>
                             <td className="numeric" data-label="Đã tiếp nhận"><span className="available-value">{formatQuantity(item.accepted_total)} {item.unit_name}</span>{!compatible && <small>Cần kiểm tra số liệu</small>}</td>
-                            <td className="numeric" data-label="Còn cần">{remaining === null ? 'Chưa xác định' : `${formatQuantity(remaining)} ${item.unit_name}`}</td>
                           </tr>;
                         })}
                       </tbody>
@@ -1056,7 +1054,7 @@ export function Donations({ user }: { user: Me | null }) {
                             Chưa xác định được số lượng còn cần; vui lòng xác nhận với điểm tiếp nhận.
                           </small>
                         )}
-                        {item.acceptance_note && <small>{item.acceptance_note}</small>}
+
                       </div>
                       <label className="donation-declaration-quantity">
                         <span>Số lượng dự kiến ({item.unit_name})</span>

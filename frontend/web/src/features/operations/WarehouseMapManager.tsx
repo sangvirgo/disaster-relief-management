@@ -279,10 +279,10 @@ export function WarehouseMapManager({ canManage, canManageDrives, warehouseOptio
     </>}
   </> : hoveredWarehouse?.id ? <>
     {canManage && <button type="button" className="button secondary small" onClick={() => void openWarehouseEdit(hoveredWarehouse)}>Sửa kho</button>}
-    {canManage && <button type="button" className="button secondary small" onClick={() => setDialog({ kind: 'opening-stock', warehouse: hoveredWarehouse })}>Khai báo tồn đầu kỳ</button>}
+
   </> : null;
   const hoverCard = hovered && hoveredWarehouse?.id && hoveredWarehouse.name
-    ? <MapHoverDetails key={`${hovered.kind}:${hovered.id}`} warehouse={{ id: hoveredWarehouse.id, name: hoveredWarehouse.name, service_radius_m: hoveredWarehouse.service_radius_m }} drive={hoveredDrive}
+    ? <MapHoverDetails key={`${hovered.kind}:${hovered.id}`} warehouse={{ id: hoveredWarehouse.id, name: hoveredWarehouse.name, service_radius_m: hoveredWarehouse.service_radius_m, address_note: hoveredWarehouse.address_note, location: hoveredWarehouse.location }} drive={hoveredDrive}
         actions={selectedId === hoveredWarehouse.id && <>{hoverActions}{actionError && <p className="notice error" role="alert">{actionError}</p>}</>} onClose={() => setHovered(null)} />
     : null;
   const radiusKm = draft ? (draft.radiusM / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 }) : '0';
@@ -318,7 +318,7 @@ export function WarehouseMapManager({ canManage, canManageDrives, warehouseOptio
     {dialog && <DetailSurface modal open onClose={() => setDialog(null)} className="operations-management-dialog"
       heading={dialog.kind === 'edit-warehouse' ? 'Sửa kho' : dialog.kind === 'opening-stock' ? 'Khai báo tồn đầu kỳ' : dialog.kind === 'new-drive' ? 'Thêm đợt quyên góp' : dialog.kind === 'edit-drive' ? 'Sửa đợt quyên góp' : dialog.action === 'pause' ? 'Tạm dừng đợt quyên góp' : 'Đóng đợt quyên góp'}
       label="Quản lý kho và đợt quyên góp">
-      {dialog.kind === 'edit-warehouse' && <CommandForm key={`wh-${dialog.warehouse.id}-${dialog.warehouse.version}`} spec={warehouseSpec(dialog.warehouse)} onSuccess={refresh} onStale={refresh} />}
+      {dialog.kind === 'edit-warehouse' && <><button type="button" className="button secondary" onClick={() => setDialog({ kind: 'opening-stock', warehouse: dialog.warehouse })}>Quản lý tồn đầu kỳ</button><CommandForm key={`wh-${dialog.warehouse.id}-${dialog.warehouse.version}`} spec={warehouseSpec(dialog.warehouse)} onSuccess={refresh} onStale={refresh} /></>}
       {dialog.kind === 'opening-stock' && dialog.warehouse.id && <OpeningStockForm key={`opening-${dialog.warehouse.id}`}
         warehouse={{ id: dialog.warehouse.id, name: dialog.warehouse.name || 'kho' }} items={items} itemScales={itemScales} itemUnits={itemUnits} onSuccess={refresh} />}
       {dialog.kind === 'new-drive' && <DriveCreateForm warehouses={warehouseOptions} campaigns={campaigns} items={items} itemScales={itemScales} lockedWarehouseId={dialog.warehouseId} areaFor={areaFor} initialLocation={dialog.location} onSuccess={refresh} />}

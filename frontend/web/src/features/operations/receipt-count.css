@@ -39,7 +39,7 @@
 .count-form__file .button { min-height: 36px; padding: 6px 14px; pointer-events: none; }
 .count-form__file-name { min-width: 0; overflow: hidden; color: var(--color-text-secondary); font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
 .count-form__file:focus-within { outline: 3px solid var(--color-primary-border); outline-offset: 2px; }
-.count-form__submit { width: 100%; }
+.count-form__submit { width: fit-content; }
 
 @media (max-width: 640px) {
   .count-form__extra { grid-template-columns: 1fr; }

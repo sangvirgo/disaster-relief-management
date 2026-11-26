@@ -10,7 +10,7 @@ type DriveItem = { item_id: string; item_name: string; unit_name: string; target
 const amount = (value?: string) => Number(value || 0).toLocaleString('vi-VN', { maximumFractionDigits: 3 });
 
 export function MapHoverDetails({ warehouse, drive, actions, onClose }: {
-  warehouse: { id: string; name: string; service_radius_m?: number | null };
+  warehouse: { id: string; name: string; address_note?: string | null; location?: { coordinates?: [number, number] } | null; service_radius_m?: number | null };
   drive?: { title: string; status: string; items: DriveItem[] };
   actions?: ReactNode;
   onClose: () => void;
@@ -33,6 +33,17 @@ export function MapHoverDetails({ warehouse, drive, actions, onClose }: {
       .finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
   }, [warehouse.id, drive, cursor]);
+  const [address, setAddress] = useState('');
+  useEffect(() => {
+    const controller = new AbortController(); setAddress('');
+    const point = warehouse.location?.coordinates;
+    if (warehouse.address_note || !point) return;
+    const query = new URLSearchParams({ location: point.join(','), langCode: 'VI', featureTypes: 'Locality', forStorage: 'false', f: 'json' });
+    void fetch('https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode?' + query, { signal: controller.signal })
+      .then(response => response.json()).then(value => { if (!controller.signal.aborted) setAddress(value.address?.Match_addr || 'Chưa tìm được địa chỉ gần đúng.'); })
+      .catch(() => { if (!controller.signal.aborted) setAddress('Chưa tìm được địa chỉ gần đúng.'); });
+    return () => controller.abort();
+  }, [warehouse.id, warehouse.address_note, warehouse.location]);
   const offset = pageIndex * LIST_PAGE_SIZE;
   const driveItems = drive?.items.slice(offset, offset + LIST_PAGE_SIZE) || [];
   return <section aria-label={drive ? `Vật phẩm của ${drive.title}` : `Tồn kho ${warehouse.name}`}>
@@ -41,6 +52,7 @@ export function MapHoverDetails({ warehouse, drive, actions, onClose }: {
       <button type="button" className="button secondary small" onClick={onClose} aria-label="Đóng thông tin trên bản đồ">×</button>
     </div>
     <p>{drive ? `Điểm quyên góp · ${warehouse.name}` : `Kho · Bán kính ${warehouse.service_radius_m ? `${(warehouse.service_radius_m / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} km` : 'chưa khai báo'}`}</p>
+    <p>Địa chỉ gần đúng: {warehouse.address_note || address || (warehouse.location ? 'Đang tìm địa chỉ…' : 'Chưa khai báo vị trí.')}</p>
     {actions && <div className="warehouse-map-hover__actions">{actions}</div>}
     {error && <p className="notice error" role="alert">{error}</p>}
     {loading && <p role="status">Đang tải tồn kho…</p>}

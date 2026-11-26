@@ -417,3 +417,8 @@
     padding: var(--space-3);
   }
 }
+
+.volunteer-mission-facts { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+.volunteer-mission-facts > div { padding: 4px 0; background: transparent; border: 0; }
+.volunteer-mission-progress .action-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+.volunteer-mission-progress .action-grid > .button { width: auto; flex: 0 1 auto; }

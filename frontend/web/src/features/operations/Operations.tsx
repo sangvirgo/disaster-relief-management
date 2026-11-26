@@ -351,9 +351,9 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           warehouseOptions={warehouseOptions} campaigns={references.campaigns || []} items={references.items || []} itemScales={references.itemScales || []} itemUnits={references.itemUnits || []}
           refreshKey={revision} onChanged={() => setRevision((value) => value + 1)} onRefresh={() => { setCursor(''); setRevision(value => value + 1); }} />}
         {page === 'review' && (
-          <div className="tabs">
+          <div className="receipt-status-filters" role="group" aria-label="Loại hồ sơ cần duyệt">
             <button
-              className={reviewTab === 'receipts' ? 'active' : ''}
+              aria-pressed={reviewTab === 'receipts'} className={reviewTab === 'receipts' ? 'active' : ''}
               onClick={() => {
                 setReviewTab('receipts');
                 setCursor('');
@@ -363,7 +363,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
               Biên nhận
             </button>
             <button
-              className={reviewTab === 'disputes' ? 'active' : ''}
+              aria-pressed={reviewTab === 'disputes'} className={reviewTab === 'disputes' ? 'active' : ''}
               onClick={() => {
                 setReviewTab('disputes');
                 setCursor('');
@@ -377,9 +377,9 @@ export function Operations({ page, user }: { page: string; user: Me }) {
         {(page === 'intake' || (page === 'review' && reviewTab === 'receipts')) && (
           <div className="filter-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', margin: '12px 0' }}>
             {page === 'review' && (
-              <div className="tabs" style={{ gridColumn: '1 / -1', margin: 0 }} role="group" aria-label="Việc cần làm">
+              <div className="receipt-status-filters" style={{ gridColumn: '1 / -1', margin: 0 }} role="group" aria-label="Việc cần làm">
                 {([['DECLARED', 'Cần đếm'], ['PENDING_REVIEW', 'Cần xác nhận'], ['', 'Tất cả']] as const).map(([value, title]) => (
-                  <button key={value} type="button" className={receiptStatus === value ? 'active' : ''}
+                  <button key={value} type="button" aria-pressed={receiptStatus === value} className={receiptStatus === value ? 'active' : ''}
                     onClick={() => { setReceiptStatus(value); setCursor(''); setSelected(null); setDetail(null); }}>{title}</button>
                 ))}
               </div>
@@ -730,11 +730,11 @@ export function Operations({ page, user }: { page: string; user: Me }) {
               {driveItems.length > 0 ? <>
                 <div className="operations-table-scroll" role="region" aria-label="Bảng vật phẩm cần tiếp nhận" tabIndex={0}>
                   <table className="drive-items-table">
-                    <thead><tr><th scope="col">Vật phẩm</th><th scope="col">Số lượng mục tiêu</th><th scope="col">Hướng dẫn tiếp nhận</th></tr></thead>
+                    <thead><tr><th scope="col">Vật phẩm</th><th scope="col">Số lượng mục tiêu</th><th scope="col">Số lượng tiếp nhận</th></tr></thead>
                     <tbody>{driveItems.slice(visibleDriveItemPage * driveItemPageSize, (visibleDriveItemPage + 1) * driveItemPageSize).map((item, index) => <tr key={string(item.item_id) || `${visibleDriveItemPage}-${index}`}>
                       <th scope="row">{string(item.item_name) || 'Vật phẩm chưa có tên'}</th>
                       <td>{quantityWithUnit(item, item.target_quantity)}</td>
-                      <td>{string(item.acceptance_note) ? <details className="drive-item-note"><summary>Xem hướng dẫn</summary><p>{string(item.acceptance_note)}</p></details> : '—'}</td>
+                      <td>{quantityWithUnit(item, item.accepted_total ?? '0')}</td>
                     </tr>)}</tbody>
                   </table>
                 </div>

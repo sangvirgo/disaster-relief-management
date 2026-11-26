@@ -585,10 +585,12 @@ export function SosForm({
               <span className="sos-upload-control">
                 <input type="file" multiple accept="image/jpeg,image/png,video/mp4"
                   onChange={(e) => {
-                    const chosen = Array.from(e.target.files ?? []).slice(0, 5);
+                    const incoming = Array.from(e.target.files ?? []);
+ const unique = incoming.filter(file => !files.some(old => old.name === file.name && old.size === file.size && old.lastModified === file.lastModified));
+ const chosen = [...files, ...unique].slice(0, 5);
                     const problem = chosen.map(evidenceFileError).find(Boolean) ?? '';
-                    setFileMessage(problem || ((e.target.files?.length ?? 0) > 5 ? 'Chỉ nhận tối đa 5 tệp; các tệp thừa đã bị bỏ qua.' : ''));
-                    setFiles(problem ? [] : chosen);
+                    setFileMessage(problem || (files.length + unique.length > 5 ? 'Chỉ nhận tối đa 5 tệp; các tệp thừa đã bị bỏ qua.' : ''));
+                    if (!problem) setFiles(chosen);
                     e.target.value = '';
                   }} />
                 <span className="sos-upload-button"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 16V4m0 0-4 4m4-4 4 4" /><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" /></svg>Chọn tệp</span>

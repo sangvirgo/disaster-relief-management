@@ -1,3 +1,4 @@
+import { LocationPicker } from '../../maps/LocationPicker';
 import { Dropdown } from '../../components/ui/Dropdown';
 import { useEffect, useMemo, useState } from 'react';
 import { api, newCommandKey } from '../../api/client';
@@ -86,6 +87,7 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
   const [areaAnimation, setAreaAnimation] = useState<(AreaAnimation & { attachedCount?: number }) | null>(null);
   // Map editor: draw a new campaign area, or adjust an existing one (kind 'adjust' carries the campaign id).
   const [editMode, setEditMode] = useState<{ kind: 'create' } | { kind: 'adjust'; id: string } | null>(null);
+  const [searchPoint, setSearchPoint] = useState<{ lat: number; lng: number; nonce: number } | null>(null);
   const [draftCenter, setDraftCenter] = useState<{ lat: number; lng: number } | null>(null);
   const [draftRadius, setDraftRadius] = useState(NEW_CAMPAIGN_RADIUS_M);
   const [draftName, setDraftName] = useState('');
@@ -217,7 +219,7 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
   }
   function startCreate() {
     setAreaAnimation(null);
-    setEditMode({ kind: 'create' }); setDraftCenter(null); setDraftRadius(NEW_CAMPAIGN_RADIUS_M); setDraftName('');
+    setEditMode({ kind: 'create' }); setDraftCenter(searchPoint ? { lat: searchPoint.lat, lng: searchPoint.lng } : null); setDraftRadius(NEW_CAMPAIGN_RADIUS_M); setDraftName('');
     setPendingAdjustment(false);
     setError(''); setMessage('');
   }
@@ -299,6 +301,15 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
       <CampaignAreaMap
         height="clamp(540px, 76dvh, 880px)"
         focusRequestId={mapFocus}
+        focusPoint={searchPoint}
+        search={<LocationPicker initiallyOpen hideMap hideToggle selectOnPick closeOnSelect={false}
+          value={searchPoint ? { latitude: searchPoint.lat, longitude: searchPoint.lng } : null}
+          onSelect={point => {
+            if (!point) return;
+            const center = { lat: point.latitude, lng: point.longitude };
+            setSearchPoint({ ...center, nonce: Date.now() });
+            if (editMode) { setDraftCenter(center); if (editMode.kind === 'adjust') setPendingAdjustment(true); }
+          }} />}
         note={editMode ? null : <>
           <span>💡 Nhấp đúp vào vòng chiến dịch để chỉnh vùng.</span>
           <span><i className="map-note-swatch map-note-swatch--solid" aria-hidden="true" /> Vòng nét liền: đang hoạt động</span>

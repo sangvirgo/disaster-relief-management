@@ -50,3 +50,31 @@
 .campaign-area-map__note > span { display: flex; align-items: center; gap: 7px; }
 .map-note-swatch { display: inline-block; width: 26px; height: 0; border-top: 3px solid #2563eb; }
 .map-note-swatch--dashed { border-top-style: dashed; }
+
+/* Campaign search stays available independently from drawing a new area. */
+.campaign-area-map-shell--searchable .campaign-area-map__search { position: absolute; z-index: 1100; left: 210px; right: 150px; top: 10px; max-width: 600px; padding: 10px; background: #fff; border-radius: 12px; box-shadow: 0 2px 8px #0003; }
+.campaign-area-map-shell--searchable .weather-bar { top: 90px; left: 10px; right: auto; bottom: auto; display: flex; flex-direction: column; overflow: visible; align-items: stretch; max-width: 175px; }
+.campaign-area-map-shell--searchable .weather-bar .weather-chip { justify-content: flex-start; }
+.campaign-area-map-shell--searchable .campaign-area-map__note { top: 130px; left: 210px; max-width: min(500px, calc(100% - 240px)); }
+.campaign-area-map-shell--searchable .weather-storms { top: 290px; left: 10px; right: auto; }
+.campaign-area-map__search .location-search { margin: 0; }
+@media (max-width: 700px) {
+ .campaign-area-map-shell--searchable .campaign-area-map__search { left: 54px; right: 10px; top: 64px; }
+ .campaign-area-map-shell--searchable .weather-bar { top: 210px; max-width: 150px; }
+ .campaign-area-map-shell--searchable .campaign-area-map__note { display: none; }
+}
+
+/* Compact map search: one fixed-height input, results float underneath. */
+.campaign-area-map-shell--searchable .campaign-area-map__search { left: 64px; right: auto; top: 10px; width: min(360px, calc(100% - 220px)); max-width: none; padding: 0; border-radius: 10px; }
+.campaign-area-map__search .location-picker, .campaign-area-map__search .location-map-panel { margin: 0; padding: 0; }
+.campaign-area-map__search .location-search { margin: 0; gap: 0; }
+.campaign-area-map__search .location-search > input { height: 42px; min-height: 42px; padding: 8px 12px; font-size: 14px; border-radius: 10px; }
+.campaign-area-map__search .location-search-hint, .campaign-area-map__search .location-selection-status { display: none; }
+.campaign-area-map__search .location-search-status { position: absolute; top: 46px; left: 0; background: white; padding: 6px 10px; border-radius: 8px; }
+.campaign-area-map__search .location-suggestions { top: 48px; max-height: 300px; }
+.campaign-area-map-shell--searchable .campaign-area-map__note { top: 66px; left: 210px; max-width: 340px; font-size: 11px; padding: 6px 10px; }
+.campaign-area-map-shell--searchable .weather-bar { top: 110px; }
+@media (max-width: 700px) {
+ .campaign-area-map-shell--searchable .campaign-area-map__search { left: 54px; top: 64px; width: calc(100% - 64px); }
+ .campaign-area-map-shell--searchable .weather-bar { top: 126px; }
+}

@@ -1160,12 +1160,45 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                   ? <PriorityBadge priority={detail.priority as 'P1' | 'P2' | 'P3' | 'P4'} />
                   : <span className="sos-head__nopriority">Chưa chọn ưu tiên</span>}
               </div>
+              <fieldset className="sos-head__actions" disabled={claimBlockedBy(detail, currentUserId)}>
+              {!['RESOLVING', 'RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) &&
+                secondaryCommand({
+                  title: 'Ghi nhận chuyển cơ quan chức năng',
+                  hideTitle: true,
+                  service: 'response',
+                  path: `/requests/${detail.id}/authority-referrals`,
+                  fields: [
+                    { name: 'referred_body', label: 'Cơ quan tiếp nhận', type: 'text', required: true, maxLength: 200 },
+                    { name: 'note', label: 'Cách thức và nội dung đã chuyển', type: 'textarea', required: true, maxLength: 1000 },
+                  ],
+                  build: (values) => ({
+                    referred_body: values.referred_body,
+                    note: values.note,
+                    expected_version: detail.version,
+                  }),
+                  warning: 'Xác nhận đã chuyển yêu cầu cho cơ quan chức năng được ghi rõ? Hệ thống sẽ thử kết thúc và đóng SOS nếu đủ điều kiện.',
+                }, undefined, referralDone)}
+              </fieldset>
               <p className="sos-head__sub">{label(detail.category)} · tiếp nhận {timeLabel(detail.received_at)}</p>
               {detail.mission_history?.items.some((mission) => mission.status === 'COMPLETED') &&
                 !['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) && (
                   <p className="notice" role="status">Đội đã hoàn thành nhiệm vụ cứu hộ. SOS chưa kết thúc{detail.needs_relief_supplies ? '; nhu cầu vật tư được theo dõi riêng.' : '.'}</p>
                 )}
             </header>
+            {detail.campaign_id && <section className="sos-campaign-context" aria-label="Chiến dịch của SOS">
+              <div><small>Chiến dịch cứu trợ</small><strong>{campaignOptions.find(campaign => campaign.value === detail.campaign_id)?.label ?? 'Chiến dịch đã gắn'}</strong></div>
+              <fieldset disabled={claimBlockedBy(detail, currentUserId)}>              {canSeeUnassigned && detail.campaign_id &&
+                secondaryCommand({
+                  title: 'Gỡ khỏi chiến dịch',
+                  hideTitle: true,
+                  service: 'response',
+                  path: `/requests/${detail.id}/detach-campaign`,
+                  version: detail.version,
+                  fields: [],
+                  warning: 'Xác nhận gỡ yêu cầu này khỏi chiến dịch?',
+                })}
+</fieldset>
+            </section>}
             <section className="claim-panel" aria-label="Nhận xử lý hồ sơ">
               {detail.handled_by && claimActive(detail) ? (
                 <p role="status" className="notice">
@@ -1435,23 +1468,6 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
             <fieldset className="claim-guard sos-actions-guard" disabled={claimBlockedBy(detail, currentUserId)} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
             <div className="action-grid sos-actions" id="request-actions" tabIndex={-1} hidden={activeTab !== 'overview' && activeTab !== 'dispatch'}>
               <div className="sos-tab-group sos-action-row" hidden={activeTab !== 'dispatch'}>
-              {!['RESOLVING', 'RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) &&
-                secondaryCommand({
-                  title: 'Ghi nhận chuyển cơ quan chức năng',
-                  hideTitle: true,
-                  service: 'response',
-                  path: `/requests/${detail.id}/authority-referrals`,
-                  fields: [
-                    { name: 'referred_body', label: 'Cơ quan tiếp nhận', type: 'text', required: true, maxLength: 200 },
-                    { name: 'note', label: 'Cách thức và nội dung đã chuyển', type: 'textarea', required: true, maxLength: 1000 },
-                  ],
-                  build: (values) => ({
-                    referred_body: values.referred_body,
-                    note: values.note,
-                    expected_version: detail.version,
-                  }),
-                  warning: 'Xác nhận đã chuyển yêu cầu cho cơ quan chức năng được ghi rõ? Hệ thống sẽ thử kết thúc và đóng SOS nếu đủ điều kiện.',
-                }, undefined, referralDone)}
               {canSeeUnassigned && !detail.campaign_id &&
                 secondaryCommand({
                   title: 'Gắn vào chiến dịch cứu trợ',
@@ -1471,16 +1487,6 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                         }) },
                   ],
                   warning: 'Xác nhận gắn yêu cầu này vào chiến dịch đã chọn?',
-                })}
-              {canSeeUnassigned && detail.campaign_id &&
-                secondaryCommand({
-                  title: 'Gỡ khỏi chiến dịch',
-                  hideTitle: true,
-                  service: 'response',
-                  path: `/requests/${detail.id}/detach-campaign`,
-                  version: detail.version,
-                  fields: [],
-                  warning: 'Xác nhận gỡ yêu cầu này khỏi chiến dịch?',
                 })}
               {detail.timeline.items.some((event) => event.event_type === 'AUTHORITY_REFERRED') && (
                 <p className="notice sos-referral-status" role="status">
@@ -1639,9 +1645,17 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                   }, 'danger')}
                 </>
               )}
+              {detail.status === 'VERIFIED' && (detail.fast_track?.suggested_priority || detail.ai_priority_advisory?.suggested_priority) && command({
+                title: `Xác nhận ${detail.fast_track?.suggested_priority ?? detail.ai_priority_advisory?.suggested_priority} và chọn đội`,
+                hideTitle: true, service: 'response', path: `/requests/${detail.id}/triage`, version: detail.version,
+                warning: `Xác nhận mức ưu tiên ${detail.fast_track?.suggested_priority ?? detail.ai_priority_advisory?.suggested_priority} cho SOS đã xác minh?`,
+                build: () => ({ priority: detail.fast_track?.suggested_priority ?? detail.ai_priority_advisory?.suggested_priority,
+                  priority_basis: detail.fast_track?.suggested_priority_basis ?? 'COMPLETE',
+                  reason: 'Điều phối viên đã xem thông tin SOS đã xác minh và xác nhận mức ưu tiên được gợi ý.' }),
+              })}
               {detail.status === 'VERIFIED' &&
                 command({
-                  title: 'Xác nhận mức ưu tiên',
+                  title: 'Chọn mức ưu tiên khác',
                   service: 'response',
                   path: `/requests/${detail.id}/triage`,
                   version: detail.version,

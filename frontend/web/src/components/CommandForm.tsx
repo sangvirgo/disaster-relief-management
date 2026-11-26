@@ -402,9 +402,7 @@ export function CommandForm({
               </>
             )}
             {field.hintFor?.(values) && <small className="field-hint" role="note">{field.hintFor(values)}</small>}
-            {inlineError && (
-              <small className="field-error" id={errorId(field)} role="alert">{inlineError}</small>
-            )}
+            <small className="field-error field-error-slot" id={inlineError ? errorId(field) : undefined} role={inlineError ? "alert" : undefined}>{inlineError || ''}</small>
           </div>
         ) : field.type === 'service-area' ? (() => {
           const centre = pointValue(values[field.name] || '');
@@ -449,9 +447,7 @@ export function CommandForm({
               <button type="button" className="button secondary" disabled={!centre && !values[field.radiusFieldName || '']}
                 onClick={() => updateServiceArea(field, null, null)}>Xóa vùng phục vụ</button>
             </div>}
-            {inlineError && (
-              <small className="field-error" id={errorId(field)} role="alert">{inlineError}</small>
-            )}
+            <small className="field-error field-error-slot" id={inlineError ? errorId(field) : undefined} role={inlineError ? "alert" : undefined}>{inlineError || ''}</small>
           </div>
           );
         })() : field.type === 'location' ? (
@@ -467,9 +463,7 @@ export function CommandForm({
             {pointValue(values[field.name] || '') && (
               <small>Vị trí đã chọn: {pointValue(values[field.name] || '')?.latitude.toFixed(6)}, {pointValue(values[field.name] || '')?.longitude.toFixed(6)}</small>
             )}
-            {inlineError && (
-              <small className="field-error" id={errorId(field)} role="alert">{inlineError}</small>
-            )}
+            <small className="field-error field-error-slot" id={inlineError ? errorId(field) : undefined} role={inlineError ? "alert" : undefined}>{inlineError || ''}</small>
           </div>
         ) : field.type === 'checkbox' ? (
           <label key={field.name} className="command-checkbox">
@@ -482,7 +476,7 @@ export function CommandForm({
             {field.hintFor?.(values) && <small className="field-hint" role="note">{field.hintFor(values)}</small>}
           </label>
         ) : (
-        <label key={field.name}>
+        <label key={field.name} className={`command-field command-field--${field.name}`}>
           <span>{field.label}{isRequired(field, values) && <> <span className="required-mark" aria-hidden="true"> *</span></>}</span>
           {field.type === 'textarea' ? (
             <textarea
@@ -542,9 +536,7 @@ export function CommandForm({
             />
           )}
           {field.hintFor?.(values) && <small className="field-hint" role="note">{field.hintFor(values)}</small>}
-          {inlineError && (
-            <small className="field-error" id={errorId(field)} role="alert">{inlineError}</small>
-          )}
+          <small className="field-error field-error-slot" id={inlineError ? errorId(field) : undefined} role={inlineError ? "alert" : undefined}>{inlineError || ''}</small>
         </label>
         )
         );

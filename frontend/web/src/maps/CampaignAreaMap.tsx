@@ -100,6 +100,8 @@ export function CampaignAreaMap({
   editActions,
   overlay,
   focusRequestId,
+  search,
+  focusPoint,
   animation,
   onAnimationComplete,
   note,
@@ -117,6 +119,8 @@ export function CampaignAreaMap({
   editActions?: { onConfirm: () => void; onCancel: () => void; busy: boolean; canConfirm: boolean } | null;
   /** Controls drawn over the map (bottom-right), e.g. draw / adjust campaign tools. */
   overlay?: ReactNode;
+  search?: ReactNode;
+  focusPoint?: { lat: number; lng: number; nonce: number } | null;
   /** Short hint pill under the weather chips, and an urgent warning pinned bottom-right. */
   note?: ReactNode;
   /** Pan/zoom to one SOS marker and pulse it; a new `nonce` re-triggers the focus. */
@@ -382,9 +386,14 @@ export function CampaignAreaMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusNonce, focusId]);
 
+  useEffect(() => {
+    if (!focusPoint || !mapRef.current) return;
+    mapRef.current.flyTo([focusPoint.lat, focusPoint.lng], 13, { duration: 0.8 });
+  }, [focusPoint]);
+
   return (
     <>
-      <div className="campaign-area-map-shell">
+      <div className={`campaign-area-map-shell${search ? ' campaign-area-map-shell--searchable' : ''}`}>
         <div
           ref={containerRef}
           className="campaign-area-map"
@@ -393,6 +402,7 @@ export function CampaignAreaMap({
           style={{ height, width: '100%', borderRadius: 8 }}
         />
         <WeatherLayers map={mapInstance} />
+        {search && <div className="campaign-area-map__search">{search}</div>}
         {overlay && <div className="campaign-area-map__tools">{overlay}</div>}
         {note && <p className="campaign-area-map__note">{note}</p>}
         {alert && <div className="campaign-area-map__alert">{alert}</div>}

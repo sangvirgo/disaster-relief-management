@@ -1826,3 +1826,55 @@
 .need-action-options { position: absolute; z-index: 20; top: calc(100% + 8px); right: 0; display: grid; min-width: min(320px, 80vw); padding: 8px; border: 1px solid #d5e1f0; border-radius: 14px; background: #fff; box-shadow: 0 16px 36px rgb(24 49 87 / 18%); }
 .need-action-options button { border: 0; border-radius: 9px; padding: 12px 14px; background: transparent; color: #254266; text-align: left; cursor: pointer; }
 .need-action-options button:hover, .need-action-options button:focus-visible { background: #eef5ff; }
+
+/* Compact record actions and spacious management surfaces. */
+.operations-management-dialog:has(.opening-stock-form) { min-height: min(540px, 85dvh); }
+.receipt-status-filters { display: flex; flex-wrap: wrap; gap: 8px; }
+.receipt-status-filters button { padding: 8px 14px; border: 1px solid var(--color-border); border-radius: 20px; background: white; cursor: pointer; font: inherit; }
+.receipt-status-filters button.active { background: var(--color-primary-bg); color: var(--color-primary); border-color: currentColor; }
+.coordinator-detail-surface .command-form > .button, .volunteer-mission-progress .button { width: fit-content; min-height: 40px; height: auto; padding: 9px 16px; justify-self: start; }
+.volunteer-mission-facts { display: flex; flex-wrap: wrap; gap: 8px 24px; }
+.volunteer-mission-facts > div { background: transparent; border: 0; padding: 4px 0; }
+.volunteer-team-panel-content > .button { width: fit-content; }
+
+.campaign-tools__panel .location-picker { margin: 0; }
+.campaign-tools__panel { width: min(420px, calc(100vw - 48px)); max-height: 70dvh; overflow-y: auto; }
+.drive-item-note p { margin: 4px 0; overflow-wrap: anywhere; }
+
+.operations-management-dialog .detail-surface-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.operations-management-dialog .detail-surface-header h2 { margin: 0; min-width: 0; }
+.operations-management-dialog .detail-surface-header .detail-close-button { position: static; flex: none; }
+
+/* Keep donation actions compact instead of stretching across the dialog. */
+.drive-detail-dialog .command-form { grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 12px; }
+.drive-detail-dialog .command-form > h3, .drive-detail-dialog .command-form > .notice { grid-column: 1 / -1; }
+.drive-detail-dialog .command-form > .button, .donation-modal form > .button { width: fit-content; min-width: 0; min-height: 40px; height: auto; padding: 9px 16px; justify-self: start; }
+.drive-detail-dialog .command-form > label { margin: 0; min-width: 0; }
+.drive-detail-dialog .command-form > h3 { margin: 0 0 4px; }
+.donation-modal form > .button { align-self: flex-start; }
+@media (max-width: 600px) { .drive-detail-dialog .command-form { grid-template-columns: minmax(0, 1fr); } }
+
+/* Action buttons size to their labels; grid forms must not stretch submissions. */
+.form-stack > :is(.button, .ui-button), .command-form > .button, .form-actions > :is(.button, .ui-button),
+.action-grid > :is(.button, .ui-button), .volunteer-team-panel-content > .button {
+  width: fit-content; max-width: 100%; justify-self: start; align-self: start; flex: 0 1 auto; white-space: normal;
+}
+.record-detail-dialog.admin-create-dialog > .command-form > .button { width: fit-content; min-height: 40px; }
+.donation-drive-actions .button, .donation-drive-detail > .donation-drive-actions .button,
+.campaign-engagement-toolbar__actions .button, .team-member-row .button, .list-action-header .list-create-button { width: fit-content; flex: 0 1 auto; }
+.sos-suggestion .action-grid .button, .common-queue-suggestions .suggestion-actions__alternatives .button { width: fit-content; }
+.sos-suggestion .action-grid > * { flex: 0 1 auto; }
+.count-form .count-form__submit { width: fit-content; justify-self: start; }
+
+/* Stable reason/action rows, including validation after blur. */
+.field-error-slot:empty { display: none; }
+.drive-detail-dialog .command-form { grid-template-columns: minmax(0, 1fr) 168px; align-items: start; }
+.drive-detail-dialog .command-form > .command-field { grid-column: 1; }
+.drive-detail-dialog .command-form > .command-field > .field-error-slot { display: block; min-height: 21px; line-height: 21px; }
+.drive-detail-dialog .command-form > .button { grid-column: 2; grid-row: 2; margin-top: 24px; width: 168px; }
+@media (max-width: 600px) {
+  .drive-detail-dialog .command-form { grid-template-columns: minmax(0, 1fr); }
+  .drive-detail-dialog .command-form > .button { grid-column: 1; grid-row: auto; margin-top: 0; }
+}
+
+.drive-detail-dialog .command-form > .command-field > span { line-height: 18px; }

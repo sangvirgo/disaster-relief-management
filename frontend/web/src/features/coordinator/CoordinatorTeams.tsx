@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { fetchAll } from '../../api/fetchAll';
 import { useCursorPages } from '../../api/useCursorPages';
 import { Pager } from '../../components/ui/Pager';
-import { CommandForm } from '../../components/CommandForm';
 import { label } from '../../i18n/labels';
 import type { Me } from '../../auth/session';
 import { TeamMembers } from '../volunteer/TeamMembers';
@@ -14,8 +13,10 @@ import { TeamCreateForm, TeamSkillsForm, type Skill } from './TeamSetupForms';
 import { DetailSurface } from '../../components/DetailSurface';
 import './teams-page.css';
 
+const ignoreManageChange = () => {};
+
 type Team = { id: string; name: string; availability: string; status: string; version: number; skills: string[]; position: { age_s: number } | null };
-type Member = { user_id: string; display_name: string; member_role: string };
+
 
 function positionAge(ageSeconds: number): string {
   const minutes = Math.max(0, Math.round(ageSeconds / 60));
@@ -29,7 +30,7 @@ export function CoordinatorTeams({ user }: { user: Me }) {
   const [selectedId, setSelectedId] = useState('');
   const teamPages = useCursorPages<Team>('response', '/teams', 10);
   const teams = teamPages.items;
-  const [members, setMembers] = useState<Member[]>([]);
+
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [revision, setRevision] = useState(0);
   const [lookupError, setLookupError] = useState('');
@@ -47,15 +48,6 @@ export function CoordinatorTeams({ user }: { user: Me }) {
       .catch((cause) => { if (live) setLookupError(cause instanceof Error ? cause.message : 'Không tải được danh mục kỹ năng.'); });
     return () => { live = false; };
   }, [revision]);
-
-  useEffect(() => {
-    if (!selectedId) return;
-    let live = true;
-    void fetchAll<Member>('response', `/teams/${selectedId}/members`)
-      .then((rows) => { if (live) setMembers(rows); })
-      .catch(() => { if (live) setMembers([]); });
-    return () => { live = false; };
-  }, [selectedId, revision]);
 
   const refresh = () => { setRevision((current) => current + 1); teamPages.reload(); };
   const closeDetail = () => { setSelectedId(''); setAddMemberOpen(false); };
@@ -84,23 +76,11 @@ export function CoordinatorTeams({ user }: { user: Me }) {
       {showCreate && <TeamCreateForm skills={skills} onSuccess={(id) => { setShowCreate(false); setSelectedId(id); refresh(); }} />}
     </DetailSurface>}
     {selected && <DetailSurface key={selected.id} modal open onClose={closeDetail} label={`Chi tiết đội ${selected.name}`} heading={selected.name} className="team-detail-dialog">
-      <TeamSkillsForm key={`skills-${selected.id}-${selected.version}`} teamId={selected.id} version={selected.version} current={selected.skills} skills={skills} onSuccess={refresh} />
-      <div className="admin-team-actions">
-        {!isAdmin && <div>
-          <h3>Đội trưởng</h3>
-          <p>Người được chọn phải là thành viên đang hoạt động của đội và có quyền Tình nguyện viên ở phạm vi hệ thống.</p>
-          <CommandForm key={`leader-${selected.id}-${selected.version}-${members.length}`} spec={{
-            title: 'Giao vai trò đội trưởng', service: 'response', path: `/teams/${selected.id}/leader`, version: selected.version,
-            warning: `Chuyển vai trò đội trưởng của ${selected.name} cho thành viên được chọn?`,
-            fields: [{ name: 'user_id', label: 'Thành viên', type: 'select', required: true,
-              options: members.map((member) => ({ value: member.user_id, label: `${member.display_name}${member.member_role === 'LEADER' ? ' · Đội trưởng hiện tại' : ''}` })) }],
-          }} onSuccess={refresh} onStale={refresh} />
-        </div>}
-      </div>
-      <details className="team-member-section"><summary>Thành viên đội ({members.length})</summary>
-        <TeamMembers key={`${selected.id}-${revision}`} teamId={selected.id} onManageChange={() => {}} addOpen={addMemberOpen}
+      {isAdmin ? <TeamSkillsForm key={`skills-${selected.id}-${selected.version}`} teamId={selected.id} version={selected.version} current={selected.skills} skills={skills} onSuccess={refresh} /> : <section><h3>Kỹ năng của đội</h3><p>{selected.skills.map(code => skills.find(skill => skill.code === code)?.display_name || label(code)).join(', ') || 'Chưa khai báo kỹ năng'}</p></section>}
+      <section className="team-member-section" aria-label="Thành viên đội">
+        <TeamMembers key={`${selected.id}-${revision}`} teamId={selected.id} readOnly={!isAdmin} onManageChange={ignoreManageChange} addOpen={addMemberOpen}
           onOpenAdd={() => setAddMemberOpen(true)} onCloseAdd={() => { setAddMemberOpen(false); refresh(); }} />
-      </details>
+      </section>
     </DetailSurface>}
   </div>;
 }

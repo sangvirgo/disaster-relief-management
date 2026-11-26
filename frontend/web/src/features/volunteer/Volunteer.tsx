@@ -40,11 +40,10 @@ type Team = {
     coordinates?: [number, number];
   };
 };
-type TeamDetailTab = 'overview' | 'members' | 'readiness' | 'location';
+type TeamDetailTab = 'overview' | 'members' | 'location';
 const teamDetailTabs: { id: TeamDetailTab; label: string }[] = [
   { id: 'overview', label: 'Tổng quan' },
   { id: 'members', label: 'Thành viên' },
-  { id: 'readiness', label: 'Sẵn sàng' },
   { id: 'location', label: 'Vị trí' },
 ];
 type MissionDetailTab = 'overview' | 'history';
@@ -981,7 +980,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                       onCloseAdd={() => setAddMemberOpen(false)}
                     />
                   )}
-                  {teamDetailTab === 'readiness' && (
+                  {teamDetailTab === 'overview' && (
                     <div className="volunteer-team-panel-content">
                       <div className="volunteer-team-section-heading">
                         <div><h4>Trạng thái sẵn sàng</h4><p>Kiểm soát việc đội có thể tiếp nhận nhiệm vụ mới.</p></div>
@@ -1058,7 +1057,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
           </>
         ) : (
           <>
-            <div className="mission-detail-heading"><h2 ref={missionHeadingRef} tabIndex={-1}>Chi tiết nhiệm vụ</h2>
+            <div className="mission-detail-heading"><div><h2 ref={missionHeadingRef} tabIndex={-1}>Chi tiết nhiệm vụ</h2>{activeMission && <small>Giao nhiệm vụ lúc {timeLabel(activeMission.created_at)}</small>}</div>
               {activeMission && <div className="mission-detail-heading__actions">
                 <button type="button" className="button secondary refresh-action" disabled={loading || missionLoading || busy} onClick={() => { setCursor(''); refreshAll(); }}>Làm mới</button>
                 <button type="button" className="button secondary mission-back-to-list" onClick={returnToMissionList}>← Danh sách nhiệm vụ</button>
@@ -1099,7 +1098,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                 {missionDetailTab === 'overview' && <div className="volunteer-mission-tab-content">
                 <div className="volunteer-mission-facts">
                   <div><small>Số người cần hỗ trợ</small><strong>{activeMission.people_affected ?? 'Chưa rõ'}</strong></div>
-                  <div><small>Thời điểm giao</small><strong>{timeLabel(activeMission.created_at)}</strong></div>
+
                   <div><small>Đội thực hiện</small><strong>{activeMission.team.name}</strong></div>
                 </div>
 

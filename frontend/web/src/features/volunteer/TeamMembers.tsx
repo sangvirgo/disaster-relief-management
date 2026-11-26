@@ -11,7 +11,7 @@ type MemberPage = { items: Member[]; can_manage_members: boolean; cursor?: strin
 type Candidate = { user_id: string; username: string; display_name: string };
 type CandidatePage = { items: Candidate[]; cursor?: string; more: boolean };
 
-export function TeamMembers({ teamId, onManageChange, addOpen, onOpenAdd, onCloseAdd }: { teamId: string; onManageChange: (allowed: boolean) => void; addOpen: boolean; onOpenAdd: () => void; onCloseAdd: () => void }) {
+export function TeamMembers({ teamId, onManageChange, addOpen, onOpenAdd, onCloseAdd, readOnly = false }: { readOnly?: boolean; teamId: string; onManageChange: (allowed: boolean) => void; addOpen: boolean; onOpenAdd: () => void; onCloseAdd: () => void }) {
   const [members, setMembers] = useState<Member[]>([]);
   const [canManage, setCanManage] = useState(false);
   const [memberCursor, setMemberCursor, prevMembers, memberPage] = useCursorNav<string>('');
@@ -42,14 +42,14 @@ export function TeamMembers({ teamId, onManageChange, addOpen, onOpenAdd, onClos
       .then((page) => {
         if (!live) return;
         setMembers(page.items);
-        setCanManage(page.can_manage_members);
-        onManageChange(page.can_manage_members);
+        setCanManage(!readOnly && page.can_manage_members);
+        onManageChange(!readOnly && page.can_manage_members);
         setMemberNext(page.cursor || '');
       })
       .catch((cause) => { if (live) setError(cause instanceof Error ? cause.message : 'Không thể tải thành viên đội.'); })
       .finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
-  }, [teamId, memberCursor, revision, onManageChange]);
+  }, [teamId, memberCursor, revision, onManageChange, readOnly]);
 
   useEffect(() => {
     setMembers([]);
