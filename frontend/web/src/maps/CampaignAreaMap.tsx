@@ -320,7 +320,7 @@ export function CampaignAreaMap({
     }).addTo(layer);
     map.invalidateSize();
     map.stop();
-    map.fitBounds(L.circle([expansion.center.lat, expansion.center.lng], { radius: expansion.toRadiusM }).getBounds(),
+    map.fitBounds(L.latLng(expansion.center.lat, expansion.center.lng).toBounds(expansion.toRadiusM * 2),
       { padding: [40, 40], maxZoom: 14, animate: false });
     containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
