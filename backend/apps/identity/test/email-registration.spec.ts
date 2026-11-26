@@ -175,11 +175,16 @@ describe('email registration cleanup', () => {
     f.service.onModuleDestroy();
   });
   it('schedules bounded cleanup of only ephemeral registration rows', async () => {
-    const stop = jest.fn();
-    const schedule = jest.spyOn(JobRunner.prototype, 'schedule').mockReturnValue(stop);
+    const stopCleanup = jest.fn();
+    const stopPasswordResetMail = jest.fn();
+    const schedule = jest.spyOn(JobRunner.prototype, 'schedule')
+      .mockReturnValueOnce(stopCleanup)
+      .mockReturnValueOnce(stopPasswordResetMail);
     const f = fixture();
     await f.service.onModuleInit();
     expect(schedule).toHaveBeenCalledWith('identity.email-registration.cleanup', 60_000, expect.any(Function));
+    expect(schedule).toHaveBeenCalledWith('identity.password-reset-mail.dispatch', 5_000, expect.any(Function));
+    expect(schedule).toHaveBeenCalledTimes(2);
     const query = jest.fn(async (_sql: string) => []);
     await schedule.mock.calls[0]![2]({ query } as never);
     const sql = query.mock.calls[0]![0];
@@ -188,6 +193,7 @@ describe('email registration cleanup', () => {
     expect(sql.match(/DELETE FROM [a-z_]+/gu)).toEqual(['DELETE FROM email_registration']);
     expect(sql).not.toMatch(/app_user|role_grant|session_family/u);
     f.service.onModuleDestroy();
-    expect(stop).toHaveBeenCalledTimes(1);
+    expect(stopCleanup).toHaveBeenCalledTimes(1);
+    expect(stopPasswordResetMail).toHaveBeenCalledTimes(1);
   });
 });
