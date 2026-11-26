@@ -15,7 +15,7 @@ function candidate(id: string, overrides: Partial<CandidateRow> = {}): Candidate
     distance_m: 1000,
     open_needed_items: 1,
     needed_items_in_stock: 0,
-    open_distributions: 0,
+    open_supply_requests: 0,
     ...overrides,
   };
 }
@@ -48,7 +48,7 @@ describe('campaign warehouse assignment planning', () => {
 
   it('ranks lower load before shorter distance when stock is equal', () => {
     const plan = planAssignment({
-      candidates: [candidate(A, { distance_m: 500, open_distributions: 3 }), candidate(B, { distance_m: 900, open_distributions: 1 })],
+      candidates: [candidate(A, { distance_m: 500, open_supply_requests: 3 }), candidate(B, { distance_m: 900, open_supply_requests: 1 })],
       stored: [], rerank: false, clearManual: false,
     });
     expect(plan.primaryId).toBe(B);

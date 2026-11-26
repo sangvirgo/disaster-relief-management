@@ -16,13 +16,13 @@ describe('NeedsQueriesService', () => {
         id: needId, cycle_id: cycleId, request_id: requestId, work_cycle: 2,
         campaign_id: null, item_id: '55555555-5555-4555-8555-555555555555', item_name: 'Nước sạch',
         unit_code: 'BOTTLE', unit_name: 'Chai', unit_scale: 0, original: '10.000', requested: '10.000',
-        committed_reserved: '4.000', issued_unsettled: '2.000', delivered: '3.000', returned: '1.000', lost: '0.000',
+        committed_reserved: '4.000', issued_unsettled: '2.000', delivered: '3.000',
         cancelled_remaining: null, status: 'PARTIALLY_FULFILLED', source: 'DECLARED', estimate_basis: null,
         reference_estimate_quantity: null, created_at: '2026-10-13T00:00:00.000Z',
         contributions: [{
           id: '66666666-6666-4666-8666-666666666666', warehouse_id: '77777777-7777-4777-8777-777777777777',
           warehouse_name: 'Kho Bắc', quantity: '10.000', released_quantity: '0.000', issued_quantity: '0.000',
-          delivered_quantity: '0.000', returned_quantity: '0.000', lost_quantity: '0.000',
+          delivered_quantity: '0.000',
           created_by_user_id: '88888888-8888-4888-8888-888888888888', created_at: '2026-10-13T00:00:00.000Z',
         }],
         contributions_more: false,
@@ -43,13 +43,13 @@ describe('NeedsQueriesService', () => {
         item: { id: '55555555-5555-4555-8555-555555555555', name: 'Nước sạch' },
         unit: { code: 'BOTTLE', display_name: 'Chai', scale: 0 },
         original: '10', requested: '10', committed_reserved: '4', issued_unsettled: '2', delivered: '3',
-        returned: '1', lost: '0', outstanding: '7', cancelled_remaining: null, status: 'PARTIALLY_FULFILLED',
+        outstanding: '7', cancelled_remaining: null, status: 'PARTIALLY_FULFILLED',
         source: 'DECLARED', estimate: null, estimate_reference_quantity: null, reason_codes: [],
         contributions: {
           items: [{
             id: '66666666-6666-4666-8666-666666666666', warehouse_id: '77777777-7777-4777-8777-777777777777',
             warehouse_name: 'Kho Bắc', quantity: '10', reserved_remaining: '10', issued_unsettled: '0',
-            delivered: '0', returned: '0', lost: '0', created_by_user_id: '88888888-8888-4888-8888-888888888888',
+            delivered: '0', created_by_user_id: '88888888-8888-4888-8888-888888888888',
             created_at: '2026-10-13T00:00:00.000Z',
           }],
           more: false,
@@ -103,7 +103,7 @@ describe('NeedsQueriesService', () => {
       id: needId, cycle_id: cycleId, request_id: requestId, work_cycle: 2,
       campaign_id: null, item_id: '55555555-5555-4555-8555-555555555555', item_name: 'Nước sạch',
       unit_code: 'BOTTLE', unit_name: 'Chai', unit_scale: 0, original: '10.000', requested: '10.000',
-      committed_reserved: '0.000', issued_unsettled: '0.000', delivered: '0.000', returned: '0.000', lost: '0.000',
+      committed_reserved: '0.000', issued_unsettled: '0.000', delivered: '0.000',
       cancelled_remaining: null, status: 'OPEN', version: 1, created_at: cursorTime, cursor_created_at: cursorTime,
     };
     const query = jest.fn().mockResolvedValueOnce([row, { ...row, id: '99999999-9999-4999-8999-999999999999' }]).mockResolvedValueOnce([]);
@@ -128,7 +128,7 @@ describe('NeedsQueriesService', () => {
     const first = {
       id: '66666666-6666-4666-8666-666666666666', warehouse_id: '77777777-7777-4777-8777-777777777777',
       warehouse_name: 'Kho Bắc', quantity: '10.00', released_quantity: '1.00', issued_quantity: '2.00',
-      delivered_quantity: '1.00', returned_quantity: '0.00', lost_quantity: '0.00',
+      delivered_quantity: '1.00',
       created_by_user_id: '88888888-8888-4888-8888-888888888888',
       created_at: '2026-10-13T00:00:00.000123Z', cursor_created_at: '2026-10-13T00:00:00.000123Z',
     };

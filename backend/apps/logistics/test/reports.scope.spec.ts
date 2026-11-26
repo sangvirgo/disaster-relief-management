@@ -38,13 +38,13 @@ describe('reportScopeSql', () => {
     expect(() => reportScopeSql([], reportPermissions, [], 'c')).toThrow(AppError);
   });
 
-  it('accepts either documented permission for reconciliation', () => {
+  it('accepts the report permission for reconciliation', () => {
     const grants: Grant[] = [
-      { role_code: 'REVIEWER', scope_type: 'SYSTEM' },
+      { role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' },
     ];
     const values: unknown[] = [];
 
-    const scope = reportScopeSql(grants, ['REPORT_READ', 'DISTRIBUTION_REVIEW'], values, 'w');
+    const scope = reportScopeSql(grants, ['REPORT_READ'], values, 'w');
 
     expect(scope).toBe('(TRUE)');
     expect(values).toEqual([]);

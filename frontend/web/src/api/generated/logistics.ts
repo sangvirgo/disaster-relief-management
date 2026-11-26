@@ -4,230 +4,6 @@
  */
 
 export interface paths {
-    "/commitments/{id}/release": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * NeedsController.releaseCommitment
-         * @description Route exported from backend/apps/logistics/src/needs/needs.controller.ts#NeedsController.releaseCommitment. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        post: operations["logisticsNeedsReleaseCommitment"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/distributions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * DistributionsController.list
-         * @description Route exported from backend/apps/logistics/src/distributions/distributions.controller.ts#DistributionsController.list. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        get: operations["logisticsDistributionsList"];
-        put?: never;
-        /**
-         * DistributionsController.create
-         * @description Route exported from backend/apps/logistics/src/distributions/distributions.controller.ts#DistributionsController.create. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        post: operations["logisticsDistributionsCreate"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/distributions/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * DistributionsController.detail
-         * @description Route exported from backend/apps/logistics/src/distributions/distributions.controller.ts#DistributionsController.detail. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        get: operations["logisticsDistributionsDetail"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/distributions/{id}/approve": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * DistributionsController.approve
-         * @description Route exported from backend/apps/logistics/src/distributions/distributions.controller.ts#DistributionsController.approve. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        post: operations["logisticsDistributionsApprove"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/distributions/{id}/cancel": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * DistributionsController.cancel
-         * @description Route exported from backend/apps/logistics/src/distributions/distributions.controller.ts#DistributionsController.cancel. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        post: operations["logisticsDistributionsCancel"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/distributions/{id}/dispatch": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * DistributionsController.dispatch
-         * @description Route exported from backend/apps/logistics/src/distributions/distributions.controller.ts#DistributionsController.dispatch. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        post: operations["logisticsDistributionsDispatch"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/distributions/{id}/handoffs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * DistributionsController.createHandoff
-         * @description Route exported from backend/apps/logistics/src/distributions/distributions.controller.ts#DistributionsController.createHandoff. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        post: operations["logisticsDistributionsCreateHandoff"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/distributions/{id}/handoffs/{handoffId}/review-loss": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * DistributionsController.reviewLoss
-         * @description Route exported from backend/apps/logistics/src/distributions/distributions.controller.ts#DistributionsController.reviewLoss. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        post: operations["logisticsDistributionsReviewLoss"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/distributions/{id}/lines": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * DistributionsController.replaceLines
-         * @description Route exported from backend/apps/logistics/src/distributions/distributions.controller.ts#DistributionsController.replaceLines. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        put: operations["logisticsDistributionsReplaceLines"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/distributions/{id}/prepare-from-commitments": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * DistributionsController.prepareFromCommitments
-         * @description Route exported from backend/apps/logistics/src/distributions/distributions.controller.ts#DistributionsController.prepareFromCommitments. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        post: operations["logisticsDistributionsPrepareFromCommitments"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/distributions/{id}/reconcile": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * DistributionsController.reconcile
-         * @description Route exported from backend/apps/logistics/src/distributions/distributions.controller.ts#DistributionsController.reconcile. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        post: operations["logisticsDistributionsReconcile"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/donation-deliveries": {
         parameters: {
             query?: never;
@@ -758,26 +534,6 @@ export interface paths {
          * @description Route exported from backend/apps/logistics/src/needs/needs.controller.ts#NeedsController.cancel. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
          */
         post: operations["logisticsNeedsCancel"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/needs/{id}/commitments": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * NeedsController.createCommitment
-         * @description Route exported from backend/apps/logistics/src/needs/needs.controller.ts#NeedsController.createCommitment. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        post: operations["logisticsNeedsCreateCommitment"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1329,7 +1085,7 @@ export interface paths {
         };
         /**
          * EvidenceController.download
-         * @description Rechecks the current evidence owner and authorization on every request before issuing a private-storage signed URL valid for 60 seconds. Donation/dispute evidence is readable by the delivery owner, a valid donation capability, or scoped DONATION_INTAKE/DONATION_REVIEW staff. Handoff evidence requires current warehouse scope: HANDOFF_RECORD for normal handoffs, DONATION_INTAKE or DISTRIBUTION_DISPATCH for RETURN, and HANDOFF_RECORD or LOSS_APPROVE for LOSS. Missing authentication for handoff evidence returns 401 UNAUTHENTICATED; an authenticated caller outside the required scope or without applicable permission returns 403 FORBIDDEN; missing or non-READY evidence returns 404 NOT_FOUND. Invalid or missing donation capability without owner or staff access returns 400 DONATION_SECRET_INVALID.
+         * @description Rechecks the current evidence owner and authorization on every request before issuing a private-storage signed URL valid for 60 seconds. Donation/dispute evidence is readable by the delivery owner, a valid donation capability, or scoped DONATION_INTAKE/DONATION_REVIEW staff. Missing or non-READY evidence returns 404 NOT_FOUND. Invalid or missing donation capability without owner or staff access returns 400 DONATION_SECRET_INVALID.
          */
         get: operations["logisticsDonationsDownloadEvidence"];
         put?: never;
@@ -1374,46 +1130,6 @@ export interface paths {
          * @description Route exported from backend/apps/logistics/src/drives/donations.controller.ts#DonationsController.recover. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
          */
         post: operations["logisticsDonationsRecover"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/distributions/{id}/handoffs/{handoffId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * DistributionsController.handoffDetail
-         * @description Requires an authenticated session and matching warehouse scope. DIRECT_HOUSEHOLD requires HANDOFF_RECORD; RETURN requires DONATION_INTAKE or DISTRIBUTION_DISPATCH; LOSS requires HANDOFF_RECORD or LOSS_APPROVE. Missing permission returns 403 FORBIDDEN; out-of-scope access returns 404 NOT_FOUND. See docs/backend/04-logistics-api.md for the response shape.
-         */
-        get: operations["logisticsDistributionsHandoffDetail"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/distributions/{id}/handoffs/{handoffId}/evidence": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * DistributionsController.uploadHandoffEvidence
-         * @description Requires an authenticated session. The handoff must belong to the path distribution and be in the caller's current warehouse scope; missing, mismatched, or out-of-scope records return 404 NOT_FOUND. DIRECT_HOUSEHOLD and LOSS require HANDOFF_RECORD; RETURN requires DONATION_INTAKE or DISTRIBUTION_DISPATCH. Missing authentication returns 401 UNAUTHENTICATED; an in-scope caller without the required permission returns 403 FORBIDDEN. LOSS_APPROVE alone does not permit upload. Accepts one multipart file named file and requires Idempotency-Key; returns READY private evidence metadata.
-         */
-        post: operations["logisticsDistributionsUploadHandoffEvidence"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1720,214 +1436,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/pickup-tickets": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * PickupTicketsController.list
-         * @description Route exported from backend/apps/logistics/src/pickup-tickets/pickup-tickets.controller.ts#PickupTicketsController.list. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        get: operations["logisticsPickupTicketsList"];
-        put?: never;
-        /**
-         * PickupTicketsController.create
-         * @description Route exported from backend/apps/logistics/src/pickup-tickets/pickup-tickets.controller.ts#PickupTicketsController.create. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        post: operations["logisticsPickupTicketsCreate"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/pickup-tickets/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * PickupTicketsController.detail
-         * @description Route exported from backend/apps/logistics/src/pickup-tickets/pickup-tickets.controller.ts#PickupTicketsController.detail. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        get: operations["logisticsPickupTicketsDetail"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/pickup-tickets/{id}/cancel": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * PickupTicketsController.cancel
-         * @description Route exported from backend/apps/logistics/src/pickup-tickets/pickup-tickets.controller.ts#PickupTicketsController.cancel. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        post: operations["logisticsPickupTicketsCancel"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/pickup-tickets/{id}/confirm": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * PickupTicketsController.confirm
-         * @description Route exported from backend/apps/logistics/src/pickup-tickets/pickup-tickets.controller.ts#PickupTicketsController.confirm. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        post: operations["logisticsPickupTicketsConfirm"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/pickup-tickets/{id}/handover": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * PickupTicketsController.handover
-         * @description Route exported from backend/apps/logistics/src/pickup-tickets/pickup-tickets.controller.ts#PickupTicketsController.handover. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        post: operations["logisticsPickupTicketsHandover"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/pickup-tickets/{id}/reserve": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * PickupTicketsController.reserve
-         * @description Route exported from backend/apps/logistics/src/pickup-tickets/pickup-tickets.controller.ts#PickupTicketsController.reserve. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        post: operations["logisticsPickupTicketsReserve"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/pickup-tickets/{id}/closeout": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * PickupTicketsController.closeout
-         * @description Route exported from backend/apps/logistics/src/pickup-tickets/pickup-tickets.controller.ts#PickupTicketsController.closeout. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        get: operations["logisticsPickupTicketsCloseout"];
-        /**
-         * PickupTicketsController.saveCloseout
-         * @description Route exported from backend/apps/logistics/src/pickup-tickets/pickup-tickets.controller.ts#PickupTicketsController.saveCloseout. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        put: operations["logisticsPickupTicketsSaveCloseout"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/pickup-tickets/{id}/closeout/review": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * PickupTicketsController.reviewCloseout
-         * @description Route exported from backend/apps/logistics/src/pickup-tickets/pickup-tickets.controller.ts#PickupTicketsController.reviewCloseout. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        post: operations["logisticsPickupTicketsReviewCloseout"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/pickup-tickets/{id}/closeout/submit": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * PickupTicketsController.submitCloseout
-         * @description Route exported from backend/apps/logistics/src/pickup-tickets/pickup-tickets.controller.ts#PickupTicketsController.submitCloseout. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        post: operations["logisticsPickupTicketsSubmitCloseout"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/pickup-tickets/{id}/deliveries": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * PickupTicketsController.deliveries
-         * @description Route exported from backend/apps/logistics/src/pickup-tickets/pickup-tickets.controller.ts#PickupTicketsController.deliveries. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
-         */
-        post: operations["logisticsPickupTicketsDeliveries"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/items/{id}": {
         parameters: {
             query?: never;
@@ -1992,7 +1500,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/distributions/{id}/approve-and-dispatch": {
+    "/internal/campaigns/{id}/warehouses/sync": {
         parameters: {
             query?: never;
             header?: never;
@@ -2002,10 +1510,114 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * DistributionsController.approveAndDispatch
-         * @description Route exported from backend/apps/logistics/src/distributions/distributions.controller.ts#DistributionsController.approveAndDispatch. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
+         * CampaignWarehousesInternalController.sync
+         * @description Route exported from backend/apps/logistics/src/campaign-warehouses/campaign-warehouses-internal.controller.ts#CampaignWarehousesInternalController.sync. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
          */
-        post: operations["logisticsDistributionsApproveAndDispatch"];
+        post: operations["logisticsCampaignWarehousesInternalSync"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/supply-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * SupplyRequestsController.forMission
+         * @description Route exported from backend/apps/logistics/src/supply-requests/supply-requests.controller.ts#SupplyRequestsController.forMission. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
+         */
+        get: operations["logisticsSupplyRequestsForMission"];
+        put?: never;
+        /**
+         * SupplyRequestsController.create
+         * @description A team leader (VOLUNTEER grant, leader of the mission team) or a coordinator of the campaign (on behalf) asks for goods for a live mission (ACCEPTED, EN_ROUTE, ON_SCENE). The system confirms the SOS needs, picks one warehouse (campaign PRIMARY/BACKUP first, another active warehouse only when no campaign warehouse holds any goods), reserves what it holds and returns a six-digit pickup code. No approval step. Requires Idempotency-Key.
+         */
+        post: operations["logisticsSupplyRequestsCreate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/supply-requests/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SupplyRequestsController.cancel
+         * @description The team leader, a coordinator of the campaign or warehouse staff cancel an open request; the reservation is released. Requires Idempotency-Key.
+         */
+        post: operations["logisticsSupplyRequestsCancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/supply-requests/{id}/hand-over": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SupplyRequestsController.handOver
+         * @description Warehouse staff (SUPPLY_REQUEST_HANDOVER) hand the reserved goods to the team that shows the matching pickup code. Issues the stock and counts it as delivered to the SOS needs in one step. Requires Idempotency-Key.
+         */
+        post: operations["logisticsSupplyRequestsHandOver"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/supply-requests/queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * SupplyRequestsController.queue
+         * @description Warehouse queue for SUPPLY_REQUEST_HANDOVER: team name and reserved goods only. Never returns the SOS, mission, request, people, location or pickup code. READY rows are oldest first; other statuses newest first.
+         */
+        get: operations["logisticsSupplyRequestsQueue"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/supply-requests/suggestion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * SupplyRequestsController.suggestion
+         * @description Route exported from backend/apps/logistics/src/supply-requests/supply-requests.controller.ts#SupplyRequestsController.suggestion. Detailed request, response, and error contract: docs/backend/04-logistics-api.md. This export does not infer payload schemas.
+         */
+        get: operations["logisticsSupplyRequestsSuggestion"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2046,1225 +1658,6 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    logisticsNeedsReleaseCommitment: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    expected_version: number;
-                    /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                    quantity: string;
-                    reason: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id?: string;
-                        /** Format: uuid */
-                        relief_need_id?: string;
-                        /** Format: uuid */
-                        item_id?: string;
-                        /** Format: uuid */
-                        warehouse_id?: string;
-                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                        quantity?: string;
-                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                        released_quantity?: string;
-                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                        issued_quantity?: string;
-                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                        delivered_quantity?: string;
-                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                        returned_quantity?: string;
-                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                        lost_quantity?: string;
-                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                        reserved_remaining?: string;
-                        version?: number;
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    logisticsDistributionsList: {
-        parameters: {
-            query?: {
-                status?: string;
-                cursor?: string;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        items?: {
-                            /** Format: uuid */
-                            id?: string;
-                            /** Format: uuid */
-                            warehouse_id?: string;
-                            campaign_id?: string | null;
-                            purpose?: string;
-                            status?: string;
-                            /** Format: uuid */
-                            preparer_user_id?: string;
-                            approver_user_id?: string | null;
-                            approved_version?: number | null;
-                            dispatch_actor_user_id?: string | null;
-                            dispatched_at?: string | null;
-                            reconciled_at?: string | null;
-                            /** Format: date-time */
-                            created_at?: string;
-                            version?: number;
-                            lines?: {
-                                /** Format: uuid */
-                                id?: string;
-                                /** Format: uuid */
-                                item_id?: string;
-                                item_name?: string;
-                                unit?: {
-                                    code?: string;
-                                    scale?: number;
-                                };
-                                commitment_id?: string | null;
-                                /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                                quantity?: string;
-                                /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                                dispatched?: string;
-                                /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                                handed_out?: string;
-                                /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                                returned?: string;
-                                /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                                lost?: string;
-                                pending_loss_count?: number;
-                                /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                                in_transit?: string;
-                            }[];
-                        }[];
-                        more?: boolean;
-                        cursor?: string;
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    logisticsDistributionsCreate: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    /** Format: uuid */
-                    warehouse_id: string;
-                    /** Format: uuid */
-                    campaign_id?: string;
-                    /** @enum {string} */
-                    purpose: "REQUEST_AID" | "CAMPAIGN_DISTRIBUTION";
-                    lines: {
-                        /** Format: uuid */
-                        item_id: string;
-                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                        quantity: string;
-                        /** Format: uuid */
-                        commitment_id?: string;
-                    }[];
-                };
-            };
-        };
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id?: string;
-                        /** Format: uuid */
-                        warehouse_id?: string;
-                        campaign_id?: string | null;
-                        purpose?: string;
-                        status?: string;
-                        /** Format: uuid */
-                        preparer_user_id?: string;
-                        approver_user_id?: string | null;
-                        approved_version?: number | null;
-                        dispatch_actor_user_id?: string | null;
-                        dispatched_at?: string | null;
-                        reconciled_at?: string | null;
-                        /** Format: date-time */
-                        created_at?: string;
-                        version?: number;
-                        lines?: {
-                            /** Format: uuid */
-                            id?: string;
-                            /** Format: uuid */
-                            item_id?: string;
-                            item_name?: string;
-                            unit?: {
-                                code?: string;
-                                scale?: number;
-                            };
-                            commitment_id?: string | null;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            quantity?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            dispatched?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            handed_out?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            returned?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            lost?: string;
-                            pending_loss_count?: number;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            in_transit?: string;
-                        }[];
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    logisticsDistributionsDetail: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id?: string;
-                        /** Format: uuid */
-                        warehouse_id?: string;
-                        campaign_id?: string | null;
-                        purpose?: string;
-                        status?: string;
-                        /** Format: uuid */
-                        preparer_user_id?: string;
-                        approver_user_id?: string | null;
-                        approved_version?: number | null;
-                        dispatch_actor_user_id?: string | null;
-                        dispatched_at?: string | null;
-                        reconciled_at?: string | null;
-                        /** Format: date-time */
-                        created_at?: string;
-                        version?: number;
-                        lines?: {
-                            /** Format: uuid */
-                            id?: string;
-                            /** Format: uuid */
-                            item_id?: string;
-                            item_name?: string;
-                            unit?: {
-                                code?: string;
-                                scale?: number;
-                            };
-                            commitment_id?: string | null;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            quantity?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            dispatched?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            handed_out?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            returned?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            lost?: string;
-                            pending_loss_count?: number;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            in_transit?: string;
-                        }[];
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    logisticsDistributionsApprove: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    expected_version: number;
-                };
-            };
-        };
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id?: string;
-                        /** Format: uuid */
-                        warehouse_id?: string;
-                        campaign_id?: string | null;
-                        purpose?: string;
-                        status?: string;
-                        /** Format: uuid */
-                        preparer_user_id?: string;
-                        approver_user_id?: string | null;
-                        approved_version?: number | null;
-                        dispatch_actor_user_id?: string | null;
-                        dispatched_at?: string | null;
-                        reconciled_at?: string | null;
-                        /** Format: date-time */
-                        created_at?: string;
-                        version?: number;
-                        lines?: {
-                            /** Format: uuid */
-                            id?: string;
-                            /** Format: uuid */
-                            item_id?: string;
-                            item_name?: string;
-                            unit?: {
-                                code?: string;
-                                scale?: number;
-                            };
-                            commitment_id?: string | null;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            quantity?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            dispatched?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            handed_out?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            returned?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            lost?: string;
-                            pending_loss_count?: number;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            in_transit?: string;
-                        }[];
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    logisticsDistributionsCancel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    expected_version: number;
-                };
-            };
-        };
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id?: string;
-                        /** Format: uuid */
-                        warehouse_id?: string;
-                        campaign_id?: string | null;
-                        purpose?: string;
-                        status?: string;
-                        /** Format: uuid */
-                        preparer_user_id?: string;
-                        approver_user_id?: string | null;
-                        approved_version?: number | null;
-                        dispatch_actor_user_id?: string | null;
-                        dispatched_at?: string | null;
-                        reconciled_at?: string | null;
-                        /** Format: date-time */
-                        created_at?: string;
-                        version?: number;
-                        lines?: {
-                            /** Format: uuid */
-                            id?: string;
-                            /** Format: uuid */
-                            item_id?: string;
-                            item_name?: string;
-                            unit?: {
-                                code?: string;
-                                scale?: number;
-                            };
-                            commitment_id?: string | null;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            quantity?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            dispatched?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            handed_out?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            returned?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            lost?: string;
-                            pending_loss_count?: number;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            in_transit?: string;
-                        }[];
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    logisticsDistributionsDispatch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    expected_version: number;
-                };
-            };
-        };
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id?: string;
-                        /** Format: uuid */
-                        warehouse_id?: string;
-                        campaign_id?: string | null;
-                        purpose?: string;
-                        status?: string;
-                        /** Format: uuid */
-                        preparer_user_id?: string;
-                        approver_user_id?: string | null;
-                        approved_version?: number | null;
-                        dispatch_actor_user_id?: string | null;
-                        dispatched_at?: string | null;
-                        reconciled_at?: string | null;
-                        /** Format: date-time */
-                        created_at?: string;
-                        version?: number;
-                        lines?: {
-                            /** Format: uuid */
-                            id?: string;
-                            /** Format: uuid */
-                            item_id?: string;
-                            item_name?: string;
-                            unit?: {
-                                code?: string;
-                                scale?: number;
-                            };
-                            commitment_id?: string | null;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            quantity?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            dispatched?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            handed_out?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            returned?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            lost?: string;
-                            pending_loss_count?: number;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            in_transit?: string;
-                        }[];
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    logisticsDistributionsCreateHandoff: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    /** @enum {string} */
-                    handoff_kind: "DIRECT_HOUSEHOLD" | "RETURN" | "LOSS";
-                    /** @enum {string} */
-                    source_stage?: "IN_TRANSIT";
-                    /** Format: uuid */
-                    receiver_user_id?: string;
-                    receiver_label?: string;
-                    confirmation_basis: string;
-                    /** Format: date-time */
-                    occurred_at: string;
-                    lines: {
-                        /** Format: uuid */
-                        distribution_line_id: string;
-                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                        quantity: string;
-                    }[];
-                };
-            };
-        };
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id?: string;
-                        /** Format: uuid */
-                        distribution_id?: string;
-                        handoff_kind?: string;
-                        source_stage?: string | null;
-                        receiver_user_id?: string | null;
-                        receiver_label?: string | null;
-                        /** Format: uuid */
-                        recorder_user_id?: string;
-                        confirmation_basis?: string;
-                        /** Format: date-time */
-                        occurred_at?: string;
-                        /** Format: date-time */
-                        created_at?: string;
-                        version?: number;
-                        status?: string;
-                        review?: {
-                            decision?: string;
-                            /** Format: uuid */
-                            reviewer_user_id?: string;
-                            reason?: string | null;
-                        } | null;
-                        lines?: {
-                            /** Format: uuid */
-                            id?: string;
-                            /** Format: uuid */
-                            distribution_line_id?: string;
-                            commitment_id?: string | null;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            quantity?: string;
-                            unit_code?: string;
-                        }[];
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    logisticsDistributionsReviewLoss: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                handoffId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    expected_version: number;
-                    /** @enum {string} */
-                    decision: "APPROVE" | "REJECT";
-                    reason: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id?: string;
-                        /** Format: uuid */
-                        distribution_id?: string;
-                        handoff_kind?: string;
-                        source_stage?: string | null;
-                        receiver_user_id?: string | null;
-                        receiver_label?: string | null;
-                        /** Format: uuid */
-                        recorder_user_id?: string;
-                        confirmation_basis?: string;
-                        /** Format: date-time */
-                        occurred_at?: string;
-                        /** Format: date-time */
-                        created_at?: string;
-                        version?: number;
-                        status?: string;
-                        review?: {
-                            decision?: string;
-                            /** Format: uuid */
-                            reviewer_user_id?: string;
-                            reason?: string | null;
-                        } | null;
-                        lines?: {
-                            /** Format: uuid */
-                            id?: string;
-                            /** Format: uuid */
-                            distribution_line_id?: string;
-                            commitment_id?: string | null;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            quantity?: string;
-                            unit_code?: string;
-                        }[];
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    logisticsDistributionsReplaceLines: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    expected_version: number;
-                    lines: {
-                        /** Format: uuid */
-                        item_id: string;
-                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                        quantity: string;
-                        /** Format: uuid */
-                        commitment_id?: string;
-                    }[];
-                };
-            };
-        };
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id?: string;
-                        /** Format: uuid */
-                        warehouse_id?: string;
-                        campaign_id?: string | null;
-                        purpose?: string;
-                        status?: string;
-                        /** Format: uuid */
-                        preparer_user_id?: string;
-                        approver_user_id?: string | null;
-                        approved_version?: number | null;
-                        dispatch_actor_user_id?: string | null;
-                        dispatched_at?: string | null;
-                        reconciled_at?: string | null;
-                        /** Format: date-time */
-                        created_at?: string;
-                        version?: number;
-                        lines?: {
-                            /** Format: uuid */
-                            id?: string;
-                            /** Format: uuid */
-                            item_id?: string;
-                            item_name?: string;
-                            unit?: {
-                                code?: string;
-                                scale?: number;
-                            };
-                            commitment_id?: string | null;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            quantity?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            dispatched?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            handed_out?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            returned?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            lost?: string;
-                            pending_loss_count?: number;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            in_transit?: string;
-                        }[];
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    logisticsDistributionsPrepareFromCommitments: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    expected_version: number;
-                };
-            };
-        };
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id?: string;
-                        /** Format: uuid */
-                        warehouse_id?: string;
-                        campaign_id?: string | null;
-                        purpose?: string;
-                        status?: string;
-                        /** Format: uuid */
-                        preparer_user_id?: string;
-                        approver_user_id?: string | null;
-                        approved_version?: number | null;
-                        dispatch_actor_user_id?: string | null;
-                        dispatched_at?: string | null;
-                        reconciled_at?: string | null;
-                        /** Format: date-time */
-                        created_at?: string;
-                        version?: number;
-                        lines?: {
-                            /** Format: uuid */
-                            id?: string;
-                            /** Format: uuid */
-                            item_id?: string;
-                            item_name?: string;
-                            unit?: {
-                                code?: string;
-                                scale?: number;
-                            };
-                            commitment_id?: string | null;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            quantity?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            dispatched?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            handed_out?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            returned?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            lost?: string;
-                            pending_loss_count?: number;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            in_transit?: string;
-                        }[];
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    logisticsDistributionsReconcile: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    expected_version: number;
-                };
-            };
-        };
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id?: string;
-                        /** Format: uuid */
-                        warehouse_id?: string;
-                        campaign_id?: string | null;
-                        purpose?: string;
-                        status?: string;
-                        /** Format: uuid */
-                        preparer_user_id?: string;
-                        approver_user_id?: string | null;
-                        approved_version?: number | null;
-                        dispatch_actor_user_id?: string | null;
-                        dispatched_at?: string | null;
-                        reconciled_at?: string | null;
-                        /** Format: date-time */
-                        created_at?: string;
-                        version?: number;
-                        lines?: {
-                            /** Format: uuid */
-                            id?: string;
-                            /** Format: uuid */
-                            item_id?: string;
-                            item_name?: string;
-                            unit?: {
-                                code?: string;
-                                scale?: number;
-                            };
-                            commitment_id?: string | null;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            quantity?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            dispatched?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            handed_out?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            returned?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            lost?: string;
-                            pending_loss_count?: number;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            in_transit?: string;
-                        }[];
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
     logisticsDonationReceiptsDeliveries: {
         parameters: {
             query?: {
@@ -5291,10 +3684,6 @@ export interface operations {
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             delivered?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            returned?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            lost?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             outstanding?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             cancelled_remaining?: string;
@@ -5708,10 +4097,6 @@ export interface operations {
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             delivered?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            returned?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            lost?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             outstanding?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             cancelled_remaining?: string;
@@ -5945,97 +4330,6 @@ export interface operations {
             };
         };
     };
-    logisticsNeedsCreateCommitment: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    /** Format: uuid */
-                    warehouse_id: string;
-                    /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                    quantity: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id?: string;
-                        /** Format: uuid */
-                        relief_need_id?: string;
-                        /** Format: uuid */
-                        item_id?: string;
-                        /** Format: uuid */
-                        warehouse_id?: string;
-                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                        quantity?: string;
-                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                        released_quantity?: string;
-                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                        issued_quantity?: string;
-                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                        delivered_quantity?: string;
-                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                        returned_quantity?: string;
-                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                        lost_quantity?: string;
-                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                        reserved_remaining?: string;
-                        version?: number;
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
     logisticsNeedsContributions: {
         parameters: {
             query?: {
@@ -6071,10 +4365,6 @@ export interface operations {
                             issued_unsettled?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             delivered?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            returned?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            lost?: string;
                             /** Format: uuid */
                             created_by_user_id?: string;
                             /** Format: date-time */
@@ -6955,13 +5245,7 @@ export interface operations {
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             reserved?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            issued_in_transit?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             delivered?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            returned?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            lost?: string;
                             flags?: {
                                 balance_mismatch?: boolean;
                                 commitment_counter_mismatch?: boolean;
@@ -7131,8 +5415,6 @@ export interface operations {
                             available?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             held?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            in_transit?: string;
                         }[];
                         more?: boolean;
                         cursor?: string;
@@ -7212,10 +5494,6 @@ export interface operations {
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             delivered?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            returned?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            lost?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             outstanding?: string;
                             /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                             cancelled_remaining?: string;
@@ -7235,10 +5513,6 @@ export interface operations {
                                     issued_unsettled?: string;
                                     /** @description Decimal quantity encoded as a string and validated against the unit scale. */
                                     delivered?: string;
-                                    /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                                    returned?: string;
-                                    /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                                    lost?: string;
                                     /** Format: uuid */
                                     created_by_user_id?: string;
                                     /** Format: date-time */
@@ -8654,229 +6928,6 @@ export interface operations {
             };
         };
     };
-    logisticsDistributionsHandoffDetail: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                handoffId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id?: string;
-                        /** Format: uuid */
-                        distribution_id?: string;
-                        handoff_kind?: string;
-                        source_stage?: string | null;
-                        receiver_user_id?: string | null;
-                        receiver_label?: string | null;
-                        /** Format: uuid */
-                        recorder_user_id?: string;
-                        confirmation_basis?: string;
-                        /** Format: date-time */
-                        occurred_at?: string;
-                        /** Format: date-time */
-                        created_at?: string;
-                        version?: number;
-                        status?: string;
-                        review?: {
-                            decision?: string;
-                            /** Format: uuid */
-                            reviewer_user_id?: string;
-                            reason?: string | null;
-                        } | null;
-                        lines?: {
-                            /** Format: uuid */
-                            id?: string;
-                            /** Format: uuid */
-                            distribution_line_id?: string;
-                            commitment_id?: string | null;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            quantity?: string;
-                            unit_code?: string;
-                        }[];
-                        evidence?: {
-                            /** Format: uuid */
-                            id: string;
-                            /** @constant */
-                            state: "READY";
-                            size_bytes: number;
-                            /** @enum {string} */
-                            detected_mime: "image/jpeg" | "image/png" | "video/mp4";
-                            /** Format: date-time */
-                            created_at: string;
-                        }[];
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    logisticsDistributionsUploadHandoffEvidence: {
-        parameters: {
-            query?: never;
-            header: {
-                "Idempotency-Key": string;
-            };
-            path: {
-                id: string;
-                handoffId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "multipart/form-data": {
-                    /** Format: binary */
-                    file: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Stored private handoff evidence metadata. */
-            201: {
-                headers: {
-                    /** @description Prevents storage of the Logistics API result. */
-                    "Cache-Control"?: "no-store";
-                    /** @description Present as true when this response replays the original command result. */
-                    "Idempotent-Replay"?: "true";
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id: string;
-                        /** @constant */
-                        state: "READY";
-                        size_bytes: number;
-                        /** @enum {string} */
-                        detected_mime: "image/jpeg" | "image/png" | "video/mp4";
-                        checksum: string;
-                        /** Format: date-time */
-                        created_at: string;
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            411: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            415: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
     logisticsDonationsLookupGuest: {
         parameters: {
             query?: never;
@@ -9094,7 +7145,7 @@ export interface operations {
                                 open_needed_items: number;
                                 needed_items_in_stock: number;
                             };
-                            open_distributions: number;
+                            open_supply_requests: number;
                         }[];
                         flags: ("NO_SERVING_WAREHOUSE" | "MANUAL_PRIMARY_INELIGIBLE" | "CAMPAIGN_AREA_MISSING")[];
                         /** @description Non-persisted proposal; present only when no PRIMARY is stored. */
@@ -9209,7 +7260,7 @@ export interface operations {
                                 open_needed_items: number;
                                 needed_items_in_stock: number;
                             };
-                            open_distributions: number;
+                            open_supply_requests: number;
                         }[];
                         flags: ("NO_SERVING_WAREHOUSE" | "MANUAL_PRIMARY_INELIGIBLE" | "CAMPAIGN_AREA_MISSING")[];
                         /** @description Non-persisted proposal; present only when no PRIMARY is stored. */
@@ -9312,7 +7363,7 @@ export interface operations {
                                 open_needed_items: number;
                                 needed_items_in_stock: number;
                             };
-                            open_distributions: number;
+                            open_supply_requests: number;
                         }[];
                         flags: ("NO_SERVING_WAREHOUSE" | "MANUAL_PRIMARY_INELIGIBLE" | "CAMPAIGN_AREA_MISSING")[];
                         /** @description Non-persisted proposal; present only when no PRIMARY is stored. */
@@ -10122,1515 +8173,6 @@ export interface operations {
             };
         };
     };
-    logisticsPickupTicketsList: {
-        parameters: {
-            query?: {
-                mission_id?: string;
-                status?: string;
-                cursor?: string;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        items: {
-                            /** Format: uuid */
-                            id: string;
-                            /** Format: uuid */
-                            mission_id: string;
-                            request_id?: string | null;
-                            campaign_id?: string | null;
-                            team_id?: string | null;
-                            /** Format: uuid */
-                            warehouse_id: string;
-                            /** @enum {string} */
-                            status: "OPEN" | "READY" | "HANDED_OVER" | "CLOSED" | "CANCELLED";
-                            distribution_id?: string | null;
-                            version: number;
-                            ready_at?: string | null;
-                            reserved_by?: string | null;
-                            confirmed_by?: string | null;
-                            confirmed_at?: string | null;
-                            handed_over_by?: string | null;
-                            handed_over_at?: string | null;
-                            collected_by_user_id?: string | null;
-                            cancelled_at?: string | null;
-                            cancel_reason?: string | null;
-                            /** Format: date-time */
-                            created_at?: string;
-                            /** Format: date-time */
-                            updated_at?: string;
-                            lines: {
-                                /** Format: uuid */
-                                relief_need_id: string;
-                                commitment_id: string | null;
-                                /** Format: uuid */
-                                item_id: string;
-                                item_name: string;
-                                unit_code: string;
-                                /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                                requested_quantity: string;
-                                /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                                reserved_quantity: string;
-                                /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                                shortfall_quantity: string;
-                            }[];
-                            shortfalls: {
-                                /** Format: uuid */
-                                relief_need_id: string;
-                                /** Format: uuid */
-                                item_id: string;
-                                item_name: string;
-                                /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                                shortfall_quantity: string;
-                            }[];
-                            backup_warehouses?: {
-                                /** Format: uuid */
-                                warehouse_id: string;
-                                /** Format: uuid */
-                                item_id: string;
-                                /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                                available_quantity: string;
-                            }[];
-                            closed_by?: string | null;
-                            closed_at?: string | null;
-                            unaccounted_goods?: boolean;
-                            handover_overdue?: boolean;
-                        }[];
-                        more: boolean;
-                        cursor?: string;
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    logisticsPickupTicketsCreate: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    /** Format: uuid */
-                    mission_id: string;
-                    /** Format: uuid */
-                    warehouse_id?: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id: string;
-                        /** Format: uuid */
-                        mission_id: string;
-                        request_id?: string | null;
-                        campaign_id?: string | null;
-                        team_id?: string | null;
-                        /** Format: uuid */
-                        warehouse_id: string;
-                        /** @enum {string} */
-                        status: "OPEN" | "READY" | "HANDED_OVER" | "CLOSED" | "CANCELLED";
-                        distribution_id?: string | null;
-                        version: number;
-                        ready_at?: string | null;
-                        reserved_by?: string | null;
-                        confirmed_by?: string | null;
-                        confirmed_at?: string | null;
-                        handed_over_by?: string | null;
-                        handed_over_at?: string | null;
-                        collected_by_user_id?: string | null;
-                        cancelled_at?: string | null;
-                        cancel_reason?: string | null;
-                        /** Format: date-time */
-                        created_at?: string;
-                        /** Format: date-time */
-                        updated_at?: string;
-                        lines: {
-                            /** Format: uuid */
-                            relief_need_id: string;
-                            commitment_id: string | null;
-                            /** Format: uuid */
-                            item_id: string;
-                            item_name: string;
-                            unit_code: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            requested_quantity: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            reserved_quantity: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            shortfall_quantity: string;
-                        }[];
-                        shortfalls: {
-                            /** Format: uuid */
-                            relief_need_id: string;
-                            /** Format: uuid */
-                            item_id: string;
-                            item_name: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            shortfall_quantity: string;
-                        }[];
-                        backup_warehouses?: {
-                            /** Format: uuid */
-                            warehouse_id: string;
-                            /** Format: uuid */
-                            item_id: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            available_quantity: string;
-                        }[];
-                        closed_by?: string | null;
-                        closed_at?: string | null;
-                        unaccounted_goods?: boolean;
-                        handover_overdue?: boolean;
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    logisticsPickupTicketsDetail: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id: string;
-                        /** Format: uuid */
-                        mission_id: string;
-                        request_id?: string | null;
-                        campaign_id?: string | null;
-                        team_id?: string | null;
-                        /** Format: uuid */
-                        warehouse_id: string;
-                        /** @enum {string} */
-                        status: "OPEN" | "READY" | "HANDED_OVER" | "CLOSED" | "CANCELLED";
-                        distribution_id?: string | null;
-                        version: number;
-                        ready_at?: string | null;
-                        reserved_by?: string | null;
-                        confirmed_by?: string | null;
-                        confirmed_at?: string | null;
-                        handed_over_by?: string | null;
-                        handed_over_at?: string | null;
-                        collected_by_user_id?: string | null;
-                        cancelled_at?: string | null;
-                        cancel_reason?: string | null;
-                        /** Format: date-time */
-                        created_at?: string;
-                        /** Format: date-time */
-                        updated_at?: string;
-                        lines: {
-                            /** Format: uuid */
-                            relief_need_id: string;
-                            commitment_id: string | null;
-                            /** Format: uuid */
-                            item_id: string;
-                            item_name: string;
-                            unit_code: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            requested_quantity: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            reserved_quantity: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            shortfall_quantity: string;
-                        }[];
-                        shortfalls: {
-                            /** Format: uuid */
-                            relief_need_id: string;
-                            /** Format: uuid */
-                            item_id: string;
-                            item_name: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            shortfall_quantity: string;
-                        }[];
-                        backup_warehouses?: {
-                            /** Format: uuid */
-                            warehouse_id: string;
-                            /** Format: uuid */
-                            item_id: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            available_quantity: string;
-                        }[];
-                        closed_by?: string | null;
-                        closed_at?: string | null;
-                        unaccounted_goods?: boolean;
-                        handover_overdue?: boolean;
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    logisticsPickupTicketsCancel: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    expected_version: number;
-                    reason: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id: string;
-                        /** Format: uuid */
-                        mission_id: string;
-                        request_id?: string | null;
-                        campaign_id?: string | null;
-                        team_id?: string | null;
-                        /** Format: uuid */
-                        warehouse_id: string;
-                        /** @enum {string} */
-                        status: "OPEN" | "READY" | "HANDED_OVER" | "CLOSED" | "CANCELLED";
-                        distribution_id?: string | null;
-                        version: number;
-                        ready_at?: string | null;
-                        reserved_by?: string | null;
-                        confirmed_by?: string | null;
-                        confirmed_at?: string | null;
-                        handed_over_by?: string | null;
-                        handed_over_at?: string | null;
-                        collected_by_user_id?: string | null;
-                        cancelled_at?: string | null;
-                        cancel_reason?: string | null;
-                        /** Format: date-time */
-                        created_at?: string;
-                        /** Format: date-time */
-                        updated_at?: string;
-                        lines: {
-                            /** Format: uuid */
-                            relief_need_id: string;
-                            commitment_id: string | null;
-                            /** Format: uuid */
-                            item_id: string;
-                            item_name: string;
-                            unit_code: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            requested_quantity: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            reserved_quantity: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            shortfall_quantity: string;
-                        }[];
-                        shortfalls: {
-                            /** Format: uuid */
-                            relief_need_id: string;
-                            /** Format: uuid */
-                            item_id: string;
-                            item_name: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            shortfall_quantity: string;
-                        }[];
-                        backup_warehouses?: {
-                            /** Format: uuid */
-                            warehouse_id: string;
-                            /** Format: uuid */
-                            item_id: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            available_quantity: string;
-                        }[];
-                        closed_by?: string | null;
-                        closed_at?: string | null;
-                        unaccounted_goods?: boolean;
-                        handover_overdue?: boolean;
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    logisticsPickupTicketsConfirm: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    expected_version: number;
-                };
-            };
-        };
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id: string;
-                        /** Format: uuid */
-                        mission_id: string;
-                        request_id?: string | null;
-                        campaign_id?: string | null;
-                        team_id?: string | null;
-                        /** Format: uuid */
-                        warehouse_id: string;
-                        /** @enum {string} */
-                        status: "OPEN" | "READY" | "HANDED_OVER" | "CLOSED" | "CANCELLED";
-                        distribution_id?: string | null;
-                        version: number;
-                        ready_at?: string | null;
-                        reserved_by?: string | null;
-                        confirmed_by?: string | null;
-                        confirmed_at?: string | null;
-                        handed_over_by?: string | null;
-                        handed_over_at?: string | null;
-                        collected_by_user_id?: string | null;
-                        cancelled_at?: string | null;
-                        cancel_reason?: string | null;
-                        /** Format: date-time */
-                        created_at?: string;
-                        /** Format: date-time */
-                        updated_at?: string;
-                        lines: {
-                            /** Format: uuid */
-                            relief_need_id: string;
-                            commitment_id: string | null;
-                            /** Format: uuid */
-                            item_id: string;
-                            item_name: string;
-                            unit_code: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            requested_quantity: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            reserved_quantity: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            shortfall_quantity: string;
-                        }[];
-                        shortfalls: {
-                            /** Format: uuid */
-                            relief_need_id: string;
-                            /** Format: uuid */
-                            item_id: string;
-                            item_name: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            shortfall_quantity: string;
-                        }[];
-                        backup_warehouses?: {
-                            /** Format: uuid */
-                            warehouse_id: string;
-                            /** Format: uuid */
-                            item_id: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            available_quantity: string;
-                        }[];
-                        closed_by?: string | null;
-                        closed_at?: string | null;
-                        unaccounted_goods?: boolean;
-                        handover_overdue?: boolean;
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    logisticsPickupTicketsHandover: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    expected_version: number;
-                    /** Format: uuid */
-                    collected_by_user_id?: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id: string;
-                        /** Format: uuid */
-                        mission_id: string;
-                        request_id?: string | null;
-                        campaign_id?: string | null;
-                        team_id?: string | null;
-                        /** Format: uuid */
-                        warehouse_id: string;
-                        /** @enum {string} */
-                        status: "OPEN" | "READY" | "HANDED_OVER" | "CLOSED" | "CANCELLED";
-                        distribution_id?: string | null;
-                        version: number;
-                        ready_at?: string | null;
-                        reserved_by?: string | null;
-                        confirmed_by?: string | null;
-                        confirmed_at?: string | null;
-                        handed_over_by?: string | null;
-                        handed_over_at?: string | null;
-                        collected_by_user_id?: string | null;
-                        cancelled_at?: string | null;
-                        cancel_reason?: string | null;
-                        /** Format: date-time */
-                        created_at?: string;
-                        /** Format: date-time */
-                        updated_at?: string;
-                        lines: {
-                            /** Format: uuid */
-                            relief_need_id: string;
-                            commitment_id: string | null;
-                            /** Format: uuid */
-                            item_id: string;
-                            item_name: string;
-                            unit_code: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            requested_quantity: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            reserved_quantity: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            shortfall_quantity: string;
-                        }[];
-                        shortfalls: {
-                            /** Format: uuid */
-                            relief_need_id: string;
-                            /** Format: uuid */
-                            item_id: string;
-                            item_name: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            shortfall_quantity: string;
-                        }[];
-                        backup_warehouses?: {
-                            /** Format: uuid */
-                            warehouse_id: string;
-                            /** Format: uuid */
-                            item_id: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            available_quantity: string;
-                        }[];
-                        closed_by?: string | null;
-                        closed_at?: string | null;
-                        unaccounted_goods?: boolean;
-                        handover_overdue?: boolean;
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    logisticsPickupTicketsReserve: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    expected_version: number;
-                };
-            };
-        };
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id: string;
-                        /** Format: uuid */
-                        mission_id: string;
-                        request_id?: string | null;
-                        campaign_id?: string | null;
-                        team_id?: string | null;
-                        /** Format: uuid */
-                        warehouse_id: string;
-                        /** @enum {string} */
-                        status: "OPEN" | "READY" | "HANDED_OVER" | "CLOSED" | "CANCELLED";
-                        distribution_id?: string | null;
-                        version: number;
-                        ready_at?: string | null;
-                        reserved_by?: string | null;
-                        confirmed_by?: string | null;
-                        confirmed_at?: string | null;
-                        handed_over_by?: string | null;
-                        handed_over_at?: string | null;
-                        collected_by_user_id?: string | null;
-                        cancelled_at?: string | null;
-                        cancel_reason?: string | null;
-                        /** Format: date-time */
-                        created_at?: string;
-                        /** Format: date-time */
-                        updated_at?: string;
-                        lines: {
-                            /** Format: uuid */
-                            relief_need_id: string;
-                            commitment_id: string | null;
-                            /** Format: uuid */
-                            item_id: string;
-                            item_name: string;
-                            unit_code: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            requested_quantity: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            reserved_quantity: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            shortfall_quantity: string;
-                        }[];
-                        shortfalls: {
-                            /** Format: uuid */
-                            relief_need_id: string;
-                            /** Format: uuid */
-                            item_id: string;
-                            item_name: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            shortfall_quantity: string;
-                        }[];
-                        backup_warehouses?: {
-                            /** Format: uuid */
-                            warehouse_id: string;
-                            /** Format: uuid */
-                            item_id: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            available_quantity: string;
-                        }[];
-                        closed_by?: string | null;
-                        closed_at?: string | null;
-                        unaccounted_goods?: boolean;
-                        handover_overdue?: boolean;
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    logisticsPickupTicketsCloseout: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        ticket_id: string;
-                        /** @enum {string} */
-                        ticket_status: "OPEN" | "READY" | "HANDED_OVER" | "CLOSED" | "CANCELLED";
-                        closeout_id?: string | null;
-                        closeout_status?: ("DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED") | null;
-                        version: number;
-                        editable: boolean;
-                        can_submit: boolean;
-                        review_note?: string | null;
-                        submitted_at?: string | null;
-                        reviewed_at?: string | null;
-                        lines: {
-                            /** Format: uuid */
-                            item_id: string;
-                            item_name: string;
-                            unit_code: string;
-                            returnable?: boolean;
-                            perishable?: boolean;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            held_quantity: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            delivered_quantity: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            remaining_quantity: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            returned_quantity: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            retired_quantity: string;
-                            retire_reason?: ("CONSUMED" | "EXPIRED" | "DAMAGED" | "LOST" | "NOT_RETURNABLE") | null;
-                            retire_reason_label?: string | null;
-                            note?: string | null;
-                            balanced: boolean;
-                        }[];
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    logisticsPickupTicketsSaveCloseout: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    expected_version: number;
-                    lines: {
-                        /** Format: uuid */
-                        item_id: string;
-                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                        returned_quantity: string;
-                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                        retired_quantity: string;
-                        /** @enum {string} */
-                        retire_reason?: "CONSUMED" | "EXPIRED" | "DAMAGED" | "LOST" | "NOT_RETURNABLE";
-                        note?: string;
-                    }[];
-                };
-            };
-        };
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        ticket_id: string;
-                        /** @enum {string} */
-                        ticket_status: "OPEN" | "READY" | "HANDED_OVER" | "CLOSED" | "CANCELLED";
-                        closeout_id?: string | null;
-                        closeout_status?: ("DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED") | null;
-                        version: number;
-                        editable: boolean;
-                        can_submit: boolean;
-                        review_note?: string | null;
-                        submitted_at?: string | null;
-                        reviewed_at?: string | null;
-                        lines: {
-                            /** Format: uuid */
-                            item_id: string;
-                            item_name: string;
-                            unit_code: string;
-                            returnable?: boolean;
-                            perishable?: boolean;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            held_quantity: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            delivered_quantity: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            remaining_quantity: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            returned_quantity: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            retired_quantity: string;
-                            retire_reason?: ("CONSUMED" | "EXPIRED" | "DAMAGED" | "LOST" | "NOT_RETURNABLE") | null;
-                            retire_reason_label?: string | null;
-                            note?: string | null;
-                            balanced: boolean;
-                        }[];
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    logisticsPickupTicketsReviewCloseout: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    expected_version: number;
-                    /** @enum {string} */
-                    decision: "APPROVE" | "REJECT";
-                    note?: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        ticket_id: string;
-                        /** @enum {string} */
-                        ticket_status: "OPEN" | "READY" | "HANDED_OVER" | "CLOSED" | "CANCELLED";
-                        closeout_id?: string | null;
-                        closeout_status?: ("DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED") | null;
-                        version: number;
-                        editable: boolean;
-                        can_submit: boolean;
-                        review_note?: string | null;
-                        submitted_at?: string | null;
-                        reviewed_at?: string | null;
-                        lines: {
-                            /** Format: uuid */
-                            item_id: string;
-                            item_name: string;
-                            unit_code: string;
-                            returnable?: boolean;
-                            perishable?: boolean;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            held_quantity: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            delivered_quantity: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            remaining_quantity: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            returned_quantity: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            retired_quantity: string;
-                            retire_reason?: ("CONSUMED" | "EXPIRED" | "DAMAGED" | "LOST" | "NOT_RETURNABLE") | null;
-                            retire_reason_label?: string | null;
-                            note?: string | null;
-                            balanced: boolean;
-                        }[];
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    logisticsPickupTicketsSubmitCloseout: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    expected_version: number;
-                };
-            };
-        };
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        ticket_id: string;
-                        /** @enum {string} */
-                        ticket_status: "OPEN" | "READY" | "HANDED_OVER" | "CLOSED" | "CANCELLED";
-                        closeout_id?: string | null;
-                        closeout_status?: ("DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED") | null;
-                        version: number;
-                        editable: boolean;
-                        can_submit: boolean;
-                        review_note?: string | null;
-                        submitted_at?: string | null;
-                        reviewed_at?: string | null;
-                        lines: {
-                            /** Format: uuid */
-                            item_id: string;
-                            item_name: string;
-                            unit_code: string;
-                            returnable?: boolean;
-                            perishable?: boolean;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            held_quantity: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            delivered_quantity: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            remaining_quantity: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            returned_quantity: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            retired_quantity: string;
-                            retire_reason?: ("CONSUMED" | "EXPIRED" | "DAMAGED" | "LOST" | "NOT_RETURNABLE") | null;
-                            retire_reason_label?: string | null;
-                            note?: string | null;
-                            balanced: boolean;
-                        }[];
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
-    logisticsPickupTicketsDeliveries: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    expected_version: number;
-                    /** Format: date-time */
-                    occurred_at: string;
-                    receiver_label?: string;
-                    lines: {
-                        /** Format: uuid */
-                        item_id: string;
-                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                        quantity: string;
-                    }[];
-                };
-            };
-        };
-        responses: {
-            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** Format: uuid */
-                        id: string;
-                        /** Format: uuid */
-                        mission_id: string;
-                        request_id?: string | null;
-                        campaign_id?: string | null;
-                        team_id?: string | null;
-                        /** Format: uuid */
-                        warehouse_id: string;
-                        /** @enum {string} */
-                        status: "OPEN" | "READY" | "HANDED_OVER" | "CLOSED" | "CANCELLED";
-                        distribution_id?: string | null;
-                        version: number;
-                        ready_at?: string | null;
-                        reserved_by?: string | null;
-                        confirmed_by?: string | null;
-                        confirmed_at?: string | null;
-                        handed_over_by?: string | null;
-                        handed_over_at?: string | null;
-                        collected_by_user_id?: string | null;
-                        cancelled_at?: string | null;
-                        cancel_reason?: string | null;
-                        /** Format: date-time */
-                        created_at?: string;
-                        /** Format: date-time */
-                        updated_at?: string;
-                        lines: {
-                            /** Format: uuid */
-                            relief_need_id: string;
-                            commitment_id: string | null;
-                            /** Format: uuid */
-                            item_id: string;
-                            item_name: string;
-                            unit_code: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            requested_quantity: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            reserved_quantity: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            shortfall_quantity: string;
-                        }[];
-                        shortfalls: {
-                            /** Format: uuid */
-                            relief_need_id: string;
-                            /** Format: uuid */
-                            item_id: string;
-                            item_name: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            shortfall_quantity: string;
-                        }[];
-                        backup_warehouses?: {
-                            /** Format: uuid */
-                            warehouse_id: string;
-                            /** Format: uuid */
-                            item_id: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            available_quantity: string;
-                        }[];
-                        closed_by?: string | null;
-                        closed_at?: string | null;
-                        unaccounted_goods?: boolean;
-                        handover_overdue?: boolean;
-                    };
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-            /** @description Documented error response; clients branch on the stable code. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorEnvelope"];
-                };
-            };
-        };
-    };
     logisticsCatalogDeleteItem: {
         parameters: {
             query?: never;
@@ -11954,7 +8496,7 @@ export interface operations {
             };
         };
     };
-    logisticsDistributionsApproveAndDispatch: {
+    logisticsCampaignWarehousesInternalSync: {
         parameters: {
             query?: never;
             header?: never;
@@ -11963,13 +8505,45 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": {
-                    expected_version: number;
+        requestBody?: never;
+        responses: {
+            /** @description Success response; see docs/backend/04-logistics-api.md for the documented response shape. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
         };
+    };
+    logisticsSupplyRequestsForMission: {
+        parameters: {
+            query: {
+                mission_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
             200: {
@@ -11978,49 +8552,63 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        /** Format: uuid */
-                        id?: string;
-                        /** Format: uuid */
-                        warehouse_id?: string;
-                        campaign_id?: string | null;
-                        purpose?: string;
-                        status?: string;
-                        /** Format: uuid */
-                        preparer_user_id?: string;
-                        approver_user_id?: string | null;
-                        approved_version?: number | null;
-                        dispatch_actor_user_id?: string | null;
-                        dispatched_at?: string | null;
-                        reconciled_at?: string | null;
-                        /** Format: date-time */
-                        created_at?: string;
-                        version?: number;
-                        lines?: {
+                        items: {
                             /** Format: uuid */
-                            id?: string;
+                            id: string;
                             /** Format: uuid */
-                            item_id?: string;
-                            item_name?: string;
-                            unit?: {
-                                code?: string;
-                                scale?: number;
+                            mission_id: string;
+                            /** Format: uuid */
+                            team_id: string;
+                            team_name: string;
+                            /** @enum {string} */
+                            status: "READY" | "HANDED_OVER" | "CANCELLED" | "EXPIRED";
+                            /** @description Shown to the team while the request is READY; null afterwards. */
+                            pickup_code: string | null;
+                            on_behalf: boolean;
+                            warehouse: {
+                                /** Format: uuid */
+                                id: string;
+                                name: string;
+                                address_note: string | null;
+                                location: {
+                                    lat: number;
+                                    lng: number;
+                                } | null;
                             };
-                            commitment_id?: string | null;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            quantity?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            dispatched?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            handed_out?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            returned?: string;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            lost?: string;
-                            pending_loss_count?: number;
-                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
-                            in_transit?: string;
+                            /** Format: date-time */
+                            expires_at: string;
+                            handed_over_at?: string | null;
+                            cancelled_at?: string | null;
+                            cancel_reason?: string | null;
+                            version: number;
+                            /** Format: date-time */
+                            created_at: string;
+                            has_shortfall: boolean;
+                            lines: {
+                                /** Format: uuid */
+                                item_id: string;
+                                item_name: string;
+                                unit_code: string;
+                                unit_name: string;
+                                /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                                requested_quantity: string;
+                                /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                                reserved_quantity: string;
+                                /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                                shortfall_quantity: string;
+                            }[];
                         }[];
+                        can_request: boolean;
                     };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
                 };
             };
             /** @description Documented error response; clients branch on the stable code. */
@@ -12042,7 +8630,571 @@ export interface operations {
                 };
             };
             /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsSupplyRequestsCreate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    mission_id: string;
+                    lines: {
+                        /** Format: uuid */
+                        item_id: string;
+                        /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                        quantity: string;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        /** Format: uuid */
+                        mission_id: string;
+                        /** Format: uuid */
+                        team_id: string;
+                        team_name: string;
+                        /** @enum {string} */
+                        status: "READY" | "HANDED_OVER" | "CANCELLED" | "EXPIRED";
+                        /** @description Shown to the team while the request is READY; null afterwards. */
+                        pickup_code: string | null;
+                        on_behalf: boolean;
+                        warehouse: {
+                            /** Format: uuid */
+                            id: string;
+                            name: string;
+                            address_note: string | null;
+                            location: {
+                                lat: number;
+                                lng: number;
+                            } | null;
+                        };
+                        /** Format: date-time */
+                        expires_at: string;
+                        handed_over_at?: string | null;
+                        cancelled_at?: string | null;
+                        cancel_reason?: string | null;
+                        version: number;
+                        /** Format: date-time */
+                        created_at: string;
+                        has_shortfall: boolean;
+                        lines: {
+                            /** Format: uuid */
+                            item_id: string;
+                            item_name: string;
+                            unit_code: string;
+                            unit_name: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            requested_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            reserved_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            shortfall_quantity: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsSupplyRequestsCancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expected_version: number;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        /** Format: uuid */
+                        mission_id: string;
+                        /** Format: uuid */
+                        team_id: string;
+                        team_name: string;
+                        /** @enum {string} */
+                        status: "READY" | "HANDED_OVER" | "CANCELLED" | "EXPIRED";
+                        /** @description Shown to the team while the request is READY; null afterwards. */
+                        pickup_code: string | null;
+                        on_behalf: boolean;
+                        warehouse: {
+                            /** Format: uuid */
+                            id: string;
+                            name: string;
+                            address_note: string | null;
+                            location: {
+                                lat: number;
+                                lng: number;
+                            } | null;
+                        };
+                        /** Format: date-time */
+                        expires_at: string;
+                        handed_over_at?: string | null;
+                        cancelled_at?: string | null;
+                        cancel_reason?: string | null;
+                        version: number;
+                        /** Format: date-time */
+                        created_at: string;
+                        has_shortfall: boolean;
+                        lines: {
+                            /** Format: uuid */
+                            item_id: string;
+                            item_name: string;
+                            unit_code: string;
+                            unit_name: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            requested_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            reserved_quantity: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            shortfall_quantity: string;
+                        }[];
+                    } | {
+                        /** Format: uuid */
+                        id: string;
+                        team_name: string;
+                        /** @enum {string} */
+                        status: "READY" | "HANDED_OVER" | "CANCELLED" | "EXPIRED";
+                        warehouse: {
+                            /** Format: uuid */
+                            id: string;
+                            name: string;
+                        };
+                        /** Format: date-time */
+                        expires_at: string;
+                        handed_over_at?: string | null;
+                        cancelled_at?: string | null;
+                        version: number;
+                        /** Format: date-time */
+                        created_at: string;
+                        lines: {
+                            /** Format: uuid */
+                            item_id: string;
+                            item_name: string;
+                            unit_code: string;
+                            unit_name: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            quantity: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsSupplyRequestsHandOver: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expected_version: number;
+                    pickup_code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        team_name: string;
+                        /** @enum {string} */
+                        status: "READY" | "HANDED_OVER" | "CANCELLED" | "EXPIRED";
+                        warehouse: {
+                            /** Format: uuid */
+                            id: string;
+                            name: string;
+                        };
+                        /** Format: date-time */
+                        expires_at: string;
+                        handed_over_at?: string | null;
+                        cancelled_at?: string | null;
+                        version: number;
+                        /** Format: date-time */
+                        created_at: string;
+                        lines: {
+                            /** Format: uuid */
+                            item_id: string;
+                            item_name: string;
+                            unit_code: string;
+                            unit_name: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            quantity: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsSupplyRequestsQueue: {
+        parameters: {
+            query?: {
+                status?: string;
+                warehouse_id?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items?: {
+                            /** Format: uuid */
+                            id?: string;
+                            team_name?: string;
+                            /** @enum {string} */
+                            status?: "READY" | "HANDED_OVER" | "CANCELLED" | "EXPIRED";
+                            warehouse?: {
+                                /** Format: uuid */
+                                id: string;
+                                name: string;
+                            };
+                            /** Format: date-time */
+                            expires_at?: string;
+                            handed_over_at?: string | null;
+                            cancelled_at?: string | null;
+                            version?: number;
+                            /** Format: date-time */
+                            created_at?: string;
+                            lines?: {
+                                /** Format: uuid */
+                                item_id: string;
+                                item_name: string;
+                                unit_code: string;
+                                unit_name: string;
+                                /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                                quantity: string;
+                            }[];
+                        }[];
+                        more?: boolean;
+                        cursor?: string;
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    logisticsSupplyRequestsSuggestion: {
+        parameters: {
+            query: {
+                mission_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Documented response projection; see the source API specification for visibility and pagination rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        mission_id: string;
+                        lines: {
+                            /** Format: uuid */
+                            item_id: string;
+                            item_name: string;
+                            unit_code: string;
+                            unit_name: string;
+                            /** @description Decimal quantity encoded as a string and validated against the unit scale. */
+                            quantity: string;
+                            /**
+                             * @description AI_TEXT: estimated from the SOS text; NORM: per-person norm; CONFIRMED: an already confirmed need.
+                             * @enum {string}
+                             */
+                            basis: "AI_TEXT" | "NORM" | "CONFIRMED";
+                        }[];
+                    };
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description Documented error response; clients branch on the stable code. */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -10,12 +10,12 @@ describe('StockReportService', () => {
       {
         balance_id: '00000000-0000-4000-8000-000000000001', warehouse_id: 'warehouse-1', item_id: 'item-1',
         item_name: 'Nước uống', unit_code: 'BOTTLE', unit_name: 'Chai', unit_scale: 0,
-        on_hand: '12', reserved: '3', available: '9', held: '2', in_transit: '4',
+        on_hand: '12', reserved: '3', available: '9', held: '2',
       },
       {
         balance_id: '00000000-0000-4000-8000-000000000002', warehouse_id: 'warehouse-1', item_id: 'item-2',
         item_name: 'Gạo', unit_code: 'KG', unit_name: 'Kilôgam', unit_scale: 3,
-        on_hand: '5.500', reserved: '0.500', available: '5.000', held: '0', in_transit: '0',
+        on_hand: '5.500', reserved: '0.500', available: '5.000', held: '0',
       },
     ]);
     const dataSource = { query } as unknown as DataSource;
@@ -31,7 +31,7 @@ describe('StockReportService', () => {
       warehouse_id: 'warehouse-1',
       item: { id: 'item-1', name: 'Nước uống' },
       unit: { code: 'BOTTLE', display_name: 'Chai', scale: 0 },
-      on_hand: '12', reserved: '3', available: '9', held: '2', in_transit: '4',
+      on_hand: '12', reserved: '3', available: '9', held: '2',
     }]);
     expect(result.more).toBe(true);
     expect(typeof result.cursor).toBe('string');
@@ -44,12 +44,12 @@ describe('StockReportService', () => {
       warehouse_id: '00000000-0000-4000-8000-000000000001',
       item_id: '00000000-0000-4000-8000-000000000002',
       item_name: 'Gạo', unit_code: 'KG', unit_name: 'Kilôgam', unit_scale: 3,
-      on_hand: '0', reserved: '0', available: '0', held: '2.000', in_transit: '0',
+      on_hand: '0', reserved: '0', available: '0', held: '2.000',
       }, {
         warehouse_id: '00000000-0000-4000-8000-000000000001',
         item_id: '00000000-0000-4000-8000-000000000003',
         item_name: 'Nước', unit_code: 'BOTTLE', unit_name: 'Chai', unit_scale: 0,
-        on_hand: '1', reserved: '0', available: '1', held: '0', in_transit: '0',
+        on_hand: '1', reserved: '0', available: '1', held: '0',
       }])
       .mockResolvedValueOnce([]);
     const dataSource = { query } as unknown as DataSource;
@@ -65,7 +65,7 @@ describe('StockReportService', () => {
       warehouse_id: '00000000-0000-4000-8000-000000000001',
       item: { id: '00000000-0000-4000-8000-000000000002', name: 'Gạo' },
       unit: { code: 'KG', display_name: 'Kilôgam', scale: 3 },
-      on_hand: '0', reserved: '0', available: '0', held: '2.000', in_transit: '0',
+      on_hand: '0', reserved: '0', available: '0', held: '2.000',
     }]);
     expect(result.more).toBe(true);
     await reports.summary({ limit: 1, cursor: String(result.cursor) }, {} as Request);

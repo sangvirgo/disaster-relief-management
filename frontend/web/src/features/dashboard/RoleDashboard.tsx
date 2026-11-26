@@ -3,7 +3,6 @@ import { api } from '../../api/client';
 import { label, requestStatusLabel, timeLabel } from '../../i18n/labels';
 import { useUrlView } from '../../app/useUrlView';
 import { Tabs } from '../../components/ui/Tabs';
-import { distributionStatusLabels } from '../operations/DistributionProgress';
 import './role-dashboard.css';
 
 type Counts = Record<string, number>;
@@ -20,7 +19,7 @@ type ResponseOverview = {
 type OperationsOverview = {
   intake?: { deliveries_by_status: Counts; awaiting_count_or_review: number; pending_review: number;
     open_disputes: number; drives_by_status: Counts; reviews_last_7d: Counts };
-  distribution?: { by_status: Counts; dispatched_not_reconciled: number; handoffs_last_7d: number };
+  supply?: { waiting: number; expiring_soon: number; handed_over_last_7d: number; expired_last_7d: number };
   stock?: { warehouses: number; tracked_item_lines: number; out_of_stock_lines: number; low_stock_lines: number;
     pending_adjustments: number; low_threshold_units: number };
   needs?: { by_status: Counts; outstanding: number };
@@ -201,17 +200,23 @@ function AdminPanels({ view }: { view: 'overview' | 'report' }) {
 
 const intakeHref = (step: string, extra = '') => `?workspace=operations&page=intake&step=${step}${extra}`;
 
-function DistributionPipeline({ counts }: { counts: Counts }) {
-  const steps = ['DRAFT', 'APPROVED', 'DISPATCHED', 'RECONCILED'];
-  return <section className="dash-pipeline" aria-label="Phiếu phân phối theo bước">
-    <header><h3>Phiếu phân phối theo bước</h3><span className="muted">Bấm một bước để mở danh sách</span></header>
-    <ol>{steps.map((status, index) => <li key={status}>
-      <a href={intakeHref('distribution', `&dist_status=${status}`)} className={counts[status] && status !== 'RECONCILED' ? 'has-work' : ''}>
-        <span className="dash-pipeline__index">{index + 1}</span>
-        <strong>{counts[status] ?? 0}</strong>
-        <span>{distributionStatusLabels[status]}</span>
-      </a>
-    </li>)}</ol>
+const handoverHref = (status = '') => `?workspace=operations&page=handover${status ? `&status=${status}` : ''}`;
+
+/** The warehouse's one job for rescue teams: goods reserved and waiting to be handed over. */
+function SupplyStrip({ supply }: { supply: NonNullable<OperationsOverview['supply']> }) {
+  return <section className="dash-pipeline" aria-label="Giao hàng cho đội cứu hộ">
+    <header><h3>Giao hàng cho đội cứu hộ</h3><a className="muted" href={handoverHref()}>Mở danh sách ›</a></header>
+    <ol>
+      <li><a href={handoverHref()} className={supply.waiting ? 'has-work' : ''}>
+        <span className="dash-pipeline__index">1</span><strong>{supply.waiting}</strong><span>Đội chờ nhận hàng</span>
+      </a></li>
+      <li><a href={handoverHref()} className={supply.expiring_soon ? 'has-work' : ''}>
+        <span className="dash-pipeline__index">!</span><strong>{supply.expiring_soon}</strong><span>Sắp hết hạn nhận (dưới 1 giờ)</span>
+      </a></li>
+      <li><a href={handoverHref()}>
+        <span className="dash-pipeline__index">2</span><strong>{supply.handed_over_last_7d}</strong><span>Đã giao 7 ngày qua</span>
+      </a></li>
+    </ol>
   </section>;
 }
 
@@ -223,16 +228,13 @@ function OperationsPanels({ view, manages, reviews }: { view: 'overview' | 'repo
       {data && <div className="dash-grid">
         {data.intake && <Bars title="Hàng quyên góp theo trạng thái" counts={data.intake.deliveries_by_status} href={intakeHref(manages ? 'intake' : 'review')} />}
         {data.intake && <Bars title="Đợt quyên góp" counts={data.intake.drives_by_status} href={manages ? '?workspace=operations&page=assets' : undefined} />}
-        {data.distribution && <Bars title="Phiếu phân phối" counts={data.distribution.by_status} order={['DRAFT', 'APPROVED', 'DISPATCHED', 'RECONCILED', 'CANCELLED']}
-          labelFor={(code) => distributionStatusLabels[code] || label(code)} href={intakeHref('distribution')} />}
-        {data.needs && <Bars title="Nhu cầu vật tư" counts={data.needs.by_status} href={intakeHref('supply')} />}
+        {data.needs && <Bars title="Nhu cầu vật tư của các chiến dịch" counts={data.needs.by_status} href={manages ? '?workspace=operations&page=supply' : undefined} />}
         {data.intake && <Bars title="Kết quả duyệt biên nhận 7 ngày qua" counts={data.intake.reviews_last_7d} />}
       </div>}
-      {manages && data && <a className="dash-link" href="?workspace=operations&page=reports">Báo cáo tồn kho, tiến độ và đối soát ›</a>}
+      {manages && data && <a className="dash-link" href="?workspace=operations&page=reports">Báo cáo tồn kho và đối soát ›</a>}
     </Panel>
     {manages && <DriveSuggestions />}
   </>;
-  const byStatus = data?.distribution?.by_status || {};
   return <Panel title="Việc cần xử lý" updated={data?.generated_at} onRefresh={snapshot.refresh} loading={snapshot.loading} error={snapshot.error}>
     {data && <>
       <AttentionList empty="Không có việc tồn đọng trong phạm vi của bạn." items={[
@@ -241,17 +243,16 @@ function OperationsPanels({ view, manages, reviews }: { view: 'overview' | 'repo
           { count: Math.max(0, data.intake.awaiting_count_or_review - data.intake.pending_review), tone: 'info' as const, title: 'Hàng quyên góp chờ kiểm đếm', hint: 'Đếm hàng thực tế khi hàng đến kho.', href: intakeHref(manages ? 'intake' : 'review') },
           { count: data.intake.open_disputes, tone: 'warning' as const, title: 'Khiếu nại đang mở', hint: 'Người đóng góp phản hồi về kết quả kiểm đếm.', href: reviews ? intakeHref('review', '&view=disputes') : undefined },
         ] : []),
-        ...(data.distribution ? [
-          { count: byStatus.DRAFT ?? 0, tone: 'warning' as const, title: 'Phiếu chờ duyệt và xuất kho', hint: 'Một quản lý vận hành khác người lập bấm “Duyệt và xuất kho”.', href: intakeHref('distribution', '&dist_status=DRAFT') },
-          { count: byStatus.APPROVED ?? 0, tone: 'warning' as const, title: 'Phiếu đã duyệt, chờ xuất kho', hint: 'Quản lý vận hành đối chiếu hàng rồi xác nhận xuất kho.', href: intakeHref('distribution', '&dist_status=APPROVED') },
-          { count: data.distribution.dispatched_not_reconciled, tone: 'info' as const, title: 'Phiếu đang bàn giao', hint: 'Khi hàng đến tay người nhận, bấm “Đã giao đủ toàn bộ”.', href: intakeHref('distribution', '&dist_status=DISPATCHED') },
+        ...(data.supply ? [
+          { count: data.supply.expiring_soon, tone: 'danger' as const, title: 'Đội sắp hết hạn nhận hàng', hint: 'Hàng đã giữ sẽ tự trả về kệ nếu đội chưa đến nhận.', href: manages ? handoverHref() : undefined },
+          { count: data.supply.waiting, tone: 'warning' as const, title: 'Đội cứu hộ chờ nhận hàng', hint: 'Soạn sẵn hàng; khi đội đến, nhập mã nhận hàng để giao.', href: manages ? handoverHref() : undefined },
         ] : []),
         ...(data.stock ? [
           { count: data.stock.out_of_stock_lines, tone: 'danger' as const, title: 'Vật phẩm đã hết hàng tại kho', hint: 'Cân nhắc mở đợt quyên góp hoặc điều chuyển.', href: manages ? '?workspace=operations&page=reports&view=stock-summary' : undefined },
           { count: data.stock.pending_adjustments, tone: 'info' as const, title: 'Điều chỉnh tồn kho chờ duyệt', hint: 'Cần người duyệt độc lập.' },
         ] : []),
       ]} />
-      {data.distribution && manages && <DistributionPipeline counts={byStatus} />}
+      {data.supply && manages && <SupplyStrip supply={data.supply} />}
       <Kpis items={[
         ...(data.stock ? [
           { title: 'Kho đang hoạt động', value: data.stock.warehouses },
@@ -259,7 +260,7 @@ function OperationsPanels({ view, manages, reviews }: { view: 'overview' | 'repo
           { title: 'Sắp hết hàng', value: data.stock.low_stock_lines, hint: `Còn ≤ ${data.stock.low_threshold_units} đơn vị` },
         ] : []),
         ...(data.needs ? [{ title: 'Nhu cầu còn thiếu', value: data.needs.outstanding }] : []),
-        ...(data.distribution ? [{ title: 'Lượt bàn giao 7 ngày', value: data.distribution.handoffs_last_7d }] : []),
+        ...(data.supply ? [{ title: 'Yêu cầu hết hạn 7 ngày', value: data.supply.expired_last_7d, hint: 'Đội không đến nhận kịp' }] : []),
       ]} />
     </>}
   </Panel>;

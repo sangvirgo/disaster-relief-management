@@ -403,10 +403,10 @@ test('text export refreshes only generated operations with documented schemas', 
     info: { title: 'C48 Logistics API', version: '1.0.0' },
     servers: [{ url: '/api/v1/logistics' }],
     paths: {
-      '/distributions': {
+      '/supply-requests': {
         post: {
-          operationId: 'logisticsDistributionsCreate',
-          summary: 'DistributionsController.create',
+          operationId: 'logisticsSupplyRequestsCreate',
+          summary: 'SupplyRequestsController.create',
           responses: { 201: { description: 'Success response' } },
           'x-c48-contract-source': 'docs/backend/04-logistics-api.md',
         },
@@ -414,14 +414,14 @@ test('text export refreshes only generated operations with documented schemas', 
     },
   }, null, 2) + '\n';
   const document = JSON.parse(raw);
-  const route = { method: 'post', path: '/distributions', controller: 'DistributionsController', handler: 'create', sourceFile: 'distributions/distributions.controller.ts', successStatus: 201 };
+  const route = { method: 'post', path: '/supply-requests', controller: 'SupplyRequestsController', handler: 'create', sourceFile: 'supply-requests/supply-requests.controller.ts', successStatus: 201 };
   const exported = exportOpenApi(document, [route], 'logistics', 'docs/backend/04-logistics-api.md');
   const merged = JSON.parse(mergeOpenApiText(raw, document, exported));
 
-  assert.deepEqual(merged.paths['/distributions'].post.requestBody.content['application/json'].schema.required, ['warehouse_id', 'purpose', 'lines']);
-  assert.equal(merged.paths['/distributions'].post.requestBody.content['application/json'].schema.properties.purpose.enum.includes('REQUEST_AID'), true);
-  assert.equal(merged.paths['/distributions'].post['x-c48-contract-gap'], undefined);
-  assert.ok(merged.paths['/distributions'].post.responses['201'].content['application/json'].schema.properties.campaign_id);
+  assert.deepEqual(merged.paths['/supply-requests'].post.requestBody.content['application/json'].schema.required, ['mission_id', 'lines']);
+  assert.equal(merged.paths['/supply-requests'].post.requestBody.content['application/json'].schema.properties.lines.maxItems, 30);
+  assert.equal(merged.paths['/supply-requests'].post['x-c48-contract-gap'], undefined);
+  assert.ok(merged.paths['/supply-requests'].post.responses['201'].content['application/json'].schema.properties.pickup_code);
 });
 
 test('OpenAPI detail application removes stale gaps after schemas are documented', () => {
@@ -884,44 +884,24 @@ test('T12 Logistics recovery and attachment routes document one-use recovery and
   assert.ok(download.security.some((requirement) => requirement.DonationSecret));
 });
 
-test('T15 Logistics handoff detail documents kind-specific permissions and forbidden response', () => {
+test('supply request contracts keep the warehouse queue free of SOS data and hand over against the pickup code', () => {
   const logistics = exportService('logistics').document;
-  const detail = operationById(logistics, 'logisticsDistributionsHandoffDetail');
+  const queue = operationById(logistics, 'logisticsSupplyRequestsQueue');
+  const handOver = operationById(logistics, 'logisticsSupplyRequestsHandOver');
+  const create = operationById(logistics, 'logisticsSupplyRequestsCreate');
 
-  assert.ok(detail);
-  assert.match(detail.description, /matching warehouse scope/u);
-  for (const permission of ['HANDOFF_RECORD', 'DONATION_INTAKE', 'DISTRIBUTION_DISPATCH', 'LOSS_APPROVE']) {
-    assert.ok(detail.description.includes(permission), `handoff detail documents ${permission}`);
+  assert.ok(queue && handOver && create);
+  const row = queue.responses['200'].content['application/json'].schema.properties.items.items.properties;
+  for (const field of ['id', 'team_name', 'status', 'warehouse', 'expires_at', 'lines']) assert.ok(row[field], `queue row includes ${field}`);
+  for (const hidden of ['mission_id', 'request_id', 'pickup_code', 'location', 'campaign_id']) assert.equal(row[hidden], undefined, `queue row hides ${hidden}`);
+  assert.deepEqual(handOver.requestBody.content['application/json'].schema.required, ['expected_version', 'pickup_code']);
+  for (const code of ['SUPPLY_CODE_MISMATCH', 'SUPPLY_REQUEST_EXPIRED']) {
+    assert.ok(handOver.responses['409'].content['application/json'].examples[code], `hand-over documents ${code}`);
   }
-  assert.ok(detail.responses['403'].content['application/json'].examples.FORBIDDEN);
-  assert.ok(detail.responses['404'].content['application/json'].examples.NOT_FOUND);
-});
-
-test('T15 Logistics handoff evidence upload and download document scoped access rules', () => {
-  const logistics = exportService('logistics').document;
-  const upload = operationById(logistics, 'logisticsDistributionsUploadHandoffEvidence');
-  const download = operationById(logistics, 'logisticsDonationsDownloadEvidence');
-
-  assert.ok(upload && download);
-  assert.equal(download.summary, 'EvidenceController.download');
-  assert.match(upload.description, /authenticated session/u);
-  assert.match(upload.description, /warehouse scope/u);
-  for (const permission of ['HANDOFF_RECORD', 'DONATION_INTAKE', 'DISTRIBUTION_DISPATCH']) {
-    assert.ok(upload.description.includes(permission), `handoff upload documents ${permission}`);
+  for (const code of ['SUPPLY_NO_STOCK', 'SUPPLY_REQUEST_EXISTS', 'SUPPLY_MISSION_NOT_ACTIVE']) {
+    assert.ok(create.responses['409'].content['application/json'].examples[code], `create documents ${code}`);
   }
-  assert.match(upload.description, /LOSS_APPROVE alone does not permit upload/u);
-  assert.match(download.description, /on every request/u);
-  assert.match(download.description, /60 seconds/u);
-  assert.match(download.description, /outside the required scope or without applicable permission returns 403 FORBIDDEN/u);
-  assert.match(download.description, /missing or non-READY evidence returns 404 NOT_FOUND/u);
-  for (const permission of ['HANDOFF_RECORD', 'DONATION_INTAKE', 'DISTRIBUTION_DISPATCH', 'LOSS_APPROVE', 'DONATION_REVIEW']) {
-    assert.ok(download.description.includes(permission), `evidence download documents ${permission}`);
-  }
-  for (const operation of [upload, download]) {
-    for (const [status, code] of [['401', 'UNAUTHENTICATED'], ['403', 'FORBIDDEN'], ['404', 'NOT_FOUND']]) {
-      assert.ok(operation.responses[status]?.content?.['application/json']?.examples?.[code], `${operation.operationId} documents ${status} ${code}`);
-    }
-  }
+  assert.match(create.description, /No approval step/u);
 });
 
 test('documented route errors include verification, mission, donation, and quantity conflicts', () => {
@@ -961,37 +941,25 @@ test('documented route errors include verification, mission, donation, and quant
   expectErrors('logistics', 'logisticsNeedsIncrease', ['CYCLE_FROZEN', 'CYCLE_SEALED']);
   expectErrors('logistics', 'logisticsNeedsReduce', ['CYCLE_FROZEN', 'CYCLE_SEALED']);
   expectErrors('logistics', 'logisticsNeedsCancel', ['CYCLE_SEALED', 'STATE_TRANSITION_INVALID']);
-  expectErrors('logistics', 'logisticsNeedsCreateCommitment', ['CYCLE_FROZEN', 'CYCLE_SEALED', 'STATE_TRANSITION_INVALID']);
   expectErrors('logistics', 'logisticsNeedsCreate', ['VALIDATION_FAILED']);
   expectErrors('logistics', 'logisticsFulfillmentCyclesFreeze', ['STATE_TRANSITION_INVALID']);
   expectErrors('logistics', 'logisticsFulfillmentCyclesSeal', ['CYCLE_FROZEN', 'CYCLE_SEALED', 'STATE_TRANSITION_INVALID']);
   expectErrors('logistics', 'logisticsFulfillmentCyclesUnseal', ['STATE_TRANSITION_INVALID']);
-  expectErrors('logistics', 'logisticsDistributionsCreate', ['VALIDATION_FAILED', 'RESPONSE_UNAVAILABLE', 'CAMPAIGN_PAUSED', 'CAMPAIGN_NOT_ACTIVE']);
+  expectErrors('logistics', 'logisticsSupplyRequestsCreate', ['VALIDATION_FAILED', 'RESPONSE_UNAVAILABLE', 'CYCLE_FROZEN', 'CYCLE_SEALED']);
   expectErrors('logistics', 'logisticsDonationsCreateDelivery', ['DRIVE_WINDOW_CLOSED']);
   expectErrors('logistics', 'logisticsDonationReceiptsCreate', ['STATE_TRANSITION_INVALID']);
   expectErrors('logistics', 'logisticsDonationReceiptsReview', ['VERSION_CONFLICT', 'STATE_TRANSITION_INVALID']);
-  expectErrors('logistics', 'logisticsDistributionsApprove', ['VERSION_CONFLICT', 'STATE_TRANSITION_INVALID']);
-  expectErrors('logistics', 'logisticsDistributionsCancel', ['VERSION_CONFLICT', 'STATE_TRANSITION_INVALID', 'ALREADY_DISPATCHED']);
-  expectErrors('logistics', 'logisticsDistributionsDispatch', ['VERSION_CONFLICT', 'STATE_TRANSITION_INVALID', 'APPROVAL_STALE']);
-  expectErrors('logistics', 'logisticsDistributionsReviewLoss', ['VERSION_CONFLICT', 'STATE_TRANSITION_INVALID', 'HANDOFF_KIND_INVALID']);
-  assert.equal(operationById(documents.logistics, 'logisticsDistributionsReviewLoss').responses['409'].content['application/json'].examples.LOSS_REVIEW_REQUIRED, undefined, 'LOSS_REVIEW_REQUIRED belongs to reconcile');
-  expectErrors('logistics', 'logisticsDistributionsCreateHandoff', ['STATE_TRANSITION_INVALID', 'HANDOFF_KIND_INVALID']);
-  expectErrors('logistics', 'logisticsDistributionsReplaceLines', ['VERSION_CONFLICT', 'STATE_TRANSITION_INVALID', 'ALREADY_DISPATCHED']);
-  expectErrors('logistics', 'logisticsDistributionsPrepareFromCommitments', ['VERSION_CONFLICT', 'STATE_TRANSITION_INVALID', 'ALREADY_DISPATCHED']);
-  expectErrors('logistics', 'logisticsDistributionsReconcile', ['VERSION_CONFLICT', 'STATE_TRANSITION_INVALID', 'LOSS_REVIEW_REQUIRED']);
+  expectErrors('logistics', 'logisticsSupplyRequestsHandOver', ['VERSION_CONFLICT', 'STATE_TRANSITION_INVALID', 'SUPPLY_CODE_MISMATCH']);
+  expectErrors('logistics', 'logisticsSupplyRequestsCancel', ['VERSION_CONFLICT', 'STATE_TRANSITION_INVALID']);
   expectErrors('logistics', 'logisticsStockReviewAdjustment', ['STATE_TRANSITION_INVALID']);
   for (const operationId of [
-    'logisticsNeedsCreate', 'logisticsNeedsIncrease', 'logisticsNeedsReduce', 'logisticsNeedsCreateCommitment',
-    'logisticsNeedsReleaseCommitment', 'logisticsDrivesCreate', 'logisticsDrivesPatch',
+    'logisticsNeedsCreate', 'logisticsNeedsIncrease', 'logisticsNeedsReduce', 'logisticsSupplyRequestsCreate',
+    'logisticsDrivesCreate', 'logisticsDrivesPatch',
     'logisticsDonationsCreateDelivery', 'logisticsDonationsReviseDeclaration', 'logisticsDonationsAssistedDeclaration',
-    'logisticsDonationReceiptsCount', 'logisticsDistributionsCreate', 'logisticsDistributionsReplaceLines',
-    'logisticsDistributionsCreateHandoff', 'logisticsStockCreateAdjustment', 'logisticsStockOpening',
+    'logisticsDonationReceiptsCount', 'logisticsStockCreateAdjustment', 'logisticsStockOpening',
   ]) expectErrors('logistics', operationId, ['QUANTITY_SCALE_INVALID']);
   for (const operationId of [
-    'logisticsNeedsReleaseCommitment',
-    'logisticsDistributionsApprove', 'logisticsDistributionsCancel', 'logisticsDistributionsDispatch',
-    'logisticsDistributionsReviewLoss', 'logisticsDistributionsPrepareFromCommitments',
-    'logisticsDistributionsReconcile', 'logisticsDistributionsReplaceLines',
+    'logisticsSupplyRequestsHandOver', 'logisticsSupplyRequestsCancel',
     'logisticsDonationsAssistedDeclaration', 'logisticsDrivesPatch', 'logisticsDrivesClose',
     'logisticsDrivesOpen', 'logisticsDrivesPause', 'logisticsDrivesResume',
     'logisticsDonationReceiptsCount', 'logisticsDonationReceiptsPost', 'logisticsDonationReceiptsReleaseHeld',
@@ -1027,7 +995,7 @@ test('documented request and report fields are carried in the per-service contra
   assert.ok(stock.item);
   assert.ok(stock.unit);
   assert.ok(stock.held);
-  assert.ok(stock.in_transit);
+  assert.equal(stock.in_transit, undefined);
   const publicDonation = operationAt(logistics, 'get', '/public/donation-reports/summary').responses['200'].content['application/json'].schema.properties.items.items.oneOf;
   assert.ok(publicDonation.every((variant) => variant.properties.item && variant.properties.unit));
   const teamDetail = operationAt(response, 'get', '/teams/{id}');
@@ -1054,7 +1022,7 @@ test('documented request and report fields are carried in the per-service contra
   assert.equal(fulfillmentRow.properties.cancelled_remainder, undefined);
 
   const reconciliationRow = operationAt(logistics, 'get', '/reconciliation').responses['200'].content['application/json'].schema.properties.items.items;
-  for (const field of ['item', 'unit', 'intake_accepted', 'posted_movements', 'posted_reserved_movements', 'reserved', 'issued_in_transit', 'delivered', 'returned', 'lost', 'flags']) {
+  for (const field of ['item', 'unit', 'intake_accepted', 'posted_movements', 'posted_reserved_movements', 'reserved', 'delivered', 'flags']) {
     assert.ok(reconciliationRow.properties[field], `reconciliation row includes ${field}`);
   }
   assert.ok(reconciliationRow.properties.item.properties.id);
@@ -1124,36 +1092,15 @@ test('source-defined Logistics projections and collection envelopes match their 
     expectFields(operationId, ['items', '[]'], rowFields);
   };
 
-  const distributionFields = [
-    'id', 'warehouse_id', 'campaign_id', 'purpose', 'status',
-    'preparer_user_id', 'approver_user_id', 'approved_version', 'dispatch_actor_user_id', 'dispatched_at',
-    'reconciled_at', 'created_at', 'version', 'lines',
+  const supplyTeamFields = [
+    'id', 'mission_id', 'team_id', 'team_name', 'status', 'pickup_code', 'on_behalf', 'warehouse',
+    'expires_at', 'version', 'created_at', 'lines', 'has_shortfall',
   ];
-  const distributionLineFields = [
-    'id', 'item_id', 'item_name', 'unit', 'commitment_id', 'quantity', 'dispatched',
-    'handed_out', 'returned', 'lost', 'pending_loss_count', 'in_transit',
-  ];
-  expectFields('logisticsDistributionsList', ['items', '[]'], distributionFields);
-  expectFields('logisticsDistributionsList', ['items', '[]', 'lines', '[]'], distributionLineFields);
-  expectFields('logisticsDistributionsList', ['items', '[]', 'lines', '[]', 'unit'], ['code', 'scale']);
-  for (const operationId of [
-    'logisticsDistributionsDetail', 'logisticsDistributionsCreate', 'logisticsDistributionsApprove',
-    'logisticsDistributionsCancel', 'logisticsDistributionsDispatch', 'logisticsDistributionsReplaceLines',
-    'logisticsDistributionsPrepareFromCommitments', 'logisticsDistributionsReconcile',
-  ]) {
-    expectFields(operationId, [], distributionFields);
-    expectFields(operationId, ['lines', '[]'], distributionLineFields);
-    expectFields(operationId, ['lines', '[]', 'unit'], ['code', 'scale']);
-  }
-
-  const handoffFields = [
-    'id', 'distribution_id', 'handoff_kind', 'source_stage', 'receiver_user_id', 'receiver_label',
-    'recorder_user_id', 'confirmation_basis', 'occurred_at', 'created_at', 'version', 'status', 'review', 'lines',
-  ];
-  for (const operationId of ['logisticsDistributionsCreateHandoff', 'logisticsDistributionsReviewLoss']) {
-    expectFields(operationId, [], handoffFields);
-    expectFields(operationId, ['lines', '[]'], ['id', 'distribution_line_id', 'commitment_id', 'quantity', 'unit_code']);
-  }
+  expectFields('logisticsSupplyRequestsForMission', ['items', '[]'], supplyTeamFields);
+  expectFields('logisticsSupplyRequestsForMission', ['items', '[]', 'lines', '[]'], ['item_id', 'item_name', 'requested_quantity', 'reserved_quantity', 'shortfall_quantity']);
+  expectFields('logisticsSupplyRequestsCreate', [], supplyTeamFields);
+  expectFields('logisticsSupplyRequestsSuggestion', ['lines', '[]'], ['item_id', 'item_name', 'unit_name', 'quantity', 'basis']);
+  expectFields('logisticsSupplyRequestsHandOver', [], ['id', 'team_name', 'status', 'warehouse', 'lines']);
 
   for (const [operationId, rowFields] of [
     ['logisticsCatalogItemTypes', ['code', 'display_name']],
@@ -1221,15 +1168,6 @@ test('source-defined Logistics projections and collection envelopes match their 
     expectFields(operationId, ['item'], ['id', 'name', 'unit']);
     expectFields(operationId, ['item', 'unit'], ['code', 'display_name', 'scale']);
   }
-  expectFields('logisticsNeedsCreateCommitment', [], [
-    'id', 'relief_need_id', 'item_id', 'warehouse_id', 'quantity', 'released_quantity', 'issued_quantity',
-    'delivered_quantity', 'returned_quantity', 'lost_quantity', 'reserved_remaining', 'version',
-  ]);
-  expectFields('logisticsNeedsReleaseCommitment', [], [
-    'id', 'relief_need_id', 'item_id', 'warehouse_id', 'quantity', 'released_quantity', 'issued_quantity',
-    'delivered_quantity', 'returned_quantity', 'lost_quantity', 'reserved_remaining', 'version',
-  ]);
-
   for (const operationId of ['logisticsNeedsList', 'logisticsNeedsFulfillment', 'logisticsNeedsInternalFulfillment']) {
     const operation = operationById(logistics, operationId);
     const needsPath = operationId === 'logisticsNeedsList' ? ['items', '[]'] : ['needs', '[]'];
@@ -1237,7 +1175,7 @@ test('source-defined Logistics projections and collection envelopes match their 
   }
   expectFields('logisticsNeedsList', ['items', '[]'], [
     'cycle_id', 'request_id', 'work_cycle', 'version', 'created_at', 'item', 'unit', 'original', 'requested',
-    'committed_reserved', 'issued_unsettled', 'delivered', 'returned', 'lost', 'outstanding', 'cancelled_remaining', 'status',
+    'committed_reserved', 'issued_unsettled', 'delivered', 'outstanding', 'cancelled_remaining', 'status',
   ]);
 
   expectFields('logisticsDonationsReviseDeclaration', [], ['id', 'status', 'declaration_revision', 'version']);

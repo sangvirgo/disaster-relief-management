@@ -28,7 +28,7 @@ import {
   type Workspace,
 } from './app/catalog';
 import { useUrlView } from './app/useUrlView';
-import { assetViews, donationViews, intakeSteps, missionViews, noticeViews, reportViews, reviewViews } from './app/routeViews';
+import { assetViews, donationViews, intakeSteps, missionViews, noticeViews, reportViews, reviewViews, supplySections } from './app/routeViews';
 import { label, requestStatusLabel, timeLabel } from './i18n/labels';
 import { CitizenAccount, CitizenRequests, requestStatusTone } from './features/citizen/CitizenAccount';
 import { clearAllSosDrafts } from './features/citizen/sosDraft';
@@ -85,40 +85,35 @@ const CoordinatorTeams = React.lazy(() => import('./features/coordinator/Coordin
 const Operations = React.lazy(() => import('./features/operations/Operations').then((module) => ({ default: module.Operations })));
 const SupplyGapsPage = React.lazy(() => import('./features/supply-gaps/SupplyGapsPage').then((module) => ({ default: module.SupplyGapsPage })));
 const RoleDashboard = React.lazy(() => import('./features/dashboard/RoleDashboard').then((module) => ({ default: module.RoleDashboard })));
-const PickupTicketsPage = React.lazy(() => import('./features/pickup/PickupTicketsPage').then((module) => ({ default: module.PickupTicketsPage })));
+const SupplyQueuePage = React.lazy(() => import('./features/supply/SupplyQueuePage').then((module) => ({ default: module.SupplyQueuePage })));
 const WarehouseDetailPage = React.lazy(() => import('./features/operations/WarehouseDetailPage').then((module) => ({ default: module.WarehouseDetailPage })));
 
+/** Donation intake: the operations manager counts goods, the reviewer confirms and handles disputes. One page, two tabs. */
 function IntakeReview({ user }: { user: Me }) {
   const canReview = roles(user).has('REVIEWER');
-  const [step, setStep] = useUrlView('step', intakeSteps, canReview && !roles(user).has('OPERATIONS_MANAGER') ? 'review' : 'supply');
+  const manages = roles(user).has('OPERATIONS_MANAGER');
+  const [step, setStep] = useUrlView('step', intakeSteps, canReview && !manages ? 'review' : 'intake');
   function changeStep(next: (typeof intakeSteps)[number]) {
     if (next === step) return;
     setStep(next);
     const url = new URL(window.location.href);
     url.searchParams.delete('view');
-    url.searchParams.delete('section');
-    url.searchParams.delete('ticket_id');
-    url.searchParams.delete('dist_status');
     window.history.replaceState(null, '', url);
   }
-  const current = step === 'review' && !canReview ? 'intake' : step;
+  const current = step === 'review' && !canReview ? 'intake' : step === 'intake' && !manages ? 'review' : step;
   const tabs: Array<[(typeof intakeSteps)[number], string]> = [
-    ['supply', 'Nhu cầu và quyên góp'],
-    ...(roles(user).has('OPERATIONS_MANAGER') ? [['intake', 'Tiếp nhận'] as [(typeof intakeSteps)[number], string]] : []),
+    ...(manages ? [['intake', 'Tiếp nhận và kiểm đếm'] as [(typeof intakeSteps)[number], string]] : []),
     ...(canReview ? [['review', 'Duyệt và khiếu nại'] as [(typeof intakeSteps)[number], string]] : []),
-    ['distribution', 'Phân phối vật tư'],
-    ...(roles(user).has('VOLUNTEER') ? [['pickup', 'Phiếu lấy hàng'] as [(typeof intakeSteps)[number], string]] : []),
   ];
   return (
     <div>
-      <div className="tabs" role="group" aria-label="Bước xử lý hàng cứu trợ">
+      {tabs.length > 1 && <div className="tabs" role="group" aria-label="Nhập kho quyên góp">
         {tabs.map(([id, label]) => (
           <button key={id} type="button" className={current === id ? 'active' : ''}
             aria-pressed={current === id} onClick={() => changeStep(id)}>{label}</button>
         ))}
-      </div>
-      {current === 'supply' ? <SupplyGapsPage key={`supply:${user.id}`} user={user} />
-        : current === 'pickup' ? <PickupTicketsPage user={user} /> : <Operations key={current} page={current} user={user} />}
+      </div>}
+      <Operations key={current} page={current} user={user} />
     </div>
   );
 }
@@ -129,12 +124,15 @@ function AssetsHub({ user }: { user: Me }) {
   return (
     <div>
       <div className="tabs" role="group" aria-label="Kho và chiến dịch">
-        <button type="button" className={view === 'warehouses' ? 'active' : ''} aria-pressed={view === 'warehouses'} onClick={() => setView('warehouses')}>Kho và đợt quyên góp</button>
+        <button type="button" className={view === 'warehouses' ? 'active' : ''} aria-pressed={view === 'warehouses'} onClick={() => setView('warehouses')}>Bản đồ kho</button>
+        <button type="button" className={view === 'drives' ? 'active' : ''} aria-pressed={view === 'drives'} onClick={() => setView('drives')}>Đợt quyên góp</button>
         <button type="button" className={view === 'campaigns' ? 'active' : ''} aria-pressed={view === 'campaigns'} onClick={() => setView('campaigns')}>Chiến dịch</button>
       </div>
       {view === 'campaigns'
         ? <Campaigns key="ops-campaigns" canAssignWarehouse={roles(user).has('OPERATIONS_MANAGER')} />
-        : <Operations key="assets" page="assets" user={user} />}
+        : view === 'drives'
+          ? <Operations key="drives" page="drives" user={user} />
+          : <Operations key="assets" page="assets" user={user} />}
     </div>
   );
 }
@@ -1578,7 +1576,9 @@ function permittedRoute(user: Me | null, requested: ReturnType<typeof routeFromU
   if (!requested || !allowedWorkspaces(user).includes(requested.workspace)) {
     return { workspace: fallbackWorkspace, page: fallbackPage };
   }
-  if (requested.workspace === 'operations' && ['supply', 'needs', 'proposals', 'items', 'drives', 'pickup'].includes(requested.page)) return { workspace: 'operations' as const, page: 'intake' };
+  // Pages retired on 2026-11-26 (needs, proposals, pickup tickets) and older links land on their new home.
+  const legacyOperationsPages: Record<string, string> = { pickup: 'handover', needs: 'supply', proposals: 'supply', items: 'supply', drives: 'assets' };
+  if (requested.workspace === 'operations' && legacyOperationsPages[requested.page]) return { workspace: 'operations' as const, page: legacyOperationsPages[requested.page]! };
   if (requested.workspace === 'operations' && requested.page === 'campaigns') return { workspace: 'operations' as const, page: 'assets' };
   if (requested.page === 'account' && user) return requested;
   if (allowedPages(requested.workspace, user).some((page) => page.id === requested.page)) return requested;
@@ -1587,14 +1587,12 @@ function permittedRoute(user: Me | null, requested: ReturnType<typeof routeFromU
 
 function normalizeSubview(url: URL, workspace: Workspace, page: string, user: Me | null) {
   const opsStep = url.searchParams.get('step') || '';
-  const opsSupply = workspace === 'operations' && page === 'intake'
-    && (opsStep === 'supply' || (!opsStep && !(roles(user).has('REVIEWER') && !roles(user).has('OPERATIONS_MANAGER'))));
-  if (!(opsSupply && ['proposals', 'donations', 'catalog'].includes(url.searchParams.get('section') || ''))) url.searchParams.delete('section');
+  const opsSupply = workspace === 'operations' && page === 'supply';
+  if (!(opsSupply && (supplySections as readonly string[]).includes(url.searchParams.get('section') || ''))) url.searchParams.delete('section');
   if (!(workspace === 'coordinator' && page === 'campaigns'
     && ['campaigns', 'routing', 'sos', 'workspace', 'history', 'choose', 'my-history'].includes(url.searchParams.get('campaign_tab') || '')))
     url.searchParams.delete('campaign_tab');
   const allowedViews: readonly string[] = workspace === 'citizen' && page === 'drives' ? donationViews
-    : opsSupply ? ['drives', 'norms']
     : (workspace === 'volunteer' || workspace === 'coordinator') && page === 'notices' ? noticeViews
     : workspace === 'volunteer' && page === 'missions' ? missionViews
     : workspace === 'operations' && page === 'assets' ? assetViews
@@ -1626,8 +1624,7 @@ function writeRoute(workspace: Workspace, page: string, user: Me | null, mode: '
   url.searchParams.set('workspace', workspace);
   url.searchParams.set('page', page);
   if (changed) {
-    if (workspace === 'operations' && page === 'intake' && previousPage === 'proposals') url.searchParams.set('section', 'proposals');
-    else if (workspace === 'operations' && page === 'intake' && previousPage === 'items') url.searchParams.set('section', 'catalog');
+    if (workspace === 'operations' && page === 'supply' && previousPage === 'items') url.searchParams.set('section', 'catalog');
     else url.searchParams.delete('section');
     url.hash = '';
     url.searchParams.delete('view');
@@ -1635,8 +1632,6 @@ function writeRoute(workspace: Workspace, page: string, user: Me | null, mode: '
     url.searchParams.delete('sos_id');
     url.searchParams.delete('sos_tab');
     url.searchParams.delete('campaign_tab');
-    url.searchParams.delete('ticket_id');
-    url.searchParams.delete('dist_status');
     url.searchParams.delete('warehouse_id');
     url.searchParams.delete('warehouse_name');
   } else {
@@ -2235,8 +2230,10 @@ function App() {
                   <RoleDashboard role="operations" manages={roles(user).has('OPERATIONS_MANAGER')} reviews={roles(user).has('REVIEWER')} />
                 ) : workspace === 'operations' && selected.id === 'intake' && user ? (
                   <IntakeReview user={user} />
-                ) : workspace === 'operations' && selected.id === 'pickup' && user ? (
-                  <PickupTicketsPage user={user} />
+                ) : workspace === 'operations' && selected.id === 'handover' && user ? (
+                  <SupplyQueuePage />
+                ) : workspace === 'operations' && selected.id === 'supply' && user ? (
+                  <SupplyGapsPage key={`supply:${user.id}`} user={user} />
                 ) : workspace === 'operations' && selected.id === 'assets' && user && new URL(window.location.href).searchParams.get('warehouse_id') ? (
                   <WarehouseDetailPage warehouseId={new URL(window.location.href).searchParams.get('warehouse_id')!} warehouseName={new URL(window.location.href).searchParams.get('warehouse_name') || undefined} />
                 ) : workspace === 'operations' && selected.id === 'assets' && user ? (

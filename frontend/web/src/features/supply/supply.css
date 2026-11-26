@@ -1,0 +1,93 @@
+/* Supply requests: warehouse queue (operations) and the mission panel (team, coordinator). Uses the shared tokens only. */
+
+.supply-page { display: grid; gap: var(--space-4); }
+
+.supply-queue { display: grid; gap: var(--space-4); }
+.supply-queue__toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--space-3); }
+.supply-queue__filter { min-width: 220px; }
+.supply-queue__list { display: grid; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+
+.supply-card {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-surface-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-card);
+}
+.supply-card--urgent { border-color: var(--color-emergency-border); box-shadow: inset 4px 0 0 var(--color-emergency); }
+.supply-card__head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-3); }
+.supply-card__head h3 { margin: 0; font: 600 var(--text-subtitle) var(--font-family); }
+.supply-card__head p { margin: var(--space-1) 0 0; }
+.supply-card__state { display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-1); }
+.supply-card__items { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.supply-card__items li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-subtle);
+}
+.supply-card__actions, .supply-open__actions, .supply-dialog__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-2); }
+
+.supply-deadline { font: var(--text-caption) var(--font-family); color: var(--color-text-secondary); }
+.supply-deadline--urgent { color: var(--color-emergency-dark); font-weight: 600; }
+.supply-shortfall { width: 100%; color: var(--color-warning-dark); }
+
+.supply-dialog__body { display: grid; gap: var(--space-3); padding: var(--space-4); min-width: min(440px, 100%); }
+.supply-code-field { display: grid; gap: var(--space-1); }
+.supply-code-field input {
+  height: var(--control-h-lg);
+  font: 600 24px/32px var(--font-family);
+  letter-spacing: 0.4em;
+  text-align: center;
+}
+.supply-code-field textarea { width: 100%; }
+
+.supply-panel { display: grid; gap: var(--space-3); }
+.supply-panel__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.supply-panel__head h3 { margin: 0; }
+.supply-panel__empty { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.supply-panel__empty p { margin: 0; flex: 1 1 260px; }
+.supply-panel__history ul { display: grid; gap: var(--space-2); margin: var(--space-2) 0 0; padding: 0; list-style: none; }
+.supply-panel__history li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+
+.supply-open { display: grid; gap: var(--space-3); }
+.supply-code {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  border: 1px dashed var(--color-primary-border);
+  border-radius: var(--radius-md);
+  background: var(--color-primary-bg);
+}
+.supply-code span { color: var(--color-text-secondary); }
+.supply-code strong { font: 700 var(--text-display) var(--font-family); letter-spacing: 0.3em; color: var(--color-primary-dark); }
+.supply-open__where p { margin: 0 0 var(--space-1); }
+.supply-inline-form { display: grid; gap: var(--space-2); }
+.supply-inline-form label { display: grid; gap: var(--space-1); }
+
+.supply-form { display: grid; gap: var(--space-3); }
+.supply-form > p { margin: 0; }
+.supply-form__lines { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.supply-form__lines li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-surface-border);
+  border-radius: var(--radius-sm);
+}
+.supply-form__lines li > div { display: grid; min-width: 0; }
+.supply-form__qty { display: flex; align-items: center; gap: var(--space-2); }
+.supply-form__qty input { width: 96px; text-align: right; }
+
+@media (max-width: 640px) {
+  .supply-card__state { align-items: flex-start; }
+  .supply-form__lines li { grid-template-columns: minmax(0, 1fr) auto; }
+  .supply-form__lines li > button { grid-column: 1 / -1; justify-self: end; }
+}

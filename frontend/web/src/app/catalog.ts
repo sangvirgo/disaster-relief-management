@@ -58,34 +58,12 @@ export const pages: Record<Workspace, Page[]> = {
     { id: 'notices', title: 'Thông báo', icon: 'notice', service: 'response', path: '/notices' },
   ],
   operations: [
-    {
-      id: 'overview',
-      title: 'Tổng quan',
-      icon: 'home',
-      service: 'logistics',
-      path: '/reports/stock-summary',
-    },
-    {
-      id: 'intake',
-      title: 'Nhu cầu và phân phối',
-      icon: 'intake',
-      service: 'logistics',
-      path: '/donation-deliveries',
-    },
-    {
-      id: 'assets',
-      title: 'Kho và đợt quyên góp',
-      icon: 'assets',
-      service: 'logistics',
-      path: '/warehouses',
-    },
-    {
-      id: 'reports',
-      title: 'Báo cáo',
-      icon: 'report',
-      service: 'logistics',
-      path: '/reconciliation',
-    },
+    { id: 'overview', title: 'Tổng quan', icon: 'home', note: 'Việc cần làm ngay ở kho.' },
+    { id: 'handover', title: 'Giao hàng cho đội', icon: 'handoff', note: 'Đội cứu hộ đọc mã nhận hàng để lấy hàng đã giữ.' },
+    { id: 'intake', title: 'Nhập kho quyên góp', icon: 'intake', service: 'logistics', path: '/donation-deliveries' },
+    { id: 'assets', title: 'Kho và đợt quyên góp', icon: 'assets', service: 'logistics', path: '/warehouses' },
+    { id: 'supply', title: 'Thiếu hàng và danh mục', icon: 'stock', note: 'Cảnh báo thiếu hàng, định mức và danh mục vật phẩm.' },
+    { id: 'reports', title: 'Báo cáo', icon: 'report', service: 'logistics', path: '/reconciliation' },
   ],
   admin: [
     { id: 'dashboard', title: 'Bảng điều khiển', icon: 'home' },
@@ -135,14 +113,10 @@ export function allowedPages(workspace: Workspace, user: Me | null): Page[] {
     if (workspace === 'admin') return r.has('ADMIN');
     const manages = r.has('OPERATIONS_MANAGER');
     const reviews = r.has('REVIEWER');
-    if (page.id === 'drives') return manages || reviews;
-    if (page.id === 'campaigns') return manages;
+    // A reviewer only reviews donation receipts; every other operations page belongs to the operations manager.
     if (page.id === 'intake') return manages || reviews;
-    if (page.id === 'assets' || page.id === 'needs') return manages;
-    if (page.id === 'stock') return manages || reviews;
-    if (page.id === 'overview') return manages || reviews;
     return manages;
-  }).map((page) => workspace === 'operations' && page.id === 'intake'
-    ? { ...page, title: r.has('REVIEWER') ? 'Nhu cầu, duyệt và phân phối' : 'Nhu cầu và phân phối' }
+  }).map((page) => workspace === 'operations' && page.id === 'intake' && r.has('REVIEWER') && !r.has('OPERATIONS_MANAGER')
+    ? { ...page, title: 'Duyệt hàng quyên góp' }
     : page);
 }

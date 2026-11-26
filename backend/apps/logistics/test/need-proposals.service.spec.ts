@@ -58,40 +58,40 @@ const cycle = { cycle_id: cycleId, request_id: requestId, work_cycle: 1, campaig
 
 describe('NeedProposalsService', () => {
   it('refuses a caller without NEED_ESTIMATE_CONFIRM in any scope', async () => {
-    const { service } = setup([{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }]);
+    const { service } = setup([{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' }]);
     await expect(service.list({}, request)).rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
   });
 
   it('a campaign-scoped manager sees only that campaign, and the SQL is read-only', async () => {
-    const { service, sqls } = setup([{ role_code: 'OPERATIONS_MANAGER', scope_type: 'CAMPAIGN', campaign_id: campaignId }], { cycles: [] });
+    const { service, sqls } = setup([{ role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: campaignId }], { cycles: [] });
     await service.list({}, request);
     expect(sqls[0]).toContain('c.campaign_id=ANY($1::uuid[])');
     for (const sql of sqls) expect(sql).not.toMatch(/\b(INSERT|UPDATE|DELETE)\b/u);
   });
 
   it('a system manager sees every campaign, but not proposals of SOS outside campaigns', async () => {
-    const { service, sqls } = setup([{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' }], { cycles: [] });
+    const { service, sqls } = setup([{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }], { cycles: [] });
     await service.list({}, request);
     expect(sqls[0]).not.toContain('c.campaign_id=ANY');
     expect(sqls[0]).toContain('c.campaign_id IS NOT NULL');
   });
 
   it('lists proposals outside every campaign apart and reports their count', async () => {
-    const { service, sqls } = setup([{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' }], { cycles: [], unassigned: 3 });
+    const { service, sqls } = setup([{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }], { cycles: [], unassigned: 3 });
     const result = await service.list({ campaign_scope: 'NONE' }, request);
     expect(sqls[0]).toContain('c.campaign_id IS NULL');
     expect(result.unassigned_total).toBe(3);
   });
 
   it('keeps the unassigned list and count away from a campaign-scoped manager', async () => {
-    const { service } = setup([{ role_code: 'OPERATIONS_MANAGER', scope_type: 'CAMPAIGN', campaign_id: campaignId }], { cycles: [] });
+    const { service } = setup([{ role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: campaignId }], { cycles: [] });
     await expect(service.list({ campaign_scope: 'NONE' }, request)).rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
     const result = await service.list({}, request);
     expect(result).not.toHaveProperty('unassigned_total');
   });
 
   it('flags a line whose quantity exceeds the free stock of the campaign PRIMARY warehouse', async () => {
-    const { service } = setup([{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' }], {
+    const { service } = setup([{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }], {
       cycles: [cycle],
       lines: [line('need-1', waterId, '12.000'), line('need-2', riceId, '2.000')],
       primaries: [{ campaign_id: campaignId, warehouse_id: warehouseId }],
@@ -111,7 +111,7 @@ describe('NeedProposalsService', () => {
   });
 
   it('leaves warehouse and shortfall null when the campaign has no PRIMARY warehouse', async () => {
-    const { service } = setup([{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' }], {
+    const { service } = setup([{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }], {
       cycles: [cycle], lines: [line('need-1', waterId, '3.000')],
     });
     const result = await service.list({}, request);
@@ -121,7 +121,7 @@ describe('NeedProposalsService', () => {
   });
 
   it('returns the extraction summary with Vietnamese reason copy and item names, never a quantity field', async () => {
-    const { service } = setup([{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' }], {
+    const { service } = setup([{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }], {
       cycles: [cycle], lines: [line('need-1', waterId, '12.000')],
     });
     const result = await service.list({}, request);
@@ -141,7 +141,7 @@ describe('NeedProposalsService', () => {
   });
 
   it('pages by cycle id with a keyset cursor', async () => {
-    const { service } = setup([{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' }], { cycles: [cycle, { ...cycle, cycle_id: '99999999-9999-4999-8999-999999999999' }] });
+    const { service } = setup([{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }], { cycles: [cycle, { ...cycle, cycle_id: '99999999-9999-4999-8999-999999999999' }] });
     const result = await service.list({ limit: 1 }, request);
     expect(result.more).toBe(true);
     expect(typeof result.cursor).toBe('string');
@@ -160,7 +160,7 @@ describe('NeedProposalsService', () => {
       throw new Error(`Unexpected SQL: ${sql.slice(0, 80)}`);
     });
     const reevaluateCampaign = jest.fn(async () => { assigned = true; });
-    const sessions = { require: jest.fn(async () => ({ userId: 'manager', grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' }] })) };
+    const sessions = { require: jest.fn(async () => ({ userId: 'manager', grants: [{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }] })) };
     const service = new NeedProposalsService({ query } as unknown as DataSource, sessions as unknown as LogisticsSessionService,
       { reevaluateCampaign } as never);
     const result = await service.list({}, request) as { items: Array<{ warehouse: { id: string } | null }> };
@@ -170,8 +170,8 @@ describe('NeedProposalsService', () => {
 
   it('still lists proposals when the lazy warehouse assignment fails', async () => {
     const reevaluateCampaign = jest.fn(async () => { throw new Error('RESPONSE_UNAVAILABLE'); });
-    const { query } = setup([{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' }], { cycles: [cycle], lines: [] });
-    const sessions = { require: jest.fn(async () => ({ userId: 'manager', grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' }] })) };
+    const { query } = setup([{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }], { cycles: [cycle], lines: [] });
+    const sessions = { require: jest.fn(async () => ({ userId: 'manager', grants: [{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }] })) };
     const service = new NeedProposalsService({ query } as unknown as DataSource, sessions as unknown as LogisticsSessionService,
       { reevaluateCampaign } as never);
     const result = await service.list({}, request) as { items: Array<{ warehouse: unknown }> };

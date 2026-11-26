@@ -16,7 +16,7 @@ import { missionViews, noticeViews } from '../../app/routeViews';
 import { TeamMembers } from './TeamMembers';
 import { TeamReadinessForm } from './TeamReadinessForm';
 import { DetailSurface } from '../../components/DetailSurface';
-import { PickupVolunteerCard } from '../pickup/PickupVolunteerCard';
+import { MissionSupplyPanel } from '../supply/MissionSupplyPanel';
 import './volunteer-missions.css';
 import './volunteer-team.css';
 
@@ -1171,7 +1171,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                 </div>}
 
                 {missionDetailTab === 'overview' && activeMission.status !== 'OFFERED' && (
-                  <PickupVolunteerCard missionId={activeMission.id} />
+                  <MissionSupplyPanel missionId={activeMission.id} missionStatus={activeMission.status} />
                 )}
 
                 {missionDetailTab === 'overview' && <div className="volunteer-mission-tab-content volunteer-mission-progress">

@@ -7,16 +7,14 @@ import { ApiExceptionFilter, loadErrorCatalog } from '@c48/technical';
 import { LOGISTICS_IDENTITY_CLIENT, LOGISTICS_IDENTITY_CONFIG, LogisticsIdentityService } from '../src/auth/logistics-identity.service';
 import { LOGISTICS_AUTH_CONFIG, LogisticsSessionService } from '../src/auth/logistics-session.service';
 import { NeedCommandsService } from '../src/needs/need-commands.service';
-import { NeedCommitmentsService } from '../src/needs/need-commitments.service';
 import { NeedNormsService } from '../src/needs/need-norms.service';
 import { NeedsQueriesService } from '../src/needs/needs-queries.service';
 import { NeedsModule } from '../src/needs/needs.module';
 import { NeedsService } from '../src/needs/needs.service';
-import { UnaccountedGoodsGuard } from '../src/pickup-tickets/unaccounted-goods.service';
 import { ResponseAdmissionClient, RESPONSE_ADMISSION_CLIENT, RESPONSE_ADMISSION_CONFIG } from '../src/needs/response-admission.client';
 import { LOGISTICS_RESPONSE_CLIENT, LogisticsResponseCampaignClient, RESPONSE_CAMPAIGN_CONFIG } from '../src/integrations/response/response-campaign.client';
 import { LogisticsServiceTokenGuard } from '../src/auth/logistics-service-token.guard';
-import type { AdjustNeedQuantityDto, CancelNeedDto, CreateNeedCommitmentDto, CreateNeedDto, FulfillmentQueryDto, NeedContributionsQueryDto, NeedNormPatchDto, NeedsListQueryDto, ReleaseCommitmentDto } from '../src/needs/needs.dto';
+import type { AdjustNeedQuantityDto, CancelNeedDto, CreateNeedDto, FulfillmentQueryDto, NeedContributionsQueryDto, NeedNormPatchDto, NeedsListQueryDto } from '../src/needs/needs.dto';
 
 const needId = '55555555-5555-4555-8555-555555555555';
 const requestId = '11111111-1111-4111-8111-111111111111';
@@ -41,10 +39,6 @@ describe('POST /needs HTTP', () => {
     list: jest.fn(async (_request: Request) => ({ items: [], generated_at: '2026-10-13T00:00:00.000Z' })),
     update: jest.fn(async (_id: string, _dto: NeedNormPatchDto, _request: Request) => ({ id: needId, version: 2 })),
   };
-  const commitments = {
-    create: jest.fn(async (_id: string, _dto: CreateNeedCommitmentDto, _request: Request) => ({ status: 201, value: { id: '99999999-9999-4999-8999-999999999999', quantity: '1.25' }, replay: false })),
-    release: jest.fn(async (_id: string, _dto: ReleaseCommitmentDto, _request: Request) => ({ status: 200, value: { id: '99999999-9999-4999-8999-999999999999', released_quantity: '0.5' }, replay: true })),
-  };
   const queries = {
     list: jest.fn(async (_query: NeedsListQueryDto, _request: Request) => ({ items: [], more: false })),
     fulfillment: jest.fn(async (_requestId: string, _query: FulfillmentQueryDto, _request: Request) => ({ needs: [], cycle_state: 'OPEN', generated_at: '2026-10-13T00:00:00.000Z' })),
@@ -55,10 +49,8 @@ describe('POST /needs HTTP', () => {
     const module = await Test.createTestingModule({ imports: [NeedsModule] })
       .overrideProvider(NeedsService).useValue(needs)
       .overrideProvider(NeedCommandsService).useValue(commands)
-      .overrideProvider(NeedCommitmentsService).useValue(commitments)
       .overrideProvider(NeedNormsService).useValue(norms)
       .overrideProvider(NeedsQueriesService).useValue(queries)
-      .overrideProvider(UnaccountedGoodsGuard).useValue({ assertRequestResolvable: async () => undefined })
       .overrideGuard(LogisticsServiceTokenGuard).useValue({ canActivate: () => true })
       .overrideProvider(ResponseAdmissionClient).useValue({})
       .overrideProvider(RESPONSE_ADMISSION_CONFIG).useValue({ baseUrl: 'http://127.0.0.1:1', timeoutMs: 2_000 })
@@ -120,41 +112,12 @@ describe('POST /needs HTTP', () => {
     expect(commands.increase).toHaveBeenCalledWith(needId, { expected_version: 1, quantity: '4', reason: 'Bổ sung nhu cầu.' }, expect.any(Object));
   });
 
-  it('creates a warehouse commitment through the idempotent HTTP route', async () => {
-    const result = await request(app.getHttpServer())
+  it('no longer exposes manual commitment routes; supply requests are the only reservation path', async () => {
+    await request(app.getHttpServer())
       .post(`/api/v1/logistics/needs/${needId}/commitments`)
       .set('Idempotency-Key', idempotencyKey)
-      .send({ warehouse_id: '88888888-8888-4888-8888-888888888888', quantity: '1.25' });
-
-    expect(result.status).toBe(201);
-    expect(result.headers['cache-control']).toBe('no-store');
-    expect(commitments.create).toHaveBeenCalledWith(needId, { warehouse_id: '88888888-8888-4888-8888-888888888888', quantity: '1.25' }, expect.any(Object));
-    expect(result.body).toMatchObject({ id: '99999999-9999-4999-8999-999999999999', quantity: '1.25' });
-  });
-
-  it('releases a commitment with its expected version through the idempotent HTTP route', async () => {
-    const result = await request(app.getHttpServer())
-      .post('/api/v1/logistics/commitments/99999999-9999-4999-8999-999999999999/release')
-      .set('Idempotency-Key', idempotencyKey)
-      .send({ expected_version: 2, quantity: '0.5', reason: 'Điều chỉnh phân bổ.' });
-
-    expect(result.status).toBe(200);
-    expect(result.headers['cache-control']).toBe('no-store');
-    expect(result.headers['idempotent-replay']).toBe('true');
-    expect(commitments.release).toHaveBeenCalledWith('99999999-9999-4999-8999-999999999999', { expected_version: 2, quantity: '0.5', reason: 'Điều chỉnh phân bổ.' }, expect.any(Object));
-  });
-
-  it('validates the release version and reason before calling the command service', async () => {
-    commitments.release.mockClear();
-    const result = await request(app.getHttpServer())
-      .post('/api/v1/logistics/commitments/99999999-9999-4999-8999-999999999999/release')
-      .set('Idempotency-Key', idempotencyKey)
-      .send({ quantity: '0.5', reason: 'Điều chỉnh phân bổ.' });
-
-    expect(result.status).toBe(400);
-    expect(result.body.code).toBe('VALIDATION_FAILED');
-    expect(result.body.message).toMatch(/[Ă-ưẠ-ỹ]/u);
-    expect(commitments.release).not.toHaveBeenCalled();
+      .send({ warehouse_id: '88888888-8888-4888-8888-888888888888', quantity: '1.25' })
+      .expect(404);
   });
 
   it('serves scoped needs and fulfillment queries without caching', async () => {

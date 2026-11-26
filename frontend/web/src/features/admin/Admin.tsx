@@ -44,7 +44,7 @@ const subCoordinatorHint = 'Điều phối viên phụ tự chọn chiến dịc
 function grantScopeLabel(grant: { role_code: string; scope_type: string; campaign_id?: string | null }): string {
   return grant.role_code === 'COORDINATOR' && grant.scope_type === 'CAMPAIGN' && !grant.campaign_id ? subCoordinatorLabel : label(grant.scope_type);
 }
-const systemOperationsWarning = 'Phạm vi toàn hệ thống cho quản lý vận hành: người này sẽ điều khiển TẤT CẢ chiến dịch (tiếp nhận, phân phối, bàn giao và đối soát), cùng danh mục, kho và nhu cầu vật tư. Chỉ chọn khi thật sự cần; nên chọn phạm vi chiến dịch.';
+const systemOperationsWarning = 'Phạm vi toàn hệ thống cho quản lý vận hành: người này sẽ điều khiển TẤT CẢ chiến dịch (tiếp nhận quyên góp, giao hàng cho đội cứu hộ và đối soát), cùng danh mục và kho. Chỉ chọn khi thật sự cần; nên chọn phạm vi chiến dịch.';
 const types: Record<string, string> = {
   app_user: 'Người dùng',
   role_grant: 'Quyền truy cập',

@@ -13,7 +13,7 @@ function setup(options: {
   cycleState?: 'OPEN' | 'FROZEN' | 'SEALED';
   sameIntent?: { intent_id: string; cycle_id: string; kind: string; state: string } | null;
   liveIntent?: { intent_id: string; kind: string; state: string } | null;
-  settlement?: { has_open_needs: boolean; has_reserved: boolean; has_unsettled_issued: boolean; has_delivered: boolean };
+  settlement?: { has_open_needs: boolean; has_reserved: boolean; has_delivered: boolean };
 } = {}) {
   const order: string[] = [];
   const sqlCalls: string[] = [];
@@ -47,7 +47,6 @@ function setup(options: {
       if (sql.includes('has_open_needs')) return [options.settlement ?? {
         has_open_needs: false,
         has_reserved: false,
-        has_unsettled_issued: false,
         has_delivered: true,
       }];
       if (sql.includes('INSERT INTO cycle_intent') || sql.includes('UPDATE fulfillment_cycle') || sql.includes('UPDATE cycle_intent')) return [];
@@ -113,7 +112,7 @@ describe('FulfillmentCyclesService', () => {
   it('requires delivered aid and fully settled needs for SUPPLY_ONLY', async () => {
     const { service } = setup({
       intent: { outcome_basis: 'SUPPLY_ONLY' },
-      settlement: { has_open_needs: false, has_reserved: false, has_unsettled_issued: false, has_delivered: false },
+      settlement: { has_open_needs: false, has_reserved: false, has_delivered: false },
     });
 
     await expect(service.seal(requestId, 3, { intent_id: intentId, outcome_basis: 'SUPPLY_ONLY' }))
@@ -122,9 +121,8 @@ describe('FulfillmentCyclesService', () => {
 
   it('reports open needs, reservations, and unsettled issues as seal blockers', async () => {
     const blockers = [
-      { settlement: { has_open_needs: true, has_reserved: false, has_unsettled_issued: false, has_delivered: true }, reason: 'OPEN_NEED' },
-      { settlement: { has_open_needs: false, has_reserved: true, has_unsettled_issued: false, has_delivered: true }, reason: 'RESERVED_QUANTITY' },
-      { settlement: { has_open_needs: false, has_reserved: false, has_unsettled_issued: true, has_delivered: true }, reason: 'UNSETTLED_ISSUE' },
+      { settlement: { has_open_needs: true, has_reserved: false, has_delivered: true }, reason: 'OPEN_NEED' },
+      { settlement: { has_open_needs: false, has_reserved: true, has_delivered: true }, reason: 'RESERVED_QUANTITY' },
     ] as const;
 
     for (const blocker of blockers) {
@@ -137,7 +135,7 @@ describe('FulfillmentCyclesService', () => {
   it('requires zero delivered and reserved quantities for NO_ACTION_REQUIRED', async () => {
     const { service } = setup({
       intent: { outcome_basis: 'NO_ACTION_REQUIRED' },
-      settlement: { has_open_needs: false, has_reserved: false, has_unsettled_issued: false, has_delivered: true },
+      settlement: { has_open_needs: false, has_reserved: false, has_delivered: true },
     });
 
     await expect(service.seal(requestId, 3, { intent_id: intentId, outcome_basis: 'NO_ACTION_REQUIRED' }))
@@ -147,7 +145,7 @@ describe('FulfillmentCyclesService', () => {
   it('rejects reservations for NO_ACTION_REQUIRED even when there is no delivery', async () => {
     const { service } = setup({
       intent: { outcome_basis: 'NO_ACTION_REQUIRED' },
-      settlement: { has_open_needs: false, has_reserved: true, has_unsettled_issued: false, has_delivered: false },
+      settlement: { has_open_needs: false, has_reserved: true, has_delivered: false },
     });
 
     await expect(service.seal(requestId, 3, { intent_id: intentId, outcome_basis: 'NO_ACTION_REQUIRED' }))

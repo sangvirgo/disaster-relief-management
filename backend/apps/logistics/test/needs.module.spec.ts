@@ -5,7 +5,7 @@ import { getDataSourceToken } from '@nestjs/typeorm';
 import { jest } from '@jest/globals';
 import { AppModule } from '../src/app.module';
 import { ResponseCampaignModule } from '../src/integrations/response/response-campaign.module';
-import { NeedCommitmentsService } from '../src/needs/need-commitments.service';
+import { ResponseAdmissionClient } from '../src/needs/response-admission.client';
 import { NeedsController } from '../src/needs/needs.controller';
 import { NeedsModule } from '../src/needs/needs.module';
 
@@ -33,10 +33,10 @@ describe('NeedsModule registration', () => {
     expect(Reflect.getMetadata('imports', AppModule)).toContain(NeedsModule);
     expect(Reflect.getMetadata('controllers', NeedsModule)).toContain(NeedsController);
     expect(Reflect.getMetadata('imports', NeedsModule)).toContain(ResponseCampaignModule);
-    expect(Reflect.getMetadata('providers', NeedsModule)).toContain(NeedCommitmentsService);
+    expect(Reflect.getMetadata('exports', NeedsModule)).toContain(ResponseAdmissionClient);
   });
 
-  it('resolves the real commitments provider graph', async () => {
+  it('resolves the real admission provider graph', async () => {
     const overrides: Record<string, string> = {
       NODE_ENV: 'test',
       JWT_ISSUER: 'https://c48.test',
@@ -55,7 +55,7 @@ describe('NeedsModule registration', () => {
     try {
       const moduleRef = await Test.createTestingModule({ imports: [TestDataSourceModule, NeedsModule] }).compile();
 
-      expect(moduleRef.get(NeedCommitmentsService)).toBeInstanceOf(NeedCommitmentsService);
+      expect(moduleRef.get(ResponseAdmissionClient)).toBeInstanceOf(ResponseAdmissionClient);
       await moduleRef.close();
     } finally {
       for (const [key, value] of previous) {

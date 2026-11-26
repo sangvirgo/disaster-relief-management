@@ -158,7 +158,7 @@ export function CampaignWarehousePanel({ campaignId, canManage }: { campaignId: 
                     <th scope="col">Nguồn gán</th>
                     <th scope="col">Khoảng cách</th>
                     <th scope="col">Nhu cầu có tồn kho</th>
-                    <th scope="col">Phiếu phân phối mở</th>
+                    <th scope="col">Đội chờ nhận hàng</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -211,7 +211,7 @@ function WarehouseRow({ row }: { row: CampaignWarehouseRow }) {
       <td>{labelFor(campaignWarehouseSourceLabels, row.source, '—')}</td>
       <td>{distanceLabel(row.distance_m)}</td>
       <td>Có tồn cho {row.stock.needed_items_in_stock} / {row.stock.open_needed_items} mặt hàng đang cần</td>
-      <td>{row.open_distributions}</td>
+      <td>{row.open_supply_requests}</td>
     </tr>
   );
 }

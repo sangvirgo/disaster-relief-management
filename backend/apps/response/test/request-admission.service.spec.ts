@@ -14,6 +14,7 @@ function setup(overrides: Partial<{
   lockedAt: Date | null;
   admittedAt: Date | null;
   pendingSupplement: boolean;
+  missionMember: boolean;
   grants: ReporterSession['grants'];
 }> = {}) {
   const row = {
@@ -32,6 +33,7 @@ function setup(overrides: Partial<{
       calls.push({ sql, values });
       if (sql.includes('FROM assistance_request') && sql.includes('FOR UPDATE')) return [row];
       if (sql.includes("supplement.event_type='REPORTER_SUPPLEMENT'")) return overrides.pendingSupplement ? [{}] : [];
+      if (sql.includes('FROM mission m JOIN team_member')) return overrides.missionMember ? [{}] : [];
       if (sql.includes('FROM request_subject')) return [{ people_affected: 10, children_count: 3, elderly_count: 2 }];
       if (sql.includes('UPDATE assistance_request')) {
         row.attribution_locked_at = new Date('2026-10-12T12:00:00.000Z');
@@ -102,7 +104,16 @@ describe('RequestAdmissionService', () => {
     }] });
 
     await expect(service.admit(requestId, 2, {} as Request)).rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
-    expect(manager.query).toHaveBeenCalledTimes(1);
+    expect(manager.query).toHaveBeenCalledTimes(2);
+  });
+
+  it('lets a member of a team with a live mission on the cycle admit the SOS for a supply request', async () => {
+    const { service, calls } = setup({ missionMember: true, grants: [{ role_code: 'VOLUNTEER', scope_type: 'SYSTEM', campaign_id: null }] });
+
+    await expect(service.admit(requestId, 2, {} as Request)).resolves.toMatchObject({ request_id: requestId, work_cycle: 2 });
+    const membership = calls.find((call) => call.sql.includes('FROM mission m JOIN team_member'));
+    expect(membership?.sql).toContain("m.status IN ('ACCEPTED','EN_ROUTE','ON_SCENE')");
+    expect(membership?.values).toEqual([requestId, 2, actorId]);
   });
 
   it('rejects admission while a reporter supplement is awaiting review', async () => {

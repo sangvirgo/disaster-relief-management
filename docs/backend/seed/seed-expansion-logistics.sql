@@ -142,34 +142,6 @@ SELECT balance.id, 'OPENING', fixture.quantity, 0, fixture.operation_ref,
  WHERE true
 ON CONFLICT DO NOTHING;
 
-INSERT INTO distribution (id, warehouse_id, campaign_id, purpose, status, preparer_user_id, created_at)
-SELECT fixture.id, warehouse.id, fixture.campaign_id, 'CAMPAIGN_DISTRIBUTION', 'DRAFT',
-       '00000000-0000-4000-8000-000000000112', now() - interval '2 hours'
-  FROM (VALUES
-    ('00000000-0000-4000-8000-0000000b3010'::uuid, '00000000-0000-4000-8000-0000000a2010'::uuid,
-     '00000000-0000-4000-8000-0000000000c3'::uuid)
-  ) AS fixture(id, warehouse_id, campaign_id)
-  JOIN warehouse ON warehouse.id = fixture.warehouse_id AND warehouse.name = 'Kho phân phối TP. Hồ Chí Minh'
- WHERE true
-ON CONFLICT DO NOTHING;
-
-INSERT INTO distribution_line (id, distribution_id, warehouse_id, item_id, quantity)
-SELECT fixture.id, distribution.id, warehouse.id, item.id, fixture.quantity
-  FROM (VALUES
-    ('00000000-0000-4000-8000-0000000b4010'::uuid, '00000000-0000-4000-8000-0000000b3010'::uuid, '00000000-0000-4000-8000-0000000a2010'::uuid, '00000000-0000-4000-8000-0000000a1010'::uuid, 'Gạo đóng túi TP. Hồ Chí Minh', 25.000::numeric),
-    ('00000000-0000-4000-8000-0000000b4011'::uuid, '00000000-0000-4000-8000-0000000b3010'::uuid, '00000000-0000-4000-8000-0000000a2010'::uuid, '00000000-0000-4000-8000-0000000a1011'::uuid, 'Nước uống đóng chai TP. Hồ Chí Minh', 36.000::numeric)
-  ) AS fixture(id, distribution_id, warehouse_id, item_id, item_name, quantity)
-  JOIN distribution ON distribution.id = fixture.distribution_id
-                   AND distribution.warehouse_id = fixture.warehouse_id
-                   AND distribution.purpose = 'CAMPAIGN_DISTRIBUTION' AND distribution.status = 'DRAFT'
-                   AND distribution.campaign_id = '00000000-0000-4000-8000-0000000000c3'
-                   AND distribution.preparer_user_id = '00000000-0000-4000-8000-000000000112'
-                   JOIN warehouse ON warehouse.id = fixture.warehouse_id
-                AND warehouse.name = 'Kho phân phối TP. Hồ Chí Minh'
-  JOIN item ON item.id = fixture.item_id AND item.name = fixture.item_name
- WHERE true
-ON CONFLICT DO NOTHING;
-
 -- Need norms for SOS estimates (same demo values as seed-logistics.sql; safe to apply more than once).
 INSERT INTO need_norm (category, item_type_code, quantity_basis, qty_adult, qty_child, qty_elderly,
                        people_per_unit, fixed_quantity, default_item_id) VALUES

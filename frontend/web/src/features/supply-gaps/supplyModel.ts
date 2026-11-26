@@ -68,7 +68,7 @@ export interface CampaignWarehouseRow {
   distance_m: number;
   eligible: boolean;
   stock: { open_needed_items: number; needed_items_in_stock: number };
-  open_distributions: number;
+  open_supply_requests: number;
 }
 
 export interface CampaignWarehouseView {

@@ -589,29 +589,26 @@ const logisticsDetails = {
   logisticsAssetsDeactivateWarehouse: { request: request(object({ expected_version: version }, ['expected_version'])) },
   logisticsCampaignWarehousesSetPrimary: { request: request(object({ warehouse_id: id, expected_version: version, reason: { type: 'string', minLength: 1, maxLength: 500 } }, ['warehouse_id', 'expected_version', 'reason'])) },
   logisticsCampaignWarehousesReevaluate: { request: { content: { 'application/json': { schema: object({ clear_manual: boolean() }) } } } },
+  logisticsSupplyRequestsCreate: {
+    description: 'A team leader (VOLUNTEER grant, leader of the mission team) or a coordinator of the campaign (on behalf) asks for goods for a live mission (ACCEPTED, EN_ROUTE, ON_SCENE). The system confirms the SOS needs, picks one warehouse (campaign PRIMARY/BACKUP first, another active warehouse only when no campaign warehouse holds any goods), reserves what it holds and returns a six-digit pickup code. No approval step. Requires Idempotency-Key.',
+    request: request(object({
+      mission_id: id,
+      lines: { ...item({ item_id: id, quantity }, ['item_id', 'quantity']), minItems: 1, maxItems: 30 },
+    }, ['mission_id', 'lines'])),
+  },
+  logisticsSupplyRequestsHandOver: {
+    description: 'Warehouse staff (SUPPLY_REQUEST_HANDOVER) hand the reserved goods to the team that shows the matching pickup code. Issues the stock and counts it as delivered to the SOS needs in one step. Requires Idempotency-Key.',
+    request: request(versionBody({ pickup_code: { type: 'string', pattern: '^[0-9]{6}$' } }, ['pickup_code'])),
+  },
+  logisticsSupplyRequestsCancel: {
+    description: 'The team leader, a coordinator of the campaign or warehouse staff cancel an open request; the reservation is released. Requires Idempotency-Key.',
+    request: request(versionBody({ reason: { type: 'string', minLength: 1, maxLength: 1000 } }, ['reason'])),
+  },
+  logisticsSupplyRequestsQueue: {
+    description: 'Warehouse queue for SUPPLY_REQUEST_HANDOVER: team name and reserved goods only. Never returns the SOS, mission, request, people, location or pickup code. READY rows are oldest first; other statuses newest first.',
+  },
   logisticsSupplyGapsAccept: { request: request(object({ expected_version: version, overrides: object({ title: text, description: { anyOf: [text, { type: 'null' }] }, items: item({ item_id: id, target_quantity: quantity, acceptance_note: text }, ['item_id', 'target_quantity']), opens_at: dateTime, closes_at: dateTime }) }, ['expected_version'])) },
   logisticsSupplyGapsDismiss: { request: request(object({ expected_version: version, reason: { type: 'string', minLength: 1, maxLength: 500 }, dismissed_days: { type: 'integer', minimum: 1, maximum: 90 } }, ['expected_version', 'reason'])) },
-  logisticsPickupTicketsCreate: { request: request(object({ mission_id: id, warehouse_id: id }, ['mission_id'])) },
-  logisticsPickupTicketsReserve: { request: request(versionBody()) },
-  logisticsPickupTicketsConfirm: { request: request(versionBody()) },
-  logisticsPickupTicketsHandover: { request: request(versionBody({ collected_by_user_id: id })) },
-  logisticsPickupTicketsCancel: { request: request(versionBody({ reason: { type: 'string', minLength: 1, maxLength: 1000 } }, ['reason'])) },
-  logisticsPickupTicketsDeliveries: { request: request(versionBody({
-    occurred_at: dateTime, receiver_label: { type: 'string', maxLength: 200 },
-    lines: array(object({ item_id: id, quantity }, ['item_id', 'quantity'])),
-  }, ['occurred_at', 'lines'])) },
-  logisticsPickupTicketsSaveCloseout: { request: request(object({
-    expected_version: { type: 'integer', minimum: 0 },
-    lines: array(object({
-      item_id: id, returned_quantity: quantity, retired_quantity: quantity,
-      retire_reason: { type: 'string', enum: ['CONSUMED', 'EXPIRED', 'DAMAGED', 'LOST', 'NOT_RETURNABLE'] },
-      note: { type: 'string', maxLength: 500 },
-    }, ['item_id', 'returned_quantity', 'retired_quantity'])),
-  }, ['expected_version', 'lines'])) },
-  logisticsPickupTicketsSubmitCloseout: { request: request(versionBody()) },
-  logisticsPickupTicketsReviewCloseout: { request: request(versionBody({
-    decision: { type: 'string', enum: ['APPROVE', 'REJECT'] }, note: { type: 'string', maxLength: 1000 },
-  }, ['decision'])) },
   logisticsStockOpening: { request: request(object({ warehouse_id: id, lines: item({ item_id: id, quantity }, ['item_id', 'quantity']), note: text }, ['warehouse_id', 'lines', 'note'])) },
   logisticsStockCreateAdjustment: { request: request(object({ balance_id: id, delta_on_hand: quantity, reason: text, compensates_movement_id: id }, ['balance_id', 'delta_on_hand', 'reason'])) },
   logisticsStockReviewAdjustment: { request: request(object({ decision: { type: 'string', enum: ['APPROVE', 'REJECT'] }, note: text }, ['decision'])) },
@@ -655,7 +652,7 @@ const logisticsDetails = {
   },
   logisticsDonationsDownloadEvidence: {
     summary: 'EvidenceController.download',
-    description: 'Rechecks the current evidence owner and authorization on every request before issuing a private-storage signed URL valid for 60 seconds. Donation/dispute evidence is readable by the delivery owner, a valid donation capability, or scoped DONATION_INTAKE/DONATION_REVIEW staff. Handoff evidence requires current warehouse scope: HANDOFF_RECORD for normal handoffs, DONATION_INTAKE or DISTRIBUTION_DISPATCH for RETURN, and HANDOFF_RECORD or LOSS_APPROVE for LOSS. Missing authentication for handoff evidence returns 401 UNAUTHENTICATED; an authenticated caller outside the required scope or without applicable permission returns 403 FORBIDDEN; missing or non-READY evidence returns 404 NOT_FOUND. Invalid or missing donation capability without owner or staff access returns 400 DONATION_SECRET_INVALID.',
+    description: 'Rechecks the current evidence owner and authorization on every request before issuing a private-storage signed URL valid for 60 seconds. Donation/dispute evidence is readable by the delivery owner, a valid donation capability, or scoped DONATION_INTAKE/DONATION_REVIEW staff. Missing or non-READY evidence returns 404 NOT_FOUND. Invalid or missing donation capability without owner or staff access returns 400 DONATION_SECRET_INVALID.',
     response: response(object({ url: { type: 'string', format: 'uri' }, expires_in: { type: 'integer', const: 60 } }, ['url', 'expires_in']), 'Short-lived signed URL issued after each access check.', undefined, {
       'Cache-Control': { description: 'Prevents storage of the Logistics API result.', schema: { type: 'string', enum: ['no-store'] } },
     }),
@@ -668,9 +665,6 @@ const logisticsDetails = {
   },
   logisticsDonationsRevokeCapability: { noBody: true, response: response(object({ id, capability_revoked: boolean(), version })) },
   logisticsDonationsClaim: { noBody: true, response: response(object({ id, public_code: text, status: text, donor_user_id: id, version }, ['id', 'public_code', 'status', 'donor_user_id', 'version'])) },
-  logisticsDistributionsPrepareFromCommitments: {
-    request: request(object({ expected_version: version }, ['expected_version'])),
-  },
   logisticsDonationReceiptsCreate: { request: request(object({ delivery_id: id, warehouse_id: id }, ['delivery_id', 'warehouse_id'])) },
   logisticsDonationReceiptsCount: { request: request(object({ expected_version: version, lines: item({ item_id: id, counted_quantity: quantity, accepted_quantity: quantity, held_quantity: quantity, rejected_quantity: quantity, condition_note: text, expiry_date: { type: 'string', format: 'date' } }, ['item_id', 'counted_quantity', 'accepted_quantity', 'held_quantity', 'rejected_quantity']), note: text }, ['expected_version', 'lines'])) },
   logisticsDonationReceiptsReview: { request: request(object({ expected_version: version, count_revision: integer(), declaration_revision: integer(), decision: { type: 'string', enum: ['APPROVE', 'REJECT', 'REQUEST_RECOUNT'] }, reason: text }, ['expected_version', 'count_revision', 'declaration_revision', 'decision'])) },
@@ -742,39 +736,9 @@ const logisticsDetails = {
       active: boolean(),
     })),
   },
-  logisticsNeedsCreateCommitment: { request: request(object({ warehouse_id: id, quantity }, ['warehouse_id', 'quantity'])) },
-  logisticsNeedsReleaseCommitment: { request: request(object({ expected_version: version, quantity, reason: text }, ['expected_version', 'quantity', 'reason'])) },
   logisticsFulfillmentCyclesFreeze: { request: request(object({ intent_id: id }, ['intent_id'])) },
   logisticsFulfillmentCyclesUnseal: { request: request(object({ intent_id: id }, ['intent_id'])) },
   logisticsFulfillmentCyclesSeal: { request: request(object({ intent_id: id, outcome_basis: { type: 'string', enum: ['RESCUE_COMPLETED', 'SUPPLY_ONLY', 'NO_ACTION_REQUIRED'] } }, ['intent_id', 'outcome_basis'])) },
-  logisticsDistributionsCreate: { request: request(object({ warehouse_id: id, campaign_id: id, purpose: { type: 'string', enum: ['REQUEST_AID', 'CAMPAIGN_DISTRIBUTION'] }, lines: item({ item_id: id, quantity, commitment_id: id }, ['item_id', 'quantity']) }, ['warehouse_id', 'purpose', 'lines'])) },
-  logisticsDistributionsReplaceLines: { request: request(object({ expected_version: version, lines: item({ item_id: id, quantity, commitment_id: id }, ['item_id', 'quantity']) }, ['expected_version', 'lines'])) },
-  logisticsDistributionsApprove: { request: request(object({ expected_version: version }, ['expected_version'])) },
-  logisticsDistributionsApproveAndDispatch: { request: request(object({ expected_version: version }, ['expected_version'])) },
-  logisticsDistributionsDispatch: { request: request(object({ expected_version: version }, ['expected_version'])) },
-  logisticsDistributionsCancel: { request: request(object({ expected_version: version }, ['expected_version'])) },
-  logisticsDistributionsReconcile: { request: request(object({ expected_version: version }, ['expected_version'])) },
-  logisticsDistributionsCreateHandoff: { request: request(object({ handoff_kind: { type: 'string', enum: ['DIRECT_HOUSEHOLD', 'RETURN', 'LOSS'] }, source_stage: { type: 'string', enum: ['IN_TRANSIT'] }, receiver_user_id: id, receiver_label: text, confirmation_basis: text, occurred_at: dateTime, lines: item({ distribution_line_id: id, quantity }, ['distribution_line_id', 'quantity']) }, ['handoff_kind', 'confirmation_basis', 'occurred_at', 'lines'])) },
-  logisticsDistributionsHandoffDetail: {
-    description: 'Requires an authenticated session and matching warehouse scope. DIRECT_HOUSEHOLD requires HANDOFF_RECORD; RETURN requires DONATION_INTAKE or DISTRIBUTION_DISPATCH; LOSS requires HANDOFF_RECORD or LOSS_APPROVE. Missing permission returns 403 FORBIDDEN; out-of-scope access returns 404 NOT_FOUND. See docs/backend/04-logistics-api.md for the response shape.',
-  },
-  logisticsDistributionsUploadHandoffEvidence: {
-    description: 'Requires an authenticated session. The handoff must belong to the path distribution and be in the caller\'s current warehouse scope; missing, mismatched, or out-of-scope records return 404 NOT_FOUND. DIRECT_HOUSEHOLD and LOSS require HANDOFF_RECORD; RETURN requires DONATION_INTAKE or DISTRIBUTION_DISPATCH. Missing authentication returns 401 UNAUTHENTICATED; an in-scope caller without the required permission returns 403 FORBIDDEN. LOSS_APPROVE alone does not permit upload. Accepts one multipart file named file and requires Idempotency-Key; returns READY private evidence metadata.',
-    parameters: [{ name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string', format: 'uuid' } }],
-    request: {
-      required: true,
-      content: { 'multipart/form-data': { schema: object({ file: { type: 'string', format: 'binary' } }, ['file']) } },
-    },
-    response: response(object({
-      id,
-      state: { type: 'string', const: 'READY' },
-      size_bytes: integer(),
-      detected_mime: { type: 'string', enum: ['image/jpeg', 'image/png', 'video/mp4'] },
-      checksum: text,
-      created_at: dateTime,
-    }, ['id', 'state', 'size_bytes', 'detected_mime', 'checksum', 'created_at']), 'Stored private handoff evidence metadata.', undefined, logisticsCommandResponseHeaders),
-  },
-  logisticsDistributionsReviewLoss: { request: request(object({ expected_version: version, decision: { type: 'string', enum: ['APPROVE', 'REJECT'] }, reason: text }, ['expected_version', 'decision', 'reason'])) },
 };
 
 const nullableValue = (schema) => ({ anyOf: [schema, { type: 'null' }] });
@@ -790,44 +754,27 @@ const catalogItemSchema = object({
   version,
   created_at: dateTime,
 });
-const distributionLineSchema = object({
-  id, item_id: id, item_name: text, unit: object({ code: text, scale: integer() }),
-  commitment_id: nullableValue(id),
-  quantity, dispatched: quantity, handed_out: quantity, returned: quantity, lost: quantity,
-  pending_loss_count: integer(), in_transit: quantity,
-});
-const distributionViewSchema = object({
-  id, warehouse_id: id,
-  campaign_id: nullableValue(id),
-  purpose: text, status: text, preparer_user_id: id, approver_user_id: nullableValue(id),
-  approved_version: nullableValue(integer()), dispatch_actor_user_id: nullableValue(id),
-  dispatched_at: nullableValue(dateTime), reconciled_at: nullableValue(dateTime), created_at: dateTime,
-  version,
-  lines: array(distributionLineSchema),
-});
-const handoffViewSchema = object({
-  id, distribution_id: id, handoff_kind: text, source_stage: nullableValue(text),
-  receiver_user_id: nullableValue(id), receiver_label: nullableValue(text), recorder_user_id: id,
-  confirmation_basis: text, occurred_at: dateTime, created_at: dateTime, version, status: text,
-  review: nullableValue(object({ decision: text, reviewer_user_id: id, reason: nullableValue(text) })),
-  lines: item({ id, distribution_line_id: id, commitment_id: nullableValue(id), quantity, unit_code: text }),
-});
-const handoffEvidenceMetadataSchema = object({
-  id,
-  state: { type: 'string', const: 'READY' },
-  size_bytes: integer(),
-  detected_mime: { type: 'string', enum: ['image/jpeg', 'image/png', 'video/mp4'] },
-  created_at: dateTime,
-}, ['id', 'state', 'size_bytes', 'detected_mime', 'created_at']);
-const handoffDetailSchema = object({
-  ...handoffViewSchema.properties,
-  evidence: array(handoffEvidenceMetadataSchema),
-});
-const commitmentValueSchema = object({
-  id, relief_need_id: id, item_id: id, warehouse_id: id, quantity, released_quantity: quantity,
-  issued_quantity: quantity, delivered_quantity: quantity, returned_quantity: quantity, lost_quantity: quantity,
-  reserved_remaining: quantity, version,
-});
+const supplyWarehouseSchema = object({
+  id, name: text, address_note: nullableValue(text),
+  location: nullableValue(object({ lat: { type: 'number' }, lng: { type: 'number' } }, ['lat', 'lng'])),
+}, ['id', 'name', 'address_note', 'location']);
+const supplyStatusSchema = { type: 'string', enum: ['READY', 'HANDED_OVER', 'CANCELLED', 'EXPIRED'] };
+const supplyTeamViewSchema = object({
+  id, mission_id: id, team_id: id, team_name: text, status: supplyStatusSchema,
+  pickup_code: { ...nullableValue({ type: 'string', pattern: '^[0-9]{6}$' }), description: 'Shown to the team while the request is READY; null afterwards.' },
+  on_behalf: boolean(), warehouse: supplyWarehouseSchema,
+  expires_at: dateTime, handed_over_at: nullableValue(dateTime), cancelled_at: nullableValue(dateTime), cancel_reason: nullableValue(text),
+  version, created_at: dateTime, has_shortfall: boolean(),
+  lines: item({
+    item_id: id, item_name: text, unit_code: text, unit_name: text,
+    requested_quantity: quantity, reserved_quantity: quantity, shortfall_quantity: quantity,
+  }, ['item_id', 'item_name', 'unit_code', 'unit_name', 'requested_quantity', 'reserved_quantity', 'shortfall_quantity']),
+}, ['id', 'mission_id', 'team_id', 'team_name', 'status', 'pickup_code', 'on_behalf', 'warehouse', 'expires_at', 'version', 'created_at', 'lines', 'has_shortfall']);
+const supplyQueueViewSchema = object({
+  id, team_name: text, status: supplyStatusSchema, warehouse: object({ id, name: text }, ['id', 'name']),
+  expires_at: dateTime, handed_over_at: nullableValue(dateTime), cancelled_at: nullableValue(dateTime), version, created_at: dateTime,
+  lines: item({ item_id: id, item_name: text, unit_code: text, unit_name: text, quantity }, ['item_id', 'item_name', 'unit_code', 'unit_name', 'quantity']),
+}, ['id', 'team_name', 'status', 'warehouse', 'expires_at', 'version', 'created_at', 'lines']);
 const needItemSchema = object({ id, name: text, unit: catalogUnitSchema });
 const needValueSchema = object({
   id, cycle_id: id, request_id: id, work_cycle: integer(),
@@ -837,12 +784,12 @@ const needValueSchema = object({
 });
 const needSummarySchema = object({
   id, item: object({ id, name: text }), unit: catalogUnitSchema, original: quantity, requested: quantity,
-  committed_reserved: quantity, issued_unsettled: quantity, delivered: quantity, returned: quantity, lost: quantity,
+  committed_reserved: quantity, issued_unsettled: quantity, delivered: quantity,
   outstanding: quantity, cancelled_remaining: quantity, status: text,
 });
 const contributionSchema = object({
   id, warehouse_id: id, warehouse_name: text, quantity, reserved_remaining: quantity, issued_unsettled: quantity,
-  delivered: quantity, returned: quantity, lost: quantity, created_by_user_id: id, created_at: dateTime,
+  delivered: quantity, created_by_user_id: id, created_at: dateTime,
 });
 const driveItemSchema = object({
   item_id: id, item_name: text, item_type_name: text, unit_code: text, unit_name: text, scale: integer(),
@@ -886,8 +833,8 @@ const campaignWarehouseViewSchema = object({
     source: nullableValue({ type: 'string', enum: ['AUTO', 'MANUAL'] }),
     distance_m: integer(), eligible: boolean(),
     stock: object({ open_needed_items: integer(), needed_items_in_stock: integer() }, ['open_needed_items', 'needed_items_in_stock']),
-    open_distributions: integer(),
-  }, ['warehouse_id', 'name', 'role', 'source', 'distance_m', 'eligible', 'stock', 'open_distributions'])),
+    open_supply_requests: integer(),
+  }, ['warehouse_id', 'name', 'role', 'source', 'distance_m', 'eligible', 'stock', 'open_supply_requests'])),
   flags: array({ type: 'string', enum: ['NO_SERVING_WAREHOUSE', 'MANUAL_PRIMARY_INELIGIBLE', 'CAMPAIGN_AREA_MISSING'] }),
   // Present only when no PRIMARY is stored. Not persisted: the warehouse the next sync would assign, or null.
   proposed_primary_warehouse_id: { ...nullableValue(id), description: 'Non-persisted proposal; present only when no PRIMARY is stored.' },
@@ -907,36 +854,6 @@ const supplyGapViewSchema = object({
   drive_id: nullableValue(id), dismissed_reason: nullableValue(text), dismissed_until: nullableValue(dateTime),
   computed_at: dateTime, version: integer(), created_at: dateTime, updated_at: dateTime,
 }, ['id', 'status', 'severity', 'warehouse_id', 'warehouse_name', 'item_id', 'item_name', 'unit_code', 'scale', 'demand', 'supply', 'pledged', 'gap_qty', 'forecast_demand', 'campaign_ids', 'backup_warehouse_ids', 'reason_codes', 'reasons', 'draft', 'drive_id', 'dismissed_reason', 'dismissed_until', 'computed_at', 'version', 'created_at', 'updated_at']);
-const pickupLineViewSchema = object({
-  relief_need_id: id, commitment_id: nullableValue(id), item_id: id, item_name: text, unit_code: text,
-  requested_quantity: quantity, reserved_quantity: quantity, shortfall_quantity: quantity,
-}, ['relief_need_id', 'commitment_id', 'item_id', 'item_name', 'unit_code', 'requested_quantity', 'reserved_quantity', 'shortfall_quantity']);
-const pickupTicketViewSchema = object({
-  id, mission_id: id, request_id: nullableValue(id), campaign_id: nullableValue(id), team_id: nullableValue(id),
-  warehouse_id: id, status: { type: 'string', enum: ['OPEN', 'READY', 'HANDED_OVER', 'CLOSED', 'CANCELLED'] },
-  distribution_id: nullableValue(id), version: integer(),
-  ready_at: nullableValue(dateTime), reserved_by: nullableValue(id), confirmed_by: nullableValue(id), confirmed_at: nullableValue(dateTime),
-  handed_over_by: nullableValue(id), handed_over_at: nullableValue(dateTime), collected_by_user_id: nullableValue(id),
-  cancelled_at: nullableValue(dateTime), cancel_reason: nullableValue(text), created_at: dateTime, updated_at: dateTime,
-  lines: array(pickupLineViewSchema),
-  shortfalls: array(object({ relief_need_id: id, item_id: id, item_name: text, shortfall_quantity: quantity }, ['relief_need_id', 'item_id', 'item_name', 'shortfall_quantity'])),
-  backup_warehouses: array(object({ warehouse_id: id, item_id: id, available_quantity: quantity }, ['warehouse_id', 'item_id', 'available_quantity'])),
-  closed_by: nullableValue(id), closed_at: nullableValue(dateTime),
-  unaccounted_goods: boolean(), handover_overdue: boolean(),
-}, ['id', 'mission_id', 'warehouse_id', 'status', 'version', 'lines', 'shortfalls']);
-const closeoutLineViewSchema = object({
-  item_id: id, item_name: text, unit_code: text, returnable: boolean(), perishable: boolean(),
-  held_quantity: quantity, delivered_quantity: quantity, remaining_quantity: quantity, returned_quantity: quantity, retired_quantity: quantity,
-  retire_reason: nullableValue({ type: 'string', enum: ['CONSUMED', 'EXPIRED', 'DAMAGED', 'LOST', 'NOT_RETURNABLE'] }),
-  retire_reason_label: nullableValue(text), note: nullableValue(text), balanced: boolean(),
-}, ['item_id', 'item_name', 'unit_code', 'held_quantity', 'delivered_quantity', 'remaining_quantity', 'returned_quantity', 'retired_quantity', 'balanced']);
-const closeoutViewSchema = object({
-  ticket_id: id, ticket_status: { type: 'string', enum: ['OPEN', 'READY', 'HANDED_OVER', 'CLOSED', 'CANCELLED'] },
-  closeout_id: nullableValue(id), closeout_status: nullableValue({ type: 'string', enum: ['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED'] }),
-  version: integer(), editable: boolean(), can_submit: boolean(), review_note: nullableValue(text),
-  submitted_at: nullableValue(dateTime), reviewed_at: nullableValue(dateTime),
-  lines: array(closeoutLineViewSchema),
-}, ['ticket_id', 'ticket_status', 'version', 'editable', 'can_submit', 'lines']);
 const receiptLineSchema = object({
   item_id: id, item_name: text, unit_code: text, unit_name: text, declared_quantity: nullableValue(quantity),
   counted_quantity: quantity, accepted_quantity: quantity, held_quantity: quantity, rejected_quantity: quantity,
@@ -1036,20 +953,20 @@ const sharedLogisticsResponses = {
   logisticsCampaignWarehousesReevaluate: campaignWarehouseViewSchema,
   logisticsSupplyGapsList: object({ items: array(supplyGapViewSchema), more: boolean(), cursor: text, generated_at: dateTime }, ['items', 'more', 'generated_at']),
   logisticsSupplyGapsDetail: supplyGapViewSchema,
+  logisticsSupplyRequestsForMission: object({ items: array(supplyTeamViewSchema), can_request: boolean() }, ['items', 'can_request']),
+  logisticsSupplyRequestsSuggestion: object({
+    mission_id: id,
+    lines: item({
+      item_id: id, item_name: text, unit_code: text, unit_name: text, quantity,
+      basis: { type: 'string', enum: ['AI_TEXT', 'NORM', 'CONFIRMED'], description: 'AI_TEXT: estimated from the SOS text; NORM: per-person norm; CONFIRMED: an already confirmed need.' },
+    }, ['item_id', 'item_name', 'unit_code', 'unit_name', 'quantity', 'basis']),
+  }, ['mission_id', 'lines']),
+  logisticsSupplyRequestsQueue: page({ ...supplyQueueViewSchema.properties }),
+  logisticsSupplyRequestsCreate: supplyTeamViewSchema,
+  logisticsSupplyRequestsHandOver: supplyQueueViewSchema,
+  logisticsSupplyRequestsCancel: { anyOf: [supplyTeamViewSchema, supplyQueueViewSchema], description: 'Team view for the team or coordinator; queue view for warehouse staff.' },
   logisticsSupplyGapsAccept: supplyGapViewSchema,
   logisticsSupplyGapsDismiss: supplyGapViewSchema,
-  logisticsPickupTicketsList: object({ items: array(pickupTicketViewSchema), more: boolean(), cursor: text }, ['items', 'more']),
-  logisticsPickupTicketsDetail: pickupTicketViewSchema,
-  logisticsPickupTicketsCreate: pickupTicketViewSchema,
-  logisticsPickupTicketsReserve: pickupTicketViewSchema,
-  logisticsPickupTicketsConfirm: pickupTicketViewSchema,
-  logisticsPickupTicketsHandover: pickupTicketViewSchema,
-  logisticsPickupTicketsCancel: pickupTicketViewSchema,
-  logisticsPickupTicketsDeliveries: pickupTicketViewSchema,
-  logisticsPickupTicketsCloseout: closeoutViewSchema,
-  logisticsPickupTicketsSaveCloseout: closeoutViewSchema,
-  logisticsPickupTicketsSubmitCloseout: closeoutViewSchema,
-  logisticsPickupTicketsReviewCloseout: closeoutViewSchema,
   logisticsDonationsTrack: object({
     id,
     public_code: text,
@@ -1094,29 +1011,14 @@ const sharedLogisticsResponses = {
     needs: array(object({ ...needSummarySchema.properties, contributions: object({ items: array(contributionSchema), more: boolean() }) })),
     cycle_state: text, generated_at: dateTime,
   }),
-  logisticsNeedsContributions: page({ id, warehouse_id: id, warehouse_name: text, quantity, reserved_remaining: quantity, issued_unsettled: quantity, delivered: quantity, returned: quantity, lost: quantity, created_by_user_id: id, created_at: dateTime }),
+  logisticsNeedsContributions: page({ id, warehouse_id: id, warehouse_name: text, quantity, reserved_remaining: quantity, issued_unsettled: quantity, delivered: quantity, created_by_user_id: id, created_at: dateTime }),
   logisticsNeedsInternalFulfillment: object({ needs: array(needSummarySchema), cycle_state: text, generated_at: dateTime }),
   logisticsNeedsIncrease: needValueSchema,
   logisticsNeedsReduce: needValueSchema,
   logisticsNeedsCancel: needValueSchema,
-  logisticsNeedsCreateCommitment: commitmentValueSchema,
-  logisticsNeedsReleaseCommitment: commitmentValueSchema,
   logisticsFulfillmentCyclesFreeze: object({ intent_id: id, request_id: id, work_cycle: integer(), cycle_state: text }),
   logisticsFulfillmentCyclesSeal: object({ intent_id: id, request_id: id, work_cycle: integer(), cycle_state: text }),
   logisticsFulfillmentCyclesUnseal: object({ intent_id: id, request_id: id, work_cycle: integer(), cycle_state: text }),
-  logisticsDistributionsList: page({ ...distributionViewSchema.properties }),
-  logisticsDistributionsDetail: distributionViewSchema,
-  logisticsDistributionsCreate: distributionViewSchema,
-  logisticsDistributionsApprove: distributionViewSchema,
-  logisticsDistributionsCancel: distributionViewSchema,
-  logisticsDistributionsApproveAndDispatch: distributionViewSchema,
-  logisticsDistributionsDispatch: distributionViewSchema,
-  logisticsDistributionsReplaceLines: distributionViewSchema,
-  logisticsDistributionsPrepareFromCommitments: distributionViewSchema,
-  logisticsDistributionsReconcile: distributionViewSchema,
-  logisticsDistributionsCreateHandoff: handoffViewSchema,
-  logisticsDistributionsReviewLoss: handoffViewSchema,
-  logisticsDistributionsHandoffDetail: handoffDetailSchema,
   logisticsStockBalances: page({
     balance_id: id, warehouse_id: id, item_id: id, item_name: text, item_type: text, unit_code: text,
     unit: text, scale: integer(), on_hand: quantity, reserved: quantity, available: quantity,
@@ -1134,7 +1036,7 @@ const sharedLogisticsResponses = {
   logisticsStockCreateAdjustment: object({ id, balance_id: id, delta_on_hand: quantity, reason: text, status: text, review_note: nullableValue(text), requested_at: dateTime, reviewed_at: nullableValue(dateTime) }),
   logisticsStockReviewAdjustment: object({ id, balance_id: id, delta_on_hand: quantity, reason: text, status: text, review_note: nullableValue(text), requested_at: dateTime, reviewed_at: nullableValue(dateTime) }),
   logisticsStockOpening: object({ warehouse_id: id, items: item({ balance_id: id, item_id: id, on_hand: quantity, reserved: quantity, available: quantity }) }),
-  logisticsReportsStockSummary: page({ warehouse_id: id, item: object({ id, name: text }), unit: object({ code: text, display_name: text, scale: integer() }), on_hand: quantity, reserved: quantity, available: quantity, held: quantity, in_transit: quantity }),
+  logisticsReportsStockSummary: page({ warehouse_id: id, item: object({ id, name: text }), unit: object({ code: text, display_name: text, scale: integer() }), on_hand: quantity, reserved: quantity, available: quantity, held: quantity }),
   logisticsReportsFulfillmentSummary: page({
     id, request_id: id, cycle_id: id, work_cycle: integer(), campaign_id: nullableValue(id),
     item: object({ id, name: text }), unit: catalogUnitSchema, original: quantity, reduced: quantity,
@@ -1142,8 +1044,7 @@ const sharedLogisticsResponses = {
   }),
   logisticsReportsReconciliationSummary: page({
     item: object({ id, name: text }), unit: catalogUnitSchema, intake_accepted: quantity, posted_movements: quantity,
-    posted_reserved_movements: quantity, reserved: quantity, issued_in_transit: quantity,
-    delivered: quantity, returned: quantity, lost: quantity,
+    posted_reserved_movements: quantity, reserved: quantity, delivered: quantity,
     flags: object({ balance_mismatch: boolean(), commitment_counter_mismatch: boolean() }),
   }),
   logisticsReportsPublicDonationSummary: object({ view: text, filter_id: text, items: array({ oneOf: [object({ item: object({ id, name: text }), unit: object({ code: text, display_name: text, scale: integer() }), accepted: quantity }), object({ item: object({ id, name: text }), unit: object({ code: text, display_name: text, scale: integer() }), distributed: quantity })] }), more: boolean(), cursor: text, generated_at: dateTime }),
@@ -1157,11 +1058,12 @@ const logisticsQueries = {
   logisticsCatalogItems: ['type', 'status', 'query', 'cursor', 'limit'], logisticsAssetsWarehouses: ['status', 'cursor', 'limit'],
   logisticsDrivesList: ['status', 'cursor', 'limit'], logisticsDrivesPublicList: ['lat', 'lng', 'cursor', 'limit'],
   logisticsSupplyGapsList: ['status', 'warehouse_id', 'cursor', 'limit'],
-  logisticsPickupTicketsList: ['mission_id', 'status', 'cursor', 'limit'],
+  logisticsSupplyRequestsForMission: ['mission_id'], logisticsSupplyRequestsSuggestion: ['mission_id'],
+  logisticsSupplyRequestsQueue: ['status', 'warehouse_id', 'cursor', 'limit'],
   logisticsDonationReceiptsDeliveries: ['drive_id', 'status', 'cursor', 'limit'], logisticsDonationReceiptsDisputes: ['status', 'cursor', 'limit'],
   logisticsNeedsList: ['request_id', 'work_cycle', 'cursor', 'limit'], logisticsNeedsContributions: ['cursor', 'limit'],
   logisticsNeedsFulfillment: ['work_cycle'], logisticsNeedsInternalFulfillment: ['work_cycle'], logisticsRequestsFulfillment: ['work_cycle'],
-  logisticsDistributionsList: ['status', 'cursor', 'limit'], logisticsStockBalances: ['warehouse_id', 'item_id', 'cursor', 'limit'],
+  logisticsStockBalances: ['warehouse_id', 'item_id', 'cursor', 'limit'],
   logisticsStockMovements: ['cursor', 'limit'], logisticsStockAdjustments: ['status', 'cursor', 'limit'],
   logisticsReportsStockSummary: ['warehouse_id', 'cursor', 'limit'], logisticsReportsFulfillmentSummary: ['campaign_id', 'from', 'to', 'cursor', 'limit'],
   logisticsReportsReconciliationSummary: ['warehouse_id', 'item_id', 'cursor', 'limit'],
@@ -1169,6 +1071,8 @@ const logisticsQueries = {
 };
 
 const logisticsRequiredQueries = {
+  logisticsSupplyRequestsForMission: ['mission_id'],
+  logisticsSupplyRequestsSuggestion: ['mission_id'],
   logisticsAuditList: ['entity_type'],
   logisticsReportsReconciliationSummary: ['warehouse_id'],
   logisticsReportsFulfillmentSummary: ['campaign_id', 'from', 'to'],
@@ -1275,8 +1179,6 @@ const routeErrorCodes = {
   logisticsNeedsIncrease: ['QUANTITY_SCALE_INVALID', 'CYCLE_FROZEN', 'CYCLE_SEALED', 'STATE_TRANSITION_INVALID', 'NEED_ESTIMATE_NOT_CONFIRMED', 'VERSION_CONFLICT'],
   logisticsNeedsReduce: ['QUANTITY_SCALE_INVALID', 'CYCLE_FROZEN', 'CYCLE_SEALED', 'STATE_TRANSITION_INVALID', 'NEED_ESTIMATE_NOT_CONFIRMED', 'BELOW_PROTECTED_QUANTITY', 'VERSION_CONFLICT'],
   logisticsNeedsCancel: ['CYCLE_SEALED', 'STATE_TRANSITION_INVALID', 'UNSETTLED_ISSUED_GOODS', 'VERSION_CONFLICT'],
-  logisticsNeedsCreateCommitment: ['QUANTITY_SCALE_INVALID', 'CYCLE_FROZEN', 'CYCLE_SEALED', 'STATE_TRANSITION_INVALID', 'NEED_ESTIMATE_NOT_CONFIRMED', 'INSUFFICIENT_STOCK', 'NEED_OVER_COMMITTED', 'CAMPAIGN_PAUSED'],
-  logisticsNeedsReleaseCommitment: ['QUANTITY_SCALE_INVALID', 'CYCLE_SEALED', 'VERSION_CONFLICT'],
   logisticsFulfillmentCyclesFreeze: ['CYCLE_FROZEN', 'CYCLE_SEALED', 'STATE_TRANSITION_INVALID'],
   logisticsFulfillmentCyclesSeal: ['CYCLE_NOT_SETTLED', 'UNSETTLED_ISSUED_GOODS', 'CYCLE_FROZEN', 'CYCLE_SEALED', 'STATE_TRANSITION_INVALID'],
   logisticsFulfillmentCyclesUnseal: ['CYCLE_SEALED', 'STATE_TRANSITION_INVALID'],
@@ -1286,20 +1188,14 @@ const routeErrorCodes = {
   logisticsCampaignWarehousesReevaluate: ['CAMPAIGN_NOT_ACTIVE', 'RESPONSE_UNAVAILABLE'],
   logisticsSupplyGapsList: ['CURSOR_INVALID'],
   logisticsSupplyGapsDetail: ['NOT_FOUND'],
+  logisticsSupplyRequestsForMission: ['VALIDATION_FAILED', 'SUPPLY_MISSION_NOT_FOUND', 'RESPONSE_UNAVAILABLE', 'FORBIDDEN'],
+  logisticsSupplyRequestsSuggestion: ['VALIDATION_FAILED', 'SUPPLY_MISSION_NOT_FOUND', 'RESPONSE_UNAVAILABLE', 'FORBIDDEN'],
+  logisticsSupplyRequestsQueue: ['VALIDATION_FAILED', 'CURSOR_INVALID', 'FORBIDDEN'],
+  logisticsSupplyRequestsCreate: ['VALIDATION_FAILED', 'QUANTITY_SCALE_INVALID', 'SUPPLY_DUPLICATE_ITEM', 'SUPPLY_MISSION_NOT_FOUND', 'SUPPLY_MISSION_NOT_ACTIVE', 'SUPPLY_REQUEST_EXISTS', 'SUPPLY_NO_STOCK', 'SUPPLY_CODE_BUSY', 'ITEM_NOT_ACTIVE', 'INSUFFICIENT_STOCK', 'CYCLE_FROZEN', 'CYCLE_SEALED', 'REQUEST_NOT_VERIFIED', 'PENDING_SUPPLEMENT_REVIEW', 'RESPONSE_UNAVAILABLE', 'FORBIDDEN', 'IDEMPOTENCY_KEY_INVALID'],
+  logisticsSupplyRequestsHandOver: ['VALIDATION_FAILED', 'NOT_FOUND', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID', 'SUPPLY_REQUEST_EXPIRED', 'SUPPLY_CODE_MISMATCH', 'SUPPLY_NOTHING_TO_HAND_OVER', 'CYCLE_FROZEN', 'CYCLE_SEALED', 'INSUFFICIENT_STOCK', 'FORBIDDEN', 'IDEMPOTENCY_KEY_INVALID'],
+  logisticsSupplyRequestsCancel: ['VALIDATION_FAILED', 'NOT_FOUND', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID', 'SUPPLY_MISSION_NOT_FOUND', 'RESPONSE_UNAVAILABLE', 'FORBIDDEN', 'IDEMPOTENCY_KEY_INVALID'],
   logisticsSupplyGapsAccept: ['VALIDATION_FAILED', 'NOT_FOUND', 'VERSION_CONFLICT', 'SUPPLY_GAP_NOT_OPEN', 'SUPPLY_GAP_WARNING_ONLY', 'QUANTITY_SCALE_INVALID', 'CAMPAIGN_NOT_ACTIVE', 'RESPONSE_UNAVAILABLE'],
   logisticsSupplyGapsDismiss: ['VALIDATION_FAILED', 'NOT_FOUND', 'VERSION_CONFLICT', 'SUPPLY_GAP_NOT_OPEN'],
-  logisticsPickupTicketsList: ['CURSOR_INVALID', 'FORBIDDEN'],
-  logisticsPickupTicketsDetail: ['NOT_FOUND', 'FORBIDDEN'],
-  logisticsPickupTicketsCreate: ['VALIDATION_FAILED', 'NOT_FOUND', 'PICKUP_MISSION_NOT_FOUND', 'PICKUP_MISSION_NOT_ASSIGNABLE', 'PICKUP_TICKET_EXISTS', 'PICKUP_NO_PRIMARY_WAREHOUSE', 'PICKUP_NO_NEEDS', 'WAREHOUSE_NOT_ELIGIBLE', 'RESPONSE_UNAVAILABLE', 'FORBIDDEN', 'IDEMPOTENCY_KEY_INVALID'],
-  logisticsPickupTicketsReserve: ['VALIDATION_FAILED', 'NOT_FOUND', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID', 'PICKUP_NOTHING_RESERVABLE', 'INSUFFICIENT_STOCK', 'NEED_OVER_COMMITTED', 'CAMPAIGN_NOT_ACTIVE', 'RESPONSE_UNAVAILABLE', 'FORBIDDEN', 'IDEMPOTENCY_KEY_INVALID'],
-  logisticsPickupTicketsConfirm: ['VALIDATION_FAILED', 'NOT_FOUND', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID', 'SELF_APPROVAL_FORBIDDEN', 'APPROVAL_STALE', 'FORBIDDEN', 'IDEMPOTENCY_KEY_INVALID'],
-  logisticsPickupTicketsHandover: ['VALIDATION_FAILED', 'NOT_FOUND', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID', 'PICKUP_NOT_CONFIRMED', 'PICKUP_COLLECTOR_NOT_MEMBER', 'FORBIDDEN', 'SELF_APPROVAL_FORBIDDEN', 'APPROVAL_STALE', 'INSUFFICIENT_STOCK', 'RESPONSE_UNAVAILABLE', 'IDEMPOTENCY_KEY_INVALID'],
-  logisticsPickupTicketsCancel: ['VALIDATION_FAILED', 'NOT_FOUND', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID', 'ALREADY_DISPATCHED', 'FORBIDDEN', 'IDEMPOTENCY_KEY_INVALID'],
-  logisticsPickupTicketsDeliveries: ['VALIDATION_FAILED', 'NOT_FOUND', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID', 'PICKUP_ITEM_NOT_ON_TICKET', 'PICKUP_DELIVERY_EXCEEDS_CUSTODY', 'PICKUP_LEDGER_MISMATCH', 'HANDOFF_EXCEEDS_BALANCE', 'SELF_HANDOFF_FORBIDDEN', 'FORBIDDEN', 'QUANTITY_SCALE_INVALID', 'IDEMPOTENCY_KEY_INVALID'],
-  logisticsPickupTicketsCloseout: ['NOT_FOUND', 'FORBIDDEN'],
-  logisticsPickupTicketsSaveCloseout: ['VALIDATION_FAILED', 'NOT_FOUND', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID', 'CLOSEOUT_LINES_INVALID', 'CLOSEOUT_INVARIANT_VIOLATED', 'CLOSEOUT_RETIRE_REASON_REQUIRED', 'ITEM_NOT_RETURNABLE', 'PICKUP_LEDGER_MISMATCH', 'QUANTITY_SCALE_INVALID', 'FORBIDDEN', 'IDEMPOTENCY_KEY_INVALID'],
-  logisticsPickupTicketsSubmitCloseout: ['VALIDATION_FAILED', 'NOT_FOUND', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID', 'CLOSEOUT_LINES_INVALID', 'CLOSEOUT_INVARIANT_VIOLATED', 'PICKUP_LEDGER_MISMATCH', 'FORBIDDEN', 'IDEMPOTENCY_KEY_INVALID'],
-  logisticsPickupTicketsReviewCloseout: ['VALIDATION_FAILED', 'NOT_FOUND', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID', 'SELF_REVIEW_FORBIDDEN', 'SELF_HANDOFF_FORBIDDEN', 'CLOSEOUT_STALE', 'CLOSEOUT_INVARIANT_VIOLATED', 'ITEM_NOT_RETURNABLE', 'PICKUP_LEDGER_MISMATCH', 'HANDOFF_EXCEEDS_BALANCE', 'FORBIDDEN', 'IDEMPOTENCY_KEY_INVALID'],
   logisticsDrivesPatch: ['DRIVE_LOCATION_OUTSIDE_AREA', 'QUANTITY_SCALE_INVALID', 'CAMPAIGN_NOT_ACTIVE', 'VALIDATION_FAILED', 'RESPONSE_UNAVAILABLE', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
   logisticsDrivesOpen: ['CAMPAIGN_NOT_ACTIVE', 'RESPONSE_UNAVAILABLE', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
   logisticsDrivesPause: ['VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
@@ -1324,18 +1220,6 @@ const routeErrorCodes = {
   logisticsStockReviewAdjustment: ['ADJUSTMENT_VIOLATES_RESERVED', 'STATE_TRANSITION_INVALID'],
   logisticsAssetsPatchWarehouse: ['VERSION_CONFLICT'],
   logisticsAssetsDeactivateWarehouse: ['VERSION_CONFLICT'],
-  logisticsDistributionsCreate: ['QUANTITY_SCALE_INVALID', 'LINE_ITEM_MISMATCH', 'VALIDATION_FAILED', 'RESPONSE_UNAVAILABLE', 'CAMPAIGN_PAUSED', 'CAMPAIGN_NOT_ACTIVE'],
-  logisticsDistributionsReplaceLines: ['QUANTITY_SCALE_INVALID', 'VERSION_CONFLICT', 'ALREADY_DISPATCHED', 'STATE_TRANSITION_INVALID'],
-  logisticsDistributionsApprove: ['SELF_APPROVAL_FORBIDDEN', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
-  logisticsDistributionsApproveAndDispatch: ['SELF_APPROVAL_FORBIDDEN', 'INSUFFICIENT_STOCK', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
-  logisticsDistributionsDispatch: ['APPROVAL_STALE', 'INSUFFICIENT_STOCK', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
-  logisticsDistributionsCancel: ['ALREADY_DISPATCHED', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
-  logisticsDistributionsCreateHandoff: ['QUANTITY_SCALE_INVALID', 'HANDOFF_EXCEEDS_BALANCE', 'HANDOFF_KIND_INVALID', 'SETTLEMENT_EXCEEDS_ISSUED', 'STATE_TRANSITION_INVALID', 'SELF_HANDOFF_FORBIDDEN'],
-  logisticsDistributionsHandoffDetail: ['NOT_FOUND', 'UNAUTHENTICATED', 'FORBIDDEN'],
-  logisticsDistributionsUploadHandoffEvidence: ['NOT_FOUND', 'UNAUTHENTICATED', 'FORBIDDEN', 'EVIDENCE_LIMIT_REACHED', 'LENGTH_REQUIRED', 'PAYLOAD_TOO_LARGE', 'UNSUPPORTED_MEDIA', 'STORAGE_UNAVAILABLE', 'VALIDATION_FAILED', 'IDEMPOTENCY_KEY_INVALID'],
-  logisticsDistributionsReviewLoss: ['VERSION_CONFLICT', 'STATE_TRANSITION_INVALID', 'HANDOFF_KIND_INVALID'],
-  logisticsDistributionsReconcile: ['LOSS_REVIEW_REQUIRED', 'VERSION_CONFLICT', 'STATE_TRANSITION_INVALID'],
-  logisticsDistributionsPrepareFromCommitments: ['TOO_MANY_LINES', 'STATE_TRANSITION_INVALID', 'VERSION_CONFLICT', 'ALREADY_DISPATCHED'],
   logisticsReportsPublicDonationSummary: ['VALIDATION_FAILED'],
   logisticsDrivesPublicDetail: ['NOT_FOUND'],
   logisticsStockCreateAdjustment: ['QUANTITY_SCALE_INVALID'],

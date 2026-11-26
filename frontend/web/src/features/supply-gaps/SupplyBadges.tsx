@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react';
-import { api } from '../../api/client';
 import { fetchAll } from '../../api/fetchAll';
 import { roles, type Me } from '../../auth/session';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
@@ -129,30 +128,5 @@ export function SupplyGapWarningBadge({ user }: { user: Me }) {
         </Button>
       </div>
     </section>
-  );
-}
-
-
-/**
- * Awareness line for the manager: SOS that need supplies but belong to no campaign. It is not part of any gap number;
- * the coordinator fixes it by attaching the SOS to a campaign.
- */
-export function UnassignedSupplyNotice({ user }: { user: Me }) {
-  const allowed = roles(user).has('OPERATIONS_MANAGER');
-  const [total, setTotal] = useState<number | null>(null);
-  useEffect(() => {
-    if (!allowed) return;
-    let live = true;
-    api<{ unassigned_total?: number }>('logistics', '/need-proposals?limit=1')
-      .then((page) => { if (live) setTotal(typeof page.unassigned_total === 'number' ? page.unassigned_total : null); })
-      .catch(() => { if (live) setTotal(null); });
-    return () => { live = false; };
-  }, [allowed]);
-  if (!allowed || !total) return null;
-  return (
-    <p className="notice" role="status">
-      {total} SOS cần hàng chưa thuộc chiến dịch.{' '}
-      <a href="/?workspace=operations&page=proposals">Xem danh sách</a>. Số này không nằm trong bất kỳ số thiếu hụt nào.
-    </p>
   );
 }

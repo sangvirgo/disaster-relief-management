@@ -7,8 +7,8 @@ const grant = (role_code: Grant['role_code'], scope_type: Grant['scope_type']): 
 describe('operations dashboard scope', () => {
   it('returns SYSTEM scope only when a grant carries the requested permission', () => {
     expect(scopeFor([grant('OPERATIONS_MANAGER', 'SYSTEM')], ['DONATION_INTAKE'])).toBeNull();
-    expect(scopeFor([grant('OPERATIONS_MANAGER', 'SYSTEM')], ['HANDOFF_RECORD'])).toBeNull();
-    expect(scopeFor([grant('COORDINATOR', 'SYSTEM')], ['DISTRIBUTION_REVIEW'])).toEqual([]);
+    expect(scopeFor([grant('OPERATIONS_MANAGER', 'SYSTEM')], ['SUPPLY_REQUEST_HANDOVER'])).toBeNull();
+    expect(scopeFor([grant('COORDINATOR', 'SYSTEM')], ['SUPPLY_REQUEST_HANDOVER'])).toEqual([]);
   });
 
   it('grants no access without a matching permission', () => {

@@ -7,8 +7,8 @@
 --   ORG_COORD 00000000-0000-4000-8000-000000000001   CAMPAIGN_ACTIVE ...0000000000c1   REQUEST_AID ...0000000000f5 (work_cycle 1)
 --   users: coord1 ...102, ops_mgr ...105, ops_seed ...112, reviewer1 ...108, reviewer2 ...109
 -- Local ids use the prefix 00000000-0000-4000-8000-0000000 + a 5-hex suffix (a1xxx items, a2xxx warehouses,
--- a5xxx balances, a6xxx drives, a7xxx deliveries, a8xxx receipts, a9xxx disputes, b1xxx needs, b2xxx commitments, b3xxx distributions,
--- b4xxx distribution lines, b5xxx handoffs, b6xxx handoff lines, b7xxx cycle, b8xxx adjustment).
+-- a5xxx balances, a6xxx drives, a7xxx deliveries, a8xxx receipts, a9xxx disputes, b1xxx needs, b2xxx commitments, b3xxx supply requests,
+-- b7xxx cycle, b8xxx adjustment). Response mission ...0000000000b1 (team ...a1 "Đội xuồng cứu hộ 1", leader ...10c) carries the supply requests.
 BEGIN;
 
 -- ---------- catalogs ----------
@@ -180,97 +180,41 @@ INSERT INTO relief_need (id, cycle_id, item_id, original_quantity, requested_qua
   ('00000000-0000-4000-8000-0000000b1002', '00000000-0000-4000-8000-0000000b7001', '00000000-0000-4000-8000-0000000a1003', 30, 30, 18,   'CANCELLED',           now() - interval '4 days');
 
 -- Commitments from warehouse A. C1 12 issued and delivered; C2 8 reserved only; C3 12 water issued and delivered.
-INSERT INTO commitment (id, relief_need_id, item_id, warehouse_id, quantity, released_quantity, issued_quantity, delivered_quantity, returned_quantity, lost_quantity, created_by_user_id, created_at) VALUES
-  ('00000000-0000-4000-8000-0000000b2001', '00000000-0000-4000-8000-0000000b1001', '00000000-0000-4000-8000-0000000a1005', '00000000-0000-4000-8000-0000000a2001', 12, 0, 12, 12, 0, 0, '00000000-0000-4000-8000-000000000105', now() - interval '4 days'),
-  ('00000000-0000-4000-8000-0000000b2002', '00000000-0000-4000-8000-0000000b1001', '00000000-0000-4000-8000-0000000a1005', '00000000-0000-4000-8000-0000000a2001',  8, 0,  0,  0, 0, 0, '00000000-0000-4000-8000-000000000105', now() - interval '3 days'),
-  ('00000000-0000-4000-8000-0000000b2003', '00000000-0000-4000-8000-0000000b1002', '00000000-0000-4000-8000-0000000a1003', '00000000-0000-4000-8000-0000000a2001', 12, 0, 12, 12, 0, 0, '00000000-0000-4000-8000-000000000105', now() - interval '4 days');
+-- Commitments are created only by supply requests; the leader of team a1 (...10c) requested both.
+INSERT INTO commitment (id, relief_need_id, item_id, warehouse_id, quantity, released_quantity, issued_quantity, delivered_quantity, created_by_user_id, created_at) VALUES
+  ('00000000-0000-4000-8000-0000000b2001', '00000000-0000-4000-8000-0000000b1001', '00000000-0000-4000-8000-0000000a1005', '00000000-0000-4000-8000-0000000a2001', 12, 0, 12, 12, '00000000-0000-4000-8000-00000000010c', now() - interval '200 minutes'),
+  ('00000000-0000-4000-8000-0000000b2002', '00000000-0000-4000-8000-0000000b1001', '00000000-0000-4000-8000-0000000a1005', '00000000-0000-4000-8000-0000000a2001',  8, 0,  0,  0, '00000000-0000-4000-8000-00000000010c', now() - interval '60 minutes'),
+  ('00000000-0000-4000-8000-0000000b2003', '00000000-0000-4000-8000-0000000b1002', '00000000-0000-4000-8000-0000000a1003', '00000000-0000-4000-8000-0000000a2001', 12, 0, 12, 12, '00000000-0000-4000-8000-00000000010c', now() - interval '200 minutes');
 
 INSERT INTO stock_movement (balance_id, movement_type, delta_on_hand, delta_reserved, commitment_id, operation_ref, actor_user_id, created_at) VALUES
-  ('00000000-0000-4000-8000-0000000a5a05', 'RESERVE', 0, 12, '00000000-0000-4000-8000-0000000b2001', 'RESERVE:00000000-0000-4000-8000-0000000b2001', '00000000-0000-4000-8000-000000000105', now() - interval '4 days'),
-  ('00000000-0000-4000-8000-0000000a5a05', 'RESERVE', 0,  8, '00000000-0000-4000-8000-0000000b2002', 'RESERVE:00000000-0000-4000-8000-0000000b2002', '00000000-0000-4000-8000-000000000105', now() - interval '3 days'),
-  ('00000000-0000-4000-8000-0000000a5a03', 'RESERVE', 0, 12, '00000000-0000-4000-8000-0000000b2003', 'RESERVE:00000000-0000-4000-8000-0000000b2003', '00000000-0000-4000-8000-000000000105', now() - interval '4 days');
+  ('00000000-0000-4000-8000-0000000a5a05', 'RESERVE', 0, 12, '00000000-0000-4000-8000-0000000b2001', 'COMMITMENT_RESERVE:00000000-0000-4000-8000-0000000b2001', '00000000-0000-4000-8000-00000000010c', now() - interval '200 minutes'),
+  ('00000000-0000-4000-8000-0000000a5a05', 'RESERVE', 0,  8, '00000000-0000-4000-8000-0000000b2002', 'COMMITMENT_RESERVE:00000000-0000-4000-8000-0000000b2002', '00000000-0000-4000-8000-00000000010c', now() - interval '60 minutes'),
+  ('00000000-0000-4000-8000-0000000a5a03', 'RESERVE', 0, 12, '00000000-0000-4000-8000-0000000b2003', 'COMMITMENT_RESERVE:00000000-0000-4000-8000-0000000b2003', '00000000-0000-4000-8000-00000000010c', now() - interval '200 minutes');
 
--- Distribution 1 (REQUEST_AID, direct to a household): preparer ops_seed, approver reviewer1, dispatcher ops_mgr, recorder ops_seed (recorder != dispatcher).
-INSERT INTO distribution (id, warehouse_id, campaign_id, purpose, status, preparer_user_id, created_at) VALUES
-  ('00000000-0000-4000-8000-0000000b3001', '00000000-0000-4000-8000-0000000a2001',
-   '00000000-0000-4000-8000-0000000000c1', 'REQUEST_AID', 'DRAFT',
-   '00000000-0000-4000-8000-000000000112', now() - interval '3 days 20 hours');
-INSERT INTO distribution_line (id, distribution_id, warehouse_id, item_id, commitment_id, quantity) VALUES
-  ('00000000-0000-4000-8000-0000000b4001', '00000000-0000-4000-8000-0000000b3001', '00000000-0000-4000-8000-0000000a2001', '00000000-0000-4000-8000-0000000a1005', '00000000-0000-4000-8000-0000000b2001', 12),
-  ('00000000-0000-4000-8000-0000000b4002', '00000000-0000-4000-8000-0000000b3001', '00000000-0000-4000-8000-0000000a2001', '00000000-0000-4000-8000-0000000a1003', '00000000-0000-4000-8000-0000000b2003', 12);
-UPDATE distribution SET status = 'RECONCILED',
-  approver_user_id = '00000000-0000-4000-8000-000000000108', approved_version = version, approved_at = now() - interval '3 days 19 hours',
-  dispatch_actor_user_id = '00000000-0000-4000-8000-000000000105', dispatched_at = now() - interval '3 days 18 hours',
-  reconciled_at = now() - interval '3 days 16 hours'
-WHERE id = '00000000-0000-4000-8000-0000000b3001';
-
+-- Supply request S1 (handed over): the team asked for 12 bộ sơ cứu and 12 nước; ops_mgr handed them over against the code,
+-- which issued the goods and counted them as delivered to the SOS needs.
+INSERT INTO supply_request (id, mission_id, request_id, work_cycle, campaign_id, team_id, team_name, warehouse_id, status, pickup_code,
+                            requested_by, on_behalf, expires_at, handed_over_by, handed_over_at, version, created_at, updated_at) VALUES
+  ('00000000-0000-4000-8000-0000000b3001', '00000000-0000-4000-8000-0000000000b1', '00000000-0000-4000-8000-0000000000f5', 1,
+   '00000000-0000-4000-8000-0000000000c1', '00000000-0000-4000-8000-0000000000a1', 'Đội xuồng cứu hộ 1', '00000000-0000-4000-8000-0000000a2001',
+   'HANDED_OVER', '318204', '00000000-0000-4000-8000-00000000010c', false, now() + interval '2 hours',
+   '00000000-0000-4000-8000-000000000105', now() - interval '190 minutes', 2, now() - interval '200 minutes', now() - interval '190 minutes');
+INSERT INTO supply_request_line (supply_request_id, item_id, relief_need_id, commitment_id, requested_quantity, reserved_quantity) VALUES
+  ('00000000-0000-4000-8000-0000000b3001', '00000000-0000-4000-8000-0000000a1005', '00000000-0000-4000-8000-0000000b1001', '00000000-0000-4000-8000-0000000b2001', 12, 12),
+  ('00000000-0000-4000-8000-0000000b3001', '00000000-0000-4000-8000-0000000a1003', '00000000-0000-4000-8000-0000000b1002', '00000000-0000-4000-8000-0000000b2003', 12, 12);
 INSERT INTO stock_movement (balance_id, movement_type, delta_on_hand, delta_reserved, commitment_id, operation_ref, actor_user_id, created_at) VALUES
-  ('00000000-0000-4000-8000-0000000a5a05', 'ISSUE', -12, -12, '00000000-0000-4000-8000-0000000b2001', 'ISSUE:00000000-0000-4000-8000-0000000b4001', '00000000-0000-4000-8000-000000000105', now() - interval '3 days 18 hours'),
-  ('00000000-0000-4000-8000-0000000a5a03', 'ISSUE', -12, -12, '00000000-0000-4000-8000-0000000b2003', 'ISSUE:00000000-0000-4000-8000-0000000b4002', '00000000-0000-4000-8000-000000000105', now() - interval '3 days 18 hours');
+  ('00000000-0000-4000-8000-0000000a5a05', 'ISSUE', -12, -12, '00000000-0000-4000-8000-0000000b2001', 'SUPPLY_ISSUE:00000000-0000-4000-8000-0000000b3001:00000000-0000-4000-8000-0000000b2001', '00000000-0000-4000-8000-000000000105', now() - interval '190 minutes'),
+  ('00000000-0000-4000-8000-0000000a5a03', 'ISSUE', -12, -12, '00000000-0000-4000-8000-0000000b2003', 'SUPPLY_ISSUE:00000000-0000-4000-8000-0000000b3001:00000000-0000-4000-8000-0000000b2003', '00000000-0000-4000-8000-000000000105', now() - interval '190 minutes');
 
-INSERT INTO handoff_record (id, distribution_id, handoff_kind, receiver_label, recorder_user_id, confirmation_basis, occurred_at, created_at) VALUES
-  ('00000000-0000-4000-8000-0000000b5001', '00000000-0000-4000-8000-0000000b3001', 'DIRECT_HOUSEHOLD', 'Hộ gia đình giả lập, tổ 5 khu A',
-   '00000000-0000-4000-8000-000000000112', 'Chủ hộ ký nhận trên phiếu giao', now() - interval '3 days 17 hours', now() - interval '3 days 17 hours');
-INSERT INTO handoff_line (id, handoff_id, distribution_id, distribution_line_id, commitment_id, quantity) VALUES
-  ('00000000-0000-4000-8000-0000000b6001', '00000000-0000-4000-8000-0000000b5001', '00000000-0000-4000-8000-0000000b3001', '00000000-0000-4000-8000-0000000b4001', '00000000-0000-4000-8000-0000000b2001', 12),
-  ('00000000-0000-4000-8000-0000000b6002', '00000000-0000-4000-8000-0000000b5001', '00000000-0000-4000-8000-0000000b3001', '00000000-0000-4000-8000-0000000b4002', '00000000-0000-4000-8000-0000000b2003', 12);
-INSERT INTO issued_line_settlement (handoff_line_id, commitment_id, settlement_type, created_at) VALUES
-  ('00000000-0000-4000-8000-0000000b6001', '00000000-0000-4000-8000-0000000b2001', 'DELIVERED', now() - interval '3 days 17 hours'),
-  ('00000000-0000-4000-8000-0000000b6002', '00000000-0000-4000-8000-0000000b2003', 'DELIVERED', now() - interval '3 days 17 hours');
-
--- Distribution 2 (plan TC-DIST-02; preparer ops_mgr, approver reviewer2, dispatcher ops_seed, recorder ops_mgr): issue 55 mì gói for a campaign distribution; direct household handoff 50,
--- loss 5 pending (no loss review row) => the 5 under pending loss stay in transit (excluded from custody arithmetic until reviewed).
-INSERT INTO distribution (id, warehouse_id, campaign_id, purpose, status, preparer_user_id, created_at) VALUES
-  ('00000000-0000-4000-8000-0000000b3002', '00000000-0000-4000-8000-0000000a2001',
-   '00000000-0000-4000-8000-0000000000c1', 'CAMPAIGN_DISTRIBUTION', 'DRAFT',
-   '00000000-0000-4000-8000-000000000105', now() - interval '2 days 20 hours');
-INSERT INTO distribution_line (id, distribution_id, warehouse_id, item_id, quantity, in_transit_quantity) VALUES
-  ('00000000-0000-4000-8000-0000000b4003', '00000000-0000-4000-8000-0000000b3002', '00000000-0000-4000-8000-0000000a2001', '00000000-0000-4000-8000-0000000a1002', 55, 5);
-UPDATE distribution SET status = 'DISPATCHED',
-  approver_user_id = '00000000-0000-4000-8000-000000000109', approved_version = version, approved_at = now() - interval '2 days 19 hours',
-  dispatch_actor_user_id = '00000000-0000-4000-8000-000000000112', dispatched_at = now() - interval '2 days 18 hours'
-WHERE id = '00000000-0000-4000-8000-0000000b3002';
-
-INSERT INTO stock_movement (balance_id, movement_type, delta_on_hand, delta_reserved, distribution_line_id, operation_ref, actor_user_id, created_at) VALUES
-  ('00000000-0000-4000-8000-0000000a5a02', 'RESERVE', 0, 55, '00000000-0000-4000-8000-0000000b4003', 'RESERVE:DL:00000000-0000-4000-8000-0000000b4003', '00000000-0000-4000-8000-000000000112', now() - interval '2 days 18 hours');
-INSERT INTO stock_movement (balance_id, movement_type, delta_on_hand, delta_reserved, distribution_line_id, operation_ref, actor_user_id, created_at) VALUES
-  ('00000000-0000-4000-8000-0000000a5a02', 'ISSUE', -55, -55, '00000000-0000-4000-8000-0000000b4003', 'ISSUE:DL:00000000-0000-4000-8000-0000000b4003', '00000000-0000-4000-8000-000000000112', now() - interval '2 days 18 hours');
-
-INSERT INTO handoff_record (id, distribution_id, handoff_kind, source_stage, receiver_label, recorder_user_id, confirmation_basis, occurred_at, created_at) VALUES
-  ('00000000-0000-4000-8000-0000000b5002', '00000000-0000-4000-8000-0000000b3002', 'DIRECT_HOUSEHOLD', NULL,         'Danh sách 50 hộ nhận trực tiếp (giả lập)',
-   '00000000-0000-4000-8000-000000000105', 'Sổ phát có chữ ký từng hộ', now() - interval '2 days 12 hours', now() - interval '2 days 12 hours'),
-  ('00000000-0000-4000-8000-0000000b5004', '00000000-0000-4000-8000-0000000b3002', 'LOSS',              'IN_TRANSIT', NULL,
-   '00000000-0000-4000-8000-000000000105', 'Biên bản thiếu 5 gói khi vận chuyển, chờ xác minh độc lập', now() - interval '2 days 11 hours', now() - interval '2 days 11 hours');
-INSERT INTO handoff_line (id, handoff_id, distribution_id, distribution_line_id, quantity) VALUES
-  ('00000000-0000-4000-8000-0000000b6003', '00000000-0000-4000-8000-0000000b5002', '00000000-0000-4000-8000-0000000b3002', '00000000-0000-4000-8000-0000000b4003', 50),
-  ('00000000-0000-4000-8000-0000000b6005', '00000000-0000-4000-8000-0000000b5004', '00000000-0000-4000-8000-0000000b3002', '00000000-0000-4000-8000-0000000b4003', 5);
-
--- Distribution 3: CAMPAIGN_DISTRIBUTION still DRAFT (warehouse B, no commitment, no stock effect yet).
-INSERT INTO distribution (id, warehouse_id, campaign_id, purpose, status, preparer_user_id, created_at) VALUES
-  ('00000000-0000-4000-8000-0000000b3003', '00000000-0000-4000-8000-0000000a2002',
-   '00000000-0000-4000-8000-0000000000c1', 'CAMPAIGN_DISTRIBUTION', 'DRAFT', '00000000-0000-4000-8000-000000000105', now() - interval '2 hours');
-INSERT INTO distribution_line (id, distribution_id, warehouse_id, item_id, quantity) VALUES
-  ('00000000-0000-4000-8000-0000000b4004', '00000000-0000-4000-8000-0000000b3003', '00000000-0000-4000-8000-0000000a2002', '00000000-0000-4000-8000-0000000a1001', 40.000),
-  ('00000000-0000-4000-8000-0000000b4005', '00000000-0000-4000-8000-0000000b3003', '00000000-0000-4000-8000-0000000a2002', '00000000-0000-4000-8000-0000000a1007', 20);
-
--- Distribution 4 (shortened flow, 2026-11-25): preparer ops_seed; ops_mgr approved and dispatched in one step
--- (approve-and-dispatch). Everything is still in transit, so ops_seed (not the dispatcher) can demo "Đã giao đủ toàn bộ".
-INSERT INTO distribution (id, warehouse_id, campaign_id, purpose, status, preparer_user_id, created_at) VALUES
-  ('00000000-0000-4000-8000-0000000b3004', '00000000-0000-4000-8000-0000000a2001',
-   '00000000-0000-4000-8000-0000000000c1', 'CAMPAIGN_DISTRIBUTION', 'DRAFT', '00000000-0000-4000-8000-000000000112', now() - interval '5 hours');
-INSERT INTO distribution_line (id, distribution_id, warehouse_id, item_id, quantity, in_transit_quantity) VALUES
-  ('00000000-0000-4000-8000-0000000b4006', '00000000-0000-4000-8000-0000000b3004', '00000000-0000-4000-8000-0000000a2001', '00000000-0000-4000-8000-0000000a1003', 20, 20),
-  ('00000000-0000-4000-8000-0000000b4007', '00000000-0000-4000-8000-0000000b3004', '00000000-0000-4000-8000-0000000a2001', '00000000-0000-4000-8000-0000000a1007', 10, 10);
-UPDATE distribution SET status = 'DISPATCHED',
-  approver_user_id = '00000000-0000-4000-8000-000000000105', approved_version = version, approved_at = now() - interval '4 hours',
-  dispatch_actor_user_id = '00000000-0000-4000-8000-000000000105', dispatched_at = now() - interval '4 hours'
-WHERE id = '00000000-0000-4000-8000-0000000b3004';
-INSERT INTO stock_movement (balance_id, movement_type, delta_on_hand, delta_reserved, distribution_line_id, operation_ref, actor_user_id, created_at) VALUES
-  ('00000000-0000-4000-8000-0000000a5a03', 'RESERVE', 0, 20, '00000000-0000-4000-8000-0000000b4006', 'RESERVE:DL:00000000-0000-4000-8000-0000000b4006', '00000000-0000-4000-8000-000000000105', now() - interval '4 hours'),
-  ('00000000-0000-4000-8000-0000000a5a07', 'RESERVE', 0, 10, '00000000-0000-4000-8000-0000000b4007', 'RESERVE:DL:00000000-0000-4000-8000-0000000b4007', '00000000-0000-4000-8000-000000000105', now() - interval '4 hours');
-INSERT INTO stock_movement (balance_id, movement_type, delta_on_hand, delta_reserved, distribution_line_id, operation_ref, actor_user_id, created_at) VALUES
-  ('00000000-0000-4000-8000-0000000a5a03', 'ISSUE', -20, -20, '00000000-0000-4000-8000-0000000b4006', 'ISSUE:DL:00000000-0000-4000-8000-0000000b4006', '00000000-0000-4000-8000-000000000105', now() - interval '4 hours'),
-  ('00000000-0000-4000-8000-0000000a5a07', 'ISSUE', -10, -10, '00000000-0000-4000-8000-0000000b4007', 'ISSUE:DL:00000000-0000-4000-8000-0000000b4007', '00000000-0000-4000-8000-000000000105', now() - interval '4 hours');
+-- Supply request S2 (waiting at the warehouse): the remaining 8 bộ sơ cứu are reserved. Demo: log in as ops_mgr,
+-- open "Giao hàng cho đội" and hand it over with code 527913 (the leader sees the same code on the mission).
+INSERT INTO supply_request (id, mission_id, request_id, work_cycle, campaign_id, team_id, team_name, warehouse_id, status, pickup_code,
+                            requested_by, on_behalf, expires_at, version, created_at, updated_at) VALUES
+  ('00000000-0000-4000-8000-0000000b3002', '00000000-0000-4000-8000-0000000000b1', '00000000-0000-4000-8000-0000000000f5', 1,
+   '00000000-0000-4000-8000-0000000000c1', '00000000-0000-4000-8000-0000000000a1', 'Đội xuồng cứu hộ 1', '00000000-0000-4000-8000-0000000a2001',
+   'READY', '527913', '00000000-0000-4000-8000-00000000010c', false, now() + interval '3 days', 1, now() - interval '60 minutes', now() - interval '60 minutes');
+INSERT INTO supply_request_line (supply_request_id, item_id, relief_need_id, commitment_id, requested_quantity, reserved_quantity) VALUES
+  ('00000000-0000-4000-8000-0000000b3002', '00000000-0000-4000-8000-0000000a1005', '00000000-0000-4000-8000-0000000b1001', '00000000-0000-4000-8000-0000000b2002', 8, 8);
 
 -- ---------- pending stock adjustment (requested by ops_seed; awaiting ops_mgr or a reviewer) ----------
 INSERT INTO stock_adjustment (id, balance_id, delta_on_hand, reason, status, requested_by_user_id, requested_at) VALUES
@@ -281,8 +225,6 @@ INSERT INTO stock_adjustment (id, balance_id, delta_on_hand, reason, status, req
 INSERT INTO notice (id, recipient_user_id, source_id, source_version, notice_type, payload, created_at) VALUES
   ('00000000-0000-4000-8000-0000000d1001', '00000000-0000-4000-8000-000000000105', '00000000-0000-4000-8000-0000000b8001', 1, 'STOCK_ADJUSTMENT_PENDING',
    '{"title": "Có yêu cầu điều chỉnh tồn kho chờ duyệt", "message": "Kho trung tâm A: giảm 3 gói Mì gói do ẩm mốc."}'::jsonb, now() - interval '1 hour'),
-  ('00000000-0000-4000-8000-0000000d1002', '00000000-0000-4000-8000-000000000105', '00000000-0000-4000-8000-0000000b5004', 1, 'LOSS_REVIEW_PENDING',
-   '{"title": "Có biên bản thất thoát chờ xác minh", "message": "Phiếu phân phối theo chiến dịch ghi thiếu 5 gói Mì gói."}'::jsonb, now() - interval '2 days 11 hours'),
   ('00000000-0000-4000-8000-0000000d1003', '00000000-0000-4000-8000-000000000105', '00000000-0000-4000-8000-0000000a7004', 1, 'DONATION_PENDING_REVIEW',
    '{"title": "Có phiếu tiếp nhận chờ duyệt", "message": "Phiếu GD7K2M04 đã được kiểm đếm và đang chờ người duyệt độc lập."}'::jsonb, now() - interval '2 hours'),
   ('00000000-0000-4000-8000-0000000d1004', '00000000-0000-4000-8000-000000000105', '00000000-0000-4000-8000-0000000a9001', 1, 'DONATION_DISPUTE_OPENED',
@@ -300,8 +242,12 @@ BEGIN
       OR b.reserved <> coalesce((SELECT sum(m.delta_reserved) FROM stock_movement m WHERE m.balance_id = b.id), 0);
   IF n <> 0 THEN RAISE EXCEPTION 'seed assertion failed: % stock balances differ from the ledger sum', n; END IF;
 
-  IF EXISTS (SELECT 1 FROM commitment_counter_mismatch) THEN
-    RAISE EXCEPTION 'seed assertion failed: commitment_counter_mismatch returned rows';
+  -- every hand-over issues and delivers in one step: delivered = issued = the ISSUE movements of the commitment
+  IF EXISTS (SELECT 1 FROM commitment c
+              WHERE c.delivered_quantity <> c.issued_quantity
+                 OR c.issued_quantity <> coalesce((SELECT -sum(m.delta_on_hand) FROM stock_movement m
+                                                    WHERE m.commitment_id = c.id AND m.movement_type = 'ISSUE'), 0)) THEN
+    RAISE EXCEPTION 'seed assertion failed: commitment counters differ from the ISSUE movements';
   END IF;
   IF EXISTS (SELECT 1 FROM check_cycle_state_matches_intent()) THEN
     RAISE EXCEPTION 'seed assertion failed: check_cycle_state_matches_intent() returned rows';
@@ -317,10 +263,8 @@ BEGIN
    WHERE receipt_id = '00000000-0000-4000-8000-0000000a8003' AND movement_type IN ('RECEIPT', 'RECEIPT_HELD_RELEASE');
   IF v <> 55 THEN RAISE EXCEPTION 'seed assertion failed: D3 ledger accepted total is %, expected 55', v; END IF;
 
-  -- need N1: outstanding = requested - delivered = 8, delivered derived from settlements
-  SELECT n1.requested_quantity - coalesce((SELECT sum(h.quantity) FROM issued_line_settlement s JOIN commitment c ON c.id = s.commitment_id
-                                           JOIN handoff_line h ON h.id = s.handoff_line_id
-                                           WHERE c.relief_need_id = n1.id AND s.settlement_type = 'DELIVERED'), 0)
+  -- need N1: outstanding = requested - delivered = 8
+  SELECT n1.requested_quantity - coalesce((SELECT sum(c.delivered_quantity) FROM commitment c WHERE c.relief_need_id = n1.id), 0)
     INTO v FROM relief_need n1 WHERE n1.id = '00000000-0000-4000-8000-0000000b1001';
   IF v <> 8 THEN RAISE EXCEPTION 'seed assertion failed: need N1 outstanding is %, expected 8', v; END IF;
 
@@ -331,12 +275,9 @@ BEGIN
     FROM relief_need n2 LEFT JOIN commitment c ON c.relief_need_id = n2.id WHERE n2.id = '00000000-0000-4000-8000-0000000b1002' GROUP BY n2.id;
   IF v <> 0 THEN RAISE EXCEPTION 'seed assertion failed: N2 cancelled_remaining does not equal requested - delivered'; END IF;
 
-  -- campaign distribution counters: 50 handed to households, 5 pending loss still in transit
-  SELECT count(*) INTO n FROM distribution_line l WHERE l.id = '00000000-0000-4000-8000-0000000b4003' AND l.in_transit_quantity = 5;
-  IF n <> 1 THEN RAISE EXCEPTION 'seed assertion failed: campaign distribution custody counters'; END IF;
-  IF EXISTS (SELECT 1 FROM handoff_loss_review WHERE handoff_id = '00000000-0000-4000-8000-0000000b5004') THEN
-    RAISE EXCEPTION 'seed assertion failed: the demo LOSS handoff must stay pending';
-  END IF;
+  -- one open supply request per mission, holding exactly the 8 reserved bộ sơ cứu
+  SELECT count(*) INTO n FROM supply_request WHERE mission_id = '00000000-0000-4000-8000-0000000000b1' AND status = 'READY';
+  IF n <> 1 THEN RAISE EXCEPTION 'seed assertion failed: expected one READY supply request for the demo mission'; END IF;
 END $$;
 
 COMMIT;

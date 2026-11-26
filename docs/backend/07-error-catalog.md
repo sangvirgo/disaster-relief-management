@@ -119,6 +119,7 @@ Every error the API can return has one row here. The implementation loads this t
 | `NEED_DEFAULT_ITEM_INVALID` | 400 | Logistics | Vật phẩm mặc định phải đang hoạt động và cùng nhóm hàng với định mức. |
 | `NEED_OVER_COMMITTED` | 409 | Logistics | Tổng số lượng cam kết vượt quá nhu cầu. |
 | `BELOW_PROTECTED_QUANTITY` | 409 | Logistics | Không thể giảm nhu cầu xuống thấp hơn lượng đã giữ chỗ hoặc đã giao. |
+| `UNSETTLED_ISSUED_GOODS` | 409 | Logistics | Còn hàng đã xuất chưa được xác nhận giao. |
 | `CYCLE_FROZEN` | 409 | Logistics | Yêu cầu đang bị khóa để hủy. Chỉ được hoàn tất các bước đã bắt đầu. |
 | `CYCLE_SEALED` | 409 | Logistics | Chu kỳ xử lý đã được niêm phong. |
 | `CYCLE_NOT_SETTLED` | 409 | Logistics | Còn nhu cầu hoặc hàng chưa hoàn tất nên chưa thể niêm phong. |

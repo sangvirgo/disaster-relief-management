@@ -39,39 +39,39 @@ describe('role catalog after retiring staff roles', () => {
     expect(hasPermission([coordinator], 'CAMPAIGN_WAREHOUSE_VIEW', { campaignId: 'campaign-a' })).toBe(true);
   });
 
-  it('keeps the operations manager as the union of the retired intake and distribution duties', () => {
-    for (const permission of ['DONATION_INTAKE', 'DISTRIBUTION_PREPARE', 'DISTRIBUTION_DISPATCH', 'HANDOFF_RECORD', 'STOCK_ADJUST_REQUEST'] as const) {
+  it('keeps the operations manager as the union of the retired intake duties and the warehouse hand-over', () => {
+    for (const permission of ['DONATION_INTAKE', 'SUPPLY_REQUEST_HANDOVER', 'STOCK_ADJUST_REQUEST'] as const) {
       expect(ROLE_PERMISSIONS.OPERATIONS_MANAGER).toContain(permission);
     }
   });
 
-  it('keeps reviewers from dispatching or recording handoffs', () => {
-    expect(ROLE_PERMISSIONS.REVIEWER).not.toContain('DISTRIBUTION_DISPATCH');
-    expect(ROLE_PERMISSIONS.REVIEWER).not.toContain('HANDOFF_RECORD');
+  it('keeps reviewers to donation review only', () => {
+    expect(ROLE_PERMISSIONS.REVIEWER).toEqual(['DONATION_REVIEW']);
   });
 
   it('confines a campaign-scoped operations manager to its own campaign', () => {
     const grant: Grant = { role_code: 'OPERATIONS_MANAGER', scope_type: 'CAMPAIGN', campaign_id: 'campaign-a' };
-    expect(hasPermission([grant], 'DISTRIBUTION_DISPATCH', { campaignId: 'campaign-a' })).toBe(true);
-    expect(hasPermission([grant], 'DISTRIBUTION_DISPATCH', { campaignId: 'campaign-b' })).toBe(false);
-    expect(hasPermission([grant], 'HANDOFF_RECORD', { campaignId: null })).toBe(false);
+    expect(hasPermission([grant], 'SUPPLY_REQUEST_HANDOVER', { campaignId: 'campaign-a' })).toBe(true);
+    expect(hasPermission([grant], 'SUPPLY_REQUEST_HANDOVER', { campaignId: 'campaign-b' })).toBe(false);
+    expect(hasPermission([grant], 'SUPPLY_REQUEST_HANDOVER', { campaignId: null })).toBe(false);
   });
 
   it('lets only a system-scoped operations manager reach catalog-wide permissions through SYSTEM scope', () => {
     const system: Grant = { role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' };
     const campaign: Grant = { role_code: 'OPERATIONS_MANAGER', scope_type: 'CAMPAIGN', campaign_id: 'campaign-a' };
     expect(hasPermission([system], 'CATALOG_MANAGE', {})).toBe(true);
-    expect(hasPermission([system], 'DISTRIBUTION_DISPATCH', { campaignId: 'campaign-b' })).toBe(true);
+    expect(hasPermission([system], 'SUPPLY_REQUEST_HANDOVER', { campaignId: 'campaign-b' })).toBe(true);
     expect(hasPermission([campaign], 'DONATION_INTAKE', { campaignId: 'campaign-b' })).toBe(false);
   });
 
-  it('lets only the operations manager estimate and confirm SOS goods needs', () => {
-    expect(ROLE_PERMISSIONS.COORDINATOR).not.toContain('NEED_ESTIMATE_CONFIRM');
-    expect(ROLE_PERMISSIONS.OPERATIONS_MANAGER).toContain('NEED_ESTIMATE_CONFIRM');
+  it('lets coordinators, not operations staff, estimate and confirm SOS goods needs', () => {
+    expect(ROLE_PERMISSIONS.COORDINATOR).toContain('NEED_ESTIMATE_CONFIRM');
+    expect(ROLE_PERMISSIONS.OPERATIONS_MANAGER).not.toContain('NEED_ESTIMATE_CONFIRM');
+    expect(ROLE_PERMISSIONS.OPERATIONS_MANAGER).not.toContain('NEED_MANAGE');
     const coordinator: Grant = { role_code: 'COORDINATOR', scope_type: 'SYSTEM' };
     const manager: Grant = { role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' };
-    expect(hasPermission([coordinator], 'NEED_ESTIMATE_CONFIRM', { campaignId: 'campaign-a' })).toBe(false);
-    expect(hasPermission([manager], 'NEED_ESTIMATE_CONFIRM', { campaignId: 'campaign-a' })).toBe(true);
+    expect(hasPermission([coordinator], 'NEED_ESTIMATE_CONFIRM', { campaignId: 'campaign-a' })).toBe(true);
+    expect(hasPermission([manager], 'NEED_ESTIMATE_CONFIRM', { campaignId: 'campaign-a' })).toBe(false);
     expect(hasPermission([coordinator], 'NEED_MANAGE', { campaignId: 'campaign-a' })).toBe(true);
   });
 
@@ -104,20 +104,14 @@ describe('role catalog after retiring staff roles', () => {
     expect(hasPermission([system], 'SUPPLY_GAP_MANAGE', { campaignId: null })).toBe(true);
   });
 
-  it('lets only the operations manager create, reserve and cancel pickup tickets; coordinators and reviewers may view them', () => {
-    expect(ROLE_PERMISSIONS.OPERATIONS_MANAGER).toContain('PICKUP_TICKET_MANAGE');
-    expect(ROLE_PERMISSIONS.COORDINATOR).not.toContain('PICKUP_TICKET_MANAGE');
-    expect(ROLE_PERMISSIONS.COORDINATOR).toContain('PICKUP_TICKET_VIEW');
+  it('lets team leaders and coordinators request goods, and only operations managers hand them over', () => {
+    expect(ROLE_PERMISSIONS.VOLUNTEER).toContain('SUPPLY_REQUEST_CREATE');
+    expect(ROLE_PERMISSIONS.COORDINATOR).toContain('SUPPLY_REQUEST_CREATE');
+    expect(ROLE_PERMISSIONS.OPERATIONS_MANAGER).not.toContain('SUPPLY_REQUEST_CREATE');
     for (const role of Object.keys(ROLE_PERMISSIONS)) {
       if (role === 'OPERATIONS_MANAGER') continue;
-      expect(ROLE_PERMISSIONS[role as keyof typeof ROLE_PERMISSIONS]).not.toContain('PICKUP_TICKET_MANAGE');
-      // COORDINATOR and REVIEWER may read tickets (the reviewer needs it for the close-out review); nobody else may.
-      if (role === 'COORDINATOR' || role === 'REVIEWER') continue;
-      expect(ROLE_PERMISSIONS[role as keyof typeof ROLE_PERMISSIONS]).not.toContain('PICKUP_TICKET_VIEW');
+      expect(ROLE_PERMISSIONS[role as keyof typeof ROLE_PERMISSIONS]).not.toContain('SUPPLY_REQUEST_HANDOVER');
     }
-    const coordinator: Grant = { role_code: 'COORDINATOR', scope_type: 'SYSTEM' };
-    expect(hasPermission([coordinator], 'PICKUP_TICKET_MANAGE', { campaignId: null })).toBe(false);
-    expect(hasPermission([coordinator], 'PICKUP_TICKET_VIEW', { campaignId: null })).toBe(true);
   });
 
   it('keeps team setup and skills with ADMIN; coordinators read team readiness only', () => {
@@ -131,18 +125,5 @@ describe('role catalog after retiring staff roles', () => {
     expect(ROLE_PERMISSIONS.OPERATIONS_MANAGER).toContain('ADJUSTMENT_REVIEW');
     expect(ROLE_PERMISSIONS.REVIEWER).not.toContain('ADJUSTMENT_REVIEW');
     expect(ROLE_PERMISSIONS.REVIEWER).not.toContain('STOCK_ADJUST_REQUEST');
-  });
-
-  it('splits pickup close-out submit and review: submit for coordinators and managers, review for managers and reviewers only', () => {
-    for (const role of ['COORDINATOR', 'OPERATIONS_MANAGER'] as const) {
-      expect(ROLE_PERMISSIONS[role]).toContain('PICKUP_CLOSEOUT_SUBMIT');
-    }
-    for (const role of ['OPERATIONS_MANAGER', 'REVIEWER'] as const) {
-      expect(ROLE_PERMISSIONS[role]).toContain('PICKUP_CLOSEOUT_REVIEW');
-    }
-    expect(ROLE_PERMISSIONS.COORDINATOR).not.toContain('PICKUP_CLOSEOUT_REVIEW');
-    expect(ROLE_PERMISSIONS.VOLUNTEER).not.toContain('PICKUP_CLOSEOUT_SUBMIT');
-    expect(ROLE_PERMISSIONS.REVIEWER).not.toContain('PICKUP_CLOSEOUT_SUBMIT');
-    expect(ROLE_PERMISSIONS.ADMIN).not.toContain('PICKUP_CLOSEOUT_REVIEW');
   });
 });

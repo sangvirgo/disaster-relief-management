@@ -16,7 +16,7 @@ import { operationIdFromTimeline, ResolutionOperationPanel } from './ResolutionO
 import { RequestTimeline } from './RequestTimeline';
 import { RequestEvidencePanel } from './RequestEvidencePanel';
 import { TeamReadinessQueue } from './TeamReadinessQueue';
-import { PickupTicketPanel } from '../pickup/PickupTicketPanel';
+import { MissionSupplyPanel } from '../supply/MissionSupplyPanel';
 import { type Me } from '../../auth/session';
 import './coordinator-detail.css';
 
@@ -538,7 +538,7 @@ function claimBlockedBy(detail: Pick<Detail, 'handled_by' | 'handled_at'>, curre
 }
 
 export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnassigned = false,
-  campaignId, campaignMatchState, initialUnassignedOnly = false, user }: {
+  campaignId, campaignMatchState, initialUnassignedOnly = false }: {
   page: string; initialRequestId?: string; currentUserId: string; canSeeUnassigned?: boolean;
   campaignId?: string; campaignMatchState?: 'UNMATCHED' | 'CONFLICT'; initialUnassignedOnly?: boolean;
   user?: Me;
@@ -1871,7 +1871,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                       </p>
                       <CoordinatorMissionControl missionId={m.id} teamId={m.team_id}
                         revision={revision} onSuccess={done} onStale={refreshAfterConflict} />
-                      {user && <PickupTicketPanel user={user} missionId={m.id} missionStatus={m.status} />}
+                      <MissionSupplyPanel missionId={m.id} missionStatus={m.status} onBehalf />
                     </div>
                   ))}
                 </div>

@@ -2495,9 +2495,9 @@ Cases are planned, not executed. Backend contracts/tasks must carry these correc
 | Donation count check | Staff compare by eye | System derives per line `MATCH`, `SHORT`, `OVER`, `UNEXPECTED_ITEM`, `UNIT_OR_SCALE_ERROR`, `EXPIRING_SOON`, `QUALITY_REJECT`; warning shown to staff, donor notified automatically; derived on read, no stored flag column | Staff enter the physical count |
 | Receipt approval | Always a distinct human reviewer | **Unchanged by owner decision (2026-10-10): independent human review is kept for every receipt.** The system only prepares the review: derived flags, exact-match highlight, donor notice. No automatic approval and no `AUTO_MATCH`. | Every receipt reviewed by someone other than every count author |
 | Need fulfilment label | Coordinator confirms FULFILLED | Becomes FULFILLED automatically when `delivered = requested` after a valid settlement | Request resolution stays a human click |
-| Distribution approval | Always a second person | **Unchanged by owner decision (2026-10-10): every distribution is approved by a real person who differs from the preparer.** No auto approval. The system prepares: "prepare from commitments" fills lines and shows which commitment each line matches. | Approver (≠ preparer). **2026-11-25:** the approver may dispatch in the same step (`approve-and-dispatch`); the handoff recorder must differ from the dispatcher. |
-| Distribution lines | Typed by hand | "Prepare from commitments" fills lines; vehicle capacity vs summed same-unit quantity is a warning, never a block | Choose warehouse, vehicle, carrier |
-| Distribution reconcile | Human `reconcile` | RECONCILED automatically when every line has `in_transit = 0`, `at_point = 0` and no pending loss | Loss approval |
+| Distribution approval *(superseded 2026-11-26 by §28.8: no slips, no approval)* | Always a second person | **Unchanged by owner decision (2026-10-10): every distribution is approved by a real person who differs from the preparer.** No auto approval. The system prepares: "prepare from commitments" fills lines and shows which commitment each line matches. | Approver (≠ preparer). **2026-11-25:** the approver may dispatch in the same step (`approve-and-dispatch`); the handoff recorder must differ from the dispatcher. |
+| Distribution lines *(superseded by §28.8)* | Typed by hand | "Prepare from commitments" fills lines; vehicle capacity vs summed same-unit quantity is a warning, never a block | Choose warehouse, vehicle, carrier |
+| Distribution reconcile *(superseded by §28.8)* | Human `reconcile` | RECONCILED automatically when every line has `in_transit = 0`, `at_point = 0` and no pending loss | Loss approval |
 | Duplicate cascade | Undefined after canonical A is rejected/cancelled | Children (DUPLICATE) of A return to VERIFYING with a `DUPLICATE_ORPHANED` event and coordinator notice; link kept in history, `canonical_request_id` cleared | Re-decide each child |
 | Verification help | Coordinator searches | System lists corroboration candidates (same category, nearby, close in time, different account/phone/IP) and independent evidence; coordinator confirms with one action | The verification decision |
 | Resolution help | Coordinator reads many panels | System computes a readiness checklist and notifies when all needs are settled and no mission is active | The resolve command |
@@ -2524,7 +2524,7 @@ Receipt posting never bypasses the distinct reviewer; the owner removed the prop
 14. **Timeline order.** Reporter timeline returns the newest 50 entries (descending), with `more` and a cursor to older ones; the index serves both directions.
 15. **Quantities typed by citizens.** None. Needs are created by staff after intake; citizens only add notes, headcount and contact.
 
-### 28.3 Delivery carrier = rescue team (optional slice, after core)
+### 28.3 Delivery carrier = rescue team (optional slice, after core) — superseded by §28.8
 
 Goal: a team that already works on the request can carry and hand over the aid, takes the destination from the system, and the coordinator relays nothing when the team uses the app.
 
@@ -2576,6 +2576,21 @@ Decided by the owner or by best practice under the owner's delegation; they repl
 - **Not added:** `receipt_review.review_kind`, `distribution.approval_kind`, `relief_need.target_reason` (reason lives in the request and audit), `donation_receipt.organization_id`, `verification_decision.concurrence_event_id`, `resolution_intent.mission_not_required`, request/delivery recovery hash pairs.
 
 **Status:** the schema files and constraint tests were rewritten to 28.7 and hardened, and run on PostGIS 17-3.5 on 2026-10-10: identity 37, response 95, logistics 133 assertions pass; restricted-role privilege tests, the SECURITY DEFINER stock writer, nine two-session race tests and key query plans at 200k rows were executed (01-schema-review §9.5). The service layer, TypeORM migrations and all application code do not exist yet. Section 27, the backend pack and the diagrams are kept; the SQL files remain the unmodified baseline until T0-S.
+
+### 28.8 Supply requests replace distribution slips (user decision, 2026-11-26)
+
+The user asked to remove warehouse slips entirely and to keep operations staff away from SOS and mission details, automating the stock issue as far as possible with AI support. This decision supersedes the distribution, handoff, loss-review, reconciliation and pickup-ticket designs (§28.1 rows on distributions, §28.3, Steps 6a/6b) and the 2026-10-10 "second person approves every distribution" decision.
+
+Flow:
+1. The need-extraction sweep (Gemini, with norm fallback) keeps proposing ESTIMATED goods from the SOS text and head counts.
+2. The **team leader** opens the mission and sees those lines pre-filled (`GET /supply-requests/suggestion`); a **coordinator** does the same on behalf of a COORDINATOR-mode team. A human edits and sends; AI never sends.
+3. `POST /supply-requests` confirms the SOS needs, picks **one** warehouse (campaign PRIMARY/BACKUP by coverage; another active warehouse only when no campaign warehouse holds any requested goods), reserves what it holds and returns a six-digit pickup code valid for 6 hours. Shortfall stays as open need and feeds the supply-gap warnings.
+4. Warehouse staff see only a queue of team names and goods (`GET /supply-requests/queue`) — never the SOS, mission, people, location or code. When the team arrives and reads the code, `POST /supply-requests/{id}/hand-over` issues the stock and counts it as delivered to the SOS needs in the same transaction.
+5. Uncollected requests expire and release their reservation automatically; the team, coordinator or warehouse may also cancel.
+
+Kept: the append-only stock ledger and balance trigger, donation intake with independent receipt review, need cycles and resolution guards (a READY request blocks sealing through `RESERVED_QUANTITY`), and the audit log. Removed: `distribution*`, `handoff_*`, `issued_line_settlement`, `pickup_ticket*`, `pickup_closeout_line`, `team_custody`, manual commitment routes, the `RETURN` movement type, handoff evidence and the permissions `DISTRIBUTION_*`, `HANDOFF_RECORD`, `LOSS_APPROVE`, `COMMITMENT_MANAGE`, `PICKUP_*`. `NEED_MANAGE`/`NEED_ESTIMATE_CONFIRM` moved off `OPERATIONS_MANAGER` (to coordinators) so operations staff no longer read per-SOS needs. New permissions: `SUPPLY_REQUEST_CREATE` (VOLUNTEER as team leader, COORDINATOR on behalf) and `SUPPLY_REQUEST_HANDOVER` (OPERATIONS_MANAGER). Contract details: [04 §6](backend/04-logistics-api.md).
+
+Accepted risk: one person can hand goods to a team without a second check; the code check and the audit rows (requester, hand-over user, time) are the controls.
 
 ## Appendix A. AI implementation and research handoff
 

@@ -29,32 +29,24 @@ Roles are a code catalog. The current role set has six codes: `ADMIN`, `COORDINA
 | `CAMPAIGN_WAREHOUSE_MANAGE` (manual primary warehouse, re-evaluation) |  |  |  | ● |  |  |
 | `SUPPLY_GAP_VIEW` (supply-gap warnings and suggestions, read-only; SYSTEM scope) |  |  |  | ● |  |  |
 | `SUPPLY_GAP_MANAGE` (accept a suggested donation drive or dismiss a gap; SYSTEM scope) |  |  |  | ● |  |  |
-| `PICKUP_TICKET_VIEW` (pickup tickets and their read model; campaign or SYSTEM scope; REVIEWER reads so the independent close-out review can run) |  |  | ● | ● | ● |  |
-| `PICKUP_TICKET_MANAGE` (create, reserve, confirm and cancel a mission pickup ticket; the inner commitment, distribution and dispatch steps keep their own permissions; user decision 2026-11-22) |  |  |  | ● |  |  |
-| `PICKUP_CLOSEOUT_SUBMIT` (draft and submit a pickup close-out; the team lead acts through a coordinator in the demo) |  |  | ● | ● |  |  |
-| `PICKUP_CLOSEOUT_REVIEW` (approve or reject a submitted close-out; reviewer differs from submitter and from the handover user) |  |  |  | ● | ● |  |
 | `RESPONSE_REPORT_READ` (Response aggregates) |  |  | ● | ● |  | ● |
 | `REPORT_READ` (Logistics aggregates) |  |  | ● | ● |  | ● |
 | `CATALOG_MANAGE`, `ASSET_MANAGE` (items, warehouses; SYSTEM scope only) |  |  |  | ● |  |  |
 | `DONATION_INTAKE` (count received goods) |  |  |  | ● |  |  |
 | `DONATION_REVIEW` (approve and post receipts; may also create receipts, count, confirm a count independently and attach counting evidence — user decision 2026-11-21) |  |  |  |  | ● |  |
-| `NEED_MANAGE` (define, reduce or cancel need) |  |  | ● | ● |  |  |
-| `NEED_ESTIMATE_CONFIRM` (generate SOS need estimates, confirm or edit them, and read the manager proposal queue `GET /need-proposals`) |  |  |  | ● |  |  |
+| `NEED_MANAGE` (define, reduce or cancel need; operations staff no longer hold it, 2026-11-26) |  |  | ● |  |  |  |
+| `NEED_ESTIMATE_CONFIRM` (generate SOS need estimates, confirm or edit them, read `GET /need-proposals`; moved from operations to coordinators on 2026-11-26) |  |  | ● |  |  |  |
+| `SUPPLY_REQUEST_CREATE` (ask for goods for a live mission and cancel the open request; a VOLUNTEER must lead the mission team, a COORDINATOR acts on behalf in its campaign scope; 2026-11-26) |  | ● | ● |  |  |  |
+| `SUPPLY_REQUEST_HANDOVER` (warehouse queue without SOS data, hand-over against the team's pickup code, cancel when goods are unavailable; 2026-11-26) |  |  |  | ● |  |  |
 | `NEED_NORM_MANAGE` (need norm table; system scope) |  |  |  | ● |  |  |
-| `COMMITMENT_MANAGE` |  |  |  | ● |  |  |
-| `DISTRIBUTION_PREPARE` |  |  |  | ● |  |  |
-| `DISTRIBUTION_REVIEW` (approve; REVIEWER approves only `REQUEST_AID` citizen distributions, campaign distributions also need `DISTRIBUTION_PREPARE`; user decision 2026-11-22) |  |  |  | ● | ● |  |
-| `DISTRIBUTION_DISPATCH` (issue stock) |  |  |  | ● |  |  |
-| `HANDOFF_RECORD` (direct delivery, point receipt, household handout, return and loss recording) |  |  |  | ● |  |  |
-| `LOSS_APPROVE` (independent review) |  |  |  | ● | ● |  |
 | `ADJUSTMENT_REVIEW` (approve or reject a stock adjustment; requester must differ from approver) |  |  |  | ● |  |  |
 | `STOCK_ADJUST_REQUEST` |  |  |  | ● |  |  |
 
 Notes:
-- `REVIEWER` is the independent approver for donation receipts, citizen (`REQUEST_AID`) distributions, losses and pickup close-outs. It does not approve stock adjustments and does not adjust stock (user decision 2026-11-22). It holds no other operational permission and no `REQUEST_CREATE_PROXY`.
+- `REVIEWER` is the independent approver for donation receipts only (distribution, loss and close-out review were removed with those flows on 2026-11-26). It does not approve stock adjustments and does not adjust stock.
 - Stock adjustments are an OPERATIONS_MANAGER duty: the same manager may request and approve (`STOCK_ADJUST_REQUEST` + `ADJUSTMENT_REVIEW`). The service still refuses approval by the requester (`assertIndependentAdjustmentReviewer`, `FORBIDDEN`), so a single manager needs a second manager account to approve their own adjustment.
-- `COORDINATOR` sees team readiness (`TEAM_READ`) but cannot manage teams, read supply gaps, or reserve/cancel pickup tickets (user decision 2026-11-22).
-- `OPERATIONS_MANAGER` holds the former `INTAKE_STAFF` and `DISTRIBUTION_STAFF` permissions in addition to its own. It has no `DONATION_REVIEW`, so it cannot approve donation receipts it counted or any other receipt; those go to `REVIEWER`.
+- `COORDINATOR` sees team readiness (`TEAM_READ`) but cannot manage teams or read supply gaps (user decision 2026-11-22). Since 2026-11-26 it may ask for goods on behalf of a team (`SUPPLY_REQUEST_CREATE`).
+- `OPERATIONS_MANAGER` holds the former `INTAKE_STAFF` permissions and the warehouse hand-over (`SUPPLY_REQUEST_HANDOVER`) in addition to its own; it no longer sees per-SOS needs (2026-11-26). It has no `DONATION_REVIEW`, so it cannot approve donation receipts it counted or any other receipt; those go to `REVIEWER`.
 - `CAMPAIGN_SETUP_MANAGE` (create a campaign, activate it, change its area) is held by `COORDINATOR` only, because coordinators draw campaigns from the SOS map. `OPERATIONS_MANAGER` does not create campaigns; it assigns a campaign's primary warehouse (`CAMPAIGN_WAREHOUSE_MANAGE`).
 - `COORDINATOR` does not hold `DONATION_DRIVE_MANAGE` (user decision, 2026-11-19): donation drives are managed by `OPERATIONS_MANAGER` only. The coordinator holds `CAMPAIGN_SETUP_MANAGE` instead and creates campaigns from the SOS map.
 - ADMIN has no request, victim or donor detail permission.
@@ -94,16 +86,11 @@ Only a primary system coordinator sees the shared intake queue. `unassigned=true
 
 | Rule | Enforcement | Error |
 |---|---|---|
-| Distribution approver differs from its preparer. The preparer may dispatch the same distribution. Since 2026-11-25 the approver may also dispatch, including in one step with `POST /distributions/{id}/approve-and-dispatch` (needs `DISTRIBUTION_REVIEW` and `DISTRIBUTION_DISPATCH`). | Database CHECK plus service | `SELF_APPROVAL_FORBIDDEN` (403) |
-| The user who dispatched a distribution cannot record any handoff for it (direct delivery, point receipt, household handout, return or loss). | Service rule (new) | `SELF_HANDOFF_FORBIDDEN` (403) |
-| A handoff recorder differs from its receiver. | Service rule | — |
-| LOSS approver differs from the LOSS recorder. | Service rule | — |
 | Receipt reviewer differs from every count author. | Service rule and test | — |
-| Pickup ticket: the confirming user approves the draft; the reserving user is its preparer, so the existing self-approval rule applies. Handover dispatches the draft; the dispatcher holds `DISTRIBUTION_DISPATCH` and, since 2026-11-25, may be the approver. A volunteer records no staff permission; the dispatcher may name the collector, who must be an active mission team member. | Existing distribution rules plus pickup-ticket facade (Step 6a). | `SELF_APPROVAL_FORBIDDEN`, `FORBIDDEN`, `PICKUP_COLLECTOR_NOT_MEMBER` |
+| Supply request (2026-11-26): no second-person approval. The team leader (or a coordinator on behalf) asks; warehouse staff hand over only against the team's six-digit code. Requester and hand-over user are both audited. | Service rule | `SUPPLY_CODE_MISMATCH` (409) |
 | Need extraction sweep: a SYSTEM job with a null actor. It creates ESTIMATED lines only (through the same core as the manual estimate) and never confirms, cancels, admits or reviews anything. Its audit rows have a null actor. | Step 7 (need-extraction sweep). | — |
-| Pickup close-out: the reviewer differs from the submitter (`SELF_REVIEW_FORBIDDEN`) and from the user who handed the goods over (`SELF_HANDOFF_FORBIDDEN`). Returns post a RETURN handoff with the reviewer as recorder, so the existing dispatch-actor rule applies as well. | Step 6b (pickup-goods service). | `SELF_REVIEW_FORBIDDEN`, `SELF_HANDOFF_FORBIDDEN` |
 
-A single `OPERATIONS_MANAGER` account can prepare, dispatch and record different distributions, but it cannot approve its own preparation and cannot record the handoff of a distribution it dispatched. The shortest valid flow therefore needs two people: A prepares, B approves and dispatches in one step, A records the handoff (2026-11-25). Demo seeds keep the actors of one distribution distinct (see [seed-logistics.sql](seed/seed-logistics.sql)).
+Distribution slips, handoffs and their separation-of-duty rules were removed on 2026-11-26 (user decision); supply requests replace them.
 
 ## 4. Object-level rules
 
@@ -112,10 +99,10 @@ A single `OPERATIONS_MANAGER` account can prepare, dispatch and record different
 | Assistance request | Reporter (account owner or holder of a valid tracking code) sees their own request, reporter-visible timeline and permitted supplements. Staff need the relevant `REQUEST_*` permission and matching scope. An unassigned request is visible only through SYSTEM scope. Assigned team members see only permitted mission fields; contact phones are limited to the reporter, scoped coordinators and assigned team leader. |
 | Mission | Read: active team members and appropriately scoped coordinators. Accept, decline, advance and report result: active leader only. Cancel, fail and record-on-behalf: authorized coordinator with a reason. |
 | Team | Team resources are shared system-wide. Active leaders may edit their team; `TEAM_MANAGE_ANY` permits system ADMIN only to manage team setup and skills (user decision 2026-11-22). Membership and active-leader checks remain separate from campaign access. Mission suggestions use skills, distance, fresh position (at most 30 minutes), radius and availability; they never filter by campaign or assign a team. |
-| Evidence | Download requires current authorization on the owning request, mission, donation or handoff; signed URL TTL is 60 seconds. RETURN evidence needs `DONATION_INTAKE` or `DISTRIBUTION_DISPATCH`; other handoff reads need `HANDOFF_RECORD`, except LOSS reads also allow `LOSS_APPROVE` for independent review. Recording or uploading LOSS evidence still needs `HANDOFF_RECORD`. |
+| Evidence | Download requires current authorization on the owning request, mission or donation; signed URL TTL is 60 seconds. |
 | Donation | Account owner or valid donation capability may use public tracking. Staff need the drive's campaign scope or SYSTEM. Receipt number, name and phone grant no access. |
-| Distribution | Separation of duties per section 3. Staff act on a distribution through its campaign scope or SYSTEM. |
 | Receipt | Reviewer differs from every count author (service rule and test). |
+| Supply request | Team view (with pickup code): active members of the mission team and coordinators of its campaign. Warehouse queue: `SUPPLY_REQUEST_HANDOVER` in scope, without SOS, mission, people, location or code. |
 | Notices | Only the recipient. |
 
 ## 5. PII inventory
@@ -126,11 +113,11 @@ Never log or expose in maps, heatmap cells, dashboards, AI input or signed-URL n
 
 `POST /identity/auth/register|login|refresh` · `POST /response/requests` (SELF) · SOS reporter operations authorized by `X-Tracking-Code`: `GET /response/requests/track`, `GET /response/requests/{id}/events`, `POST /response/requests/{id}/supplements`, `PUT /response/requests/{id}/report`, `POST /response/requests/{id}/evidence`, and `GET /response/evidence/{id}/download` · `GET /response/public/campaigns` · `GET /logistics/public/donation-drives[/{id}]` · `POST /logistics/public/donation-drives/{id}/deliveries` · `GET|POST /logistics/public/donations/{id}…` (donation capability). Account claim, recovery, and all other operations require a session.
 
-Coordinator teams need no account or leader; scoped coordinators record sourced progress. APP direct actions retain active-leader guards. Readiness cannot bypass the active-cancel latch. RETURN warehouse recording requires `DONATION_INTAKE` or `DISTRIBUTION_DISPATCH`; LOSS approval is an independent authenticated review, never a supplied actor ID. Public request-category catalogs contain no victim data; recovery redemption requires a live session plus a purpose-bound code.
+Coordinator teams need no account or leader; scoped coordinators record sourced progress. APP direct actions retain active-leader guards. Readiness cannot bypass the active-cancel latch. Public request-category catalogs contain no victim data; recovery redemption requires a live session plus a purpose-bound code.
 
 ## 7. Open items
 
 - **Campaign-scoped COORDINATOR.** Migrating a `CAMPAIGN_MANAGER` grant with `CAMPAIGN` scope yields a `COORDINATOR` grant with `CAMPAIGN` scope. The SOS rules in section 2 describe only the primary `COORDINATOR` + `SYSTEM` case, so the effect of a campaign-scoped coordinator on the request queue, verification and claims is not defined. Decide whether such grants should be converted to `OPERATIONS_MANAGER` or stay as campaign coordinators before relying on them. The demo seeds do not create one.
-- **Stock scope.** Warehouse balances are shared resources. Whether `STOCK_ADJUST_REQUEST`, `DISTRIBUTION_DISPATCH` and `ADJUSTMENT_REVIEW` on a shared balance are allowed with a CAMPAIGN grant is not decided. Until it is, the demo  confirm this against the Logistics service before the demo.
+- **Stock scope.** Warehouse balances are shared resources. Whether `STOCK_ADJUST_REQUEST`, `SUPPLY_REQUEST_HANDOVER` and `ADJUSTMENT_REVIEW` on a shared balance are allowed with a CAMPAIGN grant is not decided. Until it is, the demo  confirm this against the Logistics service before the demo.
 - **Aggregate reads.** `MAP_READ`, `REPORT_READ` and `RESPONSE_REPORT_READ` with a CAMPAIGN grant: whether results are filtered to the grant's campaign is an implementation detail to confirm in each service.
 - **Adjustment separation.** Enforced in code (`assertIndependentAdjustmentReviewer`): the approver must differ from the requester. Open policy: whether a single manager should be allowed to approve their own adjustment (currently refused).

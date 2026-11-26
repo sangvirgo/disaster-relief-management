@@ -21,7 +21,7 @@ interface FakeState {
 function candidate(id: string, distance: number, overrides: Partial<CandidateRow> = {}): CandidateRow {
   return {
     warehouse_id: id, name: `Kho ${id.slice(0, 4)}`, distance_m: distance,
-    open_needed_items: 1, needed_items_in_stock: 0, open_distributions: 0, ...overrides,
+    open_needed_items: 1, needed_items_in_stock: 0, open_supply_requests: 0, ...overrides,
   };
 }
 

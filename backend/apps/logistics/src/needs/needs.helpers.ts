@@ -97,7 +97,7 @@ export function needSourceView(row: NeedSourceFields): Record<string, unknown> {
   };
 }
 
-/** NEED_ESTIMATE_CONFIRM is held by OPERATIONS_MANAGER only: estimate generation and confirmation are manager decisions. */
+/** NEED_ESTIMATE_CONFIRM is held by COORDINATOR (2026-11-26): operations staff do not see SOS needs. */
 export function requireNeedEstimateConfirm(grants: readonly Grant[], scope: NeedScope): void {
   if (!hasPermission(grants, 'NEED_ESTIMATE_CONFIRM', { campaignId: scope.campaign_id })) throw new AppError('FORBIDDEN', { status: 403 });
 }

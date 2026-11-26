@@ -95,7 +95,6 @@ export const statusLabels: Record<string, string> = {
   MILITARY: 'Lực lượng vũ trang',
   GOVERNMENT: 'Cơ quan nhà nước',
   REQUEST_AID: 'Hỗ trợ yêu cầu SOS',
-  CAMPAIGN_DISTRIBUTION: 'Phân phối theo chiến dịch',
   DIRECT_HOUSEHOLD: 'Giao trực tiếp cho hộ dân',
   RETURN: 'Hoàn về kho',
   LOSS: 'Thất thoát',

@@ -29,6 +29,7 @@ import { MissionDetail, MissionProgressTarget, MissionStatus } from '../../../ty
 import { INCIDENT_CATEGORIES, MISSION_KIND_LABELS, MISSION_STATUS_LABELS } from '../../../constants/labels';
 import { THEME } from '../../../constants/theme';
 import { useAuthStore } from '../../../store/authStore';
+import { MissionSupplyCard } from '../components/MissionSupplyCard';
 import {
   generateUUID,
   PendingMissionTransitionCommand,
@@ -731,6 +732,9 @@ export const MissionDetailScreen: React.FC = () => {
             ) : null}
         </>
       </View>
+
+      {/* 3b. HÀNG CỨU TRỢ: trưởng đội yêu cầu hàng, nhận mã để lấy hàng tại kho */}
+      {mission.status !== 'OFFERED' && <MissionSupplyCard missionId={mission.id} missionStatus={mission.status} />}
 
       {/* 4. KẾT QUẢ THỰC ĐỊA (KHI ĐÃ HOÀN THÀNH) */}
       {/* 5. TIẾN TRÌNH NHIỆM VỤ (TIMELINE) */}

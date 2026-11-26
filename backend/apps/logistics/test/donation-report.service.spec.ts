@@ -1,7 +1,6 @@
 import { jest } from '@jest/globals';
 import type { DataSource } from 'typeorm';
 import { AppError } from '@c48/technical/errors/errors';
-import { finalDistributionHandoffPredicate } from '../src/reports/donation-report.helpers';
 import { DonationReportService } from '../src/reports/donation-report.service';
 
 describe('DonationReportService', () => {
@@ -37,9 +36,9 @@ describe('DonationReportService', () => {
   });
 
   it.each([
-    [{ campaign_id: '00000000-0000-4000-8000-000000000010' }, 'distribution.campaign_id=$1::uuid'],
-    [{ warehouse_id: '00000000-0000-4000-8000-000000000011' }, 'distribution.warehouse_id=$1::uuid'],
-  ])('uses final-recipient handoffs for %s without drive attribution', async (filters, targetFilter) => {
+    [{ campaign_id: '00000000-0000-4000-8000-000000000010' }, 'supply.campaign_id=$1::uuid'],
+    [{ warehouse_id: '00000000-0000-4000-8000-000000000011' }, 'supply.warehouse_id=$1::uuid'],
+  ])('uses goods handed to teams through supply requests for %s without drive attribution', async (filters, targetFilter) => {
     const query = jest.fn<(sql: string, parameters?: unknown[]) => Promise<Array<Record<string, unknown>>>>().mockResolvedValue([]);
     const reports = new DonationReportService({ query } as unknown as DataSource);
 
@@ -47,8 +46,8 @@ describe('DonationReportService', () => {
 
     const sql = String(query.mock.calls[0]?.[0]);
     expect(sql).toContain(targetFilter);
-    expect(sql).toContain(finalDistributionHandoffPredicate);
-    expect(finalDistributionHandoffPredicate).toBe("handoff.handoff_kind='DIRECT_HOUSEHOLD'");
+    expect(sql).toContain("supply.status='HANDED_OVER'");
+    expect(sql).toContain('commitment.delivered_quantity');
     expect(sql).not.toContain('donation_drive');
   });
 

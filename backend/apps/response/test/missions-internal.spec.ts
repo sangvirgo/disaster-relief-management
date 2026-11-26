@@ -19,8 +19,8 @@ function queries(rows: unknown[][]) {
 describe('internal mission projection (Logistics read, service token only)', () => {
   it('returns exactly the allowlisted fields with active member user ids', async () => {
     const { service, query } = queries([
-      [{ id: missionId, status: 'ACCEPTED', request_id: requestId, campaign_id: campaignId, team_id: teamId, work_cycle: '2' }],
-      [{ user_id: leaderId }, { user_id: memberId }],
+      [{ id: missionId, status: 'ACCEPTED', request_id: requestId, campaign_id: campaignId, team_id: teamId, team_name: 'Đội A', work_cycle: '2' }],
+      [{ user_id: leaderId, member_role: 'LEADER' }, { user_id: memberId, member_role: 'MEMBER' }],
     ]);
 
     expect(await service.internal(missionId)).toEqual({
@@ -29,8 +29,10 @@ describe('internal mission projection (Logistics read, service token only)', () 
       request_id: requestId,
       campaign_id: campaignId,
       team_id: teamId,
+      team_name: 'Đội A',
       work_cycle: 2,
       member_user_ids: [leaderId, memberId],
+      leader_user_ids: [leaderId],
     });
     expect(String(query.mock.calls[1]?.[0])).toContain('left_at IS NULL');
   });
@@ -41,7 +43,7 @@ describe('internal mission projection (Logistics read, service token only)', () 
       [],
     ]);
 
-    expect(await service.internal(missionId)).toMatchObject({ campaign_id: null, member_user_ids: [] });
+    expect(await service.internal(missionId)).toMatchObject({ campaign_id: null, member_user_ids: [], leader_user_ids: [] });
   });
 
   it('answers NOT_FOUND for an unknown mission', async () => {

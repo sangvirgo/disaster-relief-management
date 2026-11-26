@@ -12,7 +12,67 @@ import {
 } from '../types/api';
 import { generateUUID } from '../utils/secureStore';
 
+/** Supply requests (2026-11-26): the team asks for goods from its mission; the warehouse hands them over against a code. */
+export type SupplyStatus = 'READY' | 'HANDED_OVER' | 'CANCELLED' | 'EXPIRED';
+export interface SupplyTeamRequest {
+  id: string;
+  mission_id: string;
+  team_name: string;
+  status: SupplyStatus;
+  pickup_code: string | null;
+  warehouse: { id: string; name: string; address_note: string | null; location: { lat: number; lng: number } | null };
+  expires_at: string;
+  handed_over_at: string | null;
+  cancelled_at: string | null;
+  cancel_reason: string | null;
+  version: number;
+  created_at: string;
+  has_shortfall: boolean;
+  lines: { item_id: string; item_name: string; unit_name: string; requested_quantity: string; reserved_quantity: string; shortfall_quantity: string }[];
+}
+export interface MissionSupply { items: SupplyTeamRequest[]; can_request: boolean }
+export interface SupplySuggestionLine {
+  item_id: string; item_name: string; unit_name: string; quantity: string; basis: 'AI_TEXT' | 'NORM' | 'CONFIRMED';
+}
+export interface CatalogItemOption { id: string; name: string; status: string; unit?: { display_name?: string; scale?: number } }
+
 export const LogisticsApi = {
+  async getMissionSupply(missionId: string): Promise<MissionSupply> {
+    const response = await apiClient.get<MissionSupply>('/logistics/supply-requests', { params: { mission_id: missionId } });
+    return response.data;
+  },
+
+  async getSupplySuggestion(missionId: string): Promise<SupplySuggestionLine[]> {
+    const response = await apiClient.get<{ lines: SupplySuggestionLine[] }>('/logistics/supply-requests/suggestion', { params: { mission_id: missionId } });
+    return response.data.lines;
+  },
+
+  async getCatalogItems(): Promise<CatalogItemOption[]> {
+    const items: CatalogItemOption[] = [];
+    let cursor: string | undefined;
+    for (let page = 0; page < 10; page += 1) {
+      const response = await apiClient.get<CollectionPage<CatalogItemOption>>('/logistics/items', { params: { limit: 100, ...(cursor ? { cursor } : {}) } });
+      items.push(...response.data.items);
+      cursor = response.data.more ? response.data.cursor ?? undefined : undefined;
+      if (!cursor) break;
+    }
+    return items.filter((item) => item.status === 'ACTIVE');
+  },
+
+  async createSupplyRequest(missionId: string, lines: { item_id: string; quantity: string }[], idempotencyKey: string): Promise<SupplyTeamRequest> {
+    const response = await apiClient.post<SupplyTeamRequest>('/logistics/supply-requests', { mission_id: missionId, lines }, {
+      headers: { 'Idempotency-Key': idempotencyKey },
+    });
+    return response.data;
+  },
+
+  async cancelSupplyRequest(id: string, version: number, reason: string, idempotencyKey: string): Promise<SupplyTeamRequest> {
+    const response = await apiClient.post<SupplyTeamRequest>(`/logistics/supply-requests/${id}/cancel`, { expected_version: version, reason }, {
+      headers: { 'Idempotency-Key': idempotencyKey },
+    });
+    return response.data;
+  },
+
   // Lấy danh sách các đợt tiếp nhận quyên góp cứu trợ đang mở
   async getPublicDonationDrives(
     limit = 50,

@@ -48,7 +48,7 @@ type SetupOptions = {
   cycleCampaignId?: string | null;
   commitments?: Array<{
     id: string; warehouse_id: string; quantity: string; released_quantity: string;
-    issued_quantity: string; delivered_quantity: string; returned_quantity: string; lost_quantity: string; version: number;
+    issued_quantity: string; delivered_quantity: string; version: number;
   }>;
   balances?: Array<{ id: string; warehouse_id: string; item_id: string; reserved: string }>;
   /** Replacement item for a confirm swap (FOR SHARE lookup). */
@@ -138,7 +138,7 @@ describe('NeedCommandsService', () => {
       need,
       commitments: [{
         id: 'commitment-1', warehouse_id: warehouseId, quantity: '3', released_quantity: '0',
-        issued_quantity: '3', delivered_quantity: '3', returned_quantity: '0', lost_quantity: '0', version: 1,
+        issued_quantity: '3', delivered_quantity: '3', version: 1,
       }],
     });
 
@@ -155,7 +155,7 @@ describe('NeedCommandsService', () => {
     const { service, calls, request } = setup({
       commitments: [{
         id: 'commitment-1', warehouse_id: warehouseId, quantity: '6', released_quantity: '0',
-        issued_quantity: '2', delivered_quantity: '1', returned_quantity: '0', lost_quantity: '0', version: 1,
+        issued_quantity: '2', delivered_quantity: '1', version: 1,
       }],
     });
 
@@ -168,8 +168,8 @@ describe('NeedCommandsService', () => {
     const { service, calls, request } = setup({
       need: { ...baseNeed, requested_quantity: '5' },
       commitments: [{
-        id: 'commitment-1', warehouse_id: warehouseId, quantity: '5', released_quantity: '0',
-        issued_quantity: '5', delivered_quantity: '4', returned_quantity: '1', lost_quantity: '0', version: 1,
+        id: 'commitment-1', warehouse_id: warehouseId, quantity: '4', released_quantity: '0',
+        issued_quantity: '4', delivered_quantity: '4', version: 1,
       }],
     });
 
@@ -181,7 +181,7 @@ describe('NeedCommandsService', () => {
   it('allows cancellation in a frozen cycle and releases each reservation through the movement ledger', async () => {
     const commitments = [{
       id: 'commitment-1', warehouse_id: warehouseId, quantity: '4', released_quantity: '1',
-      issued_quantity: '0', delivered_quantity: '0', returned_quantity: '0', lost_quantity: '0', version: 7,
+      issued_quantity: '0', delivered_quantity: '0', version: 7,
     }];
     const { service, calls, request } = setup({
       cycleState: 'FROZEN',
@@ -215,7 +215,7 @@ describe('NeedCommandsService', () => {
       need: { ...baseNeed, unit_scale: 1, requested_quantity: '4.0' },
       commitments: [{
         id: 'commitment-1', warehouse_id: warehouseId, quantity: '4.0', released_quantity: '2.5',
-        issued_quantity: '0.0', delivered_quantity: '0.0', returned_quantity: '0.0', lost_quantity: '0.0', version: 1,
+        issued_quantity: '0.0', delivered_quantity: '0.0', version: 1,
       }],
       balances: [{ id: 'balance-1', warehouse_id: warehouseId, item_id: itemId, reserved: '1.5' }],
     });
@@ -229,7 +229,7 @@ describe('NeedCommandsService', () => {
     const { service, calls, request } = setup({
       commitments: [{
         id: 'commitment-1', warehouse_id: warehouseId, quantity: '3', released_quantity: '0',
-        issued_quantity: '2', delivered_quantity: '1', returned_quantity: '0', lost_quantity: '0', version: 1,
+        issued_quantity: '2', delivered_quantity: '1', version: 1,
       }],
     });
 
@@ -257,8 +257,8 @@ describe('NeedCommandsService', () => {
 });
 
 describe('NeedCommandsService estimate confirmation', () => {
-  // Confirmation is an OPERATIONS_MANAGER decision (NEED_ESTIMATE_CONFIRM).
-  const operationsManagerGrant: Grant = { role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' };
+  // Confirmation is a coordinator decision (NEED_ESTIMATE_CONFIRM, moved from operations on 2026-11-26).
+  const operationsManagerGrant: Grant = { role_code: 'COORDINATOR', scope_type: 'SYSTEM' };
   const estimated = { source: 'ESTIMATED', estimate_basis: { batch_id: 'batch-1', estimated_quantity: '3' } };
 
   it('confirms an estimate with an edited quantity, records the reason, and keeps the estimate basis', async () => {
@@ -365,7 +365,7 @@ describe('NeedCommandsService estimate confirmation', () => {
       need: { ...estimated, requested_quantity: '3', version: 1 },
       commitments: [{
         id: 'commitment-1', warehouse_id: warehouseId, quantity: '2', released_quantity: '0',
-        issued_quantity: '0', delivered_quantity: '0', returned_quantity: '0', lost_quantity: '0', version: 1,
+        issued_quantity: '0', delivered_quantity: '0', version: 1,
       }],
     });
 

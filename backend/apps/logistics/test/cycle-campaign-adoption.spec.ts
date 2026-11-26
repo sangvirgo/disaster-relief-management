@@ -26,7 +26,7 @@ describe('adoptCycleCampaigns', () => {
     expect(sql).toContain("i.state<>'ABORTED'");
     expect(sql).toContain("n.source<>'ESTIMATED'");
     expect(sql).toContain('commitment m');
-    expect(sql).toContain('pickup_ticket_line');
+    expect(sql).toContain('supply_request_line');
     expect(values).toEqual([[requestId], [2], [campaignId]]);
   });
 

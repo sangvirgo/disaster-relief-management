@@ -33,8 +33,9 @@ const norms = [
   },
 ];
 
-const coordinatorGrant: Grant = { role_code: 'COORDINATOR', scope_type: 'SYSTEM' };
-const managerGrant: Grant = { role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' };
+// NEED_ESTIMATE_CONFIRM moved to coordinators on 2026-11-26; operations staff no longer see SOS needs.
+const managerGrant: Grant = { role_code: 'COORDINATOR', scope_type: 'SYSTEM' };
+const operationsGrant: Grant = { role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' };
 
 const verifiedAdmission: ResponseAdmission = {
   request_id: requestId,
@@ -177,8 +178,8 @@ describe('NeedsService.estimate', () => {
     expect(inserted).toHaveLength(0);
   });
 
-  it('lets only the operations manager generate estimates', async () => {
-    const { service, inserted, request, dto } = setup({ grants: [coordinatorGrant] });
+  it('lets only a coordinator generate estimates; operations staff do not see SOS needs', async () => {
+    const { service, inserted, request, dto } = setup({ grants: [operationsGrant] });
 
     await expect(service.estimate(dto, request)).rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
     expect(inserted).toHaveLength(0);

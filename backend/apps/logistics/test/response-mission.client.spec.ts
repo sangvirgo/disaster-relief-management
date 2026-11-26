@@ -14,7 +14,7 @@ function client(response: { status: number; body?: unknown }) {
   return { service: new LogisticsResponseMissionClient({ get } as never, identity as never), get };
 }
 
-const valid = { id: MISSION, status: 'ACCEPTED', request_id: REQUEST, campaign_id: CAMPAIGN, team_id: TEAM, work_cycle: 1, member_user_ids: [MEMBER] };
+const valid = { id: MISSION, status: 'ACCEPTED', request_id: REQUEST, campaign_id: CAMPAIGN, team_id: TEAM, team_name: 'Đội A', work_cycle: 1, member_user_ids: [MEMBER], leader_user_ids: [MEMBER] };
 
 describe('LogisticsResponseMissionClient.getMission', () => {
   it('calls the internal mission route with a service token and returns the projection', async () => {
@@ -23,9 +23,9 @@ describe('LogisticsResponseMissionClient.getMission', () => {
     expect(get).toHaveBeenCalledWith(`/api/v1/response/internal/missions/${MISSION}`, { headers: { authorization: 'Bearer token' } });
   });
 
-  it('maps a 404 from Response to PICKUP_MISSION_NOT_FOUND', async () => {
+  it('maps a 404 from Response to SUPPLY_MISSION_NOT_FOUND', async () => {
     const { service } = client({ status: 404 });
-    await expect(service.getMission(MISSION)).rejects.toMatchObject({ code: 'PICKUP_MISSION_NOT_FOUND', status: 404 });
+    await expect(service.getMission(MISSION)).rejects.toMatchObject({ code: 'SUPPLY_MISSION_NOT_FOUND', status: 404 });
   });
 
   it('treats a projection with an unknown status or a malformed roster as unavailable', async () => {
@@ -33,6 +33,8 @@ describe('LogisticsResponseMissionClient.getMission', () => {
       .rejects.toMatchObject({ code: 'RESPONSE_UNAVAILABLE', status: 503 });
     await expect(client({ status: 200, body: { ...valid, member_user_ids: 'x' } }).service.getMission(MISSION))
       .rejects.toBeInstanceOf(AppError);
+    await expect(client({ status: 200, body: { ...valid, leader_user_ids: undefined } }).service.getMission(MISSION))
+      .rejects.toMatchObject({ code: 'RESPONSE_UNAVAILABLE' });
     await expect(client({ status: 200, body: { ...valid, id: REQUEST } }).service.getMission(MISSION))
       .rejects.toMatchObject({ code: 'RESPONSE_UNAVAILABLE' });
   });
