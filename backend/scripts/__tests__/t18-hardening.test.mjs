@@ -24,6 +24,8 @@ test('the ingress keeps required security headers and excludes query strings fro
     }
     assert.ok(directives.get('script-src')?.includes("'self'"));
     assert.ok(!directives.get('script-src')?.includes("'unsafe-inline'"));
+    assert.ok(directives.get('img-src')?.includes('https://s3.ap-southeast-2.amazonaws.com'));
+    assert.ok(directives.get('media-src')?.includes('https://s3.ap-southeast-2.amazonaws.com'));
   }
   assert.match(nginx, /add_header Cache-Control no-store always;/u);
 });
