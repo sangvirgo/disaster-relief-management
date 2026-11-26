@@ -1,8 +1,9 @@
 import { DriveNearbyMap, type MapDrive } from '../../maps/DriveNearbyMap';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, newCommandKey, upload } from '../../api/client';
-import { useLoadMore } from '../../api/useCursorPages';
-import { LoadMore } from '../../components/ui/Pager';
+import { useCursorPages } from '../../api/useCursorPages';
+import { Pager } from '../../components/ui/Pager';
+import { LIST_PAGE_SIZE } from '../../api/useCursorNav';
 import { SelectedFiles } from '../../components/ui/SelectedFiles';
 import { label } from '../../i18n/labels';
 import { formatQuantity, quantityFitsScale, remainingQuantity } from '../../i18n/quantity';
@@ -114,8 +115,8 @@ export function Donations({ user }: { user: Me | null }) {
   const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState('');
-  const drivePages = useLoadMore<Drive>('logistics', position
-    ? `/public/donation-drives?lat=${position.lat.toFixed(5)}&lng=${position.lng.toFixed(5)}` : '/public/donation-drives', 10);
+  const drivePages = useCursorPages<Drive>('logistics', position
+    ? `/public/donation-drives?lat=${position.lat.toFixed(5)}&lng=${position.lng.toFixed(5)}` : '/public/donation-drives', LIST_PAGE_SIZE);
   const drives = drivePages.items;
   const nearest = position ? drives.find((drive) => typeof drive.distance_m === 'number' && !driveUnavailable(drive)) : undefined;
   const mapDrives: MapDrive[] = drives.flatMap((drive) => {
@@ -681,7 +682,6 @@ export function Donations({ user }: { user: Me | null }) {
             <div className="donation-lookup-code-row">
               <input id="donation-history-search" type="search" value={ownedSearch} maxLength={120} disabled={ownedLoading}
                 onChange={(event) => setOwnedSearch(event.target.value)} placeholder="Nhập từ khóa cần tìm" />
-              <button type="submit" className="button secondary" disabled={ownedLoading}>Tìm kiếm</button>
               {ownedSearchTerm && <button type="button" className="button secondary" disabled={ownedLoading} onClick={() => { setOwnedSearch(''); setOwnedSearchTerm(''); }}>Xóa lọc</button>}
             </div>
           </form>
@@ -983,7 +983,8 @@ export function Donations({ user }: { user: Me | null }) {
             </article>
           ))}
         </div>
-        {drives.length > 0 && <LoadMore hasMore={drivePages.hasMore} loading={drivePages.loading} onClick={drivePages.loadMore} shown={drives.length} noun="đợt" />}
+        <Pager page={drivePages.page} hasNext={drivePages.hasNext} loading={drivePages.loading}
+          onPrev={() => { setSelected(null); drivePages.prev(); }} onNext={() => { setSelected(null); drivePages.next(); }} count={drives.length} noun="đợt" />
       </section>
       {selected && showDeclaration && <div className={`donation-modal-backdrop ${closingDeclaration ? 'is-closing' : ''}`} onClick={(event) => event.stopPropagation()}>
             <section className="donation-modal" role="dialog" aria-modal="true" aria-label="Khai báo vật phẩm" style={{ transform: `translate(${dialogOffset.x}px, ${dialogOffset.y}px)` }}>
@@ -1018,7 +1019,6 @@ export function Donations({ user }: { user: Me | null }) {
                     autoComplete="tel"
                     maxLength={33}
                     aria-invalid={Boolean((declarationAttempted || declarationTouched.donorPhone) && declarationErrors.donorPhone)}
-                    aria-describedby="donor-phone-hint"
                     value={donorPhone}
                     onChange={(e) => {
                       setDonorPhone(e.target.value);
@@ -1027,7 +1027,6 @@ export function Donations({ user }: { user: Me | null }) {
                     }}
                     onBlur={() => setDeclarationTouched((current) => ({ ...current, donorPhone: true }))}
                   />
-                  <small id="donor-phone-hint">Số liên hệ gồm 8–15 chữ số, có thể bắt đầu bằng +.</small>
                   {(declarationAttempted || declarationTouched.donorPhone) && declarationErrors.donorPhone && <small className="field-error" role="alert">{declarationErrors.donorPhone}</small>}
                 </label>
               </div>
@@ -1050,7 +1049,6 @@ export function Donations({ user }: { user: Me | null }) {
                   />
                   {(declarationAttempted || declarationTouched[`quantity:${item.item_id}`]) && declarationErrors[`quantity:${item.item_id}`] && <small className="field-error" role="alert">{declarationErrors[`quantity:${item.item_id}`]}</small>}
                   {selected.items[0]?.item_id === item.item_id && (declarationAttempted || Object.keys(declarationTouched).some((field) => field.startsWith('quantity:'))) && !hasPositiveQuantity && <small className="field-error" role="alert">Số lượng của ít nhất một vật phẩm là bắt buộc.</small>}
-                  <small>{item.acceptance_note}</small>
                 </label>
               ))}
               <p className="notice">

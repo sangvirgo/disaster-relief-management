@@ -40,6 +40,7 @@ export function CitizenRequests({
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchError, setSearchError] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -77,6 +78,11 @@ export function CitizenRequests({
   function submitSearch(event: React.FormEvent) {
     event.preventDefault();
     const nextTerm = search.trim().toUpperCase();
+    if (nextTerm && !/^[0-9A-HJKMNP-TV-Z]{10}$/.test(nextTerm)) {
+      setSearchError('Mã SOS cần gồm 10 ký tự hợp lệ.');
+      return;
+    }
+    setSearchError('');
     setItems([]);
     setNext('');
     setCursor('');
@@ -97,20 +103,21 @@ export function CitizenRequests({
       </div>
       <p>Chọn một yêu cầu để xem tiến độ. Những SOS đã gắn với tài khoản không cần nhập mã.</p>
       <form className="account-request-search" onSubmit={submitSearch} role="search">
-        <label htmlFor="account-request-search-input">Tìm SOS theo mã SOS hoặc số điện thoại</label>
+        <label htmlFor="account-request-search-input">Tìm SOS theo mã SOS</label>
         <div className="account-request-search-row">
-          <input id="account-request-search-input" type="search" value={search} maxLength={32}
-            onChange={(event) => setSearch(event.target.value)} placeholder="Nhập mã SOS hoặc số điện thoại" autoComplete="off" />
+          <input id="account-request-search-input" type="search" value={search} maxLength={10}
+            onChange={(event) => { setSearch(event.target.value.toUpperCase()); setSearchError(''); }} placeholder="Nhập mã SOS" autoComplete="off" aria-invalid={Boolean(searchError)} />
           <button type="submit" className="button secondary" disabled={loading}>Tìm kiếm</button>
           {searchTerm && <button type="button" className="button secondary" disabled={loading}
             onClick={() => { setSearch(''); setItems([]); setNext(''); setCursor(''); setSearchTerm(''); }}>Xóa lọc</button>}
         </div>
+        {searchError && <small className="field-error" role="alert">{searchError}</small>}
       </form>
       {loading && <p role="status">Đang tải yêu cầu…</p>}
       {error && <p className="notice error" role="alert">{error}</p>}
       {!loading && !error && !items.length && (
         <div className="empty">
-          {searchTerm ? <><p>Không tìm thấy SOS phù hợp với mã hoặc số điện thoại đã nhập.</p><button className="button secondary" type="button" onClick={() => { setSearch(''); setSearchTerm(''); }}>Xóa từ khóa tìm kiếm</button></>
+          {searchTerm ? <><p>Không tìm thấy SOS phù hợp với mã đã nhập.</p><button className="button secondary" type="button" onClick={() => { setSearch(''); setSearchTerm(''); }}>Xóa từ khóa tìm kiếm</button></>
             : <><p>Bạn chưa có yêu cầu SOS nào gắn với tài khoản.</p>{onNewSos && <button className="button" type="button" onClick={onNewSos}>Gửi yêu cầu SOS</button>}</>}
         </div>
       )}

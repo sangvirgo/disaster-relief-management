@@ -234,6 +234,9 @@ export function ReceiptCountForm({
   ] : [['counted_quantity', 'Số đếm được']]) as readonly (readonly [keyof Line & `${string}_quantity`, string])[];
   const canAddLine = !heldRelease && lines.length < (allowUnexpected ? items.length : driveItems.length);
   const fixedItem = (line: Line) => heldRelease || (Boolean(confirm) && !line.outside && Boolean(line.item_id));
+  const gridTemplateColumns = columns.length === 1
+    ? 'minmax(180px, 1fr) minmax(180px, 1fr) 36px'
+    : `minmax(180px, 2fr) repeat(${columns.length}, minmax(96px, 1fr)) 36px`;
   return (
     <form className="count-form" onSubmit={submit} noValidate>
       <header className="count-form__intro">
@@ -265,7 +268,7 @@ export function ReceiptCountForm({
       {allowUnexpected && !heldRelease && <p className="notice warning">Dòng ngoài đợt được đánh dấu để người duyệt rà soát. Chỉ dùng khi hàng thực tế khác danh sách của đợt.</p>}
 
       <div className="count-form__table" role="table" aria-label="Số lượng kiểm đếm">
-        <div className="count-form__row count-form__row--head" role="row" style={{ gridTemplateColumns: `minmax(180px, 2fr) repeat(${columns.length}, minmax(96px, 1fr)) 36px` }}>
+        <div className="count-form__row count-form__row--head" role="row" style={{ gridTemplateColumns }}>
           <span role="columnheader">Vật phẩm</span>
           {columns.map(([field, title]) => <span role="columnheader" key={field} className="numeric">{title}</span>)}
           <span aria-hidden="true" />
@@ -276,7 +279,7 @@ export function ReceiptCountForm({
             .filter((field) => fieldErrors[field] && showFieldError(field, field.endsWith('item_id') ? line.item_id : line[field.split('.')[1] as keyof Line] as string))
             .map((field) => fieldErrors[field]);
           return <div key={index} className={`count-form__line${line.outside ? ' count-form__line--outside' : ''}`}>
-            <div className="count-form__row" role="row" style={{ gridTemplateColumns: `minmax(180px, 2fr) repeat(${columns.length}, minmax(96px, 1fr)) 36px` }}>
+            <div className="count-form__row" role="row" style={{ gridTemplateColumns }}>
               <span role="cell" className="count-form__item">
                 {fixedItem(line) ? <><strong>{item?.name || 'Vật phẩm'}</strong><small>{item?.unit.display_name}</small></>
                   : <Dropdown

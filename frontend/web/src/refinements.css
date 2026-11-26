@@ -1041,6 +1041,24 @@
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+.opening-stock-form { display: grid; gap: 16px; }
+.opening-stock-table-wrap { overflow-x: auto; border: 1px solid var(--color-surface-border); border-radius: 12px; }
+.opening-stock-table { width: 100%; min-width: 480px; border-collapse: collapse; table-layout: fixed; }
+.opening-stock-table th, .opening-stock-table td { padding: 10px 12px; border-bottom: 1px solid var(--color-surface-border); text-align: left; vertical-align: top; }
+.opening-stock-table thead { background: #f1f5f9; color: #475569; }
+.opening-stock-table th:first-child, .opening-stock-table th:nth-child(2) { width: calc((100% - 56px) / 2); }
+.opening-stock-table th:last-child { width: 56px; }
+.opening-stock-table tbody tr:last-child td { border-bottom: 0; }
+.opening-stock-table .ui-dropdown { width: 100%; }
+.opening-stock-table .ui-dropdown__trigger { min-height: 48px; }
+.opening-stock-quantity { display: flex; align-items: center; gap: 8px; }
+.opening-stock-quantity input { box-sizing: border-box; width: 100%; min-width: 0; height: 48px; padding: 7px 10px; border: 1px solid var(--color-surface-border); border-radius: 10px; font: inherit; }
+.opening-stock-quantity span { flex: none; color: var(--color-text-secondary); font-size: 13px; }
+.opening-stock-remove { width: 32px; height: 32px; padding: 0; border: 1px solid var(--color-surface-border); border-radius: 8px; background: #fff; color: var(--color-text-secondary); font-size: 20px; line-height: 1; cursor: pointer; }
+.opening-stock-remove:hover { color: var(--color-emergency); border-color: var(--color-emergency); }
+.opening-stock-remove:disabled { opacity: .5; cursor: not-allowed; }
+.opening-stock-table .field-error { display: block; margin-top: 5px; }
+.opening-stock-add { justify-self: start; }
 .receipt-count-scroll { max-width: 100%; }
 .receipt-count-scroll:focus-visible { outline: 2px solid #2563eb; outline-offset: 3px; }
 .receipt-count-table { min-width: 720px; }
@@ -1800,7 +1818,7 @@
 .command-danger { border-color: var(--color-emergency-border) !important; color: var(--color-emergency-dark) !important; }
 .command-danger:hover:not(:disabled) { background: var(--color-emergency-bg) !important; }
 
-/* Warehouse create/edit card on the map: labelled fields and text buttons instead of ✓/× icons. */
+/* Warehouse create/edit card on the map. Creation uses a green confirm icon after map placement. */
 .warehouse-map-editor--card { display: grid; gap: 10px; padding: 6px; }
 .warehouse-map-editor--card .warehouse-map-editor__heading strong { font-size: 16px; }
 .warehouse-map-editor__field { display: grid; gap: 4px; font-size: 13px; font-weight: 700; }

@@ -493,12 +493,18 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           <h2>{page === 'review' && reviewTab === 'disputes' ? 'Xử lý khiếu nại' : headings[page]}</h2>
           <div className="list-header-actions">
             <button type="button" className="button secondary refresh-action" disabled={loading} onClick={() => { setCursor(''); setRevision((value) => value + 1); }}>Làm mới</button>
-            {canCreatePage && <button type="button" className="button primary list-create-button" onClick={() => { setSelected(null); setDetail(null); setShowCreate(true); }}>{createTitle}</button>}
+            {canCreatePage && <button type="button" className="button primary list-create-button" onClick={() => {
+              if (page === 'drives') {
+                window.location.assign('?workspace=operations&page=assets&view=warehouses&create=drive');
+                return;
+              }
+              setSelected(null); setDetail(null); setShowCreate(true);
+            }}>{createTitle}</button>}
           </div>
         </div>}
         {page === 'assets' && asset === 'warehouses' && <WarehouseMapManager
           canManage={rights.has('OPERATIONS_MANAGER')} canManageDrives={rights.has('OPERATIONS_MANAGER') || rights.has('COORDINATOR')}
-          warehouseOptions={warehouseOptions} campaigns={references.campaigns || []} items={references.items || []} itemScales={references.itemScales || []}
+          warehouseOptions={warehouseOptions} campaigns={references.campaigns || []} items={references.items || []} itemScales={references.itemScales || []} itemUnits={references.itemUnits || []}
           refreshKey={revision} onChanged={() => setRevision((value) => value + 1)} onRefresh={() => { setCursor(''); setRevision(value => value + 1); }} />}
         {distributionPages.has(page) && (
           <div className="tabs distribution-status-tabs" role="group" aria-label="Lọc phiếu theo bước">
@@ -1481,10 +1487,6 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           </>
         )}
         </div>}
-        {!selected &&
-          page === 'drives' &&
-          (rights.has('COORDINATOR') || rights.has('OPERATIONS_MANAGER')) &&
-          <p className="notice">Đợt quyên góp được tạo và chỉnh sửa trên bản đồ tại <a href="?workspace=operations&page=assets">Kho và đợt quyên góp</a>, nơi chọn vị trí điểm quyên góp trong vùng phục vụ của kho.</p>}
         {!selected &&
           page === 'needs' &&
           (rights.has('OPERATIONS_MANAGER') || rights.has('COORDINATOR')) &&
