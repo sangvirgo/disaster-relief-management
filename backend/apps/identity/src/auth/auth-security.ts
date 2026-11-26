@@ -30,6 +30,11 @@ export interface IdentityAuthConfig {
   argonMaxConcurrency: number;
   emailOtpPepper?: string;
   googleClientIds: readonly string[];
+  /**
+   * IDENTITY_SCHEDULER_ENABLED: removes expired registration and password-reset rows every minute. Default true.
+   * Mail delivery does not depend on it: queued reset emails are always sent while SMTP is configured.
+   */
+  cleanupEnabled: boolean;
 }
 
 export interface AccessTokenClaims {
@@ -137,6 +142,9 @@ export function loadIdentityAuthConfig(env: NodeJS.ProcessEnv | Record<string, s
   const webOrigins = parseOrigins(env.WEB_ALLOWED_ORIGINS, nodeEnv, errors);
   const emailOtpPepper = env.EMAIL_OTP_PEPPER;
   if (emailOtpPepper && emailOtpPepper.length < 32) errors.push('EMAIL_OTP_PEPPER');
+  const cleanupSetting = env.IDENTITY_SCHEDULER_ENABLED ?? '';
+  if (!['', 'true', 'false'].includes(cleanupSetting)) errors.push('IDENTITY_SCHEDULER_ENABLED');
+  const cleanupEnabled = cleanupSetting !== 'false';
   const googleClientIds = (env.GOOGLE_CLIENT_IDS ?? '').split(',').map((value) => value.trim()).filter(Boolean);
   const argonMemoryKib = positiveInteger(env.ARGON2_MEMORY_KIB, 'ARGON2_MEMORY_KIB', 65_536, 8_192, 262_144, errors);
   const argonTimeCost = positiveInteger(env.ARGON2_TIME_COST, 'ARGON2_TIME_COST', 3, 1, 10, errors);
@@ -157,6 +165,7 @@ export function loadIdentityAuthConfig(env: NodeJS.ProcessEnv | Record<string, s
     argonMaxConcurrency,
     ...(emailOtpPepper ? { emailOtpPepper } : {}),
     googleClientIds,
+    cleanupEnabled,
   };
 }
 

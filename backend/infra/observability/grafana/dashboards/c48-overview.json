@@ -2974,6 +2974,308 @@
           "format": "table"
         }
       ]
+    },
+    {
+      "type": "row",
+      "title": "Email (Identity)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 118
+      },
+      "id": 61,
+      "panels": []
+    },
+    {
+      "type": "stat",
+      "title": "Gửi email được cấu hình",
+      "description": "Có = identity-api có SMTP host, địa chỉ gửi và EMAIL_OTP_PEPPER. Không = mã OTP đăng ký và đặt lại mật khẩu không được gửi.",
+      "id": 62,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "c48-prometheus"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 119
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Không",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "Có",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "max(c48_identity_email_delivery_configured)"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Email đặt lại mật khẩu đang chờ",
+      "description": "Email trong hàng đợi mà mã vẫn còn hiệu lực. Bình thường là 0 sau vài giây.",
+      "id": 63,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "c48-prometheus"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 6,
+        "y": 119
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "max(c48_identity_email_outbox_pending)"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Email chờ lâu nhất",
+      "description": "Tuổi của email đặt lại mật khẩu chờ lâu nhất. Mã hết hạn sau 5 phút, nên trên 2 phút là lỗi gửi.",
+      "id": 64,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "c48-prometheus"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 12,
+        "y": 119
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 60
+              },
+              {
+                "color": "red",
+                "value": 120
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "max(c48_identity_email_outbox_oldest_age_seconds)"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Email thất bại (24 giờ)",
+      "description": "Lần gửi thất bại cộng email bị bỏ sau 5 lần thử, trong 24 giờ.",
+      "id": 65,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "c48-prometheus"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 18,
+        "y": 119
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "sum(increase(c48_identity_email_deliveries_total{outcome=~\"failed|dropped\"}[24h])) or vector(0)"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Email theo loại và kết quả",
+      "description": "registration = mã đăng ký, password_reset = mã đặt lại mật khẩu; sent = đã gửi, failed = một lần gửi lỗi (đặt lại mật khẩu được thử lại), dropped = bỏ hẳn.",
+      "id": 66,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "c48-prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 124
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "c48-prometheus"
+          },
+          "expr": "sum by (kind, outcome) (increase(c48_identity_email_deliveries_total[15m]))",
+          "legendFormat": "{{kind}} {{outcome}}"
+        }
+      ]
     }
   ],
   "templating": {

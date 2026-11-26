@@ -1,11 +1,29 @@
 import { Injectable, Logger } from '@nestjs/common';
 import nodemailer from 'nodemailer';
+import { recordEmailDelivery } from './email-metrics';
 
 @Injectable()
 export class EmailSenderService {
   private readonly logger = new Logger(EmailSenderService.name);
 
+  /** True when Identity has what it needs to send email: SMTP host and sender address. */
+  isConfigured(): boolean {
+    return Boolean(process.env.IDENTITY_EMAIL_SMTP_HOST && process.env.IDENTITY_EMAIL_FROM);
+  }
+
   async sendVerificationCode(email: string, code: string): Promise<boolean> {
+    const sent = await this.deliverVerificationCode(email, code);
+    recordEmailDelivery('registration', sent ? 'sent' : 'failed');
+    return sent;
+  }
+
+  async sendPasswordResetCode(email: string, code: string): Promise<boolean> {
+    const sent = await this.deliverPasswordResetCode(email, code);
+    recordEmailDelivery('password_reset', sent ? 'sent' : 'failed');
+    return sent;
+  }
+
+  private async deliverVerificationCode(email: string, code: string): Promise<boolean> {
     const host = process.env.IDENTITY_EMAIL_SMTP_HOST;
     const from = process.env.IDENTITY_EMAIL_FROM;
     if (!host || !from) {
@@ -96,7 +114,7 @@ export class EmailSenderService {
     }
   }
 
-  async sendPasswordResetCode(email: string, code: string): Promise<boolean> {
+  private async deliverPasswordResetCode(email: string, code: string): Promise<boolean> {
     const host = process.env.IDENTITY_EMAIL_SMTP_HOST;
     const from = process.env.IDENTITY_EMAIL_FROM;
     if (!host || !from) {

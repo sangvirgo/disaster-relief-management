@@ -67,6 +67,10 @@ Manual commands: `release rollback` (one step back), `release status`. Only the 
 
 Each SOS advisory tries `GEMINI_MODEL`, then `GEMINI_BACKUP_MODEL` (Compose default `gemini-3.1-flash-lite`; set it empty in `.env` to disable), then Ollama when it is on. Nothing needs to change in `.env` for the backup model. A 429 pauses only that model for 15 minutes. Grafana, row "AI (Gemini chính, Gemini dự phòng, Ollama)": answers by source, failures and retries, paused models, p95 latency, Ollama calls, Ollama RAM and the memory of every container. Telegram alerts: `GeminiModelPaused`, `AiServedByOllama`, `AiAdvisoriesFailing`, `OllamaFallbackDown`, `OllamaMemoryHigh`, `OllamaSlow`.
 
+### Email (password reset and registration codes)
+
+Identity sends queued password-reset emails every 5 seconds whenever `IDENTITY_EMAIL_SMTP_HOST`, `IDENTITY_EMAIL_FROM` and `EMAIL_OTP_PEPPER` are set; `IDENTITY_SCHEDULER_ENABLED` (`true`/`false`, default true) only switches the cleanup of expired rows. Grafana row "Email (Identity)" shows whether sending is configured, the queued emails, the oldest one and failures. Telegram alerts: `IdentityEmailBacklog` (an email waited more than 2 minutes; codes expire after 5), `IdentityEmailDeliveryFailing`, `IdentityEmailNotConfigured`. The usual cause is a revoked Gmail app password: update `IDENTITY_EMAIL_SMTP_PASSWORD` in `backend/.env`, then recreate `identity-api`.
+
 ### AI fallback model (Ollama, profile `ai-fallback`)
 
 **Off by default.** A local test on 2026-11-25 measured 50-76 s per SOS and saw the 0.8B model miss life-threat cases and invent facts; turn it on only for a demo of the mechanism, and tell coordinators the labelled results need careful checking. Gemini stays the primary model. A small local model answers an SOS advisory only when Gemini fails, or when Gemini has not answered after `AI_FALLBACK_HEDGE_MS`. To turn it on, edit `/opt/c48/backend/.env` once on the host (`sudo -i`, then an editor; keep mode 600):

@@ -18,7 +18,7 @@ type Registration = {
   code_hash: string | null; attempts: number; created_at: Date; expires_at: Date; code_expires_at: Date;
   last_sent_at: Date; confirmed_at: Date | null;
 };
-function fixture() {
+function fixture(options: { cleanupEnabled?: boolean; smtpConfigured?: boolean } = {}) {
   let now = started;
   jest.spyOn(Date, 'now').mockImplementation(() => now);
   let registration: Registration | undefined;
@@ -70,8 +70,11 @@ function fixture() {
     commands.set(command.key, { resource: outcome.resource, status: outcome.status });
     return { status: outcome.status, value: outcome.value, replay: false };
   } };
-  const sender = { sendVerificationCode: jest.fn(async (_email: string, _code: string) => true) };
-  const service = new AuthService(source as never, idempotency as never, config, sender as never);
+  const sender = {
+    sendVerificationCode: jest.fn(async (_email: string, _code: string) => true),
+    isConfigured: jest.fn(() => options.smtpConfigured ?? true),
+  };
+  const service = new AuthService(source as never, idempotency as never, { ...config, cleanupEnabled: options.cleanupEnabled ?? true }, sender as never);
   return { service, manager, users, grants, sender, advance: (ms: number) => { now += ms; }, failGrant: () => { failGrant = true; },
     get registration() { return registration; },
     seed: () => { registration = { id, challenge_id: challengeId, username: dto.username, display_name: dto.display_name, email: dto.email.toLowerCase(), password_hash: '$argon2id$test-hash', code_hash: digest(challengeId, '123456'), attempts: 0, created_at: new Date(now), expires_at: new Date(now + 600_000), code_expires_at: new Date(now + 300_000), last_sent_at: new Date(now), confirmed_at: null }; },
@@ -166,12 +169,29 @@ describe('email registration lifetime and verification', () => {
 
 
 describe('email registration cleanup', () => {
-  it('does not start a cleanup timer when scheduling is disabled', async () => {
+  it('keeps sending reset emails when cleanup is disabled', async () => {
+    const schedule = jest.spyOn(JobRunner.prototype, 'schedule');
+    const f = fixture({ cleanupEnabled: false });
+    await f.service.onModuleInit();
+    expect(schedule).toHaveBeenCalledWith('identity.email-registration.cleanup', 60_000, expect.any(Function), false);
+    expect(schedule).toHaveBeenCalledWith('identity.password-reset-mail.dispatch', 5_000, expect.any(Function), true);
+    f.service.onModuleDestroy();
+  });
+  it('does not poll the mail outbox when SMTP is not configured', async () => {
+    const schedule = jest.spyOn(JobRunner.prototype, 'schedule');
+    const f = fixture({ smtpConfigured: false });
+    await f.service.onModuleInit();
+    expect(f.service.emailDeliveryConfigured()).toBe(false);
+    expect(schedule).toHaveBeenCalledWith('identity.password-reset-mail.dispatch', 5_000, expect.any(Function), false);
+    f.service.onModuleDestroy();
+  });
+  it('ignores the Response/Logistics SCHEDULER_ENABLED switch', async () => {
     jest.replaceProperty(process, 'env', { ...process.env, SCHEDULER_ENABLED: 'false' });
-    jest.useFakeTimers();
+    const schedule = jest.spyOn(JobRunner.prototype, 'schedule');
     const f = fixture();
     await f.service.onModuleInit();
-    expect(jest.getTimerCount()).toBe(0);
+    expect(schedule).toHaveBeenCalledWith('identity.email-registration.cleanup', 60_000, expect.any(Function), true);
+    expect(schedule).toHaveBeenCalledWith('identity.password-reset-mail.dispatch', 5_000, expect.any(Function), true);
     f.service.onModuleDestroy();
   });
   it('schedules bounded cleanup of only ephemeral registration rows', async () => {
@@ -182,8 +202,8 @@ describe('email registration cleanup', () => {
       .mockReturnValueOnce(stopPasswordResetMail);
     const f = fixture();
     await f.service.onModuleInit();
-    expect(schedule).toHaveBeenCalledWith('identity.email-registration.cleanup', 60_000, expect.any(Function));
-    expect(schedule).toHaveBeenCalledWith('identity.password-reset-mail.dispatch', 5_000, expect.any(Function));
+    expect(schedule).toHaveBeenCalledWith('identity.email-registration.cleanup', 60_000, expect.any(Function), true);
+    expect(schedule).toHaveBeenCalledWith('identity.password-reset-mail.dispatch', 5_000, expect.any(Function), true);
     expect(schedule).toHaveBeenCalledTimes(2);
     const query = jest.fn(async (_sql: string) => []);
     await schedule.mock.calls[0]![2]({ query } as never);

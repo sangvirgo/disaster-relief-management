@@ -13,6 +13,7 @@ import { LoginDto, RegisterDto, ChangePasswordDto, GoogleLoginDto, PasswordReset
 import { IDENTITY_AUTH_CONFIG, AuthContext } from './auth.guard';
 import { IdentityAuthConfig, assertStrongPassword, issueAccessToken, WindowRateLimiter } from './auth-security';
 import { EmailSenderService } from './email-sender.service';
+import { recordEmailDelivery } from './email-metrics';
 
 interface EmailRegistrationRow {
   id: string;
@@ -112,11 +113,17 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
     @Inject(IDENTITY_AUTH_CONFIG) private readonly config: IdentityAuthConfig,
     @Optional() private readonly emailSender?: EmailSenderService,
   ) {
-    this.jobs = new JobRunner(dataSource, () => this.logger.warn('SCHEDULED_JOB_FAILED identity.email-registration.cleanup'));
+    this.jobs = new JobRunner(dataSource, (jobName) => this.logger.warn(`SCHEDULED_JOB_FAILED ${jobName}`));
+  }
+
+  /** SMTP and the OTP pepper are set, so queued emails can be sent. */
+  emailDeliveryConfigured(): boolean {
+    return Boolean(this.emailSender?.isConfigured() && this.config.emailOtpPepper);
   }
 
   async onModuleInit(): Promise<void> {
     this.dummyPasswordHash = await this.hashPassword(randomBytes(32).toString('base64url'));
+    if (!this.config.cleanupEnabled) this.logger.warn('IDENTITY_CLEANUP_DISABLED reason=IDENTITY_SCHEDULER_ENABLED');
     this.stopCleanup = this.jobs.schedule('identity.email-registration.cleanup', 60_000, async (manager) => {
       await manager.query(`WITH expired AS (
         SELECT id FROM email_registration WHERE expires_at<=clock_timestamp()
@@ -127,14 +134,18 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
         WHERE expires_at<=clock_timestamp()-interval '24 hours'
         ORDER BY expires_at,challenge_id LIMIT 100 FOR UPDATE SKIP LOCKED
       ) DELETE FROM password_reset_challenge c USING expired WHERE c.challenge_id=expired.challenge_id`);
-    });
+    }, this.config.cleanupEnabled);
+    // Sending a queued reset email is part of the password-reset request, not optional housekeeping: it always runs
+    // while SMTP is configured, whatever IDENTITY_SCHEDULER_ENABLED says.
+    const deliveryConfigured = this.emailDeliveryConfigured();
+    if (!deliveryConfigured) this.logger.warn('EMAIL_DELIVERY_DISABLED reason=NOT_CONFIGURED');
     this.stopPasswordResetMail = this.jobs.schedule('identity.password-reset-mail.dispatch', 5_000, async () => {
       if (this.passwordResetMailDispatchActive) return;
       this.passwordResetMailDispatchActive = true;
       void this.dispatchPasswordResetMail()
         .catch(() => this.logger.warn('SCHEDULED_JOB_FAILED identity.password-reset-mail.dispatch'))
         .finally(() => { this.passwordResetMailDispatchActive = false; });
-    });
+    }, deliveryConfigured);
   }
 
   onModuleDestroy(): void {
@@ -759,12 +770,14 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
       } catch {
         await this.dataSource.query('DELETE FROM identity_email_outbox WHERE id=$1', [row.id]);
         this.logger.warn('EMAIL_OUTBOX_DISCARD reason=DECRYPT_FAILED');
+        recordEmailDelivery('password_reset', 'dropped');
         continue;
       }
 
       let sent = false;
+      let active: unknown[] = [];
       try {
-        const active = await this.dataSource.query(
+        active = await this.dataSource.query(
           `SELECT 1 FROM password_reset_challenge c
              JOIN app_user u ON u.id=c.user_id
             WHERE c.challenge_id=$1 AND c.consumed_at IS NULL AND c.code_hash IS NOT NULL
@@ -777,8 +790,13 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
         this.logger.warn('EMAIL_OUTBOX_DELIVERY_FAILED');
       }
 
-      if (sent || row.attempts >= 5) {
+      // A code that was used, replaced or expired meanwhile needs no email: drop the row instead of retrying it.
+      if (sent || !active.length) {
         await this.dataSource.query('DELETE FROM identity_email_outbox WHERE id=$1', [row.id]);
+      } else if (row.attempts >= 5) {
+        await this.dataSource.query('DELETE FROM identity_email_outbox WHERE id=$1', [row.id]);
+        this.logger.warn('EMAIL_OUTBOX_DISCARD reason=RETRIES_EXHAUSTED');
+        recordEmailDelivery('password_reset', 'dropped');
       } else {
         const retrySeconds = [10, 30, 60, 120][Math.min(row.attempts - 1, 3)];
         await this.dataSource.query(

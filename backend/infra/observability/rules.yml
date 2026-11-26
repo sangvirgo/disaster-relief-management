@@ -79,6 +79,28 @@ groups:
         annotations:
           summary: 'Số yêu cầu SOS tăng đột biến'
           description: 'Đang nhận khoảng {{ $value | printf "%.0f" }} SOS mỗi phút. Kiểm tra nhân lực điều phối, dung lượng máy chủ và hàng "Báo lặp cần rà soát".'
+      # Password-reset codes expire after 5 minutes, so an email still queued after 2 minutes means delivery is broken.
+      - alert: IdentityEmailBacklog
+        expr: max(c48_identity_email_outbox_oldest_age_seconds) > 120
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: 'Email đặt lại mật khẩu bị kẹt trong hàng đợi'
+          description: 'Email chờ lâu nhất đã {{ $value | humanizeDuration }}; mã hết hạn sau 5 phút. Kiểm tra SMTP (mật khẩu ứng dụng Gmail) và log EMAIL_SEND_FAILED của identity-api.'
+      - alert: IdentityEmailDeliveryFailing
+        expr: sum(increase(c48_identity_email_deliveries_total{outcome=~"failed|dropped"}[15m])) >= 3
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: 'Gửi email xác thực hoặc đặt lại mật khẩu đang lỗi'
+          description: '{{ $value | printf "%.0f" }} lần gửi email lỗi hoặc bị bỏ trong 15 phút. Kiểm tra SMTP và log EMAIL_SEND_FAILED của identity-api.'
+      - alert: IdentityEmailNotConfigured
+        expr: max(c48_identity_email_delivery_configured) == 0
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: 'Identity chưa cấu hình gửi email'
+          description: 'Thiếu IDENTITY_EMAIL_SMTP_HOST, IDENTITY_EMAIL_FROM hoặc EMAIL_OTP_PEPPER, nên mã đăng ký và mã đặt lại mật khẩu không được gửi.'
       - alert: DbPoolWaiting
         expr: c48_db_pool_waiting_clients > 5
         for: 5m
