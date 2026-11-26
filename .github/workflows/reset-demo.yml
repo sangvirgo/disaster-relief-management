@@ -17,6 +17,11 @@ on:
         required: true
         type: boolean
         default: true
+      deploy_latest:
+        description: 'Triển khai bản mới nhất trên main rồi mới nạp lại dữ liệu (dùng khi migration mới không giữ được dữ liệu cũ; ảnh Docker của bản đó phải đã được ci-cd build xong)'
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -36,6 +41,8 @@ jobs:
       PASSWORD: ${{ inputs.password }}
       RESET_PASSWORD: ${{ secrets.RESET_PASSWORD }}
       PURGE: ${{ inputs.purge_evidence }}
+      DEPLOY_LATEST: ${{ inputs.deploy_latest }}
+      TAG: ${{ github.sha }}
     steps:
       - name: Check the reset password
         run: |
@@ -56,18 +63,25 @@ jobs:
           flag=''
           [ "$PURGE" = true ] && flag=' --purge-evidence'
           # stdin is closed: the demo password comes from SEED_PASSWORD in the host's backend/.env.
-          jq -n --arg flag "$flag" \
-            '{commands: ["bash -c \"set -euo pipefail; export HOME=/root; cd /opt/c48; bash backend/scripts/deploy/reset-demo-data --reset\($flag) < /dev/null\""]}' > ssm-parameters.json
+          if [ "$DEPLOY_LATEST" = true ]; then
+            # Deploy this main commit and reseed with ITS migrations and seed (release deploy --reset-data). The plain reset
+            # below would reseed with the running release, which cannot clear data that a new migration refuses.
+            jq -n --arg tag "$TAG" --arg flag "$flag" \
+              '{commands: ["bash -c \"set -euo pipefail; export HOME=/root; cd /opt/c48; git fetch --quiet origin; git checkout --quiet --detach \($tag); exec bash backend/scripts/deploy/release deploy \($tag) --reset-data\($flag) < /dev/null\""]}' > ssm-parameters.json
+          else
+            jq -n --arg flag "$flag" \
+              '{commands: ["bash -c \"set -euo pipefail; export HOME=/root; cd /opt/c48; bash backend/scripts/deploy/reset-demo-data --reset\($flag) < /dev/null\""]}' > ssm-parameters.json
+          fi
           cat ssm-parameters.json
           command_id="$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name AWS-RunShellScript \
             --comment "reliva reset demo data" \
-            --timeout-seconds 1500 \
+            --timeout-seconds 1800 \
             --parameters file://ssm-parameters.json \
             --query Command.CommandId --output text)"
           echo "SSM command: $command_id"
-          for _ in $(seq 1 150); do
+          for _ in $(seq 1 180); do
             status="$(aws ssm get-command-invocation --command-id "$command_id" --instance-id "$INSTANCE_ID" --query Status --output text 2>/dev/null || echo Pending)"
             case "$status" in Pending|InProgress|Delayed) sleep 10 ;; *) break ;; esac
           done
