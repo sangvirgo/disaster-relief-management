@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
@@ -51,7 +52,7 @@ test('the production template, once its placeholders are filled, is a valid main
       .replace(/^(S3_(?:RESPONSE|LOGISTICS)_SECRET_KEY)=.*$/gmu, '$1='); // init-env blanks these again
     const envFile = join(directory, '.env');
     writeFileSync(envFile, filled);
-    const result = spawnSync('docker', ['compose', '--env-file', envFile, '-f', new URL('../../infra/compose.yaml', import.meta.url).pathname, 'config', '--format', 'json'], { encoding: 'utf8' });
+    const result = spawnSync('docker', ['compose', '--env-file', envFile, '-f', fileURLToPath(new URL('../../infra/compose.yaml', import.meta.url)), 'config', '--format', 'json'], { encoding: 'utf8' });
     assert.equal(result.status, 0, result.stderr);
     const services = JSON.parse(result.stdout).services;
     for (const [name, bucket] of [['response-api', 'c48-response-evidence-abc123'], ['logistics-api', 'c48-logistics-evidence-abc123']]) {
@@ -72,7 +73,7 @@ test('the production template, once its placeholders are filled, is a valid main
 });
 
 test('the local MinIO defaults are unchanged when no S3 variable is overridden', () => {
-  const result = spawnSync('docker', ['compose', '--env-file', new URL('../../.env.example', import.meta.url).pathname, '-f', new URL('../../infra/compose.yaml', import.meta.url).pathname, 'config', '--format', 'json'], { encoding: 'utf8' });
+  const result = spawnSync('docker', ['compose', '--env-file', fileURLToPath(new URL('../../.env.example', import.meta.url)), '-f', fileURLToPath(new URL('../../infra/compose.yaml', import.meta.url)), 'config', '--format', 'json'], { encoding: 'utf8' });
   if (result.status !== 0) return;
   const { 'response-api': response, 'logistics-api': logistics } = JSON.parse(result.stdout).services;
   assert.equal(response.environment.S3_ENDPOINT, 'http://minio:9000');
