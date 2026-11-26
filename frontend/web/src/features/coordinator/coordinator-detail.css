@@ -242,7 +242,7 @@
 .sos-closeout__head .secondary-action-button:hover { background: var(--color-emergency-dark); color: var(--color-text-inverse); }
 .sos-closeout > .command-form { border-top: 0; padding-top: 0; }
 .coordinator-detail-surface .sos-decision { max-width: 100%; }
-.coordinator-detail-surface .triage-context { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: stretch; }
+.coordinator-detail-surface .triage-context { grid-template-columns: minmax(0, 1fr); }
 @media (max-width: 760px) { .coordinator-detail-surface .triage-context, .sos-detail-content { grid-template-columns: minmax(0, 1fr); } .sos-detail-content[data-tab='overview'] > .sos-tab-group:nth-child(1), .sos-detail-content[data-tab='overview'] > .sos-tab-group:nth-child(2), .sos-detail-content[data-tab='overview'] > .sos-actions-guard { grid-column: 1; grid-row: auto; } .sos-detail-content > .sos-tab-group { grid-column: 1 / -1; } }
 @media (max-width: 760px) {
   .coordinator-sos-layout .queue-filter-quick { grid-template-columns: minmax(0, 1fr); }

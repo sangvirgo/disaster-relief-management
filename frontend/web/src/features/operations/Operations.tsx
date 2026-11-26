@@ -144,6 +144,8 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   const [selected, setSelected] = useState<Row | null>(null);
   const [driveItemPage, setDriveItemPage] = useState(0);
   const [detailTab, setDetailTab] = useState('overview');
+  const [needAction, setNeedAction] = useState<'increase' | 'reduce' | 'cancel' | 'commit'>('increase');
+  useEffect(() => setNeedAction('increase'), [selected?.id]);
   const [lastHandoff, setLastHandoff] = useState<{ distributionId: string; id: string } | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [detail, setDetail] = useState<Row | null>(null);
@@ -398,6 +400,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
     if (!keepDetail) setSelected(null);
     setDetail(null);
     setDetailTab('overview');
+    setNeedAction('increase');
     setShowCreate(false);
     setRevision((value) => value + 1);
   }
@@ -738,7 +741,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
         </p>}
         {selected && detail && !['stock', 'assets', 'drives'].includes(page) && !inlineActions && !distributionPages.has(page) && <Tabs items={[
           { id: 'overview', label: 'Thông tin' },
-          { id: 'details', label: page === 'reports' ? 'Số liệu' : page === 'needs' ? 'Cam kết xuất kho' : page === 'drives' ? 'Vật phẩm tiếp nhận' : 'Chi tiết' },
+          ...(page === 'needs' ? [] : [{ id: 'details', label: page === 'reports' ? 'Số liệu' : page === 'drives' ? 'Vật phẩm tiếp nhận' : 'Chi tiết' }]),
           ...(showActionsTab && !inlineActions ? [{ id: 'actions', label: 'Thao tác' }] : []),
         ]} value={detailTab} onChange={setDetailTab} ariaLabel="Nội dung bản ghi" idBase="operations-detail" />}
         {selected && <div id="operations-detail-tabpanel" style={page === 'review' ? { display: 'flex', flexDirection: 'column' } : undefined}>
@@ -811,7 +814,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 {detail.status === 'CANCELLED' && <p className="notice">Nhu cầu đã hủy không còn được tính vào lượng cần đáp ứng hiện hành. Số đã giao vẫn được giữ lại để đối chiếu lịch sử.</p>}
               </>}
               {distributionPages.has(page) && status === 'DISPATCHED' && <p className="notice">Phiếu tự đối soát khi hết hàng đang vận chuyển, hàng tại điểm và không còn thất thoát chờ duyệt.</p>}
-              {page === 'needs' && <><p><strong>Yêu cầu SOS</strong><span className="detail-value">{references.requests?.find((item) => item.value === detail.request_id)?.label || string(detail.request_id)}</span></p><p><strong>Nhu cầu</strong><span className="detail-value">{quantityWithUnit(detail, detail.requested)} · Đã giao {quantityWithUnit(detail, detail.delivered)}</span></p><p><strong>Nguồn nhu cầu</strong><span className="detail-value"><NeedSourceBadge source={detail.source} /></span></p><NeedReasonChips codes={detail.reason_codes} all /></>}
+              {page === 'needs' && <><p><strong>Yêu cầu SOS</strong><span className="detail-value">{references.requests?.find((item) => item.value === detail.request_id)?.label || string(detail.request_id)}</span></p><p><strong>Nhu cầu</strong><span className="detail-value">{quantityWithUnit(detail, detail.requested)}</span></p><p><strong>Nguồn nhu cầu</strong><span className="detail-value"><NeedSourceBadge source={detail.source} /></span></p><NeedReasonChips codes={detail.reason_codes} all /></>}
               {distributionPages.has(page) && Boolean(detail.purpose) && (
                 <p>
                   <strong>Mục đích phân phối</strong>
@@ -820,7 +823,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                   </span>
                 </p>
               )}
-              <p>
+              {page !== 'needs' && <p>
                 <strong>
                   {distributionPages.has(page)
                     ? 'Mã phiếu phân phối'
@@ -834,7 +837,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                   {string(selected?.id || selected?.balance_id || selected?.warehouse_id) ||
                     'Không có mã riêng'}
                 </span>
-              </p>
+              </p>}
               {status && (
                 <p>
                   <strong>Trạng thái</strong>
@@ -843,7 +846,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                   </span>
                 </p>
               )}
-              {version != null && (
+              {page !== 'needs' && version != null && (
                 <p>
                   <strong>Phiên bản</strong>
                   <span className="detail-value">
@@ -930,6 +933,16 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 </p>
               )}
             </div>}
+            {page === 'needs' && <section className="need-commitments"><h3>Cam kết xuất kho hiện có</h3>
+              {commitmentsLoading && <p role="status">Đang tải cam kết…</p>}
+              {commitmentsError && <p role="alert" className="notice error">{commitmentsError}</p>}
+              {commitments.filter((item) => item.need_id === id).map((item) => <div className="candidate" key={item.id}>
+                <strong>{string(item.warehouse_name)}</strong>
+                <p>Còn có thể xuất: {quantity(item.reserved_remaining)} {string(item.unit_name)}</p>
+                <p>Mã cam kết: {item.id}</p>
+              </div>)}
+              {!commitmentsLoading && !commitmentsError && !commitments.some((item) => item.need_id === id) && <p>Chưa có cam kết còn số lượng để xuất kho.</p>}
+            </section>}
             {page === 'assets' && id && version != null && status === 'ACTIVE' && rights.has('OPERATIONS_MANAGER') &&
               command({ title: 'Ngừng sử dụng', service: 'logistics', path: `/${asset}/${id}/deactivate`, version,
                 warning: 'Ngừng sử dụng tài sản hoặc địa điểm này? Các phiếu đang liên quan có thể cần xử lý trước.' })}
@@ -984,16 +997,6 @@ export function Operations({ page, user }: { page: string; user: Me }) {
               <strong>{(detail.review as Row).decision === 'REQUEST_RECOUNT' ? 'Cần kiểm đếm lại' : 'Kết quả duyệt kiểm đếm'}</strong>
               <p>{string((detail.review as Row).reason)}</p>
             </div>}
-            {page === 'needs' && <section><h3>Cam kết xuất kho hiện có</h3>
-              {commitmentsLoading && <p role="status">Đang tải cam kết…</p>}
-              {commitmentsError && <p role="alert" className="notice error">{commitmentsError}</p>}
-              {commitments.filter((item) => item.need_id === id).map((item) => <div className="candidate" key={item.id}>
-                <strong>{string(item.warehouse_name)}</strong>
-                <p>Còn có thể xuất: {quantity(item.reserved_remaining)} {string(item.unit_name)}</p>
-                <p>Mã cam kết: {item.id}</p>
-              </div>)}
-              {!commitmentsLoading && !commitmentsError && !commitments.some((item) => item.need_id === id) && <p>Chưa có cam kết còn số lượng để xuất kho.</p>}
-            </section>}
             {page === 'reports' && report === 'reconciliation' && <section className="reconciliation-section"><h3>Đối soát {string((detail.item as Row)?.name)}</h3>
               <div className="operations-table-scroll" role="region" aria-label="Bảng đối soát vật phẩm" tabIndex={0}>
                 <table className="reconciliation-table"><thead><tr><th scope="col">Chỉ tiêu</th><th scope="col">Số lượng ({string((detail.unit as Row)?.display_name)})</th></tr></thead><tbody>
@@ -1243,8 +1246,21 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 (rights.has('OPERATIONS_MANAGER') || rights.has('COORDINATOR')) &&
                 status !== 'CANCELLED' && (
                   <>
-                    {command({
+                    <div className="need-action-header">
+                      <h3>{needAction === 'increase' ? 'Tăng số lượng cần' : needAction === 'reduce' ? 'Giảm số lượng cần' : needAction === 'cancel' ? 'Hủy phần nhu cầu còn lại' : 'Cam kết xuất kho'}</h3>
+                      <details className="need-action-menu" key={id}>
+                        <summary aria-label="Chọn thao tác nhu cầu khác" title="Chọn thao tác nhu cầu khác">⋯</summary>
+                        <div className="need-action-options" onClick={(event) => { if ((event.target as HTMLElement).closest('button')) (event.currentTarget.parentElement as HTMLDetailsElement).open = false; }}>
+                          <button type="button" onClick={() => setNeedAction('increase')}>Tăng số lượng cần</button>
+                          {status !== 'FULFILLED' && needMinimum < Number(detail.requested) && <button type="button" onClick={() => setNeedAction('reduce')}>Giảm số lượng cần</button>}
+                          {status !== 'FULFILLED' && <button type="button" onClick={() => setNeedAction('cancel')}>Hủy phần nhu cầu còn lại</button>}
+                          {status !== 'FULFILLED' && needUncommitted > 0 && rights.has('OPERATIONS_MANAGER') && <button type="button" onClick={() => setNeedAction('commit')}>Cam kết xuất kho</button>}
+                        </div>
+                      </details>
+                    </div>
+                    {needAction === 'increase' && command({
                       title: 'Tăng số lượng cần',
+                      hideTitle: true,
                       service: 'logistics',
                       path: `/needs/${id}/increase`,
                       version,
@@ -1261,8 +1277,9 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                       ],
                       build: (values) => ({ quantity: values.quantity, reason: values.reason }),
                     })}
-                    {status !== 'FULFILLED' && needMinimum < Number(detail.requested) && command({
+                    {needAction === 'reduce' && status !== 'FULFILLED' && needMinimum < Number(detail.requested) && command({
                       title: 'Giảm số lượng cần',
+                      hideTitle: true,
                       service: 'logistics',
                       path: `/needs/${id}/reduce`,
                       version,
@@ -1281,8 +1298,9 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                       build: (values) => ({ quantity: values.quantity, reason: values.reason }),
                       warning: 'Xác nhận giảm nhu cầu theo số lượng còn đủ điều kiện?',
                     })}
-                    {status !== 'FULFILLED' && command({
+                    {needAction === 'cancel' && status !== 'FULFILLED' && command({
                       title: 'Hủy phần nhu cầu còn lại',
+                      hideTitle: true,
                       service: 'logistics',
                       path: `/needs/${id}/cancel`,
                       version,
@@ -1291,10 +1309,10 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                       ],
                       warning: 'Xác nhận hủy phần nhu cầu chưa được giao?',
                     })}
-                    {status !== 'FULFILLED' && needUncommitted <= 0 && <p className="notice">Số lượng còn lại đã được giữ hoặc đang giao; chưa thể cam kết thêm hay giảm xuống dưới phần đã phân bổ.</p>}
-                    {status !== 'FULFILLED' && needUncommitted > 0 && rights.has('OPERATIONS_MANAGER') &&
+                    {needAction === 'commit' && status !== 'FULFILLED' && needUncommitted > 0 && rights.has('OPERATIONS_MANAGER') &&
                       command({
                         title: 'Cam kết xuất kho',
+                        hideTitle: true,
                         service: 'logistics',
                         path: `/needs/${id}/commitments`,
                         fields: [

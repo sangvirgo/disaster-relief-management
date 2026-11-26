@@ -1824,6 +1824,20 @@
 .warehouse-map-editor__field { display: grid; gap: 4px; font-size: 13px; font-weight: 700; }
 .warehouse-map-editor__field small { font-weight: 400; }
 .warehouse-map-editor--card .warehouse-map-editor__actions .button { min-height: 38px; padding: 6px 16px; }
+.warehouse-map-editor--create { gap: 6px; }
+.warehouse-map-editor__create-row { display: flex; align-items: center; gap: 8px; }
+.warehouse-map-editor__create-row input { flex: 1; min-width: 0; }
+.warehouse-map-editor--create .warehouse-map-editor__field { color: #334155; }
+.warehouse-map-editor--create small { font-size: 11px; }
 
 /* Hidden tab panels inside an operations record must never reserve space (a display rule was overriding [hidden]). */
 #operations-detail-tabpanel > [hidden] { display: none !important; }
+.need-commitments { margin-top: 24px; border-top: 1px solid #dce5f2; padding-top: 20px; }
+.need-action-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; }
+.need-action-header h3 { margin: 0; }
+.need-action-menu { position: relative; width: max-content; max-width: 100%; }
+.need-action-menu summary { display: grid; place-items: center; width: 52px; height: 52px; border: 1px solid #cbd9ed; border-radius: 14px; color: #254266; background: #f7faff; cursor: pointer; font-size: 1.5rem; list-style: none; }
+.need-action-menu summary::-webkit-details-marker { display: none; }
+.need-action-options { position: absolute; z-index: 20; top: calc(100% + 8px); right: 0; display: grid; min-width: min(320px, 80vw); padding: 8px; border: 1px solid #d5e1f0; border-radius: 14px; background: #fff; box-shadow: 0 16px 36px rgb(24 49 87 / 18%); }
+.need-action-options button { border: 0; border-radius: 9px; padding: 12px 14px; background: transparent; color: #254266; text-align: left; cursor: pointer; }
+.need-action-options button:hover, .need-action-options button:focus-visible { background: #eef5ff; }

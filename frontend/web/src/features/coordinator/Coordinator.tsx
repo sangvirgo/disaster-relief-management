@@ -1835,15 +1835,6 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
             )}
             {(page === 'triage' || (page === 'queue' && detail.status === 'VERIFIED')) && (
               <div className="triage-context">
-                <div className="triage-context-summary">
-                  <h3>Thông tin để quyết định ưu tiên</h3>
-                  <strong>{detail.tracking_code}</strong>
-                  <p>{detail.description || 'Người báo chưa cung cấp mô tả tình huống.'}</p>
-                  <p><b>{label(detail.category)}</b> · {detail.subject.people_affected ?? 'Chưa rõ số'} người cần hỗ trợ</p>
-                  <p>{detail.declared_danger ? 'Có khai báo nguy hiểm tính mạng' : 'Chưa khai báo nguy hiểm tính mạng'}</p>
-                  <p>{detail.needs_rescue ? 'Cần cứu hộ' : 'Không khai báo cần cứu hộ'}</p>
-                  <small>Ghim đỏ nhấp nháy là SOS đang chọn; vùng nhiệt cho biết mật độ SOS gần đó.</small>
-                </div>
                 <div className="triage-context-map">
                   <h3>Vị trí trên bản đồ nhiệt</h3>
                   <HeatmapPanel

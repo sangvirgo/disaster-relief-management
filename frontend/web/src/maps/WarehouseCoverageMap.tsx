@@ -262,7 +262,6 @@ export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, er
       setZoomComplete(false);
       setDraftReady(false);
       mapRef.current?.stop();
-      mapRef.current?.setView([16.1, 107.7], 6, { animate: false });
     } else { setZoomComplete(false); setDraftReady(false); }
   }, [creatingWarehouse]);
 
@@ -283,7 +282,7 @@ export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, er
     {banner && <div className="warehouse-map-banner" role="status">{banner}</div>}
     {(creatingWarehouse || editingWarehouse) && draft && zoomComplete && !draftReady && <div className="warehouse-map-banner" role="status">Kéo tâm kho hoặc nút bán kính, rồi thả để tiếp tục.</div>}
     {toolbar && <div className="warehouse-map-toolbar">{toolbar}</div>}
-    {hoverCard && ((!creatingWarehouse && !editingWarehouse) || (creatingWarehouse && !draft) || draftReady) && <div className={`warehouse-map-hover${creatingWarehouse || editingWarehouse ? ' warehouse-map-hover--draft' : ''}`} style={(creatingWarehouse || editingWarehouse) && draftPoint ? draftCardStyle(draftPoint) : undefined}>{hoverCard}</div>}
+    {hoverCard && ((!creatingWarehouse && !editingWarehouse) || (draft && draftReady)) && <div className={`warehouse-map-hover${creatingWarehouse || editingWarehouse ? ' warehouse-map-hover--draft' : ''}`} style={(creatingWarehouse || editingWarehouse) && draftPoint ? draftCardStyle(draftPoint) : undefined}>{hoverCard}</div>}
     <div className="warehouse-map-legend" aria-label="Chú giải bản đồ">
       <span><span className="legend-warehouse-icon" dangerouslySetInnerHTML={{ __html: warehouseIconHtml() }} /> Kho và bán kính phục vụ</span>
       <span><i className="legend-dot legend-dot--campaign">⚑</i> Vùng chiến dịch cứu trợ</span>

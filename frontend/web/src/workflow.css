@@ -651,13 +651,12 @@
 
 .triage-context {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
   gap: 16px;
   margin: 18px 0 22px;
 }
 
-.triage-context-summary,
 .triage-context-map,
 .report-heatmap {
   min-width: 0;
@@ -667,13 +666,8 @@
   background: #f8fbff;
 }
 
-.triage-context-summary p {
-  overflow-wrap: anywhere;
-  line-height: 1.5;
-}
-
-.triage-context-summary small {
-  color: var(--color-text-muted);
+.triage-context .heatmap-panel-compact .heatmap-canvas {
+  height: clamp(420px, 58vh, 650px);
 }
 
 .report-heatmap {
@@ -686,9 +680,7 @@
 }
 
 @media (max-width: 720px) {
-  .triage-context {
-    grid-template-columns: 1fr;
-  }
+  .triage-context .heatmap-panel-compact .heatmap-canvas { height: 420px; }
 }
 
 /* Tabs */

@@ -37,7 +37,7 @@ export function SupplyGapsPage({ user }: { user: Me }) {
       <div role={canManage ? 'tabpanel' : undefined} id="supply-page-tabpanel"
         aria-labelledby={canManage ? `supply-page-tab-${section}` : undefined} className="supply-page__content">
         {section === 'proposals' && <>
-          <p className="supply-page__intro">SOS đã xác minh và cần hàng cứu trợ sẽ tạo đề xuất vật tư. Quản lý duyệt từng đề xuất; nhu cầu được xác nhận xuất hiện ở danh sách bên dưới.</p>
+          <p className="supply-page__intro">SOS đã xác minh và cần hàng cứu trợ sẽ tạo đề xuất vật tư. Chọn “Cần xem xét” để duyệt hoặc “Đã xác nhận” để theo dõi kết quả. Danh sách nhu cầu chi tiết ở bên dưới.</p>
           <UnassignedSupplyNotice user={user} />
           <NeedProposalsPage user={user} />
           <section className="card supply-page__related" aria-labelledby="supply-needs-title">

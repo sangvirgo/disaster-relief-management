@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { fetchAll } from '../../api/fetchAll';
+import { useCursorNav, LIST_PAGE_SIZE } from '../../api/useCursorNav';
 import { sendRetryableCommand } from '../../api/retryableCommand';
 import { roles, type Me } from '../../auth/session';
 import { CommandForm, type CommandSpec } from '../../components/CommandForm';
@@ -10,6 +11,7 @@ import { Badge, type BadgeTone } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Skeleton } from '../../components/ui/Skeleton';
+import { ListNav } from '../../components/ui/Pager';
 import { formatQuantity } from '../../i18n/quantity';
 import {
   extractionSourceLabels,
@@ -37,7 +39,9 @@ import './need-proposals.css';
 type Resolution = 'CONFIRMED' | 'REJECTED';
 type Dialog = { mode: 'confirm' | 'reject'; line: ProposalLine } | null;
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = LIST_PAGE_SIZE;
+type ConfirmedNeed = { id: string; request_id: string; work_cycle: number; item: { name: string }; unit: { display_name: string }; requested: string; delivered: string; status: string; source: string };
+type ConfirmedPage = { items: ConfirmedNeed[]; cursor?: string | null; more?: boolean };
 const PICKUP_HREF = '/?workspace=operations&page=pickup';
 const shortId = (id: string) => `…${id.slice(-8)}`;
 
@@ -121,10 +125,12 @@ function rejectSpec(line: ProposalLine): CommandSpec {
 export function NeedProposalsPage({ user }: { user: Me }) {
   const canManage = canManageNeedProposals(roles(user));
   const [groups, setGroups] = useState<ProposalGroup[]>([]);
-  const [cursor, setCursor] = useState('');
+  const [cursor, setCursor, prevPage, pageIndex] = useCursorNav<string>('');
   const [more, setMore] = useState(false);
+  const [nextCursor, setNextCursor] = useState('');
+  const [view, setView] = useState<'review' | 'confirmed'>('review');
+  const [confirmed, setConfirmed] = useState<ConfirmedNeed[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [revision, setRevision] = useState(0);
@@ -144,18 +150,38 @@ export function NeedProposalsPage({ user }: { user: Me }) {
     let live = true;
     setLoading(true);
     setError('');
-    api<ProposalPage>('logistics', `/need-proposals?limit=${PAGE_SIZE}${scopeQuery}`)
-      .then((page) => {
-        if (!live) return;
-        if (typeof page.unassigned_total === 'number') setUnassignedTotal(page.unassigned_total);
-        setGroups(page.items);
-        setMore(Boolean(page.more));
-        setCursor(page.more ? page.cursor ?? '' : '');
-      })
-      .catch((cause) => { if (live) { setGroups([]); setError(proposalListErrorMessage(cause)); } })
-      .finally(() => { if (live) setLoading(false); });
+    async function loadPage() {
+      try {
+        if (view === 'review') {
+          const page = await api<ProposalPage>('logistics', `/need-proposals?limit=${PAGE_SIZE}${scopeQuery}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
+          if (!live) return;
+          if (typeof page.unassigned_total === 'number') setUnassignedTotal(page.unassigned_total);
+          setGroups(page.items);
+          setMore(Boolean(page.more));
+          setNextCursor(page.more ? page.cursor ?? '' : '');
+        } else {
+          const items: ConfirmedNeed[] = [];
+          let after = cursor;
+          let hasMore = false;
+          const seen = new Set<string>();
+          do {
+            const page = await api<ConfirmedPage>('logistics', `/needs?limit=${PAGE_SIZE - items.length}${after ? `&cursor=${encodeURIComponent(after)}` : ''}`);
+            if (!live) return;
+            items.push(...page.items.filter((need) => need.source === 'CONFIRMED'));
+            hasMore = Boolean(page.more && page.cursor && !seen.has(page.cursor));
+            if (page.cursor) { seen.add(page.cursor); after = page.cursor; }
+          } while (items.length < PAGE_SIZE && hasMore);
+          setConfirmed(items);
+          setMore(hasMore);
+          setNextCursor(hasMore ? after : '');
+        }
+      } catch (cause) {
+        if (live) { setGroups([]); setConfirmed([]); setError(proposalListErrorMessage(cause)); }
+      } finally { if (live) setLoading(false); }
+    }
+    void loadPage();
     return () => { live = false; };
-  }, [canManage, revision, scopeQuery]);
+  }, [canManage, revision, scopeQuery, view, cursor]);
 
   useEffect(() => {
     if (!canManage) return;
@@ -182,21 +208,6 @@ export function NeedProposalsPage({ user }: { user: Me }) {
     });
     return () => { live = false; };
   }, [canManage]);
-
-  async function loadMore() {
-    if (!cursor) return;
-    setLoadingMore(true);
-    try {
-      const page = await api<ProposalPage>('logistics', `/need-proposals?limit=${PAGE_SIZE}${scopeQuery}&cursor=${encodeURIComponent(cursor)}`);
-      setGroups((current) => [...current, ...page.items]);
-      setMore(Boolean(page.more));
-      setCursor(page.more ? page.cursor ?? '' : '');
-    } catch (cause) {
-      setError(proposalListErrorMessage(cause));
-    } finally {
-      setLoadingMore(false);
-    }
-  }
 
   function reload(message = '') {
     setNotice(message);
@@ -245,6 +256,11 @@ export function NeedProposalsPage({ user }: { user: Me }) {
 
   const unitOf = (line: ProposalLine) => line.item.unit.display_name || '(chưa rõ đơn vị)';
   const unitById = new Map(activeItems.map((item) => [item.id, item.unit.display_name || '']));
+  const confirmedGroups = new Map<string, ConfirmedNeed[]>();
+  for (const need of confirmed) {
+    const key = `${need.request_id}:${need.work_cycle}`;
+    confirmedGroups.set(key, [...(confirmedGroups.get(key) || []), need]);
+  }
 
   return (
     <div className="need-proposals">
@@ -252,20 +268,25 @@ export function NeedProposalsPage({ user }: { user: Me }) {
         <div className="section-header list-action-header">
           <div>
             <span className="eyebrow">Quản lý vận hành</span>
-            <h2 id="need-proposals-title">Đề xuất cấp phát</h2>
+            <h2 id="need-proposals-title">Nhu cầu từ SOS</h2>
           </div>
           <div className="list-header-actions">
             <Button variant="secondary" size="sm" className="refresh-action" disabled={loading} onClick={() => reload()}>Làm mới</Button>
           </div>
         </div>
-        <p className="muted">
+        {view === 'review' && <p className="muted">
           Hệ thống tự tạo đề xuất từ SOS đã xác minh và định mức. Quản lý kiểm tra số lượng và vật phẩm rồi xác nhận hoặc từ chối.
           Đề xuất không tự động phân công hay điều phối.
-        </p>
-        <p className="need-proposals__timing">SOS có tick cần hàng cứu trợ được quét khoảng mỗi 5 phút. Danh sách tự làm mới khi bạn đang mở trang.</p>
+        </p>}
+        {view === 'review' && <p className="need-proposals__timing">SOS có tick cần hàng cứu trợ được quét khoảng mỗi 5 phút. Danh sách tự làm mới khi bạn đang mở trang.</p>}
+        <div className="campaign-filters" role="group" aria-label="Trạng thái nhu cầu từ SOS">
+          <button type="button" className={view === 'review' ? 'active' : ''} aria-pressed={view === 'review'} onClick={() => { setView('review'); setCursor(''); }}>Cần xem xét</button>
+          <button type="button" className={view === 'confirmed' ? 'active' : ''} aria-pressed={view === 'confirmed'} onClick={() => { setView('confirmed'); setCursor(''); }}>Đã xác nhận</button>
+        </div>
+        {view === 'review' && <>
         <div className="campaign-filters" role="group" aria-label="Phạm vi đề xuất">
-          <button type="button" className={unassigned ? '' : 'active'} aria-pressed={!unassigned} onClick={() => { setUnassigned(false); setGroups([]); }}>Theo chiến dịch</button>
-          <button type="button" className={unassigned ? 'active' : ''} aria-pressed={unassigned} onClick={() => { setUnassigned(true); setGroups([]); }}>
+          <button type="button" className={unassigned ? '' : 'active'} aria-pressed={!unassigned} onClick={() => { setUnassigned(false); setGroups([]); setCursor(''); }}>Theo chiến dịch</button>
+          <button type="button" className={unassigned ? 'active' : ''} aria-pressed={unassigned} onClick={() => { setUnassigned(true); setGroups([]); setCursor(''); }}>
             Chưa thuộc chiến dịch nào{unassignedTotal === null ? '' : ` (${unassignedTotal})`}
           </button>
         </div>
@@ -275,6 +296,7 @@ export function NeedProposalsPage({ user }: { user: Me }) {
             Điều phối viên cần gắn SOS vào chiến dịch (hoặc mở rộng/tạo vùng chiến dịch); sau đó đề xuất sẽ chuyển sang danh sách theo chiến dịch và được đối chiếu với kho.
           </p>
         )}
+        </>}
         {notice && <p className="notice" role="status">{notice}</p>}
         {lookupError && <p className="notice error" role="alert">{lookupError}</p>}
         {error && (
@@ -285,15 +307,15 @@ export function NeedProposalsPage({ user }: { user: Me }) {
         )}
       </section>
 
-      {loading && groups.length === 0 && <Skeleton rows={4} label="Đang tải đề xuất cấp phát…" />}
+      {loading && <Skeleton rows={4} label="Đang tải nhu cầu từ SOS…" />}
 
-      {!loading && !error && groups.length === 0 && (
+      {view === 'review' && !loading && !error && groups.length === 0 && (
         unassigned
           ? <EmptyState title="Không có SOS cần hàng nào ngoài chiến dịch" description="Mọi SOS có nhu cầu hàng cứu trợ đều đã thuộc một chiến dịch." />
           : <EmptyState title="Chưa có đề xuất cần duyệt" description="SOS phải được xác minh và có tick cần hàng cứu trợ. Hệ thống quét khoảng mỗi 5 phút; SOS ngoài chiến dịch vẫn có đề xuất nhưng chưa đối chiếu được kho." />
       )}
 
-      {groups.map((group) => {
+      {view === 'review' && !loading && groups.map((group) => {
         const summary = summarizeProposalGroup(group);
         const open = group.lines.filter((line) => !resolved[line.need_id]);
         const confirmedHere = group.lines.some((line) => resolved[line.need_id] === 'CONFIRMED');
@@ -425,11 +447,15 @@ export function NeedProposalsPage({ user }: { user: Me }) {
         );
       })}
 
-      {more && (
-        <div className="need-proposals__more">
-          <Button variant="secondary" loading={loadingMore} disabled={loadingMore} onClick={() => void loadMore()}>Tải thêm</Button>
-        </div>
-      )}
+      {view === 'confirmed' && !loading && !error && confirmed.length === 0 && <EmptyState title="Chưa có nhu cầu đã xác nhận" description="Khi quản lý xác nhận đề xuất, nhu cầu sẽ xuất hiện tại đây." />}
+      {view === 'confirmed' && !loading && [...confirmedGroups].map(([key, lines]) => {
+        const first = lines[0];
+        return <section key={key} className="card proposal-group" aria-label={`Nhu cầu đã xác nhận của SOS ${shortId(first.request_id)}`}>
+          <header className="proposal-group__header"><div className="proposal-group__identity"><span className="proposal-group__kicker">Nhu cầu từ SOS · Đã xác nhận</span><h3 className="proposal-group__title">SOS {shortId(first.request_id)} · Đợt {first.work_cycle}</h3><div className="proposal-group__facts"><span><strong>{lines.length}</strong> vật phẩm đã xác nhận</span></div></div><Badge kind="meta" tone="success">Đã xác nhận</Badge></header>
+          <ul className="proposal-lines" aria-label={`Vật phẩm đã xác nhận của SOS ${shortId(first.request_id)}`}>{lines.map((need) => <li key={need.id} className="proposal-line"><div className="proposal-line__main"><strong className="proposal-line__item">{need.item.name}</strong><span className="proposal-line__quantity">{formatQuantity(need.requested)} {need.unit.display_name}</span></div><p className="proposal-line__stock">Đã giao: {formatQuantity(need.delivered)} {need.unit.display_name} · Trạng thái: {labelFor({ OPEN: 'Đang cần', PARTIALLY_FULFILLED: 'Đáp ứng một phần', FULFILLED: 'Đã đáp ứng', CANCELLED: 'Đã hủy' }, need.status, 'Đang xử lý')}</p></li>)}</ul>
+        </section>;
+      })}
+      <ListNav page={pageIndex} hasNext={more} loading={loading} onPrev={prevPage} onNext={() => nextCursor && setCursor(nextCursor)} count={view === 'review' ? groups.length : confirmed.length} />
 
       {dialog && (
         <DetailSurface
