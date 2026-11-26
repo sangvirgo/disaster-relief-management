@@ -84,7 +84,7 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
   const [choice, setChoice] = useState<Record<string, string>>({});
   const [mapFocus, setMapFocus] = useState<{ id: string; nonce: number } | null>(null);
   const [areaExpansion, setAreaExpansion] = useState<{
-    id: string; name: string; center: { lat: number; lng: number }; fromRadiusM: number; toRadiusM: number; nonce: number;
+    id: string; name: string; center: { lat: number; lng: number }; fromRadiusM: number; toRadiusM: number; attachedCount: number; nonce: number;
   } | null>(null);
   // Map editor: draw a new campaign area, or adjust an existing one (kind 'adjust' carries the campaign id).
   const [editMode, setEditMode] = useState<{ kind: 'create' } | { kind: 'adjust'; id: string } | null>(null);
@@ -188,13 +188,14 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
     setSelectedCampaignId(campaign.id);
     document.querySelector('.common-queue-suggestions .campaign-area-map')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     try {
-      await post(`/campaigns/${campaign.id}/area`, { expected_version: campaign.version, center: campaign.center, radius_m: radiusM });
+      const result = await post<{ attached_request_count?: number }>(`/campaigns/${campaign.id}/area`,
+        { expected_version: campaign.version, center: campaign.center, radius_m: radiusM });
       setData(current => current ? {
         ...current,
         campaigns: current.campaigns.map(item => item.id === campaign.id ? { ...item, radius_m: radiusM } : item),
       } : current);
       setAreaExpansion({ id: campaign.id, name: campaign.name, center: campaign.center,
-        fromRadiusM: campaign.radius_m, toRadiusM: radiusM, nonce: Date.now() });
+        fromRadiusM: campaign.radius_m, toRadiusM: radiusM, attachedCount: result.attached_request_count ?? 0, nonce: Date.now() });
     } catch (cause) {
       setError(messageOf(cause));
       setBusy(false);
@@ -205,7 +206,10 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
   function finishAreaExpansion() {
     if (!areaExpansion) return;
     setAreaExpansion(null);
-    setMessage(`Đã mở rộng vùng ${areaExpansion.name} đến ${km(areaExpansion.toRadiusM)} km và gắn các SOS trong vùng mới.`);
+    const attachedMessage = areaExpansion.attachedCount > 0
+      ? `Đã gắn ${areaExpansion.attachedCount} SOS trong vùng mới.`
+      : 'Chưa có SOS nào được gắn trong lần mở rộng này.';
+    setMessage(`Đã mở rộng vùng ${areaExpansion.name} đến ${km(areaExpansion.toRadiusM)} km. ${attachedMessage}`);
     setCursor('');
     setRevision(value => value + 1);
     onChanged();
