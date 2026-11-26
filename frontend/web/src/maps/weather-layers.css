@@ -38,6 +38,7 @@
 .campaign-area-circle { cursor: pointer; }
 @media (max-width: 900px) { .campaign-area-map-shell:has(.campaign-area-map__tools) .weather-bar { right: 10px; top: auto; bottom: 10px; left: 54px; } }
 .campaign-area-map__note { position: absolute; z-index: 600; top: 52px; left: 54px; margin: 0; display: grid; gap: 3px; padding: 7px 12px; border-radius: 12px; background: #fffffff2; color: #1f2937; font-size: 12.5px; font-weight: 600; box-shadow: 0 2px 8px #0003; pointer-events: none; }
+.campaign-area-map__expansion { position: absolute; z-index: 1001; top: 12px; left: 54px; max-width: calc(100% - 70px); padding: 9px 13px; border: 1px solid #93c5fd; border-radius: 10px; background: #eff6ff; color: #1e40af; box-shadow: 0 4px 14px #0f172a26; font-size: 13px; font-weight: 700; pointer-events: none; }
 .campaign-area-map__alert { position: absolute; z-index: 1000; right: 10px; bottom: 30px; max-width: min(360px, calc(100% - 20px)); }
 .campaign-map-alert { display: flex; align-items: center; gap: 10px; width: 100%; margin: 0; padding: 10px 14px; border: 0; border-left: 6px solid #fff; border-radius: 12px; background: #dc2626; color: #fff; text-align: left; cursor: pointer; box-shadow: 0 4px 16px #7f1d1d66; }
 .campaign-map-alert:hover { background: #b91c1c; }

@@ -83,6 +83,9 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
   const [cursor, setCursor, prevPage, pageIndex] = useCursorNav<string>('');
   const [choice, setChoice] = useState<Record<string, string>>({});
   const [mapFocus, setMapFocus] = useState<{ id: string; nonce: number } | null>(null);
+  const [areaExpansion, setAreaExpansion] = useState<{
+    id: string; name: string; center: { lat: number; lng: number }; fromRadiusM: number; toRadiusM: number; nonce: number;
+  } | null>(null);
   // Map editor: draw a new campaign area, or adjust an existing one (kind 'adjust' carries the campaign id).
   const [editMode, setEditMode] = useState<{ kind: 'create' } | { kind: 'adjust'; id: string } | null>(null);
   const [draftCenter, setDraftCenter] = useState<{ lat: number; lng: number } | null>(null);
@@ -178,10 +181,36 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
     () => post(`/requests/${item.id}/attach-campaign`, { campaign_id: campaignId, expected_version: item.version }).then(() => undefined),
     `Đã gắn ${item.tracking_code} vào chiến dịch.`,
   );
-  const expandArea = (campaign: SuggestionCampaign, radiusM: number) => run(
-    () => post(`/campaigns/${campaign.id}/area`, { expected_version: campaign.version, center: campaign.center, radius_m: radiusM }).then(() => undefined),
-    `Đã mở rộng vùng ${campaign.name} và gắn các SOS trong vùng mới.`,
-  );
+  async function expandArea(campaign: SuggestionCampaign, radiusM: number) {
+    setBusy(true);
+    setError('');
+    setMessage('');
+    setSelectedCampaignId(campaign.id);
+    document.querySelector('.common-queue-suggestions .campaign-area-map')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    try {
+      await post(`/campaigns/${campaign.id}/area`, { expected_version: campaign.version, center: campaign.center, radius_m: radiusM });
+      setData(current => current ? {
+        ...current,
+        campaigns: current.campaigns.map(item => item.id === campaign.id ? { ...item, radius_m: radiusM } : item),
+      } : current);
+      setAreaExpansion({ id: campaign.id, name: campaign.name, center: campaign.center,
+        fromRadiusM: campaign.radius_m, toRadiusM: radiusM, nonce: Date.now() });
+    } catch (cause) {
+      setError(messageOf(cause));
+      setBusy(false);
+      setRevision(value => value + 1);
+    }
+  }
+
+  function finishAreaExpansion() {
+    if (!areaExpansion) return;
+    setAreaExpansion(null);
+    setMessage(`Đã mở rộng vùng ${areaExpansion.name} đến ${km(areaExpansion.toRadiusM)} km và gắn các SOS trong vùng mới.`);
+    setCursor('');
+    setRevision(value => value + 1);
+    onChanged();
+    setBusy(false);
+  }
   const createAndActivate = (name: string, center: LatLng, radiusM: number, success: string) => run(async () => {
     const created = await post<{ id: string; version: number }>('/campaigns', {
       name, center: { lat: center.latitude, lng: center.longitude }, radius_m: radiusM,
@@ -300,6 +329,8 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
         </>}
         requests={selectedCampaignId ? campaignRequests : [...(data?.map_points ?? []), ...attachedPoints]}
         campaigns={data?.campaigns ?? []}
+        expansion={areaExpansion}
+        onExpansionComplete={finishAreaExpansion}
         selectedCampaignId={selectedCampaignId}
         onCampaignSelect={(id) => { cancelEdit(); setSelectedCampaignId(id); }}
         onCampaignEdit={(id) => { setSelectedCampaignId(id); startAdjust(id); }}

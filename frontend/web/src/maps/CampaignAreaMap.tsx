@@ -56,6 +56,15 @@ export type AreaEditor = {
   onChange: (center: { lat: number; lng: number }, radiusM: number) => void;
 };
 
+export type AreaExpansion = {
+  id: string;
+  name: string;
+  center: { lat: number; lng: number };
+  fromRadiusM: number;
+  toRadiusM: number;
+  nonce: number;
+};
+
 const RADIUS_MIN_M = 500;
 const RADIUS_MAX_M = 300_000;
 const clampRadius = (radius: number, range?: { min: number; max: number }) =>
@@ -81,6 +90,8 @@ export function CampaignAreaMap({
   editActions,
   overlay,
   focusRequestId,
+  expansion,
+  onExpansionComplete,
   note,
   alert,
   height = 380,
@@ -100,6 +111,9 @@ export function CampaignAreaMap({
   note?: ReactNode;
   /** Pan/zoom to one SOS marker and pulse it; a new `nonce` re-triggers the focus. */
   focusRequestId?: { id: string; nonce: number } | null;
+  /** Animate a saved campaign area from its previous radius after the server confirms expansion. */
+  expansion?: AreaExpansion | null;
+  onExpansionComplete?: () => void;
   alert?: ReactNode;
   height?: number | string;
   ariaLabel?: string;
@@ -108,6 +122,7 @@ export function CampaignAreaMap({
   const mapRef = useRef<L.Map | null>(null);
   const layerRef = useRef<L.LayerGroup | null>(null);
   const editLayerRef = useRef<L.LayerGroup | null>(null);
+  const expansionLayerRef = useRef<L.LayerGroup | null>(null);
   const boundsRef = useRef<L.LatLngTuple[]>([]);
   const selectRef = useRef(onSelect);
   selectRef.current = onSelect;
@@ -117,6 +132,8 @@ export function CampaignAreaMap({
   campaignSelectRef.current = onCampaignSelect;
   const campaignEditRef = useRef(onCampaignEdit);
   campaignEditRef.current = onCampaignEdit;
+  const expansionCompleteRef = useRef(onExpansionComplete);
+  expansionCompleteRef.current = onExpansionComplete;
   const focusedRef = useRef(false);
   const markersRef = useRef(new Map<string, L.CircleMarker>());
   const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
@@ -133,6 +150,7 @@ export function CampaignAreaMap({
     setMapInstance(map);
     layerRef.current = L.layerGroup().addTo(map);
     editLayerRef.current = L.layerGroup().addTo(map);
+    expansionLayerRef.current = L.layerGroup().addTo(map);
     map.on('click', (event: L.LeafletMouseEvent) => {
       const current = editorRef.current;
       if (!current) return;
@@ -154,10 +172,12 @@ export function CampaignAreaMap({
       mapRef.current = null;
       layerRef.current = null;
       editLayerRef.current = null;
+      expansionLayerRef.current = null;
     };
   }, []);
 
   const hideId = editor?.hideCampaignId;
+  const expandingId = expansion?.id;
   const editing = Boolean(editor);
   const centerLat = editor?.center?.lat;
   const centerLng = editor?.center?.lng;
@@ -203,7 +223,7 @@ export function CampaignAreaMap({
     markersRef.current.clear();
     const bounds: L.LatLngTuple[] = [];
     campaigns.forEach((campaign, index) => {
-      if (campaign.id === hideId) return;
+      if (campaign.id === hideId || campaign.id === expandingId) return;
       const active = campaign.status === 'ACTIVE';
       const color = areaColor(index);
       L.circle([campaign.center.lat, campaign.center.lng], {
@@ -264,7 +284,7 @@ export function CampaignAreaMap({
     boundsRef.current = bounds;
     map.invalidateSize();
     if (bounds.length && !focusedRef.current) map.fitBounds(bounds, { padding: [24, 24], maxZoom: 12, animate: false });
-  }, [requests, campaigns, hideId]);
+  }, [requests, campaigns, hideId, expandingId]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -285,6 +305,44 @@ export function CampaignAreaMap({
     map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14, animate: false });
     containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [selectedCampaignId, campaigns]);
+
+  const expansionNonce = expansion?.nonce;
+  useEffect(() => {
+    const map = mapRef.current;
+    const layer = expansionLayerRef.current;
+    if (!map || !layer || !expansion) return;
+    layer.clearLayers();
+    const index = campaigns.findIndex(campaign => campaign.id === expansion.id);
+    const color = areaColor(Math.max(0, index));
+    const circle = L.circle([expansion.center.lat, expansion.center.lng], {
+      radius: expansion.fromRadiusM, color, weight: 3, fillColor: color, fillOpacity: 0.14,
+      className: 'campaign-area-circle campaign-area-circle--expanding', interactive: false,
+    }).addTo(layer);
+    map.invalidateSize();
+    map.stop();
+    map.fitBounds(L.circle([expansion.center.lat, expansion.center.lng], { radius: expansion.toRadiusM }).getBounds(),
+      { padding: [40, 40], maxZoom: 14, animate: false });
+    containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      circle.setRadius(expansion.toRadiusM);
+      expansionCompleteRef.current?.();
+      return () => layer.clearLayers();
+    }
+    let frame = 0;
+    let startedAt: number | null = null;
+    const tick = (now: number) => {
+      startedAt ??= now;
+      const progress = Math.min(1, (now - startedAt) / 2200);
+      const eased = 1 - (1 - progress) ** 3;
+      circle.setRadius(expansion.fromRadiusM + (expansion.toRadiusM - expansion.fromRadiusM) * eased);
+      if (progress < 1) frame = window.requestAnimationFrame(tick);
+      else expansionCompleteRef.current?.();
+    };
+    frame = window.requestAnimationFrame(tick);
+    return () => { window.cancelAnimationFrame(frame); layer.clearLayers(); };
+    // A new expansion command is the only reason to restart the animation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expansionNonce]);
 
   const focusNonce = focusRequestId?.nonce;
   const focusId = focusRequestId?.id;
@@ -323,6 +381,9 @@ export function CampaignAreaMap({
         {overlay && <div className="campaign-area-map__tools">{overlay}</div>}
         {note && <p className="campaign-area-map__note">{note}</p>}
         {alert && <div className="campaign-area-map__alert">{alert}</div>}
+        {expansion && <div className="campaign-area-map__expansion" role="status">
+          Đang mở rộng {expansion.name}: {(expansion.fromRadiusM / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} → {(expansion.toRadiusM / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} km
+        </div>}
         {editActions && <div className="campaign-area-map__confirm" role="group" aria-label="Xác nhận thay đổi vùng chiến dịch">
           <span>Áp dụng vòng vừa chỉnh?</span>
           <button type="button" className="campaign-area-map__accept" aria-label="Xác nhận vùng mới" title="Xác nhận vùng mới"
