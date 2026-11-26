@@ -7,9 +7,11 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
   Image,
   ScrollView,
+  Platform,
   Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -1674,8 +1676,14 @@ export const DonationScreen: React.FC = () => {
 
       {/* MODAL KHAI BÁO BÀN GIAO */}
       <Modal visible={!!selectedDrive} transparent={true} animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
+          <ScrollView
+            style={styles.inputModalSheet}
+            contentContainerStyle={styles.inputModalSheetContent}
+            keyboardShouldPersistTaps="always"
+            keyboardDismissMode="none"
+            showsVerticalScrollIndicator={false}
+          >
             <Text style={styles.modalTitle}>KHAI BÁO HÀNG ĐÃ BÀN GIAO</Text>
             <Text style={styles.modalSubtitle}>
               Khai báo số lượng thực tế bạn mang đến kho để đối chiếu kiểm đếm:
@@ -1858,14 +1866,20 @@ export const DonationScreen: React.FC = () => {
                 )}
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* MODAL MỞ KHIẾU NẠI KIỂM ĐẾM */}
       <Modal visible={showDisputeModal} transparent={true} animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
+          <ScrollView
+            style={styles.inputModalSheet}
+            contentContainerStyle={styles.inputModalSheetContent}
+            keyboardShouldPersistTaps="always"
+            keyboardDismissMode="none"
+            showsVerticalScrollIndicator={false}
+          >
             <Text style={[styles.modalTitle, { color: THEME.colors.warning.main }]}>
               KHIẾU NẠI KIỂM ĐẾM HIỆN VẬT
             </Text>
@@ -1917,8 +1931,8 @@ export const DonationScreen: React.FC = () => {
                 )}
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* MODAL BÁO CÁO MINH BẠCH QUYÊN GÓP */}
@@ -2693,6 +2707,16 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     padding: 20,
     maxHeight: '85%',
+  },
+  inputModalSheet: {
+    maxHeight: '92%',
+    backgroundColor: THEME.colors.surface.card,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  inputModalSheetContent: {
+    padding: 20,
+    paddingBottom: 28,
   },
   modalTitle: {
     fontSize: THEME.typography.fontSizes.base,

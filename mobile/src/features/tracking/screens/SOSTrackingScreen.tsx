@@ -6,13 +6,13 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Modal,
   Image,
   Platform,
   ScrollView,
   Linking,
   Switch,
-  KeyboardAvoidingView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { goBackOrHome } from '../../../navigation/back';
@@ -27,7 +27,7 @@ import { TimelineStep } from '../../../components/common/TimelineStep';
 import { LocationPickerModal } from '../../../components/common/LocationPickerModal';
 import { ResponseApi } from '../../../api/responseApi';
 import { generateUUID, PendingSupplementCommand, StorageService } from '../../../utils/secureStore';
-import { getApiErrorMessage, isApiErrorCode } from '../../../api/client';
+import { getApiErrorMessage, getApiFieldErrors, isApiErrorCode } from '../../../api/client';
 import { useAuthStore } from '../../../store/authStore';
 import {
   GeoLocation,
@@ -66,6 +66,21 @@ import {
 
 const MAX_EVIDENCE_FILES_PER_REQUEST = 5;
 type OptionalBooleanChoice = 'UNCHANGED' | 'YES' | 'NO';
+
+const REPORTER_UPDATE_FIELD_ALIASES: Record<string, string> = {
+  description: 'supplementError',
+  household_reference_note: 'supplementError',
+  people_affected: 'supplementError',
+  children_count: 'supplementError',
+  elderly_count: 'supplementError',
+  'location.coordinates': 'supplementError',
+  'location.accuracy_m': 'supplementError',
+  location: 'supplementError',
+  reporter_declared_danger: 'supplementError',
+  needs_rescue: 'supplementError',
+  needs_relief_supplies: 'supplementError',
+  body: 'supplementError',
+};
 
 function isUnverifiedRequestStatus(status: string): boolean {
   return status === 'SUBMITTED' || status === 'VERIFYING';
@@ -551,14 +566,18 @@ export const SOSTrackingScreen: React.FC = () => {
           : evidenceMessage;
       Alert.alert('Thành công', successMessage);
     } catch (err: any) {
-      if (isApiErrorCode(err, 'VERSION_CONFLICT')) {
+      const serverFieldErrors = getApiFieldErrors(err, REPORTER_UPDATE_FIELD_ALIASES);
+      const serverFieldMessage = serverFieldErrors.supplementError;
+      if (serverFieldMessage) setSupplementError(serverFieldMessage);
+
+      if (isApiErrorCode(err, 'VERSION_CONFLICT', 'VALIDATION_FAILED')) {
         try {
           await StorageService.clearPendingSupplement(data.id);
           setPendingSupplementCommand(null);
         } catch {
           // The state changes only after local cleanup succeeds.
         }
-        await fetchTrackingData();
+        if (isApiErrorCode(err, 'VERSION_CONFLICT')) await fetchTrackingData();
       }
       const localMessage = err instanceof Error && err.message === 'PENDING_SUPPLEMENT_MUST_BE_RESUMED'
         ? 'Có thông tin cập nhật trước đang chờ xác nhận. Hãy mở lại phần bổ sung và gửi nội dung đã lưu.'
@@ -569,7 +588,7 @@ export const SOSTrackingScreen: React.FC = () => {
             : isApiErrorCode(err, 'EVIDENCE_LIMIT_REACHED')
               ? `Hồ sơ đã đạt giới hạn ${MAX_EVIDENCE_FILES_PER_REQUEST} tệp bằng chứng.`
             : null;
-      const failureMessage = localMessage || getApiErrorMessage(err, 'Không thể gửi bổ sung thông tin.');
+      const failureMessage = localMessage || serverFieldMessage || getApiErrorMessage(err, 'Không thể gửi bổ sung thông tin.');
       if (updateSent || uploadedCount > 0) {
         await fetchTrackingData();
         const pendingCount = images.length - uploadedCount;
@@ -583,7 +602,7 @@ export const SOSTrackingScreen: React.FC = () => {
           updateSent ? 'Thông tin cập nhật đã được gửi' : 'Đã tải một phần bằng chứng',
           `${updateSent ? 'Thông tin cập nhật đã được gửi. ' : ''}${sentMessage}${pendingMessage} ${failureMessage}`
         );
-      } else {
+      } else if (!serverFieldMessage) {
         const retainedMessage = images.length > 0 ? ' Tệp đã chọn vẫn được giữ để bạn thử lại.' : '';
         Alert.alert('Lỗi', `${failureMessage}${retainedMessage}`);
       }
@@ -1020,14 +1039,12 @@ export const SOSTrackingScreen: React.FC = () => {
           onBack={() => setShowSupplementModal(false)}
           scrollable={false}
         >
-          <KeyboardAvoidingView
-            style={styles.supplementPage}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          >
+          <View style={styles.supplementPage}>
             <ScrollView
               style={styles.supplementFormScroll}
               contentContainerStyle={styles.supplementFormContent}
-              keyboardShouldPersistTaps="handled"
+              keyboardShouldPersistTaps="always"
+              keyboardDismissMode="none"
               showsVerticalScrollIndicator={false}
             >
               <View style={styles.formCard}>
@@ -1289,7 +1306,7 @@ export const SOSTrackingScreen: React.FC = () => {
                 </TouchableOpacity>
               </View>
             </View>
-          </KeyboardAvoidingView>
+          </View>
         </ScreenContainer>
       </Modal>
 
@@ -1318,8 +1335,14 @@ export const SOSTrackingScreen: React.FC = () => {
 
       {/* MODAL KHÔI PHỤC MÃ TRA CỨU */}
       <Modal visible={showRecoveryModal} transparent={true} animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
+          <ScrollView
+            style={styles.modalContent}
+            contentContainerStyle={styles.modalContentBody}
+            keyboardShouldPersistTaps="always"
+            keyboardDismissMode="none"
+            showsVerticalScrollIndicator={false}
+          >
             <Text style={styles.modalTitle}>GẮN HỒ SƠ SOS VÀO TÀI KHOẢN</Text>
             <Text style={styles.modalSubtitle}>
               Chỉ dùng mã một lần do điều phối viên cấp sau khi xác minh liên hệ để gắn hồ sơ chưa thuộc tài khoản này. Bạn vẫn có thể tra cứu tiến độ bằng mã tra cứu thông thường.
@@ -1403,8 +1426,8 @@ export const SOSTrackingScreen: React.FC = () => {
                 )}
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* MODAL XEM ẢNH HIỆN TRƯỜNG PHÓNG TO */}
@@ -1713,8 +1736,11 @@ const styles = StyleSheet.create({
     backgroundColor: THEME.colors.surface.card,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    padding: 20,
     maxHeight: '92%',
+  },
+  modalContentBody: {
+    padding: 20,
+    paddingBottom: 28,
   },
   modalTitle: {
     fontSize: THEME.typography.fontSizes.base,

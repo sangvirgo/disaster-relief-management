@@ -15,7 +15,7 @@ import type { Request, Response } from 'express';
 import { randomBytes } from 'node:crypto';
 import { AppError } from '@c48/technical/errors/errors';
 import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotency.interceptor';
-import { ChangePasswordDto, GoogleLinkDto, GoogleLoginDto, LoginDto, RefreshDto, RegisterDto, ResendEmailOtpDto, VerifyEmailDto } from './auth.dto';
+import { ChangePasswordDto, GoogleLinkDto, GoogleLoginDto, LoginDto, PasswordResetConfirmDto, PasswordResetRequestDto, RefreshDto, RegisterDto, ResendEmailOtpDto, VerifyEmailDto } from './auth.dto';
 import { AuthTransportGuard, IDENTITY_AUTH_CONFIG, IdentityRequest, IdentitySessionGuard } from './auth.guard';
 import { AuthService } from './auth.service';
 import { createCsrfToken, IdentityAuthConfig, parseCookies } from './auth-security';
@@ -115,6 +115,32 @@ export class AuthController {
   async resendEmailOtp(@Body() dto: ResendEmailOtpDto, @Req() request: Request, @Res({ passthrough: true }) response: Response): Promise<Record<string, unknown>> {
     cachePrivate(response);
     return this.authService.resendEmailOtp(dto.challenge_id, requestIp(request));
+  }
+
+  @Post('auth/password-reset/request')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @UseGuards(AuthTransportGuard)
+  @UseInterceptors(IdempotencyKeyInterceptor)
+  async requestPasswordReset(
+    @Body() dto: PasswordResetRequestDto,
+    @Req() request: IdentityRequest,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<{ challenge_id: string }> {
+    cachePrivate(response);
+    return this.authService.requestPasswordReset(dto, request.idempotencyKey!, requestIp(request));
+  }
+
+  @Post('auth/password-reset/confirm')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(AuthTransportGuard)
+  @UseInterceptors(IdempotencyKeyInterceptor)
+  async confirmPasswordReset(
+    @Body() dto: PasswordResetConfirmDto,
+    @Req() request: IdentityRequest,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<void> {
+    cachePrivate(response);
+    await this.authService.confirmPasswordReset(dto, request.idempotencyKey!, requestIp(request));
   }
 
   @Post('auth/google')

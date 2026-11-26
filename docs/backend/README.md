@@ -2,7 +2,9 @@
 
 Reliva runs three NestJS APIs: **Identity** owns accounts and permissions, **Response** owns SOS reports and rescue missions, and **Logistics** owns donations, stock, and distribution. Each service has its own PostgreSQL database. The APIs communicate over versioned REST contracts.
 
-> **Project status · 27 October 2026:** the backend review fixes and ten-minute pending-registration flow are implemented. Local builds, unit/script tests, OpenAPI and Compose checks passed under Node 24.15.0. The main Compose stack is running with healthy PostgreSQL, migrations, APIs, Web, and Nginx; the new Identity migration has applied. The MinIO Community `storage` profile (no license needed) is running; private bucket initialization and per-service S3 read/write/cross-bucket denial were checked. T5/T12/T15 API upload/download smokes are currently blocked before upload by Identity test-user registration returning HTTP 400 `VALIDATION_FAILED`; isolated recovery and live OTP flows remain open. This remains an academic prototype; coordinators retain authority over verification, priority, and dispatch.
+> **Project status · 26 November 2026:** Self-service password reset by email OTP is implemented for Web and Mobile. Its additive Identity migration and backend/Web images were applied through the main Compose stack without resetting data; all Compose services are healthy. The backend Docker build, OpenAPI export/check, and Web/Mobile TypeScript checks passed. The host Web Vite build hit Windows `spawn EPERM`, so the Web image was built and started in Compose. SMTP settings are present in the local environment; no live email was sent as part of verification. This remains an academic prototype; coordinators retain authority over verification, priority, and dispatch.
+
+> **Historical status · 27 October 2026:** The backend review fixes and ten-minute pending-registration flow were implemented. At that time, T5/T12/T15 API upload/download smokes were blocked before upload by Identity test-user registration returning HTTP 400 `VALIDATION_FAILED`; isolated recovery and live OTP flows remained open.
 
 ## Start a local demo
 
@@ -24,6 +26,8 @@ docker compose -p c48 --env-file .env -f infra/compose.yaml --profile seed up --
 Private evidence storage uses the optional `storage` profile, which builds MinIO Community from the upstream source tag (`backend/infra/minio/Dockerfile`). No license is needed; run `docker compose --env-file .env --profile storage up --build -d`.
 
 Existing databases need `AddPendingEmailRegistration1792953600001` through the declared `identity-migrate` job before the updated Identity API serves registration requests. The migration preserves active accounts and converts only unused legacy placeholders; review the [Identity lifecycle and rollback notes](02-identity-api.md) before applying it to an existing dataset.
+
+The additive `AddPasswordResetOtp1795651200000` migration adds the single-use reset challenge and encrypted mail outbox. It runs through the same `identity-migrate` job and does not reset existing databases or sessions. The public request response intentionally does not reveal whether an email matches an account. SMTP delivery uses the existing server-only `IDENTITY_EMAIL_SMTP_*` and `IDENTITY_EMAIL_FROM` values; `EMAIL_OTP_PEPPER` must remain stable while encrypted messages are queued. See the [Identity API guide](02-identity-api.md) for throttling, OTP lifetime, and session revocation behavior.
 
 Open **<http://127.0.0.1:8080>**. The public API paths are `/api/v1/identity`, `/api/v1/response`, and `/api/v1/logistics` on the same Nginx origin. Normal startup and seeding do not reset database volumes. Only use a documented reset command when intentionally discarding the primary demo database; MinIO data must be preserved.
 

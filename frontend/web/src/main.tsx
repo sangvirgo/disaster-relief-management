@@ -10,6 +10,8 @@ import {
   logout,
   me,
   register,
+  requestPasswordReset,
+  confirmPasswordReset,
   resendEmailOtp,
   roles,
   verifyEmail,
@@ -200,13 +202,14 @@ function AuthModal({
   onClose: () => void;
   onReady: (user: Me) => void;
 }) {
-  const [mode, setMode] = useState<'login' | 'register' | 'verify' | 'help'>('login');
+  const [mode, setMode] = useState<'login' | 'register' | 'verify' | 'reset-request' | 'reset-confirm'>('login');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [challengeId, setChallengeId] = useState('');
   const [otp, setOtp] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
   const googleButton = useRef<HTMLDivElement>(null);
   const authCard = useRef<HTMLDivElement>(null);
   const authCallbacks = useRef({ onReady, onClose });
@@ -222,10 +225,26 @@ function AuthModal({
   const [authAttempted, setAuthAttempted] = useState(false);
   function getAuthValidationErrors(): Record<string, string> {
     const invalid: Record<string, string> = {};
-    if (mode === 'verify') {
+    if (mode === 'verify' || mode === 'reset-confirm') {
       if (!otp.trim()) invalid.otp = 'Mã xác thực là bắt buộc.';
       else if (otp.length > 6 || !/^[0-9]{6}$/.test(otp.trim()))
         invalid.otp = 'Vui lòng nhập đúng mã xác thực gồm 6 chữ số.';
+      if (mode === 'verify') return invalid;
+    }
+    if (mode === 'reset-request') {
+      if (!email.trim()) invalid.email = 'Email là bắt buộc.';
+      else if (email.length > 254) invalid.email = 'Email không được vượt quá 254 ký tự.';
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
+        invalid.email = 'Vui lòng nhập địa chỉ email hợp lệ.';
+      return invalid;
+    }
+    if (mode === 'reset-confirm') {
+      if (!password) invalid.password = 'Mật khẩu mới là bắt buộc.';
+      else if (password.length < 10) invalid.password = 'Mật khẩu mới cần ít nhất 10 ký tự.';
+      else if (password.length > 256) invalid.password = 'Mật khẩu mới không được vượt quá 256 ký tự.';
+      else if (commonPasswords.has(password.toLowerCase())) invalid.password = 'Mật khẩu quá phổ biến. Hãy chọn mật khẩu khó đoán hơn.';
+      if (!passwordConfirm) invalid.password_confirm = 'Vui lòng nhập lại mật khẩu mới.';
+      else if (passwordConfirm !== password) invalid.password_confirm = 'Mật khẩu xác nhận chưa khớp.';
       return invalid;
     }
     if (mode === 'register') {
@@ -252,8 +271,10 @@ function AuthModal({
   }
   const authValidationErrors = getAuthValidationErrors();
   const activeAuthFields = mode === 'verify' ? ['otp']
-    : mode === 'register' ? ['email', 'display_name', 'username', 'password']
-      : ['username', 'password'];
+    : mode === 'reset-request' ? ['email']
+      : mode === 'reset-confirm' ? ['otp', 'password', 'password_confirm']
+        : mode === 'register' ? ['email', 'display_name', 'username', 'password']
+          : ['username', 'password'];
   const hasAuthErrors = activeAuthFields.some((field) => Boolean(authErrors[field] || authValidationErrors[field]));
   function authErrorFor(field: string, value: string) {
     return authErrors[field] || ((authAttempted || authTouched[field] || Boolean(value)) ? authValidationErrors[field] : '');
@@ -264,6 +285,9 @@ function AuthModal({
     if (!isOpen) {
       setMode('login');
       setPassword('');
+      setPasswordConfirm('');
+      setOtp('');
+      setChallengeId('');
       setShowPassword(false);
       setMessage('');
       setAuthErrors({});
@@ -398,6 +422,25 @@ function AuthModal({
         setAuthTouched({});
         setAuthAttempted(false);
         setMessage('Email đã được xác thực. Bạn có thể đăng nhập.');
+      } else if (mode === 'reset-request') {
+        const result = await requestPasswordReset(email.trim());
+        setChallengeId(result.challenge_id);
+        setOtp('');
+        setPassword('');
+        setPasswordConfirm('');
+        setMode('reset-confirm');
+        setAuthTouched({});
+        setAuthAttempted(false);
+        setMessage('Nếu email này khớp với tài khoản Reliva đã xác thực và có mật khẩu Reliva, mã xác nhận sẽ được gửi đến hộp thư. Nếu tài khoản chỉ dùng Google để đăng nhập, hãy tiếp tục bằng Google. Mã có hiệu lực trong 5 phút.');
+      } else if (mode === 'reset-confirm') {
+        await confirmPasswordReset(challengeId, otp.trim(), password);
+        setMode('login');
+        setOtp('');
+        setPassword('');
+        setPasswordConfirm('');
+        setAuthTouched({});
+        setAuthAttempted(false);
+        setMessage('Mật khẩu đã được đặt lại. Vui lòng đăng nhập bằng mật khẩu mới.');
       } else {
         const loggedUser = await login(username.trim(), password);
         onReady(loggedUser);
@@ -411,6 +454,8 @@ function AuthModal({
         setAuthErrors({ username: 'Tên đăng nhập đã được sử dụng.' });
       } else if (mode === 'register' && error instanceof ApiError && error.code === 'EMAIL_TAKEN') {
         setAuthErrors({ email: 'Địa chỉ email đã được sử dụng.' });
+      } else if (mode === 'reset-confirm' && error instanceof ApiError && error.code === 'PASSWORD_WEAK') {
+        setAuthErrors({ password: 'Mật khẩu cần từ 10 ký tự, khác tên đăng nhập và không phổ biến.' });
       } else if (error instanceof ApiError && Object.keys(error.fieldErrors).length) {
         setAuthErrors(
           Object.fromEntries(
@@ -448,23 +493,25 @@ function AuthModal({
               ? 'Tạo tài khoản'
               : mode === 'verify'
                 ? 'Xác thực email'
-                : 'Hỗ trợ mật khẩu'}
+                : mode === 'reset-request'
+                  ? 'Quên mật khẩu'
+                  : 'Đặt lại mật khẩu'}
         </h2>
-        {mode === 'help' && (
+        {(mode === 'reset-request' || mode === 'reset-confirm') && (
           <p className="modal-desc">
-            Nếu quên mật khẩu, hãy liên hệ quản trị viên của hệ thống để xác minh tài khoản và cấp
-            mật khẩu tạm. Sau khi đăng nhập, bạn phải đổi mật khẩu tạm.
+            {mode === 'reset-request'
+              ? 'Nhập email đã xác minh với tài khoản Reliva có mật khẩu Reliva. Nếu bạn chỉ dùng Google để đăng nhập, hãy tiếp tục bằng Google. Hệ thống vẫn hiển thị cùng một thông báo để bảo vệ thông tin tài khoản.'
+              : 'Nhập mã đã gửi đến email để tạo mật khẩu Reliva. Nếu tài khoản chỉ đăng nhập Google, hãy quay lại và chọn đăng nhập Google. Mã chỉ có hiệu lực trong 5 phút.'}
           </p>
         )}
-        {mode !== 'help' && (
-          <form onSubmit={submit} noValidate className="form-stack">
-            {mode === 'register' && (
+        <form onSubmit={submit} noValidate className="form-stack">
+            {(mode === 'register' || mode === 'reset-request') && (
               <label className="auth-field">
-                <span>Email nhận mã xác thực <span className="required-mark" aria-hidden="true">*</span></span>
+                  <span>{mode === 'register' ? 'Email nhận mã xác thực' : 'Email tài khoản'} <span className="required-mark" aria-hidden="true">*</span></span>
                 <input
                   required
                   type="email"
-                  maxLength={255}
+                  maxLength={254}
                   aria-invalid={Boolean(authErrorFor('email', email))}
                   value={email}
                   onChange={(e) => {
@@ -479,18 +526,18 @@ function AuthModal({
                 {authErrorFor('email', email) && <small className="field-error" role="alert">{authErrorFor('email', email)}</small>}
               </label>
             )}
-            {mode === 'verify' && (
+            {(mode === 'verify' || mode === 'reset-confirm') && (
               <label className="auth-field">
-                <span>Mã xác thực 6 chữ số <span className="required-mark" aria-hidden="true">*</span></span>
+                <span>{mode === 'verify' ? 'Mã xác thực 6 chữ số' : 'Mã xác nhận đặt lại mật khẩu'} <span className="required-mark" aria-hidden="true">*</span></span>
                 <input
                   required
                   inputMode="numeric"
                   pattern="[0-9]{6}"
-                  maxLength={7}
+                  maxLength={6}
                   aria-invalid={Boolean(authErrorFor('otp', otp))}
                   value={otp}
                   onChange={(e) => {
-                    setOtp(e.target.value.replace(/\D/g, '').slice(0, 7));
+                    setOtp(e.target.value.replace(/\D/g, '').slice(0, 6));
                     setAuthErrors((current) => ({ ...current, otp: '' }));
                     setAuthTouched((current) => ({ ...current, otp: true }));
                   }}
@@ -500,7 +547,7 @@ function AuthModal({
                 {authErrorFor('otp', otp) && <small className="field-error" role="alert">{authErrorFor('otp', otp)}</small>}
               </label>
             )}
-            {mode !== 'verify' && (
+            {(mode === 'login' || mode === 'register') && (
               <>
                 {mode === 'register' && (
                   <label className="auth-field">
@@ -546,14 +593,14 @@ function AuthModal({
                 </label>
               </>
             )}
-            {mode !== 'verify' && (
+            {(mode === 'login' || mode === 'register' || mode === 'reset-confirm') && (
               <label className="auth-field">
-                <span>Mật khẩu <span className="required-mark" aria-hidden="true">*</span></span>
+                <span>{mode === 'reset-confirm' ? 'Mật khẩu mới' : 'Mật khẩu'} <span className="required-mark" aria-hidden="true">*</span></span>
                 <span className="auth-password-field">
                   <input
                     required
                     type={showPassword ? 'text' : 'password'}
-                    minLength={mode === 'register' ? 10 : undefined}
+                    minLength={mode === 'register' || mode === 'reset-confirm' ? 10 : undefined}
                     maxLength={257}
                     aria-invalid={Boolean(authErrorFor('password', password))}
                     value={password}
@@ -564,7 +611,7 @@ function AuthModal({
                     }}
                     onBlur={() => setAuthTouched((current) => ({ ...current, password: true }))}
                     autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                    placeholder={mode === 'register' ? 'Tối thiểu 10 ký tự' : 'Nhập mật khẩu'}
+                    placeholder={mode === 'register' || mode === 'reset-confirm' ? 'Tối thiểu 10 ký tự' : 'Nhập mật khẩu'}
                   />
                   <PasswordVisibilityButton visible={showPassword} length={password.length} onToggle={() => setShowPassword((value) => !value)} />
                 </span>
@@ -573,10 +620,34 @@ function AuthModal({
                 )}
               </label>
             )}
+            {mode === 'reset-confirm' && (
+              <label className="auth-field">
+                <span>Nhập lại mật khẩu mới <span className="required-mark" aria-hidden="true">*</span></span>
+                <input
+                  required
+                  type="password"
+                  minLength={10}
+                  maxLength={256}
+                  aria-invalid={Boolean(authErrorFor('password_confirm', passwordConfirm))}
+                  value={passwordConfirm}
+                  onChange={(e) => {
+                    setPasswordConfirm(e.target.value);
+                    setAuthErrors((current) => ({ ...current, password_confirm: '' }));
+                    setAuthTouched((current) => ({ ...current, password_confirm: true }));
+                  }}
+                  onBlur={() => setAuthTouched((current) => ({ ...current, password_confirm: true }))}
+                  autoComplete="new-password"
+                  placeholder="Nhập lại mật khẩu mới"
+                />
+                {authErrorFor('password_confirm', passwordConfirm) && (
+                  <small className="field-error" role="alert">{authErrorFor('password_confirm', passwordConfirm)}</small>
+                )}
+              </label>
+            )}
             {message && (
               <p
-                role={/thành công|đã được xác thực|đã gửi/i.test(message) ? 'status' : 'alert'}
-                className={`notice ${/thành công|đã được xác thực|đã gửi/i.test(message) ? 'success' : 'error'}`}
+                role={/thành công|đã được xác thực|đã gửi|Nếu email này khớp/i.test(message) ? 'status' : 'alert'}
+                className={`notice ${/thành công|đã được xác thực|đã gửi|Nếu email này khớp/i.test(message) ? 'success' : 'error'}`}
               >
                 {message}
               </p>
@@ -588,7 +659,11 @@ function AuthModal({
                   ? 'Đăng nhập'
                   : mode === 'verify'
                     ? 'Xác thực email'
-                    : 'Tạo tài khoản'}
+                  : mode === 'reset-request'
+                    ? 'Gửi mã xác nhận'
+                    : mode === 'reset-confirm'
+                      ? 'Đặt lại mật khẩu'
+                      : 'Tạo tài khoản'}
             </button>
             {mode === 'verify' && (
               <button
@@ -613,8 +688,24 @@ function AuthModal({
                 Gửi lại mã xác thực
               </button>
             )}
+            {mode === 'reset-confirm' && (
+              <button
+                type="button"
+                className="text-button"
+                disabled={busy}
+                onClick={() => {
+                  setMode('reset-request');
+                  setOtp('');
+                  setMessage('');
+                  setAuthErrors({});
+                  setAuthTouched({});
+                  setAuthAttempted(false);
+                }}
+              >
+                Dùng email khác hoặc yêu cầu mã mới
+              </button>
+            )}
           </form>
-        )}
         {mode === 'login' && googleClientId && (
           <div className="google-auth-wrap">
             <span className="auth-divider">hoặc tiếp tục với</span>
@@ -633,9 +724,16 @@ function AuthModal({
               type="button"
               className="text-button"
               onClick={() => {
-                setMode('help');
+                setMode('reset-request');
+                setPassword('');
+                setPasswordConfirm('');
+                setOtp('');
+                setChallengeId('');
                 setShowPassword(false);
                 setMessage('');
+                setAuthErrors({});
+                setAuthTouched({});
+                setAuthAttempted(false);
               }}
             >
               Quên mật khẩu?
@@ -648,6 +746,9 @@ function AuthModal({
               setMode(mode === 'login' ? 'register' : 'login');
               setUsername('');
               setPassword('');
+              setPasswordConfirm('');
+              setOtp('');
+              setChallengeId('');
               setShowPassword(false);
               setMessage('');
               setAuthErrors({});

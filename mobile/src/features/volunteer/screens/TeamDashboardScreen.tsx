@@ -7,6 +7,8 @@ import {
   Switch,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   Modal,
 } from 'react-native';
@@ -20,7 +22,7 @@ import { TeamMembersSection } from '../components/TeamMembersSection';
 import { useAuthStore } from '../../../store/authStore';
 import { useLocation } from '../../../hooks/useLocation';
 import { ResponseApi } from '../../../api/responseApi';
-import { getApiErrorMessage, isApiErrorCode } from '../../../api/client';
+import { getApiErrorMessage, getApiFieldErrors, isApiErrorCode } from '../../../api/client';
 import { GeoLocation, RescueTeamDetail, Mission, TeamSkillOption } from '../../../types/api';
 import { THEME } from '../../../constants/theme';
 import { reverseGeocodeCoordinates } from '../../../utils/locationGeocoding';
@@ -371,7 +373,8 @@ export const TeamDashboardScreen: React.FC = () => {
         setShowTeamProfileModal(false);
         Alert.alert('Hồ sơ đội đã thay đổi', 'Dữ liệu mới đã được tải. Hãy mở lại phần chỉnh sửa trước khi lưu.');
       } else {
-        setTeamProfileError(getApiErrorMessage(err, 'Không thể cập nhật hồ sơ đội.'));
+        const fieldErrors = getApiFieldErrors(err, { name: 'teamProfile', skill_codes: 'teamProfile' });
+        setTeamProfileError(Object.values(fieldErrors).join(' ') || getApiErrorMessage(err, 'Không thể cập nhật hồ sơ đội.'));
       }
     } finally {
       setIsSavingTeamProfile(false);
@@ -861,14 +864,20 @@ export const TeamDashboardScreen: React.FC = () => {
 
       <Modal visible={showTeamProfileModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.profileModalBox}>
+          <KeyboardAvoidingView style={styles.profileModalBox} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
             <View style={styles.modalHeaderRow}>
               <Text style={styles.modalTitle}>Chỉnh sửa hồ sơ đội</Text>
               <TouchableOpacity onPress={() => setShowTeamProfileModal(false)} disabled={isSavingTeamProfile}>
                 <X size={20} color={THEME.colors.text.muted} />
               </TouchableOpacity>
             </View>
-            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <ScrollView
+              style={styles.profileFormScroll}
+              contentContainerStyle={styles.profileFormContent}
+              keyboardShouldPersistTaps="always"
+              keyboardDismissMode="none"
+              showsVerticalScrollIndicator={false}
+            >
               <CompactTextInput
                 label="Tên đội cứu hộ"
                 required
@@ -927,7 +936,7 @@ export const TeamDashboardScreen: React.FC = () => {
                 </TouchableOpacity>
               </View>
             </ScrollView>
-          </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
       <LocationPickerModal
@@ -1483,10 +1492,18 @@ const styles = StyleSheet.create({
   profileModalBox: {
     width: '100%',
     maxHeight: '88%',
+    flexShrink: 1,
     backgroundColor: THEME.colors.surface.card,
     borderRadius: 16,
     padding: 20,
     ...THEME.shadows.md,
+  },
+  profileFormScroll: {
+    flexShrink: 1,
+    minHeight: 0,
+  },
+  profileFormContent: {
+    paddingBottom: 8,
   },
   modalHeaderRow: {
     flexDirection: 'row',

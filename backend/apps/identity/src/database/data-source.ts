@@ -10,5 +10,6 @@ import { RemoveOrganizationIdentity1794787200000 } from './migrations/RemoveOrga
 import { AddCampaignCoordinatorRole1794960000000 } from './migrations/AddCampaignCoordinatorRole1794960000000';
 import { RetireLegacyStaffRoles1795046400000 } from './migrations/RetireLegacyStaffRoles1795046400000';
 import { RetireCampaignCoordinatorRole1795132800000 } from './migrations/RetireCampaignCoordinatorRole1795132800000';
+import { AddPasswordResetOtp1795651200000 } from './migrations/AddPasswordResetOtp1795651200000';
 
-export default new DataSource(postgresOptions([InitialIdentity1710000000000, AddAuthEmailOtpGoogle1792953600000, AddPendingEmailRegistration1792953600001, GrantExternalIdentitySelect1794144543000, RemoveRegionScope1794700800000, RemoveOrganizationIdentity1794787200000, AddCampaignCoordinatorRole1794960000000, RetireLegacyStaffRoles1795046400000, RetireCampaignCoordinatorRole1795132800000], 'identity'));
+export default new DataSource(postgresOptions([InitialIdentity1710000000000, AddAuthEmailOtpGoogle1792953600000, AddPendingEmailRegistration1792953600001, GrantExternalIdentitySelect1794144543000, RemoveRegionScope1794700800000, RemoveOrganizationIdentity1794787200000, AddCampaignCoordinatorRole1794960000000, RetireLegacyStaffRoles1795046400000, RetireCampaignCoordinatorRole1795132800000, AddPasswordResetOtp1795651200000], 'identity'));

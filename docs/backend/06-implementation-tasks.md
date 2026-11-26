@@ -79,3 +79,11 @@ Client, AI research, SRS/SDD, schedule and demo deliverables remain in the full 
 Automatic steps must write a SYSTEM event naming the rule; they never replace human verification, priority, rescue dispatch or the resolve command.
 
 T0-S additionally follows 01 §9 (column and index cleanup, receipt-independence trigger, review-uniqueness indexes); its exit gate is §9.4.
+
+## T20 — Self-service password reset (2026-11-26)
+
+This user-directed implementation extends the credential-recovery behavior under FR-IAM-01. It uses existing security and localization invariants NFR-SEC-02 and NFR-L10N-01 and reuses TC-BE-20 / TC-L10N-01 coverage; it does not add a new source requirement.
+
+| Task | Depends | Deliverables | Exit evidence |
+|---|---|---|---|
+| T20 | T2, T19 | Identity request/confirm endpoints; additive challenge and encrypted-mail-outbox migration; generic request response for unknown/inactive/unverified/local-password accounts; `409 PASSWORD_RESET_GOOGLE_ONLY` for active verified Google-only accounts; five-minute, five-attempt, single-use OTP; Argon2id password update and revoke-all; Vietnamese email and Web/Mobile flows; OpenAPI and docs | Identity/Web/Mobile typechecks and build, OpenAPI contract check, then an authorized primary-stack smoke covering generic unknown/known responses, the Google-only message and unchanged email step, wrong/expired/replayed OTP, weak password, session revocation, and Vietnamese API/UI copy. SMTP delivery requires the existing server-only `IDENTITY_EMAIL_SMTP_*`, `IDENTITY_EMAIL_FROM`, and stable `EMAIL_OTP_PEPPER` configuration. |

@@ -44,13 +44,20 @@ export class MobileApiError extends Error {
   readonly code?: string;
   readonly status?: number;
   readonly correlationId?: string;
+  readonly fieldErrors?: Record<string, string | string[]>;
 
-  constructor(message: string, details: { code?: string; status?: number; correlationId?: string } = {}) {
+  constructor(message: string, details: {
+    code?: string;
+    status?: number;
+    correlationId?: string;
+    fieldErrors?: Record<string, string | string[]>;
+  } = {}) {
     super(message);
     this.name = 'MobileApiError';
     this.code = details.code;
     this.status = details.status;
     this.correlationId = details.correlationId;
+    this.fieldErrors = details.fieldErrors;
   }
 }
 
@@ -60,7 +67,9 @@ const codeMessages: Record<string, string> = {
   EMAIL_TAKEN: 'Email này đã được sử dụng. Vui lòng đăng nhập hoặc dùng địa chỉ email khác.',
   PASSWORD_WEAK: 'Mật khẩu chưa đủ mạnh. Vui lòng chọn mật khẩu khác theo yêu cầu.',
   EMAIL_OTP_INVALID: 'Mã xác minh không đúng, đã hết hạn hoặc đã được sử dụng. Hãy kiểm tra mã mới nhất trong email.',
-  EMAIL_OTP_UNAVAILABLE: 'Chưa thể gửi email xác minh. Vui lòng thử gửi lại mã sau.',
+  EMAIL_OTP_UNAVAILABLE: 'Dịch vụ gửi mã email tạm thời chưa sẵn sàng. Vui lòng thử lại sau.',
+  PASSWORD_RESET_CODE_INVALID: 'Mã đặt lại mật khẩu không hợp lệ hoặc đã hết hạn. Hãy kiểm tra email rồi thử lại.',
+  PASSWORD_RESET_GOOGLE_ONLY: 'Email này đang đăng nhập bằng Google. Hãy tiếp tục bằng Google.',
   REGISTRATION_EXPIRED: 'Yêu cầu đăng ký đã hết hạn. Vui lòng đăng ký lại để nhận mã mới.',
   INVALID_CREDENTIALS: 'Tên đăng nhập hoặc mật khẩu không chính xác.',
   RATE_LIMITED: 'Bạn thao tác quá nhanh. Vui lòng đợi một lát rồi thử lại.',
@@ -98,6 +107,51 @@ const codeMessages: Record<string, string> = {
   DECLARATION_LOCKED: 'Bản khai đã được chuyển sang kiểm đếm và không thể chỉnh sửa.',
 };
 
+const fieldErrorCodeMessages: Record<string, string> = {
+  COORDINATES_OUT_OF_RANGE: 'Vị trí ghim nằm ngoài phạm vi hợp lệ. Hãy kiểm tra lại vị trí trên bản đồ.',
+  PHONE_INVALID: 'Số điện thoại phải có từ 8 đến 15 chữ số.',
+  PEOPLE_AFFECTED_OUT_OF_RANGE: 'Số người bị ảnh hưởng phải là số nguyên từ 1 đến 10.000.',
+  VULNERABLE_COUNT_OUT_OF_RANGE: 'Số lượng trẻ em hoặc người cao tuổi chưa hợp lệ.',
+  VULNERABLE_COUNT_EXCEEDS_TOTAL: 'Tổng số trẻ em và người cao tuổi không được lớn hơn tổng số người bị ảnh hưởng.',
+  AT_LEAST_ONE_NEED_REQUIRED: 'Hãy chọn cần cứu hộ, cần hàng cứu trợ hoặc cả hai.',
+  ACCURACY_REQUIRED: 'Vị trí GPS cần có độ chính xác và thời điểm ghi nhận.',
+  CATEGORY_UNKNOWN: 'Loại sự cố không còn hợp lệ. Hãy chọn lại loại sự cố.',
+};
+
+function localizeFieldError(value: string): string {
+  if (value === 'VALIDATION_FAILED') return 'Thông tin tại mục này chưa hợp lệ. Vui lòng kiểm tra lại.';
+  if (fieldErrorCodeMessages[value]) return fieldErrorCodeMessages[value];
+  if (codeMessages[value]) return codeMessages[value];
+  // Error codes are stable machine values. Never show an unmapped code in the UI.
+  if (/^[A-Z][A-Z0-9_]*$/.test(value)) return 'Thông tin tại mục này chưa hợp lệ. Vui lòng kiểm tra lại.';
+  // The API contract requires human-readable field errors to be Vietnamese.
+  return value;
+}
+
+export function getApiFieldErrors(
+  error: unknown,
+  fieldAliases: Record<string, string>,
+): Record<string, string> {
+  if (!(error instanceof MobileApiError) || !error.fieldErrors) return {};
+
+  const mapped: Record<string, string[]> = {};
+  for (const [field, rawMessages] of Object.entries(error.fieldErrors)) {
+    const parentField = field.split('.')[0];
+    const target = fieldAliases[field] || fieldAliases[parentField];
+    if (!target) continue;
+
+    const messages = Array.isArray(rawMessages) ? rawMessages : [rawMessages];
+    const localized = messages.map(localizeFieldError).filter(Boolean);
+    if (localized.length > 0) {
+      mapped[target] = [...(mapped[target] || []), ...localized];
+    }
+  }
+
+  return Object.fromEntries(
+    Object.entries(mapped).map(([field, messages]) => [field, [...new Set(messages)].join(' ')]),
+  );
+}
+
 const statusMessages: Record<number, string> = {
   400: 'Thông tin gửi lên chưa hợp lệ. Vui lòng kiểm tra lại.',
   401: 'Phiên đăng nhập đã hết hạn hoặc thông tin xác thực chưa chính xác.',
@@ -133,6 +187,7 @@ export function formatApiError(error: unknown): MobileApiError {
     code,
     status,
     correlationId: envelope?.correlation_id,
+    fieldErrors: envelope?.field_errors,
   });
 }
 

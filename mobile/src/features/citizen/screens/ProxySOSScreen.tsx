@@ -24,7 +24,7 @@ import { useAuthStore } from '../../../store/authStore';
 import { INCIDENT_CATEGORIES, CONTACTABILITY_LABELS } from '../../../constants/labels';
 import { IncidentCategoryCode, CreateProxySOSPayload, GeoLocation } from '../../../types/api';
 import { ResponseApi } from '../../../api/responseApi';
-import { getApiErrorMessage, isApiErrorCode } from '../../../api/client';
+import { getApiErrorMessage, getApiFieldErrors, isApiErrorCode } from '../../../api/client';
 import { PendingProxySOSCommand, StorageService } from '../../../utils/secureStore';
 import { THEME } from '../../../constants/theme';
 import { isValidPhone, normalizePhone } from '../../../utils/formValidation';
@@ -55,6 +55,25 @@ const INCIDENT_CATEGORY_OPTIONS: SingleChoiceOption<IncidentCategoryCode>[] = IN
   label: INCIDENT_CATEGORIES[value]?.label || value,
   description: INCIDENT_CATEGORIES[value]?.desc,
 }));
+
+const PROXY_SOS_FIELD_ALIASES: Record<string, string> = {
+  'location.coordinates': 'location',
+  'location.accuracy_m': 'location',
+  location: 'location',
+  people_affected: 'peopleAffected',
+  children_count: 'vulnerableCounts',
+  elderly_count: 'vulnerableCounts',
+  needs_rescue: 'needs',
+  needs_relief_supplies: 'needs',
+  relief_items_text: 'reliefItemsText',
+  relationship: 'relationship',
+  information_source: 'informationSource',
+  last_known_situation_at: 'lastKnownSituationAt',
+  beneficiary_contact_phone: 'beneficiaryPhone',
+  'alternate_contact.name': 'alternateContactName',
+  'alternate_contact.phone': 'alternateContactPhone',
+  description: 'description',
+};
 
 const formatLocalSituationDate = (value: string): string => {
   const date = new Date(value);
@@ -388,6 +407,12 @@ export const ProxySOSScreen: React.FC = () => {
 
       setSubmissionSuccessCode(response.tracking_code);
     } catch (error: any) {
+      const serverFieldErrors = getApiFieldErrors(error, PROXY_SOS_FIELD_ALIASES);
+      const hasServerFieldErrors = Object.keys(serverFieldErrors).length > 0;
+      if (hasServerFieldErrors) {
+        setFormErrors((current) => ({ ...current, ...serverFieldErrors }));
+      }
+
       if (error instanceof Error && error.message === 'PENDING_COMMAND_TOO_LARGE') {
         Alert.alert('Bản gửi quá dài', 'Không thể lưu an toàn để bảo đảm gửi lại đúng một lần. Hãy rút gọn nội dung rồi thử lại.');
       } else if (error instanceof Error && error.message === 'PENDING_PROXY_SOS_MUST_BE_RESUMED') {
@@ -396,14 +421,16 @@ export const ProxySOSScreen: React.FC = () => {
         try {
           await StorageService.clearPendingProxySOS();
           setPendingCommand(null);
-          Alert.alert(
-            'Yêu cầu chưa được gửi',
-            'Hệ thống từ chối dữ liệu báo hộ đã lưu. Nội dung vẫn còn trên biểu mẫu để bạn chỉnh sửa rồi gửi lại.',
-          );
+          if (!hasServerFieldErrors) {
+            Alert.alert(
+              'Yêu cầu chưa được gửi',
+              'Hệ thống từ chối dữ liệu báo hộ đã lưu. Nội dung vẫn còn trên biểu mẫu để bạn chỉnh sửa rồi gửi lại.',
+            );
+          }
         } catch {
           Alert.alert('Lỗi gửi yêu cầu', getApiErrorMessage(error, 'Không thể gửi báo hộ.'));
         }
-      } else {
+      } else if (!hasServerFieldErrors) {
         Alert.alert('Lỗi gửi yêu cầu', getApiErrorMessage(error, 'Không thể gửi báo hộ. Nội dung và khóa lần gửi được giữ lại để thử lại an toàn.'));
       }
     } finally {

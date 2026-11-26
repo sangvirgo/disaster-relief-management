@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import argon2 from 'argon2';
-import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 import { OAuth2Client } from 'google-auth-library';
 import { DataSource, EntityManager } from 'typeorm';
 import { AppError } from '@c48/technical/errors/errors';
@@ -9,7 +9,7 @@ import { canonicalRequestHash, IdempotencyService, IdempotentResult } from '@c48
 import { JobRunner } from '@c48/technical/persistence/jobs';
 import { withDatabaseRetry } from '@c48/technical/persistence/postgres-errors';
 import { hashPurposeBoundSecret } from '@c48/technical/security/secret-hash';
-import { LoginDto, RegisterDto, ChangePasswordDto, GoogleLoginDto } from './auth.dto';
+import { LoginDto, RegisterDto, ChangePasswordDto, GoogleLoginDto, PasswordResetConfirmDto, PasswordResetRequestDto } from './auth.dto';
 import { IDENTITY_AUTH_CONFIG, AuthContext } from './auth.guard';
 import { IdentityAuthConfig, assertStrongPassword, issueAccessToken, WindowRateLimiter } from './auth-security';
 import { EmailSenderService } from './email-sender.service';
@@ -27,6 +27,26 @@ interface EmailRegistrationRow {
   code_expires_at: Date | string;
   last_sent_at: Date | string;
   confirmed_at: Date | string | null;
+}
+
+interface PasswordResetChallengeRow {
+  challenge_id: string;
+  user_id: string | null;
+  code_hash: string | null;
+  attempts: number;
+  expires_at: Date | string;
+  consumed_at: Date | string | null;
+  username?: string | null;
+  user_status?: string | null;
+}
+
+interface PasswordResetMailRow {
+  id: string;
+  challenge_id: string;
+  encrypted_payload: Buffer;
+  nonce: Buffer;
+  auth_tag: Buffer;
+  attempts: number;
 }
 
 interface UserRow {
@@ -72,6 +92,8 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AuthService.name);
   private readonly jobs: JobRunner;
   private stopCleanup?: () => void;
+  private stopPasswordResetMail?: () => void;
+  private passwordResetMailDispatchActive = false;
   private dummyPasswordHash = '';
   private readonly rateLimiter = new WindowRateLimiter();
   private activeArgonOperations = 0;
@@ -93,10 +115,25 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
         SELECT id FROM email_registration WHERE expires_at<=clock_timestamp()
         ORDER BY expires_at,id LIMIT 100 FOR UPDATE SKIP LOCKED
       ) DELETE FROM email_registration r USING expired WHERE r.id=expired.id`);
+      await manager.query(`WITH expired AS (
+        SELECT challenge_id FROM password_reset_challenge
+        WHERE expires_at<=clock_timestamp()-interval '24 hours'
+        ORDER BY expires_at,challenge_id LIMIT 100 FOR UPDATE SKIP LOCKED
+      ) DELETE FROM password_reset_challenge c USING expired WHERE c.challenge_id=expired.challenge_id`);
+    });
+    this.stopPasswordResetMail = this.jobs.schedule('identity.password-reset-mail.dispatch', 5_000, async () => {
+      if (this.passwordResetMailDispatchActive) return;
+      this.passwordResetMailDispatchActive = true;
+      void this.dispatchPasswordResetMail()
+        .catch(() => this.logger.warn('SCHEDULED_JOB_FAILED identity.password-reset-mail.dispatch'))
+        .finally(() => { this.passwordResetMailDispatchActive = false; });
     });
   }
 
-  onModuleDestroy(): void { this.stopCleanup?.(); }
+  onModuleDestroy(): void {
+    this.stopCleanup?.();
+    this.stopPasswordResetMail?.();
+  }
 
   async register(dto: RegisterDto, idempotencyKey: string, ip: string): Promise<IdempotentResult<{ user: { id: string; username: string; display_name: string }; verification: { challenge_id: string }; email_sent: boolean }>> {
     this.consumeRate(`register:${ip}`, 3, 60 * 60_000);
@@ -195,6 +232,167 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
     if (!outcome) return { challenge_id: null, email_sent: false };
     const emailSent = await this.emailSender?.sendVerificationCode(outcome.email, code) ?? false;
     return { challenge_id: nextId, email_sent: emailSent };
+  }
+
+  async requestPasswordReset(dto: PasswordResetRequestDto, idempotencyKey: string, ip: string): Promise<{ challenge_id: string }> {
+    if (!this.config.emailOtpPepper) throw new AppError('EMAIL_OTP_UNAVAILABLE', { status: 503 });
+    const email = dto.email.trim().normalize('NFC').toLowerCase();
+    const emailFingerprint = createHmac('sha256', this.config.emailOtpPepper)
+      .update('c48.password-reset-email-rate.v1\0').update(email).digest('hex');
+
+    const challengeId = randomUUID();
+    const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
+    const codeHash = this.passwordResetOtpHash(challengeId, code);
+    const result = await this.idempotency.execute<{ challenge_id: string }>(this.dataSource, {
+      scopeKey: 'anon:password-reset',
+      command: 'identity.auth.password-reset.request',
+      key: idempotencyKey,
+      requestHash: canonicalRequestHash({ email_fingerprint: emailFingerprint }),
+      execute: async (manager) => {
+        this.consumeRate(`password-reset-request:${ip}`, 30, 60 * 60_000);
+        this.consumeRate(`password-reset-email:${emailFingerprint}`, 5, 60 * 60_000);
+        const accounts = await manager.query(
+          `SELECT u.id,u.email,u.password_hash,
+                  EXISTS (SELECT 1 FROM external_identity e WHERE e.user_id=u.id AND e.provider='GOOGLE') AS google_linked
+             FROM app_user u
+            WHERE lower(u.email)=$1 AND u.status='ACTIVE' AND u.email_verified_at IS NOT NULL
+            LIMIT 1 FOR UPDATE OF u`, [email],
+        ) as Array<{ id: string; email: string; password_hash: string | null; google_linked: boolean }>;
+        const account = accounts[0];
+        if (account && !account.password_hash && account.google_linked) {
+          return { status: 409, value: { challenge_id: challengeId }, resource: { type: 'password_reset_google_only', id: challengeId } };
+        }
+        const eligibleAccount = account?.password_hash ? account : undefined;
+        if (eligibleAccount) {
+          await manager.query(
+            `UPDATE password_reset_challenge
+                SET consumed_at=clock_timestamp(),code_hash=NULL
+              WHERE user_id=$1 AND consumed_at IS NULL`, [eligibleAccount.id],
+          );
+          await manager.query(
+            `DELETE FROM identity_email_outbox o USING password_reset_challenge c
+              WHERE o.challenge_id=c.challenge_id AND c.user_id=$1`, [eligibleAccount.id],
+          );
+        }
+
+        await manager.query(
+          `INSERT INTO password_reset_challenge (challenge_id,user_id,code_hash,expires_at)
+           VALUES ($1,$2,$3,now()+interval '5 minutes')`,
+          [challengeId, eligibleAccount?.id ?? null, eligibleAccount ? codeHash : null],
+        );
+
+        if (eligibleAccount) {
+          const outboxId = randomUUID();
+          const encrypted = this.encryptPasswordResetMessage(outboxId, eligibleAccount.email, code);
+          await manager.query(
+            `INSERT INTO identity_email_outbox (id,challenge_id,encrypted_payload,nonce,auth_tag)
+             VALUES ($1,$2,$3,$4,$5)`,
+            [outboxId, challengeId, encrypted.payload, encrypted.nonce, encrypted.authTag],
+          );
+        }
+
+        return {
+          status: 202,
+          value: { challenge_id: challengeId },
+          resource: { type: 'password_reset_challenge', id: challengeId },
+        };
+      },
+      replay: async (_manager, resource, status) => {
+        if (status === 409) return { challenge_id: '' };
+        if (resource?.type !== 'password_reset_challenge') throw new AppError('INTERNAL_ERROR', { status: 500 });
+        return { challenge_id: resource.id };
+      },
+    });
+    if (result.status === 409) throw new AppError('PASSWORD_RESET_GOOGLE_ONLY', { status: 409 });
+    return result.value;
+  }
+
+  async confirmPasswordReset(dto: PasswordResetConfirmDto, idempotencyKey: string, ip: string): Promise<void> {
+    this.consumeRate(`password-reset-confirm:${ip}`, 10, 60_000);
+    if (!this.config.emailOtpPepper) throw new AppError('EMAIL_OTP_UNAVAILABLE', { status: 503 });
+
+    const challengeId = dto.challenge_id;
+    const codeHash = this.passwordResetOtpHash(challengeId, dto.code);
+    const candidates = await this.dataSource.query(
+      `SELECT r.challenge_id,r.user_id,r.code_hash,r.attempts,r.expires_at,r.consumed_at,
+              u.username,u.status AS user_status
+         FROM password_reset_challenge r
+         JOIN app_user u ON u.id=r.user_id
+        WHERE r.challenge_id=$1 AND r.consumed_at IS NULL AND r.expires_at>clock_timestamp() AND r.attempts<5
+          AND u.status='ACTIVE' AND u.email_verified_at IS NOT NULL AND u.password_hash IS NOT NULL`,
+      [challengeId],
+    ) as PasswordResetChallengeRow[];
+    const candidate = candidates[0];
+    const candidateHash = candidate?.code_hash ? Buffer.from(candidate.code_hash) : Buffer.alloc(0);
+    const suppliedHash = Buffer.from(codeHash);
+    const validOtp = Boolean(candidate?.user_id && candidate.user_status === 'ACTIVE'
+      && candidateHash.length === suppliedHash.length && timingSafeEqual(candidateHash, suppliedHash));
+
+    let nextPasswordHash: string | undefined;
+    if (validOtp) {
+      assertStrongPassword(dto.new_password, candidate?.username ?? '');
+      nextPasswordHash = await this.hashPassword(dto.new_password);
+    }
+
+    const codeBinding = hashPurposeBoundSecret(dto.code, 'identity-password-reset-code-idempotency', this.config.refreshPeppers, this.config.currentRefreshPepperVersion);
+    const passwordBinding = hashPurposeBoundSecret(dto.new_password, 'identity-password-reset-password-idempotency', this.config.refreshPeppers, this.config.currentRefreshPepperVersion);
+    const result = await this.idempotency.execute<void>(this.dataSource, {
+      scopeKey: `anon:password-reset:${challengeId}`,
+      command: 'identity.auth.password-reset.confirm',
+      key: idempotencyKey,
+      requestHash: canonicalRequestHash({ code_binding: codeBinding, password_binding: passwordBinding }),
+      execute: async (manager) => {
+        const rows = await manager.query(
+          `SELECT r.challenge_id,r.user_id,r.code_hash,r.attempts,r.expires_at,r.consumed_at,
+                  u.username,u.status AS user_status
+             FROM password_reset_challenge r
+             JOIN app_user u ON u.id=r.user_id
+            WHERE r.challenge_id=$1
+              AND u.status='ACTIVE' AND u.email_verified_at IS NOT NULL AND u.password_hash IS NOT NULL
+            FOR UPDATE OF r,u`, [challengeId],
+        ) as PasswordResetChallengeRow[];
+        const row = rows[0];
+        const expectedHash = row?.code_hash ? Buffer.from(row.code_hash) : Buffer.alloc(0);
+        const actualHash = Buffer.from(codeHash);
+        const usable = Boolean(row?.user_id && row.user_status === 'ACTIVE' && row.consumed_at === null
+          && new Date(row.expires_at).getTime() > Date.now() && Number(row.attempts) < 5
+          && expectedHash.length === actualHash.length && timingSafeEqual(expectedHash, actualHash));
+        if (!usable || !nextPasswordHash || !row?.user_id) {
+          if (row && row.consumed_at === null && row.code_hash && Number(row.attempts) < 5
+            && new Date(row.expires_at).getTime() > Date.now() && !usable) {
+            await manager.query('UPDATE password_reset_challenge SET attempts=attempts+1 WHERE challenge_id=$1', [challengeId]);
+          }
+          return { status: 400, value: undefined, resource: null };
+        }
+
+        const updated = await manager.query(
+          `UPDATE app_user
+              SET password_hash=$2,must_change_password=false,
+                  authz_version=authz_version+1,version=version+1
+            WHERE id=$1 AND status='ACTIVE'
+              AND email_verified_at IS NOT NULL AND password_hash IS NOT NULL
+            RETURNING id`,
+          [row.user_id, nextPasswordHash],
+        ) as Array<{ id: string }>;
+        if (!updated[0]) return { status: 400, value: undefined, resource: null };
+
+        await manager.query(
+          `UPDATE password_reset_challenge SET consumed_at=clock_timestamp(),code_hash=NULL
+            WHERE user_id=$1 AND consumed_at IS NULL`, [row.user_id],
+        );
+        await manager.query(
+          `DELETE FROM identity_email_outbox o USING password_reset_challenge c
+            WHERE o.challenge_id=c.challenge_id AND c.user_id=$1`, [row.user_id],
+        );
+        await manager.query(
+          `UPDATE session_family SET revoked_at=clock_timestamp(),revoke_reason='PASSWORD_RESET'
+            WHERE user_id=$1 AND revoked_at IS NULL`, [row.user_id],
+        );
+        return { status: 204, value: undefined, resource: null };
+      },
+      replay: async () => undefined,
+    });
+    if (result.status !== 204) throw new AppError('PASSWORD_RESET_CODE_INVALID', { status: 400 });
   }
 
   async login(dto: LoginDto, ip: string): Promise<IssuedSession> {
@@ -486,6 +684,105 @@ export class AuthService implements OnModuleInit, OnModuleDestroy {
   private emailOtpHash(challengeId: string, code: string): string {
     if (!this.config.emailOtpPepper) throw new AppError('EMAIL_OTP_UNAVAILABLE', { status: 503 });
     return createHmac('sha256', this.config.emailOtpPepper).update('c48.email-otp.v1\0').update(challengeId).update('\0').update(code).digest('hex');
+  }
+
+  private passwordResetOtpHash(challengeId: string, code: string): string {
+    if (!this.config.emailOtpPepper) throw new AppError('EMAIL_OTP_UNAVAILABLE', { status: 503 });
+    return createHmac('sha256', this.config.emailOtpPepper)
+      .update('c48.password-reset-otp.v1\0').update(challengeId).update('\0').update(code).digest('hex');
+  }
+
+  private passwordResetOutboxKey(): Buffer {
+    if (!this.config.emailOtpPepper) throw new AppError('EMAIL_OTP_UNAVAILABLE', { status: 503 });
+    return createHmac('sha256', this.config.emailOtpPepper).update('c48.password-reset-outbox-key.v1\0').digest();
+  }
+
+  private encryptPasswordResetMessage(id: string, email: string, code: string): { payload: Buffer; nonce: Buffer; authTag: Buffer } {
+    const nonce = randomBytes(12);
+    const cipher = createCipheriv('aes-256-gcm', this.passwordResetOutboxKey(), nonce);
+    cipher.setAAD(Buffer.from(id, 'utf8'));
+    const payload = Buffer.concat([
+      cipher.update(JSON.stringify({ email, code }), 'utf8'),
+      cipher.final(),
+    ]);
+    return { payload, nonce, authTag: cipher.getAuthTag() };
+  }
+
+  private decryptPasswordResetMessage(row: PasswordResetMailRow): { email: string; code: string } {
+    const decipher = createDecipheriv('aes-256-gcm', this.passwordResetOutboxKey(), row.nonce);
+    decipher.setAAD(Buffer.from(row.id, 'utf8'));
+    decipher.setAuthTag(row.auth_tag);
+    const plain = Buffer.concat([decipher.update(row.encrypted_payload), decipher.final()]).toString('utf8');
+    const message = JSON.parse(plain) as { email?: unknown; code?: unknown };
+    if (typeof message.email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(message.email)
+      || typeof message.code !== 'string' || !/^\d{6}$/u.test(message.code)) {
+      throw new TypeError('Invalid encrypted password-reset mail payload');
+    }
+    return { email: message.email, code: message.code };
+  }
+
+  private async dispatchPasswordResetMail(): Promise<void> {
+    if (!this.emailSender || !this.config.emailOtpPepper) return;
+    const claimed = await this.dataSource.transaction(async (manager) => {
+      const rows = await manager.query(
+        `SELECT o.id,o.challenge_id,o.encrypted_payload,o.nonce,o.auth_tag,o.attempts
+           FROM identity_email_outbox o
+           JOIN password_reset_challenge c ON c.challenge_id=o.challenge_id
+           JOIN app_user u ON u.id=c.user_id
+          WHERE o.available_at<=clock_timestamp()
+            AND (o.locked_until IS NULL OR o.locked_until<=clock_timestamp())
+            AND c.consumed_at IS NULL AND c.code_hash IS NOT NULL AND c.expires_at>clock_timestamp()
+            AND u.status='ACTIVE' AND u.email_verified_at IS NOT NULL AND u.password_hash IS NOT NULL
+          ORDER BY o.available_at,o.id
+          LIMIT 10 FOR UPDATE OF o SKIP LOCKED`,
+      ) as PasswordResetMailRow[];
+      for (const row of rows) {
+        await manager.query(
+          `UPDATE identity_email_outbox SET locked_until=clock_timestamp()+interval '60 seconds',attempts=attempts+1 WHERE id=$1`,
+          [row.id],
+        );
+        row.attempts = Number(row.attempts) + 1;
+      }
+      return rows;
+    });
+
+    for (const row of claimed) {
+      let message: { email: string; code: string };
+      try {
+        message = this.decryptPasswordResetMessage(row);
+      } catch {
+        await this.dataSource.query('DELETE FROM identity_email_outbox WHERE id=$1', [row.id]);
+        this.logger.warn('EMAIL_OUTBOX_DISCARD reason=DECRYPT_FAILED');
+        continue;
+      }
+
+      let sent = false;
+      try {
+        const active = await this.dataSource.query(
+          `SELECT 1 FROM password_reset_challenge c
+             JOIN app_user u ON u.id=c.user_id
+            WHERE c.challenge_id=$1 AND c.consumed_at IS NULL AND c.code_hash IS NOT NULL
+              AND c.expires_at>clock_timestamp() AND u.status='ACTIVE'
+              AND u.email_verified_at IS NOT NULL AND u.password_hash IS NOT NULL`,
+          [row.challenge_id],
+        ) as unknown[];
+        if (active.length) sent = await this.emailSender.sendPasswordResetCode(message.email, message.code);
+      } catch {
+        this.logger.warn('EMAIL_OUTBOX_DELIVERY_FAILED');
+      }
+
+      if (sent || row.attempts >= 5) {
+        await this.dataSource.query('DELETE FROM identity_email_outbox WHERE id=$1', [row.id]);
+      } else {
+        const retrySeconds = [10, 30, 60, 120][Math.min(row.attempts - 1, 3)];
+        await this.dataSource.query(
+          `UPDATE identity_email_outbox
+              SET locked_until=NULL,available_at=clock_timestamp()+($2::text || ' seconds')::interval
+            WHERE id=$1`,
+          [row.id, retrySeconds],
+        );
+      }
+    }
   }
 
   private issueSession(user: UserRow, familyId: string, clientKind: 'WEB' | 'NATIVE', refreshToken: string, absoluteExpiresAt: Date): IssuedSession {

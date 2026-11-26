@@ -449,7 +449,10 @@ export function writeOpenApiSnapshotIfValid(snapshotPath, currentRaw, current, e
   const errors = validateOpenApi(exported, routes, service);
   if (errors.length) return errors;
 
-  const content = currentRaw ? mergeOpenApiText(currentRaw, current, exported) : `${JSON.stringify(exported, null, 2)}\n`;
+  const merged = currentRaw ? mergeOpenApiText(currentRaw, current, exported) : JSON.stringify(exported);
+  const mergedDocument = JSON.parse(merged);
+  const hasSemanticChanges = !currentRaw || !isDeepStrictEqual(current, mergedDocument);
+  const content = currentRaw && !hasSemanticChanges ? currentRaw : `${JSON.stringify(mergedDocument, null, 2)}\n`;
   fs.writeFileSync(snapshotPath, content);
   return errors;
 }

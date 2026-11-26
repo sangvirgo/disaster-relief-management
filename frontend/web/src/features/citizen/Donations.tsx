@@ -1030,27 +1030,58 @@ export function Donations({ user }: { user: Me | null }) {
                   {(declarationAttempted || declarationTouched.donorPhone) && declarationErrors.donorPhone && <small className="field-error" role="alert">{declarationErrors.donorPhone}</small>}
                 </label>
               </div>
-              {selected.items.map((item) => (
-                <label key={item.item_id}>
-                  {item.item_name} · {item.unit_name}
-                  <input
-                    type="number"
-                    min="0"
-                    step={item.scale ? 1 / 10 ** item.scale : 1}
-                    aria-invalid={Boolean((declarationAttempted || declarationTouched[`quantity:${item.item_id}`]) && declarationErrors[`quantity:${item.item_id}`])}
-                    value={quantities[item.item_id] || ''}
-                    onChange={(e) => {
-                      setQuantities({ ...quantities, [item.item_id]: e.target.value });
-                      setDeclarationTouched((current) => ({ ...current, [`quantity:${item.item_id}`]: true }));
-                      pending.current = null;
-                    }}
-                    onBlur={() => setDeclarationTouched((current) => ({ ...current, [`quantity:${item.item_id}`]: true }))}
-                    placeholder="Số lượng dự kiến bàn giao"
-                  />
-                  {(declarationAttempted || declarationTouched[`quantity:${item.item_id}`]) && declarationErrors[`quantity:${item.item_id}`] && <small className="field-error" role="alert">{declarationErrors[`quantity:${item.item_id}`]}</small>}
-                  {selected.items[0]?.item_id === item.item_id && (declarationAttempted || Object.keys(declarationTouched).some((field) => field.startsWith('quantity:'))) && !hasPositiveQuantity && <small className="field-error" role="alert">Số lượng của ít nhất một vật phẩm là bắt buộc.</small>}
-                </label>
-              ))}
+              <div className="donation-declaration-items">
+                {selected.items.map((item) => {
+                  const compatible = quantityFitsScale(item.target_quantity, item.scale) && quantityFitsScale(item.accepted_total, item.scale);
+                  const remaining = compatible ? remainingQuantity(item.target_quantity, item.accepted_total) : null;
+                  const quantityError = declarationErrors[`quantity:${item.item_id}`];
+                  const showQuantityError = (declarationAttempted || declarationTouched[`quantity:${item.item_id}`]) && quantityError;
+                  return (
+                    <div className="donation-declaration-item" key={item.item_id}>
+                      <div className="donation-declaration-item-info">
+                        <strong>{item.item_name}</strong>
+                        {compatible && remaining !== null ? (
+                          <div className="donation-declaration-stats" id={`declaration-progress-${item.item_id}`}>
+                            <span><span>Mục tiêu</span><strong>{formatQuantity(item.target_quantity)} {item.unit_name}</strong></span>
+                            <span><span>Đã nhập kho</span><strong>{formatQuantity(item.accepted_total)} {item.unit_name}</strong></span>
+                            <span>
+                              <span>{remaining === '0' ? 'Tiến độ' : 'Còn cần'}</span>
+                              <strong className={remaining === '0' ? 'is-complete' : 'is-remaining'}>
+                                {remaining === '0' ? 'Đã đủ' : `${formatQuantity(remaining)} ${item.unit_name}`}
+                              </strong>
+                            </span>
+                          </div>
+                        ) : (
+                          <small className="donation-declaration-progress-unavailable">
+                            Chưa xác định được số lượng còn cần; vui lòng xác nhận với điểm tiếp nhận.
+                          </small>
+                        )}
+                        {item.acceptance_note && <small>{item.acceptance_note}</small>}
+                      </div>
+                      <label className="donation-declaration-quantity">
+                        <span>Số lượng dự kiến ({item.unit_name})</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step={item.scale ? 1 / 10 ** item.scale : 1}
+                          aria-describedby={compatible && remaining !== null ? `declaration-progress-${item.item_id}` : undefined}
+                          aria-invalid={Boolean((declarationAttempted || declarationTouched[`quantity:${item.item_id}`]) && quantityError)}
+                          value={quantities[item.item_id] || ''}
+                          onChange={(e) => {
+                            setQuantities({ ...quantities, [item.item_id]: e.target.value });
+                            setDeclarationTouched((current) => ({ ...current, [`quantity:${item.item_id}`]: true }));
+                            pending.current = null;
+                          }}
+                          onBlur={() => setDeclarationTouched((current) => ({ ...current, [`quantity:${item.item_id}`]: true }))}
+                          placeholder="Nhập số lượng"
+                        />
+                      </label>
+                      {showQuantityError && <small className="field-error" role="alert">{quantityError}</small>}
+                    </div>
+                  );
+                })}
+              </div>
+              {selected.items[0] && (declarationAttempted || Object.keys(declarationTouched).some((field) => field.startsWith('quantity:'))) && !hasPositiveQuantity && <small className="field-error" role="alert">Số lượng của ít nhất một vật phẩm là bắt buộc.</small>}
               <p className="notice">
                 Bản khai chỉ ghi số dự kiến. Nhân viên sẽ đếm thực tế, người khác duyệt độc lập rồi
                 mới ghi sổ kho.

@@ -15,6 +15,7 @@ import { FormFieldError } from '../../../components/common/FormFieldError';
 import { CompactTextInput } from '../../../components/common/CompactTextInput';
 import { useAuthStore } from '../../../store/authStore';
 import { getApiErrorMessage, isApiErrorCode } from '../../../api/client';
+import { IdentityApi } from '../../../api/identityApi';
 import { ResponseApi } from '../../../api/responseApi';
 import { THEME } from '../../../constants/theme';
 import { GoogleAuthError, useGoogleAuth } from '../googleAuth';
@@ -51,6 +52,15 @@ export const LoginScreen: React.FC = () => {
   const [formErrors, setFormErrors] = useState<Record<string, string | undefined>>({});
   const [showPassword, setShowPassword] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
+  const [recoveryStep, setRecoveryStep] = useState<'request' | 'confirm' | null>(null);
+  const [recoveryEmail, setRecoveryEmail] = useState('');
+  const [recoveryChallengeId, setRecoveryChallengeId] = useState('');
+  const [recoveryCode, setRecoveryCode] = useState('');
+  const [recoveryPassword, setRecoveryPassword] = useState('');
+  const [recoveryPasswordConfirm, setRecoveryPasswordConfirm] = useState('');
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [recoveryMessage, setRecoveryMessage] = useState('');
+  const [recoveryError, setRecoveryError] = useState('');
   const { googleReady, promptGoogle, googleConfigured, isExpoGo } = useGoogleAuth();
 
   const handleLogin = async () => {
@@ -177,6 +187,57 @@ export const LoginScreen: React.FC = () => {
     }
   };
 
+  const handleRequestPasswordReset = async () => {
+    const normalizedEmail = recoveryEmail.trim();
+    if (!normalizedEmail || normalizedEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      setRecoveryError('Vui lòng nhập địa chỉ email hợp lệ.');
+      return;
+    }
+    setRecoveryBusy(true);
+    setRecoveryError('');
+    setRecoveryMessage('');
+    try {
+      const result = await IdentityApi.requestPasswordReset(normalizedEmail);
+      setRecoveryChallengeId(result.challenge_id);
+      setRecoveryStep('confirm');
+      setRecoveryMessage('Nếu email này khớp với tài khoản Reliva đã xác thực và có mật khẩu Reliva, mã xác nhận sẽ được gửi đến hộp thư. Nếu tài khoản chỉ dùng Google để đăng nhập, hãy tiếp tục bằng Google. Mã có hiệu lực trong 5 phút.');
+    } catch (error: unknown) {
+      setRecoveryError(getApiErrorMessage(error, 'Chưa thể gửi yêu cầu. Vui lòng thử lại sau.'));
+    } finally {
+      setRecoveryBusy(false);
+    }
+  };
+
+  const handleConfirmPasswordReset = async () => {
+    if (!/^\d{6}$/.test(recoveryCode.trim())) {
+      setRecoveryError('Vui lòng nhập mã xác nhận gồm 6 chữ số.');
+      return;
+    }
+    if (!recoveryPassword || recoveryPassword.length < 10 || recoveryPassword.length > 256) {
+      setRecoveryError('Mật khẩu mới cần có từ 10 đến 256 ký tự.');
+      return;
+    }
+    if (recoveryPassword !== recoveryPasswordConfirm) {
+      setRecoveryError('Mật khẩu xác nhận chưa khớp.');
+      return;
+    }
+    setRecoveryBusy(true);
+    setRecoveryError('');
+    try {
+      await IdentityApi.confirmPasswordReset(recoveryChallengeId, recoveryCode.trim(), recoveryPassword);
+      setRecoveryStep(null);
+      setRecoveryCode('');
+      setRecoveryPassword('');
+      setRecoveryPasswordConfirm('');
+      setRecoveryMessage('');
+      Alert.alert('Đặt lại mật khẩu thành công', 'Vui lòng đăng nhập bằng mật khẩu mới. Các phiên đăng nhập trước đó đã được đăng xuất.');
+    } catch (error: unknown) {
+      setRecoveryError(getApiErrorMessage(error, 'Chưa thể đặt lại mật khẩu. Vui lòng kiểm tra mã và thử lại.'));
+    } finally {
+      setRecoveryBusy(false);
+    }
+  };
+
   const loginDisabled = isLoading || !username.trim() || !password || username.length > 64 || password.length > 256;
 
   return (
@@ -196,6 +257,103 @@ export const LoginScreen: React.FC = () => {
       </View>
 
       <View style={styles.card}>
+        {recoveryStep ? (
+          <View>
+            <Text style={styles.recoveryTitle}>{recoveryStep === 'request' ? 'Quên mật khẩu?' : 'Xác nhận mã đặt lại'}</Text>
+            {recoveryStep === 'request' ? (
+              <View style={styles.inputGroup}>
+                <CompactTextInput
+                  label="Email tài khoản"
+                  required
+                  style={styles.textInput}
+                  placeholder="ten@example.com"
+                  placeholderTextColor={THEME.colors.text.muted}
+                  value={recoveryEmail}
+                  onChangeText={(value) => { setRecoveryEmail(value); setRecoveryError(''); }}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  maxLength={254}
+                />
+              </View>
+            ) : (
+              <>
+                <Text style={styles.recoveryHint}>Nhập mã đã gửi đến email để tạo mật khẩu Reliva. Nếu tài khoản chỉ đăng nhập Google, hãy quay lại và chọn đăng nhập Google. Mã có hiệu lực trong 5 phút.</Text>
+                <View style={styles.inputGroup}>
+                  <CompactTextInput
+                    label="Mã xác nhận"
+                    required
+                    style={styles.textInput}
+                    placeholder="Nhập mã 6 chữ số"
+                    placeholderTextColor={THEME.colors.text.muted}
+                    value={recoveryCode}
+                    onChangeText={(value) => { setRecoveryCode(value.replace(/\D/g, '').slice(0, 6)); setRecoveryError(''); }}
+                    keyboardType="number-pad"
+                    maxLength={6}
+                    autoComplete="one-time-code"
+                  />
+                </View>
+                <View style={styles.inputGroup}>
+                  <CompactTextInput
+                    label="Mật khẩu mới"
+                    required
+                    style={styles.textInput}
+                    placeholder="Tối thiểu 10 ký tự"
+                    placeholderTextColor={THEME.colors.text.muted}
+                    value={recoveryPassword}
+                    onChangeText={(value) => { setRecoveryPassword(value); setRecoveryError(''); }}
+                    secureTextEntry
+                    autoCapitalize="none"
+                    maxLength={256}
+                  />
+                </View>
+                <View style={styles.inputGroup}>
+                  <CompactTextInput
+                    label="Nhập lại mật khẩu mới"
+                    required
+                    style={styles.textInput}
+                    placeholder="Nhập lại mật khẩu mới"
+                    placeholderTextColor={THEME.colors.text.muted}
+                    value={recoveryPasswordConfirm}
+                    onChangeText={(value) => { setRecoveryPasswordConfirm(value); setRecoveryError(''); }}
+                    secureTextEntry
+                    autoCapitalize="none"
+                    maxLength={256}
+                  />
+                </View>
+              </>
+            )}
+            {recoveryMessage ? <Text accessibilityLiveRegion="polite" style={styles.recoveryMessage}>{recoveryMessage}</Text> : null}
+            {recoveryError ? <FormFieldError message={recoveryError} /> : null}
+            <TouchableOpacity
+              style={[styles.loginButton, recoveryBusy && styles.loginButtonDisabled]}
+              onPress={recoveryStep === 'request' ? handleRequestPasswordReset : handleConfirmPasswordReset}
+              disabled={recoveryBusy}
+              activeOpacity={0.85}
+            >
+              {recoveryBusy ? <ActivityIndicator size="small" color="#FFFFFF" /> : (
+                <Text style={styles.loginButtonText}>{recoveryStep === 'request' ? 'GỬI MÃ XÁC NHẬN' : 'ĐẶT LẠI MẬT KHẨU'}</Text>
+              )}
+            </TouchableOpacity>
+            {recoveryStep === 'confirm' ? (
+              <TouchableOpacity
+                style={styles.recoveryLinkButton}
+                onPress={() => { setRecoveryStep('request'); setRecoveryCode(''); setRecoveryMessage(''); setRecoveryError(''); }}
+                disabled={recoveryBusy}
+              >
+                <Text style={styles.registerPromptLink}>Nhập email khác hoặc yêu cầu mã mới</Text>
+              </TouchableOpacity>
+            ) : null}
+            <TouchableOpacity
+              style={styles.recoveryLinkButton}
+              onPress={() => { setRecoveryStep(null); setRecoveryError(''); setRecoveryMessage(''); }}
+              disabled={recoveryBusy}
+            >
+              <Text style={styles.registerPromptLink}>Quay lại đăng nhập</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <>
         <View style={styles.inputGroup}>
           <CompactTextInput
             label="Tên đăng nhập"
@@ -278,6 +436,21 @@ export const LoginScreen: React.FC = () => {
         </TouchableOpacity>
 
         <TouchableOpacity
+          style={styles.forgotPasswordButton}
+          onPress={() => {
+            setRecoveryStep('request');
+            setRecoveryError('');
+            setRecoveryMessage('');
+            setRecoveryEmail('');
+            setPassword('');
+            setShowPassword(false);
+          }}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.registerPromptLink}>Quên mật khẩu?</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
           style={[styles.googleButton, (isLoading || googleBusy || !googleReady) && styles.loginButtonDisabled]}
           onPress={handleGoogleLogin}
           disabled={isLoading || googleBusy || !googleReady}
@@ -303,6 +476,8 @@ export const LoginScreen: React.FC = () => {
             <Text style={styles.registerPromptLink}>Đăng ký tài khoản Công dân ngay</Text>
           </TouchableOpacity>
         </View>
+          </>
+        )}
       </View>
 
     </ScreenContainer>
@@ -459,5 +634,31 @@ const styles = StyleSheet.create({
     fontSize: THEME.typography.fontSizes.sm,
     fontWeight: '800',
     color: THEME.colors.primary.main,
+  },
+  forgotPasswordButton: {
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  recoveryLinkButton: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  recoveryTitle: {
+    fontSize: THEME.typography.fontSizes.lg,
+    fontWeight: '800',
+    color: THEME.colors.text.primary,
+    marginBottom: 12,
+  },
+  recoveryHint: {
+    color: THEME.colors.text.secondary,
+    fontSize: THEME.typography.fontSizes.sm,
+    lineHeight: 20,
+    marginBottom: 14,
+  },
+  recoveryMessage: {
+    color: THEME.colors.text.secondary,
+    fontSize: THEME.typography.fontSizes.sm,
+    lineHeight: 20,
+    marginBottom: 12,
   },
 });

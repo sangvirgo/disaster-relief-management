@@ -111,6 +111,9 @@ const messages: Record<string, string> = {
   IDENTITY_UNAVAILABLE: 'Dịch vụ tài khoản tạm thời không khả dụng. Vui lòng thử lại.',
   PASSWORD_WEAK:
     'Mật khẩu chưa đủ mạnh. Mật khẩu phải từ 10 ký tự, khác tên tài khoản và không dùng mật khẩu phổ biến (như password123, 1234567890...).',
+  PASSWORD_RESET_CODE_INVALID: 'Mã đặt lại mật khẩu không hợp lệ hoặc đã hết hạn. Hãy kiểm tra email rồi thử lại.',
+  PASSWORD_RESET_GOOGLE_ONLY: 'Email này đang đăng nhập bằng Google. Hãy tiếp tục bằng Google.',
+  EMAIL_OTP_UNAVAILABLE: 'Dịch vụ gửi mã email tạm thời chưa sẵn sàng. Vui lòng thử lại sau.',
   INVALID_CREDENTIALS: 'Không thể xác thực tài khoản. Vui lòng kiểm tra thông tin đăng nhập; nếu thông tin đã đúng, hãy nhờ quản trị viên kiểm tra trạng thái tài khoản.',
 };
 let csrfToken: string | null = null;

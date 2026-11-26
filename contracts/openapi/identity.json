@@ -221,7 +221,7 @@
                     "summary": "EMAIL_OTP_UNAVAILABLE",
                     "value": {
                       "code": "EMAIL_OTP_UNAVAILABLE",
-                      "message": "Dịch vụ xác minh email tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
+                      "message": "Dịch vụ gửi mã email tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
                       "correlation_id": "00000000-0000-4000-8000-000000000000"
                     }
                   }
@@ -1195,103 +1195,103 @@
     },
     "/users/{id}": {
       "get": {
-          "operationId": "getIdentityUser",
-          "summary": "Get a user profile.",
-          "security": [
-            {
-              "WebAccessCookie": []
-            },
-            {
-              "NativeBearer": []
-            }
-          ],
-          "parameters": [
-            {
-              "$ref": "#/components/parameters/UserId"
-            }
-          ],
-          "responses": {
-            "200": {
-              "description": "Credential-free user detail.",
-              "content": {
-                "application/json": {
-                  "schema": {
-                    "$ref": "#/components/schemas/UserDetail"
-                  }
-                }
-              },
-              "headers": {
-                "Cache-Control": {
-                  "$ref": "#/components/headers/CacheControlNoStore"
+        "operationId": "getIdentityUser",
+        "summary": "Get a user profile.",
+        "security": [
+          {
+            "WebAccessCookie": []
+          },
+          {
+            "NativeBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UserId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Credential-free user detail.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDetail"
                 }
               }
             },
-            "401": {
-              "description": "Vietnamese error message; clients branch on the stable code.",
-              "content": {
-                "application/json": {
-                  "schema": {
-                    "$ref": "#/components/schemas/ErrorEnvelope"
-                  },
-                  "examples": {
-                    "UNAUTHENTICATED": {
-                      "summary": "UNAUTHENTICATED",
-                      "value": {
-                        "code": "UNAUTHENTICATED",
-                        "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
-                        "correlation_id": "00000000-0000-4000-8000-000000000000"
-                      }
-                    },
-                    "SESSION_EXPIRED": {
-                      "summary": "SESSION_EXPIRED",
-                      "value": {
-                        "code": "SESSION_EXPIRED",
-                        "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
-                        "correlation_id": "00000000-0000-4000-8000-000000000000"
-                      }
-                    }
-                  }
-                }
-              },
-              "headers": {
-                "Cache-Control": {
-                  "$ref": "#/components/headers/CacheControlNoStore"
-                }
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
               }
-            },
-            "403": {
-              "description": "Vietnamese error message; clients branch on the stable code.",
-              "content": {
-                "application/json": {
-                  "schema": {
-                    "$ref": "#/components/schemas/ErrorEnvelope"
-                  },
-                  "examples": {
-                    "FORBIDDEN": {
-                      "summary": "FORBIDDEN",
-                      "value": {
-                        "code": "FORBIDDEN",
-                        "message": "Bạn không có quyền thực hiện thao tác này.",
-                        "correlation_id": "00000000-0000-4000-8000-000000000000"
-                      }
-                    }
-                  }
-                }
-              },
-              "headers": {
-                "Cache-Control": {
-                  "$ref": "#/components/headers/CacheControlNoStore"
-                }
-              }
-            },
-            "404": {
-              "$ref": "#/components/responses/Error"
             }
           },
-          "x-c48-controller-source": "backend/apps/identity/src/users/users.controller.ts#UsersController.get",
-          "x-c48-contract-source": "docs/backend/02-identity-api.md",
-          "x-c48-contract-gap": "The API specification does not define this operation’s success response body."
-        }
+          "401": {
+            "description": "Vietnamese error message; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "UNAUTHENTICATED": {
+                    "summary": "UNAUTHENTICATED",
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "SESSION_EXPIRED": {
+                    "summary": "SESSION_EXPIRED",
+                    "value": {
+                      "code": "SESSION_EXPIRED",
+                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              }
+            }
+          },
+          "403": {
+            "description": "Vietnamese error message; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "FORBIDDEN": {
+                    "summary": "FORBIDDEN",
+                    "value": {
+                      "code": "FORBIDDEN",
+                      "message": "Bạn không có quyền thực hiện thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-c48-controller-source": "backend/apps/identity/src/users/users.controller.ts#UsersController.get",
+        "x-c48-contract-source": "docs/backend/02-identity-api.md",
+        "x-c48-contract-gap": "The API specification does not define this operation’s success response body."
+      }
     },
     "/users/{id}/disable": {
       "post": {
@@ -3115,7 +3115,7 @@
                     "summary": "EMAIL_OTP_UNAVAILABLE",
                     "value": {
                       "code": "EMAIL_OTP_UNAVAILABLE",
-                      "message": "Dịch vụ xác minh email tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
+                      "message": "Dịch vụ gửi mã email tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
                       "correlation_id": "00000000-0000-4000-8000-000000000000"
                     }
                   }
@@ -3317,7 +3317,7 @@
                     "summary": "EMAIL_OTP_UNAVAILABLE",
                     "value": {
                       "code": "EMAIL_OTP_UNAVAILABLE",
-                      "message": "Dịch vụ xác minh email tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
+                      "message": "Dịch vụ gửi mã email tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
                       "correlation_id": "00000000-0000-4000-8000-000000000000"
                     }
                   }
@@ -3806,175 +3806,175 @@
     },
     "/internal/users:search": {
       "post": {
-          "operationId": "identityInternalSearchActiveUsers",
-          "summary": "Search active accounts for a Response team roster.",
-          "description": "Restricted to the Response service token. Searches active accounts by username or display-name prefix and returns only the fields needed by the team member picker. Results use a filter-bound keyset cursor and are not cached.",
-          "responses": {
-            "200": {
-              "description": "Active account search results.",
-              "headers": {
-                "Cache-Control": {
-                  "$ref": "#/components/headers/CacheControlNoStore"
-                }
-              },
-              "content": {
-                "application/json": {
-                  "schema": {
-                    "type": "object",
-                    "properties": {
+        "operationId": "identityInternalSearchActiveUsers",
+        "summary": "Search active accounts for a Response team roster.",
+        "description": "Restricted to the Response service token. Searches active accounts by username or display-name prefix and returns only the fields needed by the team member picker. Results use a filter-bound keyset cursor and are not cached.",
+        "responses": {
+          "200": {
+            "description": "Active account search results.",
+            "headers": {
+              "Cache-Control": {
+                "$ref": "#/components/headers/CacheControlNoStore"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
                       "items": {
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "properties": {
-                            "id": {
-                              "type": "string",
-                              "format": "uuid"
-                            },
-                            "username": {
-                              "type": "string"
-                            },
-                            "display_name": {
-                              "type": "string"
-                            }
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
                           },
-                          "required": [
-                            "id",
-                            "username",
-                            "display_name"
-                          ]
-                        }
-                      },
-                      "more": {
-                        "type": "boolean"
-                      },
-                      "cursor": {
-                        "type": "string"
+                          "username": {
+                            "type": "string"
+                          },
+                          "display_name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "username",
+                          "display_name"
+                        ]
                       }
                     },
-                    "required": [
-                      "items",
-                      "more"
-                    ]
-                  }
-                }
-              }
-            },
-            "400": {
-              "description": "Documented error response; clients branch on the stable code.",
-              "content": {
-                "application/json": {
-                  "schema": {
-                    "$ref": "#/components/schemas/ErrorEnvelope"
-                  },
-                  "examples": {
-                    "CURSOR_INVALID": {
-                      "summary": "CURSOR_INVALID",
-                      "value": {
-                        "code": "CURSOR_INVALID",
-                        "message": "Dữ liệu phân trang không còn hợp lệ. Vui lòng tải lại danh sách.",
-                        "correlation_id": "00000000-0000-4000-8000-000000000000"
-                      }
+                    "more": {
+                      "type": "boolean"
                     },
-                    "VALIDATION_FAILED": {
-                      "summary": "VALIDATION_FAILED",
-                      "value": {
-                        "code": "VALIDATION_FAILED",
-                        "message": "Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại các trường được đánh dấu.",
-                        "correlation_id": "00000000-0000-4000-8000-000000000000"
-                      }
+                    "cursor": {
+                      "type": "string"
                     }
-                  }
+                  },
+                  "required": [
+                    "items",
+                    "more"
+                  ]
                 }
               }
-            },
-            "401": {
-              "description": "Documented error response; clients branch on the stable code.",
-              "content": {
-                "application/json": {
-                  "schema": {
-                    "$ref": "#/components/schemas/ErrorEnvelope"
-                  },
-                  "examples": {
-                    "UNAUTHENTICATED": {
-                      "summary": "UNAUTHENTICATED",
-                      "value": {
-                        "code": "UNAUTHENTICATED",
-                        "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
-                        "correlation_id": "00000000-0000-4000-8000-000000000000"
-                      }
-                    },
-                    "SESSION_EXPIRED": {
-                      "summary": "SESSION_EXPIRED",
-                      "value": {
-                        "code": "SESSION_EXPIRED",
-                        "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
-                        "correlation_id": "00000000-0000-4000-8000-000000000000"
-                      }
+            }
+          },
+          "400": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "CURSOR_INVALID": {
+                    "summary": "CURSOR_INVALID",
+                    "value": {
+                      "code": "CURSOR_INVALID",
+                      "message": "Dữ liệu phân trang không còn hợp lệ. Vui lòng tải lại danh sách.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
                     }
-                  }
-                }
-              }
-            },
-            "403": {
-              "description": "Documented error response; clients branch on the stable code.",
-              "content": {
-                "application/json": {
-                  "schema": {
-                    "$ref": "#/components/schemas/ErrorEnvelope"
                   },
-                  "examples": {
-                    "FORBIDDEN": {
-                      "summary": "FORBIDDEN",
-                      "value": {
-                        "code": "FORBIDDEN",
-                        "message": "Bạn không có quyền thực hiện thao tác này.",
-                        "correlation_id": "00000000-0000-4000-8000-000000000000"
-                      }
+                  "VALIDATION_FAILED": {
+                    "summary": "VALIDATION_FAILED",
+                    "value": {
+                      "code": "VALIDATION_FAILED",
+                      "message": "Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại các trường được đánh dấu.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
                     }
                   }
                 }
               }
             }
           },
-          "x-c48-contract-source": "docs/backend/02-identity-api.md",
-          "x-c48-controller-source": "backend/apps/identity/src/internal/internal.controller.ts#InternalController.searchActiveUsers",
-          "security": [
-            {
-              "IdentityServiceBearer": []
-            }
-          ],
-          "requestBody": {
-            "required": true,
+          "401": {
+            "description": "Documented error response; clients branch on the stable code.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "query": {
-                      "type": "string",
-                      "minLength": 2,
-                      "maxLength": 64
-                    },
-                    "cursor": {
-                      "type": "string",
-                      "maxLength": 2048
-                    },
-                    "limit": {
-                      "type": "integer",
-                      "minimum": 1,
-                      "maximum": 100,
-                      "default": 50
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "UNAUTHENTICATED": {
+                    "summary": "UNAUTHENTICATED",
+                    "value": {
+                      "code": "UNAUTHENTICATED",
+                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
                     }
                   },
-                  "required": [
-                    "query"
-                  ]
+                  "SESSION_EXPIRED": {
+                    "summary": "SESSION_EXPIRED",
+                    "value": {
+                      "code": "SESSION_EXPIRED",
+                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "FORBIDDEN": {
+                    "summary": "FORBIDDEN",
+                    "value": {
+                      "code": "FORBIDDEN",
+                      "message": "Bạn không có quyền thực hiện thao tác này.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
                 }
               }
             }
           }
+        },
+        "x-c48-contract-source": "docs/backend/02-identity-api.md",
+        "x-c48-controller-source": "backend/apps/identity/src/internal/internal.controller.ts#InternalController.searchActiveUsers",
+        "security": [
+          {
+            "IdentityServiceBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 64
+                  },
+                  "cursor": {
+                    "type": "string",
+                    "maxLength": 2048
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100,
+                    "default": 50
+                  }
+                },
+                "required": [
+                  "query"
+                ]
+              }
+            }
+          }
         }
+      }
     },
     "/dashboard/admin": {
       "get": {
@@ -4045,6 +4045,398 @@
           }
         ],
         "x-c48-contract-gap": "The API specification does not define this operation’s success response body."
+      }
+    },
+    "/auth/password-reset/confirm": {
+      "post": {
+        "operationId": "identityAuthConfirmPasswordReset",
+        "summary": "Confirm the password-reset code and set a new password.",
+        "description": "The six-digit code can be used once and expires after five minutes. At most five code attempts are accepted. On success, the password is stored with Argon2id, all outstanding reset codes are invalidated, authz_version advances, and every active session family is revoked. WEB requests require the pre-session cookie and CSRF token; NATIVE requests send no cookies or Origin.",
+        "responses": {
+          "204": {
+            "description": "Success response; see docs/backend/02-identity-api.md for the documented response shape."
+          },
+          "400": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "PASSWORD_RESET_CODE_INVALID": {
+                    "summary": "PASSWORD_RESET_CODE_INVALID",
+                    "value": {
+                      "code": "PASSWORD_RESET_CODE_INVALID",
+                      "message": "Mã đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "PASSWORD_WEAK": {
+                    "summary": "PASSWORD_WEAK",
+                    "value": {
+                      "code": "PASSWORD_WEAK",
+                      "message": "Mật khẩu chưa đủ mạnh (tối thiểu 10 ký tự, không phổ biến).",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "VALIDATION_FAILED": {
+                    "summary": "VALIDATION_FAILED",
+                    "value": {
+                      "code": "VALIDATION_FAILED",
+                      "message": "Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại các trường được đánh dấu.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "IDEMPOTENCY_KEY_INVALID": {
+                    "summary": "IDEMPOTENCY_KEY_INVALID",
+                    "value": {
+                      "code": "IDEMPOTENCY_KEY_INVALID",
+                      "message": "Mã yêu cầu không hợp lệ.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "CSRF_INVALID": {
+                    "summary": "CSRF_INVALID",
+                    "value": {
+                      "code": "CSRF_INVALID",
+                      "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "IDEMPOTENCY_KEY_REUSED": {
+                    "summary": "IDEMPOTENCY_KEY_REUSED",
+                    "value": {
+                      "code": "IDEMPOTENCY_KEY_REUSED",
+                      "message": "Mã yêu cầu đã được dùng cho nội dung khác.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "RATE_LIMITED": {
+                    "summary": "RATE_LIMITED",
+                    "value": {
+                      "code": "RATE_LIMITED",
+                      "message": "Bạn thao tác quá nhanh. Vui lòng thử lại sau.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "EMAIL_OTP_UNAVAILABLE": {
+                    "summary": "EMAIL_OTP_UNAVAILABLE",
+                    "value": {
+                      "code": "EMAIL_OTP_UNAVAILABLE",
+                      "message": "Dịch vụ gửi mã email tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-c48-contract-source": "docs/backend/02-identity-api.md",
+        "x-c48-controller-source": "backend/apps/identity/src/auth/auth.controller.ts#AuthController.confirmPasswordReset",
+        "security": [
+          {
+            "WebPreSessionCookie": [],
+            "CsrfToken": []
+          },
+          {}
+        ],
+        "x-c48-conditional-security": {
+          "access_token_required": false,
+          "web": {
+            "required": [
+              "Origin allowed by Identity",
+              "cookie c48_pre",
+              "header X-CSRF-Token"
+            ]
+          },
+          "native": {
+            "required": [],
+            "forbidden": [
+              "Cookie",
+              "Origin"
+            ]
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "challenge_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "code": {
+                    "type": "string",
+                    "pattern": "^\\d{6}$"
+                  },
+                  "new_password": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  }
+                },
+                "required": [
+                  "challenge_id",
+                  "code",
+                  "new_password"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/password-reset/request": {
+      "post": {
+        "operationId": "identityAuthRequestPasswordReset",
+        "summary": "Request a password-reset code by email.",
+        "description": "Unknown, inactive, unverified, and eligible local-password accounts receive the same accepted response. An active, verified Google-only account returns 409 PASSWORD_RESET_GOOGLE_ONLY so the user can stay on the email step and continue with Google sign-in. Only active accounts with a verified email and an existing local password receive a six-digit code through the encrypted Identity email outbox. The code is purpose-bound, expires after five minutes, allows at most five attempts, and is invalidated when another reset request is created. WEB requests require the pre-session cookie and CSRF token; NATIVE requests send no cookies or Origin.",
+        "responses": {
+          "202": {
+            "description": "Accepted password-reset request. The response shape is shared by unknown, inactive, unverified, and eligible local-password accounts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "challenge_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "challenge_id"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "VALIDATION_FAILED": {
+                    "summary": "VALIDATION_FAILED",
+                    "value": {
+                      "code": "VALIDATION_FAILED",
+                      "message": "Dữ liệu gửi lên không hợp lệ. Vui lòng kiểm tra lại các trường được đánh dấu.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "IDEMPOTENCY_KEY_INVALID": {
+                    "summary": "IDEMPOTENCY_KEY_INVALID",
+                    "value": {
+                      "code": "IDEMPOTENCY_KEY_INVALID",
+                      "message": "Mã yêu cầu không hợp lệ.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "CSRF_INVALID": {
+                    "summary": "CSRF_INVALID",
+                    "value": {
+                      "code": "CSRF_INVALID",
+                      "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "IDEMPOTENCY_KEY_REUSED": {
+                    "summary": "IDEMPOTENCY_KEY_REUSED",
+                    "value": {
+                      "code": "IDEMPOTENCY_KEY_REUSED",
+                      "message": "Mã yêu cầu đã được dùng cho nội dung khác.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  },
+                  "PASSWORD_RESET_GOOGLE_ONLY": {
+                    "summary": "PASSWORD_RESET_GOOGLE_ONLY",
+                    "value": {
+                      "code": "PASSWORD_RESET_GOOGLE_ONLY",
+                      "message": "Email này đang đăng nhập bằng Google. Hãy tiếp tục bằng Google.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "RATE_LIMITED": {
+                    "summary": "RATE_LIMITED",
+                    "value": {
+                      "code": "RATE_LIMITED",
+                      "message": "Bạn thao tác quá nhanh. Vui lòng thử lại sau.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Documented error response; clients branch on the stable code.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                },
+                "examples": {
+                  "EMAIL_OTP_UNAVAILABLE": {
+                    "summary": "EMAIL_OTP_UNAVAILABLE",
+                    "value": {
+                      "code": "EMAIL_OTP_UNAVAILABLE",
+                      "message": "Dịch vụ gửi mã email tạm thời chưa sẵn sàng. Vui lòng thử lại sau.",
+                      "correlation_id": "00000000-0000-4000-8000-000000000000"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-c48-contract-source": "docs/backend/02-identity-api.md",
+        "x-c48-controller-source": "backend/apps/identity/src/auth/auth.controller.ts#AuthController.requestPasswordReset",
+        "security": [
+          {
+            "WebPreSessionCookie": [],
+            "CsrfToken": []
+          },
+          {}
+        ],
+        "x-c48-conditional-security": {
+          "access_token_required": false,
+          "web": {
+            "required": [
+              "Origin allowed by Identity",
+              "cookie c48_pre",
+              "header X-CSRF-Token"
+            ]
+          },
+          "native": {
+            "required": [],
+            "forbidden": [
+              "Cookie",
+              "Origin"
+            ]
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "maxLength": 254
+                  }
+                },
+                "required": [
+                  "email"
+                ]
+              }
+            }
+          }
+        }
       }
     }
   },
@@ -4463,40 +4855,40 @@
         }
       },
       "MeGrant": {
-                   "type": "object",
-                   "required": [
-                     "id",
-                     "role_code",
-                     "scope_type"
-                   ],
-                   "properties": {
-                     "id": {
-                       "type": "string",
-                       "format": "uuid"
-                     },
-                     "role_code": {
-                       "type": "string",
-                       "enum": [
-                         "CITIZEN",
-                         "VOLUNTEER",
-                         "COORDINATOR",
-                         "OPERATIONS_MANAGER",
-                         "REVIEWER",
-                         "ADMIN"
-                       ]
-                     },
-                     "scope_type": {
-                       "type": "string"
-                     },
-                     "campaign_id": {
-                       "type": [
-                         "string",
-                         "null"
-                       ],
-                       "format": "uuid"
-                     }
-                   }
-                 },
+        "type": "object",
+        "required": [
+          "id",
+          "role_code",
+          "scope_type"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "role_code": {
+            "type": "string",
+            "enum": [
+              "CITIZEN",
+              "VOLUNTEER",
+              "COORDINATOR",
+              "OPERATIONS_MANAGER",
+              "REVIEWER",
+              "ADMIN"
+            ]
+          },
+          "scope_type": {
+            "type": "string"
+          },
+          "campaign_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
       "MeResponse": {
         "type": "object",
         "required": [
@@ -4682,63 +5074,63 @@
         "unevaluatedProperties": false
       },
       "Grant": {
-                 "type": "object",
-                 "required": [
-                   "id",
-                   "user_id",
-                   "role_code",
-                   "scope_type",
-                   "campaign_id",
-                   "created_at",
-                   "revoked_at"
-                 ],
-                 "properties": {
-                   "id": {
-                     "type": "string",
-                     "format": "uuid"
-                   },
-                   "user_id": {
-                     "type": "string",
-                     "format": "uuid"
-                   },
-                   "role_code": {
-                     "type": "string",
-                     "enum": [
-                       "CITIZEN",
-                       "VOLUNTEER",
-                       "COORDINATOR",
-                       "OPERATIONS_MANAGER",
-                       "REVIEWER",
-                       "ADMIN"
-                     ]
-                   },
-                   "scope_type": {
-                     "type": "string",
-                     "enum": [
-                       "SYSTEM",
-                       "CAMPAIGN"
-                     ]
-                   },
-                   "campaign_id": {
-                     "type": [
-                       "string",
-                       "null"
-                     ],
-                     "format": "uuid"
-                   },
-                   "created_at": {
-                     "type": "string",
-                     "format": "date-time"
-                   },
-                   "revoked_at": {
-                     "type": [
-                       "string",
-                       "null"
-                     ],
-                     "format": "date-time"
-                   }
-                 }
-               },
+        "type": "object",
+        "required": [
+          "id",
+          "user_id",
+          "role_code",
+          "scope_type",
+          "campaign_id",
+          "created_at",
+          "revoked_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "role_code": {
+            "type": "string",
+            "enum": [
+              "CITIZEN",
+              "VOLUNTEER",
+              "COORDINATOR",
+              "OPERATIONS_MANAGER",
+              "REVIEWER",
+              "ADMIN"
+            ]
+          },
+          "scope_type": {
+            "type": "string",
+            "enum": [
+              "SYSTEM",
+              "CAMPAIGN"
+            ]
+          },
+          "campaign_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "revoked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
       "GrantPage": {
         "type": "object",
         "required": [
@@ -4761,43 +5153,43 @@
         }
       },
       "CreateGrantRequest": {
-                              "type": "object",
-                              "additionalProperties": false,
-                              "required": [
-                                "role_code",
-                                "scope_type",
-                                "reason"
-                              ],
-                              "properties": {
-                                "role_code": {
-                                  "type": "string",
-                                  "enum": [
-                                    "CITIZEN",
-                                    "VOLUNTEER",
-                                    "COORDINATOR",
-                                    "OPERATIONS_MANAGER",
-                                    "REVIEWER",
-                                    "ADMIN"
-                                  ]
-                                },
-                                "scope_type": {
-                                  "type": "string",
-                                  "enum": [
-                                    "SYSTEM",
-                                    "CAMPAIGN"
-                                  ]
-                                },
-                                "campaign_id": {
-                                  "type": "string",
-                                  "format": "uuid"
-                                },
-                                "reason": {
-                                  "type": "string",
-                                  "minLength": 1,
-                                  "maxLength": 500
-                                }
-                              }
-                            },
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "role_code",
+          "scope_type",
+          "reason"
+        ],
+        "properties": {
+          "role_code": {
+            "type": "string",
+            "enum": [
+              "CITIZEN",
+              "VOLUNTEER",
+              "COORDINATOR",
+              "OPERATIONS_MANAGER",
+              "REVIEWER",
+              "ADMIN"
+            ]
+          },
+          "scope_type": {
+            "type": "string",
+            "enum": [
+              "SYSTEM",
+              "CAMPAIGN"
+            ]
+          },
+          "campaign_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        }
+      },
       "Reason": {
         "type": "object",
         "additionalProperties": false,

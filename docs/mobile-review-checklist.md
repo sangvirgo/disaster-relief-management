@@ -160,3 +160,18 @@ Compared the mobile reporter and volunteer workflows with the current backend re
 - Reporter evidence upload responses are typed and the device stores only the returned evidence references, never the signed download URL. Opening an image or MP4 requests a fresh 60-second URL. Since there is no reporter-facing endpoint to list previously uploaded evidence, references can be reopened on the device that uploaded them; another device cannot discover those files through the current API.
 - The client counts locally known uploaded and selected evidence against the five-file per-request limit. The backend remains authoritative when files were added from another device.
 - Checks run for this follow-up: `npx tsc --noEmit` passed; `npx eslint .` passed with no errors and the existing `DateTimePicker` import warning in `ProxySOSScreen.tsx`; `git diff --check` passed. No mobile app runtime or API smoke was run.
+
+## 11. Mobile/backend alignment — 2026-11-22
+
+Compared the current mobile Identity, reporter, volunteer, and public donor calls against the OpenAPI snapshots and service guides. The citizen and volunteer routes exposed to mobile are wired. New staff-only coordinator, operations, reviewer, and administrator routes remain outside the mobile role scope; in particular, pickup-ticket management is permissioned to operations managers. Reporter evidence references are still device-local because the backend has no reporter-facing evidence-list route.
+
+- Identity stores usernames as entered and performs an exact-case login lookup. Mobile registration now preserves the entered case for both account creation and the immediate login after email verification; password equality checks remain case-insensitive, matching Identity.
+- `MobileApiError` now retains backend `field_errors`. Stable field codes are mapped to Vietnamese copy and attached to the matching registration, SELF/PROXY SOS, reporter-update, mission-outcome, and team-profile fields. Invalid saved SOS retry commands are cleared after a validation rejection so the corrected form can create a new command.
+- Replaced the unsupported React Native 0.88 `StyleSheet.absoluteFillObject` reference in `SingleChoicePicker` with the documented `StyleSheet.absoluteFill` property so strict TypeScript checking can complete.
+- Checks run: `npx tsc --noEmit` passed; `npx eslint .` passed with no errors and the existing `DateTimePicker` import warning in `ProxySOSScreen.tsx`; `git diff --check` passed. No app runtime, emulator, device, or API smoke was run.
+
+## 12. Mobile keyboard handling — 2026-11-23
+
+Shared `ScreenContainer` content uses React Native `KeyboardAvoidingView` padding on iOS. On Android it leaves keyboard layout to the activity's `adjustResize` mode, avoiding a focus-transition issue caused by combining Android resize with explicit `KeyboardAvoidingView` padding. Scrollable forms keep the keyboard open while scrolling between fields or tapping another field. Input-bearing modals and picker/search surfaces use the same platform behavior and scroll their form content where needed, including SOS tracking recovery/supplement forms, mission outcomes, team profile/member selection, donation declaration/dispute, anonymous request linking, and location selection.
+
+- Checks run: `npx tsc --noEmit` passed; direct `npx eslint .` passed with no errors and the existing `DateTimePicker` import warning in `ProxySOSScreen.tsx`; `git diff --check` passed. No device or emulator keyboard interaction was run.

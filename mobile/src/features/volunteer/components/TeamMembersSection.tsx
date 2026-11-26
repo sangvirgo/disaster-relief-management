@@ -390,7 +390,7 @@ export const TeamMembersSection: React.FC<TeamMembersSectionProps> = ({
       ) : null}
 
       <Modal visible={pickerVisible} animationType="slide" onRequestClose={closePicker}>
-        <KeyboardAvoidingView style={styles.modal} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView style={styles.modal} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
           <View style={styles.modalHeader}>
             <View style={{ flex: 1 }}>
               <Text style={styles.modalTitle}>Thêm thành viên vào đội</Text>

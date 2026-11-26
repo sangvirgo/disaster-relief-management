@@ -91,6 +91,24 @@ const identityDetails = {
     request: request(object({ challenge_id: id }, ['challenge_id'])),
     response: response(object({ challenge_id: { anyOf: [id, { type: 'null' }] }, email_sent: boolean() }, ['challenge_id', 'email_sent'])),
   },
+  identityAuthRequestPasswordReset: {
+    summary: 'Request a password-reset code by email.',
+    description: 'Unknown, inactive, unverified, and eligible local-password accounts receive the same accepted response. An active, verified Google-only account returns 409 PASSWORD_RESET_GOOGLE_ONLY so the user can stay on the email step and continue with Google sign-in. Only active accounts with a verified email and an existing local password receive a six-digit code through the encrypted Identity email outbox. The code is purpose-bound, expires after five minutes, allows at most five attempts, and is invalidated when another reset request is created. WEB requests require the pre-session cookie and CSRF token; NATIVE requests send no cookies or Origin.',
+    parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }],
+    request: request(object({ email: { type: 'string', format: 'email', maxLength: 254 } }, ['email'])),
+    response: response(object({ challenge_id: id }, ['challenge_id']), 'Accepted password-reset request. The response shape is shared by unknown, inactive, unverified, and eligible local-password accounts.'),
+  },
+  identityAuthConfirmPasswordReset: {
+    summary: 'Confirm the password-reset code and set a new password.',
+    description: 'The six-digit code can be used once and expires after five minutes. At most five code attempts are accepted. On success, the password is stored with Argon2id, all outstanding reset codes are invalidated, authz_version advances, and every active session family is revoked. WEB requests require the pre-session cookie and CSRF token; NATIVE requests send no cookies or Origin.',
+    parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }],
+    request: request(object({
+      challenge_id: id,
+      code: { type: 'string', pattern: '^\\d{6}$' },
+      new_password: { type: 'string', minLength: 1, maxLength: 256 },
+    }, ['challenge_id', 'code', 'new_password'])),
+    noBody: true,
+  },
   identityAuthGoogleLogin: {
     summary: 'Create a session using a verified Google identity.',
     description: 'The server verifies the Google ID token against configured client IDs. Accounts are matched by the stable Google subject; an existing account is never linked by email alone. WEB sessions use secure cookies; NATIVE sessions return tokens in JSON.',
@@ -1197,6 +1215,8 @@ const routeErrorCodes = {
   login: ['INVALID_CREDENTIALS', 'RATE_LIMITED', 'CSRF_INVALID'],
   identityAuthVerifyEmail: ['EMAIL_OTP_INVALID', 'EMAIL_OTP_UNAVAILABLE', 'USERNAME_TAKEN', 'EMAIL_TAKEN', 'RATE_LIMITED', 'CSRF_INVALID'],
   identityAuthResendEmailOtp: ['EMAIL_OTP_INVALID', 'EMAIL_OTP_UNAVAILABLE', 'RATE_LIMITED', 'CSRF_INVALID'],
+  identityAuthRequestPasswordReset: ['PASSWORD_RESET_GOOGLE_ONLY', 'EMAIL_OTP_UNAVAILABLE', 'RATE_LIMITED', 'VALIDATION_FAILED', 'IDEMPOTENCY_KEY_INVALID', 'IDEMPOTENCY_KEY_REUSED', 'CSRF_INVALID'],
+  identityAuthConfirmPasswordReset: ['PASSWORD_RESET_CODE_INVALID', 'EMAIL_OTP_UNAVAILABLE', 'PASSWORD_WEAK', 'RATE_LIMITED', 'VALIDATION_FAILED', 'IDEMPOTENCY_KEY_INVALID', 'IDEMPOTENCY_KEY_REUSED', 'CSRF_INVALID'],
   identityAuthGoogleLogin: ['GOOGLE_TOKEN_INVALID', 'GOOGLE_LOGIN_UNAVAILABLE', 'GOOGLE_ACCOUNT_LINK_REQUIRED', 'USERNAME_TAKEN', 'RATE_LIMITED', 'CSRF_INVALID'],
   identityAuthLinkGoogle: ['GOOGLE_TOKEN_INVALID', 'GOOGLE_LOGIN_UNAVAILABLE', 'GOOGLE_IDENTITY_IN_USE', 'GOOGLE_ALREADY_LINKED', 'SESSION_REAUTH_REQUIRED', 'CSRF_INVALID'],
   refreshSession: ['SESSION_EXPIRED', 'REFRESH_REUSED', 'REFRESH_RACE', 'CSRF_INVALID'],
@@ -1385,7 +1405,7 @@ function routeSecurity(service, routePath, method, operationId) {
   const write = method !== 'get';
   if (service === 'identity') {
     if (routePath === '/auth/csrf') return [];
-    if (['/auth/register', '/auth/login', '/auth/google', '/auth/email/verify', '/auth/email/resend'].includes(routePath)) {
+    if (['/auth/register', '/auth/login', '/auth/google', '/auth/email/verify', '/auth/email/resend', '/auth/password-reset/request', '/auth/password-reset/confirm'].includes(routePath)) {
       return [{ WebPreSessionCookie: [], CsrfToken: [] }, {}];
     }
     if (routePath === '/auth/refresh') {
@@ -1436,7 +1456,7 @@ function routeSecurity(service, routePath, method, operationId) {
 }
 
 function requiresExactSecurity(service, routePath, operationId) {
-  if (service === 'identity') return routePath.startsWith('/internal/') || ['/auth/csrf', '/auth/register', '/auth/login', '/auth/refresh', '/auth/google', '/auth/email/verify', '/auth/email/resend'].includes(routePath);
+  if (service === 'identity') return routePath.startsWith('/internal/') || ['/auth/csrf', '/auth/register', '/auth/login', '/auth/refresh', '/auth/google', '/auth/email/verify', '/auth/email/resend', '/auth/password-reset/request', '/auth/password-reset/confirm'].includes(routePath);
   if (service === 'response') {
     return routePath.startsWith('/internal/') || routePath === '/public/campaigns' || [
       'createSelfRequest', 'trackSelfRequest', 'listReporterEvents', 'supplementSelfRequest',
@@ -1495,6 +1515,16 @@ const identityConditionalSecurity = {
     native: { required: [], forbidden: ['Cookie', 'Origin'] },
   },
   identityAuthResendEmailOtp: {
+    access_token_required: false,
+    web: { required: ['Origin allowed by Identity', 'cookie c48_pre', 'header X-CSRF-Token'] },
+    native: { required: [], forbidden: ['Cookie', 'Origin'] },
+  },
+  identityAuthRequestPasswordReset: {
+    access_token_required: false,
+    web: { required: ['Origin allowed by Identity', 'cookie c48_pre', 'header X-CSRF-Token'] },
+    native: { required: [], forbidden: ['Cookie', 'Origin'] },
+  },
+  identityAuthConfirmPasswordReset: {
     access_token_required: false,
     web: { required: ['Origin allowed by Identity', 'cookie c48_pre', 'header X-CSRF-Token'] },
     native: { required: [], forbidden: ['Cookie', 'Origin'] },
@@ -1572,6 +1602,10 @@ export function applyOpenApiDetails(document, service) {
   };
   Object.assign(document.components.securitySchemes, serviceSecuritySchemes[service] ?? {});
   if (service === 'identity') {
+    document.components.parameters ??= {};
+    document.components.parameters.IdempotencyKey ??= {
+      name: 'Idempotency-Key', in: 'header', required: true, schema: { type: 'string', format: 'uuid' },
+    };
     for (const name of ['MeGrant', 'Grant', 'CreateGrantRequest']) {
       const role = document.components.schemas[name]?.properties?.role_code;
       if (role) role.enum = identityRoleCodes;

@@ -15,7 +15,7 @@ import { FormFieldError } from '../../../components/common/FormFieldError';
 import { CompactTextInput } from '../../../components/common/CompactTextInput';
 import { useAuthStore } from '../../../store/authStore';
 import { IdentityApi } from '../../../api/identityApi';
-import { getApiErrorMessage, isApiErrorCode } from '../../../api/client';
+import { getApiErrorMessage, getApiFieldErrors, isApiErrorCode } from '../../../api/client';
 import { THEME } from '../../../constants/theme';
 import { isCommonPassword, isValidEmail } from '../../../utils/formValidation';
 import { generateUUID } from '../../../utils/secureStore';
@@ -75,7 +75,8 @@ export const RegisterScreen: React.FC = () => {
   const handleRegister = async () => {
     const emailValue = email.trim();
     const trimmedDisplayName = displayName.trim().normalize('NFC');
-    const trimmedUsername = username.trim().toLowerCase();
+    // Identity stores the username as entered and uses exact-case login lookup.
+    const trimmedUsername = username.trim();
     const cleanPassword = password;
     const errors: Record<string, string> = {};
 
@@ -93,7 +94,7 @@ export const RegisterScreen: React.FC = () => {
     if (!cleanPassword) errors.password = 'Vui lòng nhập mật khẩu.';
     else if ([...cleanPassword].length < 10) errors.password = 'Mật khẩu phải có ít nhất 10 ký tự.';
     else if ([...cleanPassword].length > 256) errors.password = 'Mật khẩu không được vượt quá 256 ký tự.';
-    else if (trimmedUsername && cleanPassword.toLowerCase() === trimmedUsername) errors.password = 'Mật khẩu không được trùng tên đăng nhập.';
+    else if (trimmedUsername && cleanPassword.toLowerCase() === trimmedUsername.toLowerCase()) errors.password = 'Mật khẩu không được trùng tên đăng nhập.';
     else if (isCommonPassword(cleanPassword)) errors.password = 'Mật khẩu quá phổ biến. Hãy chọn mật khẩu khó đoán hơn.';
 
     if (!confirmPassword) errors.confirmPassword = 'Vui lòng nhập lại mật khẩu.';
@@ -131,8 +132,25 @@ export const RegisterScreen: React.FC = () => {
         ? `Mã xác minh đã được gửi đến ${email.trim()}.`
         : 'Chưa gửi được email. Hãy kiểm tra cấu hình email hoặc thử gửi lại sau.');
     } catch (err: any) {
-      const errorMsg = getApiErrorMessage(err, 'Không thể tạo tài khoản. Vui lòng thử lại sau.');
-      Alert.alert('Đăng ký thất bại', errorMsg);
+      const serverFieldErrors = getApiFieldErrors(err, {
+        email: 'email',
+        username: 'username',
+        password: 'password',
+        display_name: 'displayName',
+      });
+      if (isApiErrorCode(err, 'USERNAME_TAKEN')) {
+        serverFieldErrors.username = 'Tên đăng nhập này đã có người sử dụng. Vui lòng chọn tên khác.';
+      } else if (isApiErrorCode(err, 'EMAIL_TAKEN')) {
+        serverFieldErrors.email = 'Email này đã được sử dụng. Vui lòng đăng nhập hoặc dùng địa chỉ email khác.';
+      } else if (isApiErrorCode(err, 'PASSWORD_WEAK')) {
+        serverFieldErrors.password = 'Mật khẩu chưa đủ mạnh. Vui lòng chọn mật khẩu khác theo yêu cầu.';
+      }
+      if (Object.keys(serverFieldErrors).length > 0) {
+        setFormErrors((current) => ({ ...current, ...serverFieldErrors }));
+      } else {
+        const errorMsg = getApiErrorMessage(err, 'Không thể tạo tài khoản. Vui lòng thử lại sau.');
+        Alert.alert('Đăng ký thất bại', errorMsg);
+      }
     }
   };
 
@@ -152,7 +170,7 @@ export const RegisterScreen: React.FC = () => {
       await IdentityApi.verifyEmail(challengeId, code, verificationAttempt.current.key);
       verificationAttempt.current = null;
       try {
-        await login(username.trim().toLowerCase(), password);
+        await login(username.trim(), password);
         Alert.alert('Xác minh thành công', 'Email đã được xác minh và tài khoản đã kích hoạt.', [
           { text: 'Tiếp tục', onPress: finishLogin },
         ]);

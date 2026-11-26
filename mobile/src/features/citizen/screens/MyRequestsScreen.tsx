@@ -9,6 +9,9 @@ import {
   RefreshControl,
   Alert,
   Modal,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { goBackOrHome } from '../../../navigation/back';
@@ -297,7 +300,14 @@ export const MyRequestsScreen: React.FC = () => {
 
       {/* Modal gắn yêu cầu */}
       <Modal visible={showClaimModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
+          <ScrollView
+            style={styles.modalScroll}
+            contentContainerStyle={styles.modalScrollContent}
+            keyboardShouldPersistTaps="always"
+            keyboardDismissMode="none"
+            showsVerticalScrollIndicator={false}
+          >
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>GẮN YÊU CẦU ẨN DANH</Text>
             <Text style={styles.modalSubtitle}>
@@ -354,7 +364,8 @@ export const MyRequestsScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
     </ScreenContainer>
   );
@@ -554,7 +565,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 20,
+    maxHeight: '100%',
     ...THEME.shadows.md,
+  },
+  modalScroll: {
+    flex: 1,
+  },
+  modalScrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingVertical: 20,
   },
   modalTitle: {
     fontSize: THEME.typography.fontSizes.base,

@@ -52,6 +52,28 @@ export const IdentityApi = {
     return response.data;
   },
 
+  async requestPasswordReset(email: string, idempotencyKey = generateUUID()): Promise<{ challenge_id: string }> {
+    const response = await apiClient.post<{ challenge_id: string }>(
+      '/identity/auth/password-reset/request',
+      { email: email.trim().toLowerCase() },
+      { headers: { 'Idempotency-Key': idempotencyKey } },
+    );
+    return response.data;
+  },
+
+  async confirmPasswordReset(
+    challengeId: string,
+    code: string,
+    newPassword: string,
+    idempotencyKey = generateUUID(),
+  ): Promise<void> {
+    await apiClient.post('/identity/auth/password-reset/confirm', {
+      challenge_id: challengeId,
+      code: code.trim(),
+      new_password: newPassword,
+    }, { headers: { 'Idempotency-Key': idempotencyKey } });
+  },
+
   // Đăng nhập Native (dành cho Tình nguyện viên, Đội cứu hộ, Công dân)
   async login(username: string, password: string): Promise<NativeLoginResponse> {
     const response = await apiClient.post<NativeLoginResponse>('/identity/auth/login', {

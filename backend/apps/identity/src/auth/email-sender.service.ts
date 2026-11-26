@@ -96,6 +96,68 @@ export class EmailSenderService {
     }
   }
 
+  async sendPasswordResetCode(email: string, code: string): Promise<boolean> {
+    const host = process.env.IDENTITY_EMAIL_SMTP_HOST;
+    const from = process.env.IDENTITY_EMAIL_FROM;
+    if (!host || !from) {
+      this.logger.warn('EMAIL_SEND_FAILED reason=NOT_CONFIGURED');
+      return false;
+    }
+    const port = Number(process.env.IDENTITY_EMAIL_SMTP_PORT ?? 587);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      this.logger.warn('EMAIL_SEND_FAILED reason=INVALID_PORT');
+      return false;
+    }
+    let transport: ReturnType<typeof nodemailer.createTransport> | undefined;
+    try {
+      transport = nodemailer.createTransport({
+        host,
+        port,
+        secure: process.env.IDENTITY_EMAIL_SMTP_SECURE === 'true',
+        ...(process.env.IDENTITY_EMAIL_SMTP_USER ? {
+          auth: {
+            user: process.env.IDENTITY_EMAIL_SMTP_USER,
+            pass: process.env.IDENTITY_EMAIL_SMTP_PASSWORD ?? '',
+          },
+        } : {}),
+      });
+      await transport.sendMail({
+        from: { name: 'Reliva', address: from },
+        to: email,
+        subject: 'Mã đặt lại mật khẩu Reliva',
+        text: [
+          'Đặt lại mật khẩu Reliva',
+          '',
+          'Bạn vừa yêu cầu đặt lại mật khẩu cho tài khoản Reliva.',
+          `Mã xác nhận: ${code}`,
+          '',
+          'Mã chỉ có hiệu lực trong 5 phút và chỉ được sử dụng một lần. Vui lòng không chia sẻ mã này với bất kỳ ai.',
+          'Nếu bạn không yêu cầu đặt lại mật khẩu, hãy bỏ qua email này. Mật khẩu hiện tại của bạn vẫn được giữ nguyên.',
+          '',
+          'Đội ngũ Reliva',
+        ].join('\n'),
+        html: `<!doctype html>
+<html lang="vi"><body style="margin:0;padding:28px;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;color:#0f172a;">
+  <main style="max-width:520px;margin:auto;padding:28px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;">
+    <p style="margin:0 0 8px;color:#1d4ed8;font-weight:700;letter-spacing:1px;">RELIVA · BẢO MẬT TÀI KHOẢN</p>
+    <h1 style="font-size:22px;margin:0 0 12px;">Đặt lại mật khẩu</h1>
+    <p style="line-height:1.6;color:#475569;">Bạn vừa yêu cầu đặt lại mật khẩu. Nhập mã xác nhận bên dưới để tiếp tục:</p>
+    <p style="padding:18px;text-align:center;background:#eff6ff;border-radius:10px;color:#1d4ed8;font-family:Consolas,monospace;font-size:30px;font-weight:700;letter-spacing:8px;">${code}</p>
+    <p style="line-height:1.6;color:#475569;">Mã có hiệu lực trong <strong>5 phút</strong> và chỉ dùng được một lần. Không chia sẻ mã này với bất kỳ ai.</p>
+    <p style="padding:12px;background:#f8fafc;border-radius:8px;line-height:1.6;color:#475569;">Nếu bạn không yêu cầu đặt lại mật khẩu, hãy bỏ qua email này. Mật khẩu hiện tại vẫn được giữ nguyên.</p>
+    <p style="margin:20px 0 0;color:#64748b;font-size:12px;">Email tự động từ Reliva. Vui lòng không trả lời thư này.</p>
+  </main>
+</body></html>`,
+      });
+      return true;
+    } catch (error) {
+      this.logger.warn(`EMAIL_SEND_FAILED ${EmailSenderService.failureReason(error)}`);
+      return false;
+    } finally {
+      transport?.close();
+    }
+  }
+
   /**
    * Stable, secret-free description of a transport failure: only the nodemailer/Node error code and the SMTP
    * response code, each checked against a strict pattern. Never the message, address, host or credentials.

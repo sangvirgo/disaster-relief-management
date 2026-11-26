@@ -22,7 +22,7 @@ import { useLocation } from '../../../hooks/useLocation';
 import { INCIDENT_CATEGORIES } from '../../../constants/labels';
 import { IncidentCategoryCode, CreateSOSPayload } from '../../../types/api';
 import { ResponseApi } from '../../../api/responseApi';
-import { getApiErrorMessage, isApiErrorCode } from '../../../api/client';
+import { getApiErrorMessage, getApiFieldErrors, isApiErrorCode } from '../../../api/client';
 import { PendingSOSCommand, StorageService } from '../../../utils/secureStore';
 import { THEME } from '../../../constants/theme';
 import { isValidPhone, normalizePhone } from '../../../utils/formValidation';
@@ -50,6 +50,20 @@ const INCIDENT_CATEGORY_OPTIONS: SingleChoiceOption<IncidentCategoryCode>[] = IN
   label: INCIDENT_CATEGORIES[value]?.label || value,
   description: INCIDENT_CATEGORIES[value]?.desc,
 }));
+
+const SELF_SOS_FIELD_ALIASES: Record<string, string> = {
+  'location.coordinates': 'location',
+  'location.accuracy_m': 'location',
+  location: 'location',
+  people_affected: 'peopleAffected',
+  children_count: 'vulnerableCounts',
+  elderly_count: 'vulnerableCounts',
+  needs_rescue: 'needs',
+  needs_relief_supplies: 'needs',
+  relief_items_text: 'reliefItemsText',
+  reporter_contact_phone: 'reporterPhone',
+  description: 'description',
+};
 
 export const CreateSOSScreen: React.FC = () => {
   const router = useRouter();
@@ -313,6 +327,12 @@ export const CreateSOSScreen: React.FC = () => {
         trackingCode: response.tracking_code,
       });
     } catch (error: any) {
+      const serverFieldErrors = getApiFieldErrors(error, SELF_SOS_FIELD_ALIASES);
+      const hasServerFieldErrors = Object.keys(serverFieldErrors).length > 0;
+      if (hasServerFieldErrors) {
+        setFormErrors((current) => ({ ...current, ...serverFieldErrors }));
+      }
+
       if (error instanceof Error && error.message === 'PENDING_SOS_MUST_BE_RESUMED') {
         Alert.alert('Có yêu cầu đang chờ xác nhận', 'Ứng dụng giữ nguyên nội dung và khóa của lần gửi trước để tránh tạo SOS trùng. Hãy khôi phục nội dung cũ hoặc chờ kết nối rồi gửi lại.');
       } else if (error instanceof Error && error.message === 'PENDING_COMMAND_TOO_LARGE') {
@@ -321,14 +341,16 @@ export const CreateSOSScreen: React.FC = () => {
         try {
           await StorageService.clearPendingSOS();
           setPendingCommand(null);
-          Alert.alert(
-            'Yêu cầu chưa được gửi',
-            'Hệ thống từ chối dữ liệu của bản gửi trước. Nội dung vẫn còn trên biểu mẫu để bạn chỉnh sửa rồi gửi lại.',
-          );
+          if (!hasServerFieldErrors) {
+            Alert.alert(
+              'Yêu cầu chưa được gửi',
+              'Hệ thống từ chối dữ liệu của bản gửi trước. Nội dung vẫn còn trên biểu mẫu để bạn chỉnh sửa rồi gửi lại.',
+            );
+          }
         } catch {
           Alert.alert('Không thể gửi yêu cầu', getApiErrorMessage(error, 'Đã có lỗi xảy ra.'));
         }
-      } else {
+      } else if (!hasServerFieldErrors) {
         Alert.alert('Không thể gửi yêu cầu', getApiErrorMessage(error, 'Đã có lỗi xảy ra. Bản gửi được giữ lại để bạn thử lại an toàn.'));
       }
     } finally {

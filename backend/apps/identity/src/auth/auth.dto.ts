@@ -87,6 +87,26 @@ export class ResendEmailOtpDto {
   challenge_id!: string;
 }
 
+export class PasswordResetRequestDto {
+  @IsEmail()
+  @MaxLength(254)
+  email!: string;
+}
+
+export class PasswordResetConfirmDto {
+  @IsUUID('all')
+  challenge_id!: string;
+
+  @IsString()
+  @Matches(/^\d{6}$/)
+  code!: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(256)
+  new_password!: string;
+}
+
 export class GoogleLinkDto {
   @IsString() @MinLength(20) @MaxLength(8192)
   id_token!: string;

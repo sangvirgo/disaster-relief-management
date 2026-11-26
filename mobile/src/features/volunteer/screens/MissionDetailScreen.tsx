@@ -8,8 +8,11 @@ import {
   Alert,
   ActivityIndicator,
   Linking,
+  KeyboardAvoidingView,
   Modal,
   Image,
+  Platform,
+  ScrollView,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,7 +24,7 @@ import { FormFieldError } from '../../../components/common/FormFieldError';
 import { StatusBadge } from '../../../components/common/StatusBadge';
 import { TimelineStep } from '../../../components/common/TimelineStep';
 import { ResponseApi } from '../../../api/responseApi';
-import { getApiErrorMessage, isApiErrorCode, MobileApiError } from '../../../api/client';
+import { getApiErrorMessage, getApiFieldErrors, isApiErrorCode, MobileApiError } from '../../../api/client';
 import { MissionDetail, MissionProgressTarget, MissionStatus } from '../../../types/api';
 import { INCIDENT_CATEGORIES, MISSION_KIND_LABELS, MISSION_STATUS_LABELS } from '../../../constants/labels';
 import { THEME } from '../../../constants/theme';
@@ -430,7 +433,12 @@ export const MissionDetailScreen: React.FC = () => {
       setShowDeclineModal(false);
       goBackOrHome(router);
     } catch (e: any) {
-      Alert.alert('Lỗi', getApiErrorMessage(e, 'Không thể cập nhật trạng thái nhiệm vụ.'));
+      const fieldErrors = getApiFieldErrors(e, { reason: 'declineReason', note: 'declineReason' });
+      if (fieldErrors.declineReason) {
+        setFormErrors((current) => ({ ...current, ...fieldErrors }));
+      } else {
+        Alert.alert('Lỗi', getApiErrorMessage(e, 'Không thể cập nhật trạng thái nhiệm vụ.'));
+      }
     } finally {
       setActionLoading(false);
     }
@@ -528,10 +536,17 @@ export const MissionDetailScreen: React.FC = () => {
       evidenceUploadKey.current = null;
       fetchDetail();
     } catch (e: any) {
+      const fieldErrors = getApiFieldErrors(e, {
+        'result.outcome_note': 'outcomeNote',
+        outcome_note: 'outcomeNote',
+      });
+      if (fieldErrors.outcomeNote) {
+        setFormErrors((current) => ({ ...current, ...fieldErrors }));
+      }
       if (isApiErrorCode(e, 'VERSION_CONFLICT')) {
         await fetchDetail();
         Alert.alert('Nhiệm vụ đã thay đổi', 'Thông tin mới nhất đã được tải. Hãy kiểm tra lại rồi xác nhận hoàn thành lần nữa.');
-      } else {
+      } else if (!fieldErrors.outcomeNote) {
         Alert.alert('Lỗi', getApiErrorMessage(e, 'Không thể kết thúc nhiệm vụ.'));
       }
     } finally {
@@ -905,7 +920,14 @@ export const MissionDetailScreen: React.FC = () => {
 
       {/* MODAL HOÀN THÀNH NHIỆM VỤ */}
       <Modal visible={showCompleteModal} transparent={true} animationType="slide">
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
+          <ScrollView
+            style={styles.modalScroll}
+            contentContainerStyle={styles.modalScrollContent}
+            keyboardShouldPersistTaps="always"
+            keyboardDismissMode="none"
+            showsVerticalScrollIndicator={false}
+          >
           <View style={[styles.modalContent, { paddingBottom: 20 + insets.bottom }]}>
             <Text style={styles.modalTitle}>{outcomeTitle}</Text>
             <Text style={styles.modalSubtitle}>
@@ -999,12 +1021,20 @@ export const MissionDetailScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* MODAL TỪ CHỐI / BÁO THẤT BẠI */}
       <Modal visible={showDeclineModal} transparent={true} animationType="slide">
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
+          <ScrollView
+            style={styles.modalScroll}
+            contentContainerStyle={styles.modalScrollContent}
+            keyboardShouldPersistTaps="always"
+            keyboardDismissMode="none"
+            showsVerticalScrollIndicator={false}
+          >
           <View style={[styles.modalContent, { paddingBottom: 20 + insets.bottom }]}>
             <Text style={[styles.modalTitle, { color: THEME.colors.emergency.main }]}>
               LÝ DO TỪ CHỐI / TRỞ NGẠI
@@ -1051,7 +1081,8 @@ export const MissionDetailScreen: React.FC = () => {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* MODAL XEM ẢNH MINH CHỨNG PHÓNG TO */}
@@ -1354,6 +1385,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
+  },
+  modalScroll: {
+    flex: 1,
+  },
+  modalScrollContent: {
+    flexGrow: 1,
+    justifyContent: 'flex-end',
+    paddingTop: 20,
   },
   modalContent: {
     backgroundColor: THEME.colors.surface.card,

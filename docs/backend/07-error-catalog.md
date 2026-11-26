@@ -37,7 +37,9 @@ Every error the API can return has one row here. The implementation loads this t
 | `EMAIL_TAKEN` | 409 | Identity | Địa chỉ email đã được sử dụng. |
 | `REGISTRATION_EXPIRED` | 410 | Identity | Phiên đăng ký đã hết hạn. Vui lòng đăng ký lại. |
 | `EMAIL_OTP_INVALID` | 400 | Identity | Mã xác minh email không hợp lệ hoặc đã hết hạn. |
-| `EMAIL_OTP_UNAVAILABLE` | 503 | Identity | Dịch vụ xác minh email tạm thời chưa sẵn sàng. Vui lòng thử lại sau. |
+| `EMAIL_OTP_UNAVAILABLE` | 503 | Identity | Dịch vụ gửi mã email tạm thời chưa sẵn sàng. Vui lòng thử lại sau. |
+| `PASSWORD_RESET_CODE_INVALID` | 400 | Identity | Mã đặt lại mật khẩu không hợp lệ hoặc đã hết hạn. |
+| `PASSWORD_RESET_GOOGLE_ONLY` | 409 | Identity | Email này đang đăng nhập bằng Google. Hãy tiếp tục bằng Google. |
 | `GOOGLE_LOGIN_UNAVAILABLE` | 503 | Identity | Đăng nhập Google chưa được cấu hình. Vui lòng thử bằng tài khoản và mật khẩu. |
 | `GOOGLE_TOKEN_INVALID` | 401 | Identity | Phiên xác thực Google không hợp lệ hoặc đã hết hạn. Vui lòng thử lại. |
 | `GOOGLE_ACCOUNT_LINK_REQUIRED` | 409 | Identity | Email này đã có tài khoản. Hãy đăng nhập bằng tài khoản hiện có rồi liên kết Google trong phần bảo mật. |

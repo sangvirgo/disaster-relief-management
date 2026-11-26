@@ -699,7 +699,8 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
         <SafeAreaView style={styles.container} edges={["top", "right", "bottom", "left"]}>
           <KeyboardAvoidingView
             style={styles.container}
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            keyboardVerticalOffset={0}
           >
         {/* Header Modal */}
         <View style={styles.header}>
@@ -879,7 +880,7 @@ export const LocationPickerModal: React.FC<LocationPickerModalProps> = ({
         {/* Khu vực Nhập / Chỉnh sửa Chi tiết Tọa độ */}
         <ScrollView
           style={styles.formContainer}
-          keyboardShouldPersistTaps="handled"
+          keyboardShouldPersistTaps="always"
         >
           <View style={styles.coordInputsRow}>
             <View style={styles.coordInputCol}>

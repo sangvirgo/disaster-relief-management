@@ -39,6 +39,20 @@ export const resendEmailOtp = (challenge_id: string) =>
     body: { challenge_id },
     retryAuth: false,
   });
+export const requestPasswordReset = (email: string) =>
+  api<{ challenge_id: string }>('identity', '/auth/password-reset/request', {
+    method: 'POST',
+    body: { email: email.trim().toLowerCase() },
+    idempotencyKey: newCommandKey(),
+    retryAuth: false,
+  });
+export const confirmPasswordReset = (challenge_id: string, code: string, new_password: string) =>
+  api<void>('identity', '/auth/password-reset/confirm', {
+    method: 'POST',
+    body: { challenge_id, code: code.trim(), new_password },
+    idempotencyKey: newCommandKey(),
+    retryAuth: false,
+  });
 export async function googleLogin(id_token: string): Promise<Me> {
   await csrf();
   await api('identity', '/auth/google', {
