@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "b794aaf5-169e-470b-a0c4-9a2176a8c480",
     "name": "C48 · Kịch bản SOS và cứu hộ qua Nginx",
-    "description": "Chọn folder 00 để chạy kịch bản chính: SOS SELF → xác minh → ưu tiên do điều phối viên quyết định → cứu hộ hoàn tất → kết thúc → công dân theo dõi. Chạy ở cấp collection cũng dừng sau folder 00; folder tùy chọn 10–70 chỉ chạy khi chọn riêng. Collection giữ các bước demo, danh mục API đầy đủ ở contracts/openapi. Tài khoản demo lấy mật khẩu từ seedPassword. ID chiến dịch, SOS, dữ liệu quyên góp và kho được tự lấy qua API. Mọi URL đi qua Nginx 127.0.0.1:8080. Không cần SMTP/Google/MinIO/Gemini cho luồng chính. Không reset DB hoặc sửa đội đang bận. Điều phối chính dùng coord1; coord2 là điều phối viên thứ hai (đồng thuận xác minh). Các lệnh ghi dùng Idempotency-Key. Dữ liệu demo giả lập; ưu tiên và điều phối luôn do con người quyết định.",
+    "description": "Chọn folder 00 để chạy kịch bản chính: SOS SELF → xác minh → ưu tiên do điều phối viên quyết định → cứu hộ hoàn tất → kết thúc → công dân theo dõi. Chạy ở cấp collection cũng dừng sau folder 00; folder tùy chọn 10–70 chỉ chạy khi chọn riêng. Collection giữ các bước demo, danh mục API đầy đủ ở contracts/openapi. Tài khoản demo lấy mật khẩu từ seedPassword. ID chiến dịch, SOS, dữ liệu quyên góp và kho được tự lấy qua API. Mọi URL đi qua Nginx 127.0.0.1:8080. Không cần SMTP/Google/MinIO/Gemini cho luồng chính. Không reset DB hoặc sửa đội đang bận. Điều phối chính dùng coord1; coord_seed là điều phối viên chính thứ hai (đồng thuận xác minh); coord2 là điều phối viên phụ (folder 70). Các lệnh ghi dùng Idempotency-Key. Dữ liệu demo giả lập; ưu tiên và điều phối luôn do con người quyết định.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -2139,7 +2139,7 @@
     },
     {
       "name": "20 · Tùy chọn · PROXY và hai điều phối viên",
-      "description": "Tạo SOS gửi thay bằng citizen2, coord1 bắt đầu xác minh, coord2 đồng thuận, coord1 xác minh. Dừng ở VERIFIED; không trộn với nhánh SELF. Chọn riêng folder này để chạy; bước cuối dừng Runner. Không chạy chung với luồng chính. Các lệnh ghi lưu trên DB demo chính.",
+      "description": "Tạo SOS gửi thay bằng citizen2, coord1 bắt đầu xác minh, coord_seed đồng thuận, coord1 xác minh. Dừng ở VERIFIED; không trộn với nhánh SELF. Chọn riêng folder này để chạy; bước cuối dừng Runner. Không chạy chung với luồng chính. Các lệnh ghi lưu trên DB demo chính.",
       "item": [
         {
           "id": "proxy-01",
@@ -2454,7 +2454,7 @@
             "description": "Điều phối viên thứ hai đăng nhập\n\nChạy theo thứ tự trong kịch bản. Lệnh ghi thay đổi dữ liệu demo chính; lỗi sẽ dừng Runner. Các lần đăng nhập, đọc chi tiết và chuyển trạng thái lặp có mục đích.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"coord2\",\n  \"password\": \"{{seedPassword}}\",\n  \"client_kind\": \"NATIVE\"\n}",
+              "raw": "{\n  \"username\": \"coord_seed\",\n  \"password\": \"{{seedPassword}}\",\n  \"client_kind\": \"NATIVE\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -3092,7 +3092,7 @@
     },
     {
       "name": "40 · Tùy chọn · Khôi phục SOS khách",
-      "description": "Tạo SOS không có Authorization. coord1 ghi REPORTER/REACHED khi VERIFYING; coord2 cấp mã dựa trên contactAttemptId thật; citizen1 đổi requestRecoveryCode và theo dõi bằng tài khoản. Không dùng mã recovery quyên góp. Chọn riêng folder này để chạy; bước cuối dừng Runner. Không chạy chung với luồng chính. Các lệnh ghi lưu trên DB demo chính.",
+      "description": "Tạo SOS không có Authorization. coord1 ghi REPORTER/REACHED khi VERIFYING; coord_seed cấp mã dựa trên contactAttemptId thật; citizen1 đổi requestRecoveryCode và theo dõi bằng tài khoản. Không dùng mã recovery quyên góp. Chọn riêng folder này để chạy; bước cuối dừng Runner. Không chạy chung với luồng chính. Các lệnh ghi lưu trên DB demo chính.",
       "item": [
         {
           "id": "recovery-01",
@@ -3414,7 +3414,7 @@
             "description": "Điều phối viên thứ hai đăng nhập để cấp mã\n\nChạy theo thứ tự trong kịch bản. Lệnh ghi thay đổi dữ liệu demo chính; lỗi sẽ dừng Runner. Các lần đăng nhập, đọc chi tiết và chuyển trạng thái lặp có mục đích.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"username\": \"coord2\",\n  \"password\": \"{{seedPassword}}\",\n  \"client_kind\": \"NATIVE\"\n}",
+              "raw": "{\n  \"username\": \"coord_seed\",\n  \"password\": \"{{seedPassword}}\",\n  \"client_kind\": \"NATIVE\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -4534,10 +4534,10 @@
     },
     {
       "name": "70 - Điều phối chiến dịch",
-      "description": "Chạy riêng folder này sau khi seed. coord2 bắt đầu một phiên, xem hàng đợi đúng chiến dịch rồi dừng; coord1 xem tổng quan, tạo chiến dịch và giải quyết SOS xung đột. Các ID được lấy từ phản hồi trước đó.",
+      "description": "Chạy riêng folder này sau khi seed. coord2 (điều phối viên phụ) tự chọn chiến dịch, bắt đầu một phiên, xem hàng đợi đúng chiến dịch rồi dừng; coord1 xem tổng quan, tạo chiến dịch và giải quyết SOS xung đột. Các ID được lấy từ phản hồi trước đó.",
       "item": [
         {
-          "name": "Đăng nhập điều phối viên coord2",
+          "name": "Đăng nhập điều phối viên phụ coord2",
           "event": [
             {
               "listen": "prerequest",

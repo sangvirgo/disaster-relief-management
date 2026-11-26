@@ -94,7 +94,7 @@ async function createRequest(reporter, coordinates, suffix, idempotencyKey = key
 await Promise.all([responseDb.connect(), identityDb.connect()]);
 try {
   const [primary, secondary, citizen, campaignManager, subCoordinator] = await Promise.all([
-    login('coord1'), login('coord2'), login('citizen1'), login('ops_mgr'), login('coord3'),
+    login('coord1'), login('coord_seed'), login('citizen1'), login('ops_mgr'), login('coord2'),
   ]);
   const grants = await identityDb.query(
     `SELECT role_code,scope_type FROM role_grant WHERE user_id=$1 AND revoked_at IS NULL ORDER BY role_code,scope_type`,

@@ -40,7 +40,6 @@ SELECT pg_temp.u(g.suffix), g.role_code, g.scope_type, g.campaign_id
 FROM (VALUES
   ('101', 'ADMIN',              'SYSTEM',   NULL::uuid),
   ('102', 'COORDINATOR',        'SYSTEM',   NULL::uuid),
-  ('103', 'COORDINATOR',        'SYSTEM',   NULL::uuid),
   ('105', 'OPERATIONS_MANAGER', 'SYSTEM',   NULL::uuid),
   ('108', 'REVIEWER',           'SYSTEM',   NULL::uuid),
   ('109', 'REVIEWER',           'SYSTEM',   NULL::uuid),
@@ -50,6 +49,7 @@ FROM (VALUES
   ('10f', 'CITIZEN',            'SYSTEM',   NULL::uuid),
   ('110', 'CITIZEN',            'SYSTEM',   NULL::uuid),
   -- Sub-coordinators: COORDINATOR at CAMPAIGN scope without a campaign; they choose (engage) campaigns themselves.
+  ('103', 'COORDINATOR',        'CAMPAIGN', NULL::uuid),
   ('111', 'COORDINATOR',        'CAMPAIGN', NULL::uuid),
   ('125', 'COORDINATOR',        'CAMPAIGN', NULL::uuid)
 ) AS g(suffix, role_code, scope_type, campaign_id)
