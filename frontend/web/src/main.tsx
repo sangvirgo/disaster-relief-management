@@ -13,6 +13,7 @@ import {
   requestPasswordReset,
   confirmPasswordReset,
   resendEmailOtp,
+  isSubCoordinator,
   roles,
   verifyEmail,
   type Me,
@@ -2106,7 +2107,7 @@ function App() {
                   <span className="user-name">{user.display_name}</span>
                   <span className="user-role-badge" title={[...new Set(user.grants.map((grant) => label(grant.role_code)))].join(', ')}>
                     {(() => {
-                      const codes = [...new Set(user.grants.map((grant) => grant.role_code))];
+                      const codes = [...new Set(user.grants.map((grant) => grant.role_code === 'COORDINATOR' && isSubCoordinator(user) ? 'SUB_COORDINATOR' : grant.role_code))];
                       if (!codes.length) return label('CITIZEN');
                       return codes.length > 1 ? `${label(codes[0])} +${codes.length - 1} vai trò` : label(codes[0]);
                     })()}

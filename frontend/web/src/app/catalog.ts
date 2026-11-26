@@ -121,7 +121,7 @@ export function workspaceRoleCodes(workspace: Workspace, user: Me | null): strin
   const r: ReadonlySet<string> = roles(user);
   if (workspace === 'citizen') return ['CITIZEN'];
   if (workspace === 'volunteer') return ['VOLUNTEER'];
-  if (workspace === 'coordinator') return ['COORDINATOR'].filter((role) => r.has(role));
+  if (workspace === 'coordinator') return isSubCoordinator(user) ? ['SUB_COORDINATOR'] : ['COORDINATOR'].filter((role) => r.has(role));
   if (workspace === 'admin') return ['ADMIN'];
   return operationsRoles.filter((role) => r.has(role));
 }

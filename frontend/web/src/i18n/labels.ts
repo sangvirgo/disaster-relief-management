@@ -83,6 +83,7 @@ export const statusLabels: Record<string, string> = {
   CITIZEN: 'Người dân',
   VOLUNTEER: 'Tình nguyện viên',
   COORDINATOR: 'Điều phối viên',
+  SUB_COORDINATOR: 'Điều phối viên phụ',
   OPERATIONS_MANAGER: 'Quản lý vận hành',
   REVIEWER: 'Người duyệt',
   ADMIN: 'Quản trị viên',

@@ -68,24 +68,26 @@ export class MissionsQueriesService {
    */
   async internal(missionId: string): Promise<Record<string, unknown>> {
     const rows = await this.dataSource.query(
-      `SELECT m.id,m.status,m.request_id,r.campaign_id,m.team_id,m.work_cycle
-         FROM mission m JOIN assistance_request r ON r.id=m.request_id WHERE m.id=$1`,
+      `SELECT m.id,m.status,m.request_id,r.campaign_id,m.team_id,t.name AS team_name,m.work_cycle
+         FROM mission m JOIN assistance_request r ON r.id=m.request_id JOIN rescue_team t ON t.id=m.team_id WHERE m.id=$1`,
       [missionId],
-    ) as Array<{ id: string; status: string; request_id: string; campaign_id: string | null; team_id: string; work_cycle: number | string }>;
+    ) as Array<{ id: string; status: string; request_id: string; campaign_id: string | null; team_id: string; team_name: string; work_cycle: number | string }>;
     const row = rows[0];
     if (!row) throw new AppError('NOT_FOUND', { status: 404 });
     const members = await this.dataSource.query(
-      'SELECT user_id FROM team_member WHERE team_id=$1 AND left_at IS NULL ORDER BY user_id',
+      'SELECT user_id,member_role FROM team_member WHERE team_id=$1 AND left_at IS NULL ORDER BY user_id',
       [row.team_id],
-    ) as Array<{ user_id: string }>;
+    ) as Array<{ user_id: string; member_role: string }>;
     return {
       id: row.id,
       status: row.status,
       request_id: row.request_id,
       campaign_id: row.campaign_id ?? null,
       team_id: row.team_id,
+      team_name: row.team_name,
       work_cycle: Number(row.work_cycle),
       member_user_ids: members.map((member) => member.user_id),
+      leader_user_ids: members.filter((member) => member.member_role === 'LEADER').map((member) => member.user_id),
     };
   }
 

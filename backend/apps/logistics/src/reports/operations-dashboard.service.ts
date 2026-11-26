@@ -33,7 +33,7 @@ const lowThreshold = (): number => {
 };
 
 /**
- * Counts for the warehouse, receiving and distribution staff. Each section appears only when one of the
+ * Counts for the warehouse and receiving staff. Each section appears only when one of the
  * caller's grants carries the matching permission. Campaign-attached figures are limited to the granted
  * campaigns; warehouse and stock figures are SYSTEM-only because warehouses are shared resources.
  */
@@ -52,10 +52,10 @@ export class OperationsDashboardService {
     const session = await this.sessions.require(request);
     const g = session.grants;
     const intake = scopeFor(g, ['DONATION_INTAKE', 'DONATION_REVIEW', 'DONATION_DRIVE_MANAGE', 'REPORT_READ']);
-    const distribution = scopeFor(g, ['DISTRIBUTION_PREPARE', 'DISTRIBUTION_REVIEW', 'DISTRIBUTION_DISPATCH', 'HANDOFF_RECORD', 'REPORT_READ']);
-    const stock = scopeFor(g, ['REPORT_READ', 'STOCK_ADJUST_REQUEST', 'ADJUSTMENT_REVIEW', 'DISTRIBUTION_PREPARE', 'DONATION_INTAKE', 'DONATION_REVIEW']);
+    const supply = scopeFor(g, ['SUPPLY_REQUEST_HANDOVER', 'REPORT_READ']);
+    const stock = scopeFor(g, ['REPORT_READ', 'STOCK_ADJUST_REQUEST', 'ADJUSTMENT_REVIEW', 'DONATION_INTAKE', 'DONATION_REVIEW']);
     const needs = scopeFor(g, ['NEED_MANAGE', 'REPORT_READ']);
-    if ([intake, distribution, stock, needs].every((scope) => scope !== null && scope.length === 0)) {
+    if ([intake, supply, stock, needs].every((scope) => scope !== null && scope.length === 0)) {
       throw new AppError('FORBIDDEN', { status: 403 });
     }
     const visible = (scope: CampaignScope): boolean => scope === null || scope.length > 0;
@@ -81,16 +81,20 @@ export class OperationsDashboardService {
         reviews_last_7d: counts(reviews7d),
       };
     }
-    if (visible(distribution)) {
-      const [rows, unreconciled, handoffs] = await Promise.all([
-        this.q<{ key: string; total: number }>(`SELECT d.status AS key, COUNT(*)::int AS total FROM distribution d WHERE ${inCampaign('d.campaign_id')} GROUP BY d.status`, distribution),
-        this.q<{ total: number }>(`SELECT COUNT(*)::int AS total FROM distribution d WHERE d.status = 'DISPATCHED' AND ${inCampaign('d.campaign_id')}`, distribution),
-        this.q<{ total: number }>(`SELECT COUNT(*)::int AS total FROM handoff_record h JOIN distribution d ON d.id = h.distribution_id WHERE h.occurred_at >= now() - interval '7 days' AND ${inCampaign('d.campaign_id')}`, distribution),
+    if (visible(supply)) {
+      const [rows] = await Promise.all([
+        this.q<{ waiting: number; expiring_soon: number; handed_over_7d: number; expired_7d: number }>(
+          `SELECT COUNT(*) FILTER (WHERE s.status = 'READY')::int AS waiting,
+                  COUNT(*) FILTER (WHERE s.status = 'READY' AND s.expires_at <= now() + interval '1 hour')::int AS expiring_soon,
+                  COUNT(*) FILTER (WHERE s.status = 'HANDED_OVER' AND s.handed_over_at >= now() - interval '7 days')::int AS handed_over_7d,
+                  COUNT(*) FILTER (WHERE s.status = 'EXPIRED' AND s.cancelled_at >= now() - interval '7 days')::int AS expired_7d
+             FROM supply_request s WHERE ${inCampaign('s.campaign_id')}`, supply),
       ]);
-      out.distribution = {
-        by_status: counts(rows),
-        dispatched_not_reconciled: n(unreconciled[0]?.total),
-        handoffs_last_7d: n(handoffs[0]?.total),
+      out.supply = {
+        waiting: n(rows[0]?.waiting),
+        expiring_soon: n(rows[0]?.expiring_soon),
+        handed_over_last_7d: n(rows[0]?.handed_over_7d),
+        expired_last_7d: n(rows[0]?.expired_7d),
       };
     }
     if (systemOnly(stock)) {

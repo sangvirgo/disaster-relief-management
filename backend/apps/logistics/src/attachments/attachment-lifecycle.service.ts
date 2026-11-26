@@ -16,7 +16,6 @@ export interface AttachmentRecord {
   id: string;
   delivery_id: string | null;
   dispute_id: string | null;
-  handoff_id: string | null;
   object_key: string;
   state: 'PENDING' | 'READY' | 'FAILED';
   declared_bytes: number | string;
@@ -109,14 +108,6 @@ export class AttachmentLifecycleService implements OnModuleInit, OnModuleDestroy
     }
   }
 
-  async ownerKind(attachmentId: string): Promise<'DONATION' | 'HANDOFF'> {
-    const rows = await this.dataSource.query(
-      "SELECT handoff_id FROM logistics_attachment WHERE id=$1 AND state='READY'", [attachmentId],
-    ) as Array<{ handoff_id: string | null }>;
-    if (!rows[0]) throw new AppError('NOT_FOUND', { status: 404 });
-    return rows[0].handoff_id ? 'HANDOFF' : 'DONATION';
-  }
-
   readyView(row: AttachmentRecord): Record<string, unknown> {
     return readyView(row);
   }
@@ -192,7 +183,7 @@ export class AttachmentLifecycleService implements OnModuleInit, OnModuleDestroy
       [rows] = await this.dataSource.query(
         `UPDATE logistics_attachment SET state='READY',size_bytes=$2,detected_mime=$3,checksum=$4
           WHERE id=$1 AND state='PENDING'
-          RETURNING id,delivery_id,dispute_id,handoff_id,object_key,state,declared_bytes,size_bytes,detected_mime,checksum,created_at`,
+          RETURNING id,delivery_id,dispute_id,object_key,state,declared_bytes,size_bytes,detected_mime,checksum,created_at`,
         [attachmentId, stagedFile.size, stagedFile.mime, stagedFile.checksum],
       ) as [AttachmentRecord[], number];
     } catch {
@@ -234,7 +225,7 @@ export class AttachmentLifecycleService implements OnModuleInit, OnModuleDestroy
     const deadline = Date.now() + 30_000;
     while (Date.now() < deadline) {
       const rows = await this.dataSource.query(
-        `SELECT id,delivery_id,dispute_id,handoff_id,object_key,state,declared_bytes,size_bytes,detected_mime,checksum,created_at
+        `SELECT id,delivery_id,dispute_id,object_key,state,declared_bytes,size_bytes,detected_mime,checksum,created_at
            FROM logistics_attachment WHERE id=$1`, [id],
       ) as AttachmentRecord[];
       const row = rows[0];

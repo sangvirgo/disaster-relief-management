@@ -318,8 +318,8 @@ export class CampaignWarehouseService {
               (SELECT COUNT(*)::int FROM needs) AS open_needed_items,
               (SELECT COUNT(DISTINCT sb.item_id)::int FROM stock_balance sb JOIN needs n ON n.item_id = sb.item_id
                 WHERE sb.warehouse_id = w.id AND sb.on_hand - sb.reserved > 0) AS needed_items_in_stock,
-              (SELECT COUNT(*)::int FROM distribution d
-                WHERE d.warehouse_id = w.id AND d.status IN ('DRAFT','APPROVED','DISPATCHED')) AS open_distributions
+              (SELECT COUNT(*)::int FROM supply_request s
+                WHERE s.warehouse_id = w.id AND s.status = 'READY') AS open_supply_requests
          FROM area a
          JOIN warehouse w ON w.status = 'ACTIVE' AND w.location IS NOT NULL AND w.service_radius_m IS NOT NULL
           AND ST_DWithin(w.location, a.center, $2::float8)
@@ -387,7 +387,7 @@ export class CampaignWarehouseService {
           distance_m: candidate.distance_m,
           eligible: true,
           stock: { open_needed_items: candidate.open_needed_items, needed_items_in_stock: candidate.needed_items_in_stock },
-          open_distributions: candidate.open_distributions,
+          open_supply_requests: candidate.open_supply_requests,
         };
       }),
       flags: deriveFlags({ hasArea: Boolean(area.center), primary, eligibleIds }),

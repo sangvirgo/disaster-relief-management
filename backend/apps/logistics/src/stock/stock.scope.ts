@@ -1,7 +1,7 @@
 import { hasPermission, Grant, Permission } from '@c48/identity-contracts/permissions';
 import { AppError } from '@c48/technical/errors/errors';
 
-/** Warehouses and stock are SYSTEM resources; a campaign-attached operation (for example a distribution) passes its campaign. */
+/** Warehouses and stock are SYSTEM resources; a campaign-attached operation (for example a supply request) passes its campaign. */
 export interface WarehouseScope {
   campaign_id?: string | null;
 }

@@ -19,7 +19,6 @@ interface StockSummaryRow {
   reserved: string;
   available: string;
   held: string;
-  in_transit: string;
 }
 
 function reportFilters(userId: string, grants: readonly unknown[], query: StockSummaryQueryDto): Record<string, unknown> {
@@ -86,16 +85,11 @@ export class StockReportService {
               un.code AS unit_code,un.display_name AS unit_name,un.scale AS unit_scale,
               inventory.on_hand::text AS on_hand,inventory.reserved::text AS reserved,
               (inventory.on_hand-inventory.reserved)::text AS available,
-              COALESCE(held.held,'0') AS held,COALESCE(custody.in_transit,'0') AS in_transit
+              COALESCE(held.held,'0') AS held
          FROM inventory
          JOIN item i ON i.id=inventory.item_id
          JOIN unit un ON un.code=i.unit_code
          LEFT JOIN held ON held.warehouse_id=inventory.warehouse_id AND held.item_id=inventory.item_id
-         LEFT JOIN LATERAL (
-           SELECT SUM(line.in_transit_quantity)::text AS in_transit
-             FROM distribution_line line
-            WHERE line.warehouse_id=inventory.warehouse_id AND line.item_id=inventory.item_id
-         ) custody ON TRUE
         ${conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''}
         ORDER BY inventory.warehouse_id ASC,inventory.item_id ASC LIMIT $${values.length}`,
       values,
@@ -112,7 +106,6 @@ export class StockReportService {
         reserved: row.reserved,
         available: row.available,
         held: row.held,
-        in_transit: row.in_transit,
       })),
       more: rows.length > limit,
       ...(rows.length > limit && last ? {

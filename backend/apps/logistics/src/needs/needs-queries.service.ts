@@ -13,7 +13,8 @@ import { FulfillmentQueryDto, NeedContributionsQueryDto, NeedsListQueryDto } fro
 import { NeedEstimateBasis, needSourceView, referenceEstimateSql } from './needs.helpers';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
-const readPermissions: readonly Permission[] = ['NEED_MANAGE', 'REPORT_READ'];
+// Per-SOS needs are read by coordinators only; operations staff see aggregated reports, never one SOS (2026-11-26).
+const readPermissions: readonly Permission[] = ['NEED_MANAGE'];
 
 interface NeedQueryRow extends Record<string, unknown> {
   id: string;
@@ -31,8 +32,6 @@ interface NeedQueryRow extends Record<string, unknown> {
   committed_reserved: string;
   issued_unsettled: string;
   delivered: string;
-  returned: string;
-  lost: string;
   cancelled_remaining: string | null;
   status: string;
   source: 'DECLARED' | 'ESTIMATED' | 'CONFIRMED';
@@ -61,8 +60,6 @@ interface ContributionRow extends Record<string, unknown> {
   released_quantity: string;
   issued_quantity: string;
   delivered_quantity: string;
-  returned_quantity: string;
-  lost_quantity: string;
   created_by_user_id: string;
   created_at: Date | string;
   cursor_created_at: string;
@@ -109,10 +106,8 @@ function needTotalsQuery(includeContributions = false): string {
          n.item_id,i.name AS item_name,u.code AS unit_code,u.display_name AS unit_name,u.scale AS unit_scale,
          n.original_quantity::text AS original,n.requested_quantity::text AS requested,
          COALESCE(sum(cm.quantity-cm.released_quantity-cm.issued_quantity),0)::text AS committed_reserved,
-         COALESCE(sum(cm.issued_quantity-cm.delivered_quantity-cm.returned_quantity-cm.lost_quantity),0)::text AS issued_unsettled,
+         COALESCE(sum(cm.issued_quantity-cm.delivered_quantity),0)::text AS issued_unsettled,
          COALESCE(sum(cm.delivered_quantity),0)::text AS delivered,
-         COALESCE(sum(cm.returned_quantity),0)::text AS returned,
-         COALESCE(sum(cm.lost_quantity),0)::text AS lost,
          n.cancelled_remaining::text AS cancelled_remaining,n.status,n.source,n.estimate_basis,
          ${referenceEstimateSql} AS reference_estimate_quantity,
          n.version,n.created_at,
@@ -129,15 +124,13 @@ const boardContributionsJoin = `
     SELECT COALESCE(jsonb_agg(jsonb_build_object(
              'id',x.id,'warehouse_id',x.warehouse_id,'warehouse_name',x.warehouse_name,
              'quantity',x.quantity,'released_quantity',x.released_quantity,'issued_quantity',x.issued_quantity,
-             'delivered_quantity',x.delivered_quantity,'returned_quantity',x.returned_quantity,
-             'lost_quantity',x.lost_quantity,'created_by_user_id',x.created_by_user_id,'created_at',x.created_at
+             'delivered_quantity',x.delivered_quantity,'created_by_user_id',x.created_by_user_id,'created_at',x.created_at
            ) ORDER BY x.created_at,x.id) FILTER (WHERE x.row_number <= 20),'[]'::jsonb) AS contributions,
            count(*) > 20 AS contributions_more
       FROM (
         SELECT cm.id,cm.warehouse_id,w.name AS warehouse_name,cm.quantity::text AS quantity,
                cm.released_quantity::text AS released_quantity,cm.issued_quantity::text AS issued_quantity,
-               cm.delivered_quantity::text AS delivered_quantity,cm.returned_quantity::text AS returned_quantity,
-               cm.lost_quantity::text AS lost_quantity,cm.created_by_user_id,cm.created_at,
+               cm.delivered_quantity::text AS delivered_quantity,cm.created_by_user_id,cm.created_at,
                row_number() OVER (ORDER BY cm.created_at,cm.id) AS row_number
           FROM commitment cm JOIN warehouse w ON w.id=cm.warehouse_id
          WHERE cm.relief_need_id=n.id ORDER BY cm.created_at,cm.id LIMIT 21
@@ -150,7 +143,7 @@ function normalized(value: string | null, scale: number): string | null {
 
 function contributionValue(row: ContributionRow, scale: number): Record<string, unknown> {
   const issued = quantityUnits(row.issued_quantity, scale);
-  const settled = quantityUnits(row.delivered_quantity, scale) + quantityUnits(row.returned_quantity, scale) + quantityUnits(row.lost_quantity, scale);
+  const settled = quantityUnits(row.delivered_quantity, scale);
   const released = quantityUnits(row.released_quantity, scale);
   const quantity = quantityUnits(row.quantity, scale);
   return {
@@ -161,8 +154,6 @@ function contributionValue(row: ContributionRow, scale: number): Record<string, 
     reserved_remaining: decimalFromUnits(quantity - released - issued, scale),
     issued_unsettled: decimalFromUnits(issued - settled, scale),
     delivered: decimalFromUnits(quantityUnits(row.delivered_quantity, scale), scale),
-    returned: decimalFromUnits(quantityUnits(row.returned_quantity, scale), scale),
-    lost: decimalFromUnits(quantityUnits(row.lost_quantity, scale), scale),
     created_by_user_id: row.created_by_user_id,
     created_at: new Date(row.created_at).toISOString(),
   };
@@ -195,8 +186,6 @@ function needTotals(row: NeedQueryRow): Record<string, unknown> {
     committed_reserved: normalized(row.committed_reserved, scale),
     issued_unsettled: normalized(row.issued_unsettled, scale),
     delivered: decimalFromUnits(delivered, scale),
-    returned: normalized(row.returned, scale),
-    lost: normalized(row.lost, scale),
     outstanding: decimalFromUnits(outstanding, scale),
     cancelled_remaining: normalized(row.cancelled_remaining, scale),
     status: row.status,
@@ -320,7 +309,7 @@ export class NeedsQueriesService {
     const rows = await this.dataSource.query(
       `SELECT cm.id,cm.warehouse_id,w.name AS warehouse_name,cm.quantity::text,
               cm.released_quantity::text,cm.issued_quantity::text,cm.delivered_quantity::text,
-              cm.returned_quantity::text,cm.lost_quantity::text,cm.created_by_user_id,cm.created_at,
+              cm.created_by_user_id,cm.created_at,
               to_char(cm.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at
          FROM commitment cm JOIN warehouse w ON w.id=cm.warehouse_id
         WHERE cm.relief_need_id=$1 ${cursorWhere}

@@ -30,7 +30,6 @@ interface CycleIntentRow {
 interface CycleSettlement {
   has_open_needs: boolean;
   has_reserved: boolean;
-  has_unsettled_issued: boolean;
   has_delivered: boolean;
 }
 
@@ -228,8 +227,6 @@ export class FulfillmentCyclesService {
          EXISTS (SELECT 1 FROM commitment cm JOIN relief_need n ON n.id=cm.relief_need_id
                   WHERE n.cycle_id=$1 AND cm.quantity-cm.released_quantity-cm.issued_quantity>0) AS has_reserved,
          EXISTS (SELECT 1 FROM commitment cm JOIN relief_need n ON n.id=cm.relief_need_id
-                  WHERE n.cycle_id=$1 AND cm.issued_quantity-cm.delivered_quantity-cm.returned_quantity-cm.lost_quantity>0) AS has_unsettled_issued,
-         EXISTS (SELECT 1 FROM commitment cm JOIN relief_need n ON n.id=cm.relief_need_id
                   WHERE n.cycle_id=$1 AND cm.delivered_quantity>0) AS has_delivered`,
       [cycleId],
     ) as CycleSettlement[];
@@ -239,7 +236,6 @@ export class FulfillmentCyclesService {
     const reasons: string[] = [];
     if (settlement.has_open_needs) reasons.push('OPEN_NEED');
     if (settlement.has_reserved) reasons.push('RESERVED_QUANTITY');
-    if (settlement.has_unsettled_issued) reasons.push('UNSETTLED_ISSUE');
     if (basis === 'SUPPLY_ONLY' && !settlement.has_delivered) reasons.push('NO_DELIVERED_AID');
     if (basis === 'NO_ACTION_REQUIRED' && settlement.has_delivered) reasons.push('DELIVERED_AID_PRESENT');
     if (reasons.length) throw new AppError('CYCLE_NOT_SETTLED', { status: 409, details: { reasons } });

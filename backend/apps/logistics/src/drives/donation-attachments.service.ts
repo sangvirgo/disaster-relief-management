@@ -32,7 +32,6 @@ interface DonationAttachmentRow {
   id: string;
   delivery_id: string | null;
   dispute_id: string | null;
-  handoff_id: null;
   object_key: string;
   state: 'PENDING' | 'READY' | 'FAILED';
   declared_bytes: number | string;
@@ -138,7 +137,7 @@ export class DonationAttachmentsService {
          JOIN donation_delivery dd ON dd.id=coalesce(a.delivery_id,dispute.delivery_id)
          JOIN donation_drive d ON d.id=dd.drive_id
          JOIN warehouse w ON w.id=d.intake_warehouse_id
-        WHERE a.id=$1 AND a.state='READY' AND a.handoff_id IS NULL`, [attachmentId],
+        WHERE a.id=$1 AND a.state='READY'`, [attachmentId],
     ) as DonationAttachmentOwner[];
     const attachment = rows[0];
     if (!attachment) throw new AppError('NOT_FOUND', { status: 404 });
@@ -197,7 +196,7 @@ export class DonationAttachmentsService {
   ): Promise<Record<string, unknown>> {
     if (resource?.type !== 'logistics_attachment') throw new AppError('INTERNAL_ERROR', { status: 500 });
     const rows = await manager.query(
-      `SELECT id,delivery_id,dispute_id,handoff_id,object_key,state,declared_bytes,size_bytes,detected_mime,checksum,created_at
+      `SELECT id,delivery_id,dispute_id,object_key,state,declared_bytes,size_bytes,detected_mime,checksum,created_at
          FROM logistics_attachment WHERE id=$1 AND ${disputeId ? 'dispute_id=$3' : 'delivery_id=$2'} AND ${disputeId ? 'EXISTS (SELECT 1 FROM donation_dispute WHERE id=$3 AND delivery_id=$2)' : 'TRUE'}`,
       disputeId ? [resource.id, deliveryId, disputeId] : [resource.id, deliveryId],
     ) as DonationAttachmentRow[];

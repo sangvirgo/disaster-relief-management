@@ -12,7 +12,7 @@ import { EvidenceModule } from './evidence/evidence.module';
 import { FulfillmentCyclesModule } from './fulfillment-cycles/fulfillment-cycles.module';
 import { ReportsModule } from './reports/reports.module';
 import { SupplyGapsModule } from './supply-gaps/supply-gaps.module';
-import { PickupTicketsModule } from './pickup-tickets/pickup-tickets.module';
+import { SupplyRequestsModule } from './supply-requests/supply-requests.module';
 import { NeedExtractionModule } from './need-extraction/need-extraction.module';
 
 @Module({
@@ -29,7 +29,7 @@ import { NeedExtractionModule } from './need-extraction/need-extraction.module';
     ReportsModule,
     AuditModule,
     SupplyGapsModule,
-    PickupTicketsModule,
+    SupplyRequestsModule,
     NeedExtractionModule,
   ],
 })

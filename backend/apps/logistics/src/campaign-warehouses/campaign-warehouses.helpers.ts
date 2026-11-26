@@ -31,7 +31,7 @@ export interface CandidateRow {
   distance_m: number;
   open_needed_items: number;
   needed_items_in_stock: number;
-  open_distributions: number;
+  open_supply_requests: number;
 }
 
 /** A stored campaign_warehouse row. */
@@ -86,7 +86,7 @@ export function rankCandidates(candidates: readonly CandidateRow[]): CandidateRo
     const leftStock = left.needed_items_in_stock > 0 ? 1 : 0;
     const rightStock = right.needed_items_in_stock > 0 ? 1 : 0;
     if (leftStock !== rightStock) return rightStock - leftStock;
-    if (left.open_distributions !== right.open_distributions) return left.open_distributions - right.open_distributions;
+    if (left.open_supply_requests !== right.open_supply_requests) return left.open_supply_requests - right.open_supply_requests;
     if (left.distance_m !== right.distance_m) return left.distance_m - right.distance_m;
     return left.warehouse_id < right.warehouse_id ? -1 : left.warehouse_id > right.warehouse_id ? 1 : 0;
   });

@@ -13,8 +13,10 @@ export interface ResponseMission {
   request_id: string;
   campaign_id: string | null;
   team_id: string;
+  team_name: string;
   work_cycle: number;
   member_user_ids: string[];
+  leader_user_ids: string[];
 }
 
 function unavailable(): AppError {
@@ -31,7 +33,7 @@ export class LogisticsResponseMissionClient {
   ) {}
 
   async getMission(id: string): Promise<ResponseMission> {
-    if (!uuidPattern.test(id)) throw new AppError('PICKUP_MISSION_NOT_FOUND', { status: 404 });
+    if (!uuidPattern.test(id)) throw new AppError('SUPPLY_MISSION_NOT_FOUND', { status: 404 });
     let result;
     try {
       const token = await this.identity.serviceToken('response');
@@ -42,12 +44,14 @@ export class LogisticsResponseMissionClient {
       if (error instanceof AppError && error.code === 'RESPONSE_UNAVAILABLE') throw error;
       throw unavailable();
     }
-    if (result.status === 404) throw new AppError('PICKUP_MISSION_NOT_FOUND', { status: 404 });
+    if (result.status === 404) throw new AppError('SUPPLY_MISSION_NOT_FOUND', { status: 404 });
     if (result.status !== 200 || !result.body || typeof result.body !== 'object') throw unavailable();
     const value = result.body as Record<string, unknown>;
     const members = value.member_user_ids;
+    const leaders = value.leader_user_ids;
     const campaignId = value.campaign_id;
     if (value.id !== id || typeof value.request_id !== 'string' || typeof value.team_id !== 'string' ||
+        typeof value.team_name !== 'string' || !Array.isArray(leaders) || !leaders.every((leader) => typeof leader === 'string') ||
         !Number.isInteger(value.work_cycle) || !(MISSION_STATUSES as readonly string[]).includes(String(value.status)) ||
         !(campaignId === null || typeof campaignId === 'string') || !Array.isArray(members) ||
         !members.every((member) => typeof member === 'string')) throw unavailable();
@@ -57,8 +61,10 @@ export class LogisticsResponseMissionClient {
       request_id: value.request_id,
       campaign_id: campaignId,
       team_id: value.team_id,
+      team_name: value.team_name,
       work_cycle: value.work_cycle as number,
       member_user_ids: members as string[],
+      leader_user_ids: leaders as string[],
     };
   }
 }

@@ -3,7 +3,6 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import type { DataSource } from 'typeorm';
 import { AppError } from '@c48/technical/errors/errors';
 import { encodeKeysetCursor } from '@c48/technical/pagination/keyset';
-import { finalDistributionHandoffPredicate } from './donation-report.helpers';
 import { decodeReportIdCursor } from './reports.helpers';
 import type { PublicDonationReportQueryDto } from './reports.dto';
 
@@ -54,7 +53,7 @@ export class DonationReportService {
       filter = `drive.id=$1::uuid AND movement.movement_type IN ('RECEIPT','RECEIPT_HELD_RELEASE')`;
     } else {
       metric = 'distributed';
-      filter = view === 'CAMPAIGN_DISTRIBUTED' ? 'distribution.campaign_id=$1::uuid' : 'distribution.warehouse_id=$1::uuid';
+      filter = view === 'CAMPAIGN_DISTRIBUTED' ? 'supply.campaign_id=$1::uuid' : 'supply.warehouse_id=$1::uuid';
     }
     const after = cursor
       ? (values.push(cursor.id, cursor.id), `AND (item.id,item.id)>($${values.length - 1}::uuid,$${values.length}::uuid)`)
@@ -72,18 +71,14 @@ export class DonationReportService {
            JOIN item ON item.id=balance.item_id JOIN unit ON unit.code=item.unit_code
           WHERE ${filter} ${after}
           GROUP BY item.id,unit.code ORDER BY item.id ASC LIMIT $${values.length}`
+      // Goods handed to rescue teams through supply requests (issued and delivered in one step).
       : `SELECT item.id AS item_id,item.name AS item_name,unit.code AS unit_code,unit.display_name AS unit_name,
-                unit.scale AS unit_scale,SUM(line.quantity)::text AS quantity
-           FROM handoff_record handoff
-           JOIN handoff_line line ON line.handoff_id=handoff.id
-           JOIN distribution_line distributionLine ON distributionLine.id=line.distribution_line_id
-           JOIN distribution ON distribution.id=distributionLine.distribution_id
-           LEFT JOIN commitment ON commitment.id=distributionLine.commitment_id
-           LEFT JOIN relief_need need ON need.id=commitment.relief_need_id
-           JOIN item ON item.id=distributionLine.item_id JOIN unit ON unit.code=item.unit_code
-          WHERE ${filter}
-            AND ${finalDistributionHandoffPredicate}
-            ${after}
+                unit.scale AS unit_scale,SUM(commitment.delivered_quantity)::text AS quantity
+           FROM supply_request supply
+           JOIN supply_request_line line ON line.supply_request_id=supply.id
+           JOIN commitment ON commitment.id=line.commitment_id
+           JOIN item ON item.id=line.item_id JOIN unit ON unit.code=item.unit_code
+          WHERE supply.status='HANDED_OVER' AND ${filter} ${after}
           GROUP BY item.id,unit.code ORDER BY item.id ASC LIMIT $${values.length}`;
 
     const rows = await this.dataSource.query(sql, values) as DonationReportRow[];

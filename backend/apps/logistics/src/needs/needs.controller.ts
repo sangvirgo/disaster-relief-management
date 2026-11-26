@@ -5,16 +5,14 @@ import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotenc
 import type { IdempotentResult } from '@c48/technical/idempotency/idempotency';
 import { LogisticsServiceTokenGuard } from '../auth/logistics-service-token.guard';
 import {
-  AdjustNeedQuantityDto, CancelNeedDto, ConfirmNeedDto, CreateNeedCommitmentDto, CreateNeedDto, EstimateNeedsDto, FulfillmentQueryDto,
-  NeedContributionsQueryDto, NeedNormPatchDto, NeedsListQueryDto, ReleaseCommitmentDto,
+  AdjustNeedQuantityDto, CancelNeedDto, ConfirmNeedDto, CreateNeedDto, EstimateNeedsDto, FulfillmentQueryDto,
+  NeedContributionsQueryDto, NeedNormPatchDto, NeedsListQueryDto,
 } from './needs.dto';
 import { NeedCommandsService } from './need-commands.service';
-import { NeedCommitmentsService } from './need-commitments.service';
 import { NeedNormsService } from './need-norms.service';
 import { NeedCommandRequest } from './needs.helpers';
 import { NeedsQueriesService } from './needs-queries.service';
 import { NeedsService } from './needs.service';
-import { UnaccountedGoodsGuard } from '../pickup-tickets/unaccounted-goods.service';
 import { noStore } from '@c48/technical/http/response-headers';
 
 function actorRequest(request: Request): Request {
@@ -31,10 +29,8 @@ export class NeedsController {
   constructor(
     private readonly needs: NeedsService,
     private readonly commands: NeedCommandsService,
-    private readonly commitments: NeedCommitmentsService,
     private readonly queries: NeedsQueriesService,
     private readonly norms: NeedNormsService,
-    private readonly unaccountedGoods: UnaccountedGoodsGuard,
   ) {}
 
   @Get('needs')
@@ -63,8 +59,6 @@ export class NeedsController {
     @Res({ passthrough: true }) response: Response,
   ) {
     noStore(response);
-    // Response calls this read before it creates a resolution intent: refuse while goods on a HANDED_OVER pickup are unaccounted.
-    await this.unaccountedGoods.assertRequestResolvable(requestId);
     return this.queries.fulfillment(requestId, query, actorRequest(request));
   }
 
@@ -130,32 +124,6 @@ export class NeedsController {
   ) {
     noStore(response);
     return this.commandResult(response, this.commands.cancel(id, dto, request));
-  }
-
-  @Post('needs/:id/commitments')
-  @HttpCode(HttpStatus.CREATED)
-  @UseInterceptors(IdempotencyKeyInterceptor)
-  createCommitment(
-    @Param('id', new ParseUUIDPipe({ version: 'all' })) id: string,
-    @Body() dto: CreateNeedCommitmentDto,
-    @Req() request: NeedCommandRequest,
-    @Res({ passthrough: true }) response: Response,
-  ) {
-    noStore(response);
-    return this.commandResult(response, this.commitments.create(id, dto, request));
-  }
-
-  @Post('commitments/:id/release')
-  @HttpCode(HttpStatus.OK)
-  @UseInterceptors(IdempotencyKeyInterceptor)
-  releaseCommitment(
-    @Param('id', new ParseUUIDPipe({ version: 'all' })) id: string,
-    @Body() dto: ReleaseCommitmentDto,
-    @Req() request: NeedCommandRequest,
-    @Res({ passthrough: true }) response: Response,
-  ) {
-    noStore(response);
-    return this.commandResult(response, this.commitments.release(id, dto, request));
   }
 
   @Post('needs/estimate')

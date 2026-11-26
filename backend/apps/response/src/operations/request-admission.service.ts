@@ -5,7 +5,7 @@ import type { DataSource, EntityManager } from 'typeorm';
 import { AppError } from '@c48/technical/errors/errors';
 import { ReporterSessionService } from '../requests/reporter-session';
 import { hasPendingSupplement } from './request-operations.verification.helpers';
-import { assertRequestPermission } from '../requests/request-scope';
+import { canAccessRequest } from '../requests/request-scope';
 
 interface AdmissionRequestRow {
   id: string;
@@ -36,7 +36,10 @@ export class RequestAdmissionService {
     const session = await this.sessions.require(request);
     return this.dataSource.transaction(async (manager) => {
       const row = await this.findRequest(manager, requestId);
-      assertRequestPermission(session, 'NEED_MANAGE', row);
+      if (!canAccessRequest(session, 'NEED_MANAGE', row) && !canAccessRequest(session, 'MISSION_RECORD_ON_BEHALF', row) &&
+          !(await this.isActiveMissionMember(manager, requestId, workCycle, session.userId))) {
+        throw new AppError('FORBIDDEN', { status: 403 });
+      }
       if (Number(row.work_cycle) !== workCycle) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
       if (!['VERIFIED', 'TRIAGED', 'DISPATCHED', 'IN_PROGRESS'].includes(row.status)) {
         throw new AppError('REQUEST_NOT_VERIFIED', { status: 409 });
@@ -59,6 +62,19 @@ export class RequestAdmissionService {
 
       return this.view(row, await this.subjectCounts(manager, requestId));
     });
+  }
+
+  /**
+   * A member of a team with a live mission on this cycle may admit the SOS to Logistics: the team asks for goods for its
+   * own mission (supply requests, user decision 2026-11-26). The member never sees anything beyond the admission facts.
+   */
+  private async isActiveMissionMember(manager: Pick<EntityManager, 'query'>, requestId: string, workCycle: number, userId: string): Promise<boolean> {
+    const rows = await manager.query(
+      `SELECT 1 FROM mission m JOIN team_member tm ON tm.team_id=m.team_id AND tm.left_at IS NULL
+        WHERE m.request_id=$1 AND m.work_cycle=$2 AND tm.user_id=$3 AND m.status IN ('ACCEPTED','EN_ROUTE','ON_SCENE') LIMIT 1`,
+      [requestId, workCycle, userId],
+    ) as unknown[];
+    return rows.length > 0;
   }
 
   private async findRequest(manager: Pick<EntityManager, 'query'>, requestId: string): Promise<AdmissionRequestRow> {

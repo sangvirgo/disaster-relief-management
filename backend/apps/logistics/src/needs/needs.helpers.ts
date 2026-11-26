@@ -154,7 +154,7 @@ export async function readNeed(manager: Pick<EntityManager, 'query'>, id: string
 export async function writeNeedAudit(
   manager: Pick<EntityManager, 'query'>,
   actorId: string | null,
-  action: 'NEED_CREATED' | 'NEED_INCREASED' | 'NEED_REDUCED' | 'NEED_CANCELLED' | 'NEED_ESTIMATED' | 'NEED_CONFIRMED',
+  action: 'NEED_CREATED' | 'NEED_INCREASED' | 'NEED_REDUCED' | 'NEED_CANCELLED' | 'NEED_ESTIMATED' | 'NEED_CONFIRMED' | 'NEED_REQUESTED_BY_TEAM',
   needId: string,
   before: Record<string, unknown> | null,
   after: Record<string, unknown>,

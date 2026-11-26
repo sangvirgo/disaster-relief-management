@@ -38,6 +38,12 @@ const roles = [
   'REVIEWER',
   'ADMIN',
 ];
+const SUB_COORDINATOR_SCOPE = 'SUB_COORDINATOR';
+const subCoordinatorLabel = 'Điều phối viên phụ (tự chọn chiến dịch)';
+const subCoordinatorHint = 'Điều phối viên phụ tự chọn chiến dịch đang hoạt động trên bản đồ điểm nóng rồi xử lý SOS trong chiến dịch đó. Không xử lý SOS chưa thuộc chiến dịch, không tạo hay quản lý chiến dịch.';
+function grantScopeLabel(grant: { role_code: string; scope_type: string; campaign_id?: string | null }): string {
+  return grant.role_code === 'COORDINATOR' && grant.scope_type === 'CAMPAIGN' && !grant.campaign_id ? subCoordinatorLabel : label(grant.scope_type);
+}
 const systemOperationsWarning = 'Phạm vi toàn hệ thống cho quản lý vận hành: người này sẽ điều khiển TẤT CẢ chiến dịch (tiếp nhận, phân phối, bàn giao và đối soát), cùng danh mục, kho và nhu cầu vật tư. Chỉ chọn khi thật sự cần; nên chọn phạm vi chiến dịch.';
 const types: Record<string, string> = {
   app_user: 'Người dùng',
@@ -278,7 +284,7 @@ export function Admin({ page }: { page: string }) {
                   detail.grants.map((grant) => (
                     <div className="candidate" key={grant.id}>
                       <p>
-                        {label(grant.role_code)} · {label(grant.scope_type)}{' '}
+                        {label(grant.role_code)} · {grantScopeLabel(grant)}{' '}
                         {grant.campaign_id && <> · Chiến dịch {grant.campaign_id}</>}
                         {grant.revoked_at ? ' (đã thu hồi)' : ''}
                       </p>
@@ -289,7 +295,7 @@ export function Admin({ page }: { page: string }) {
                 )}
             </>
             <div className="action-grid admin-user-actions">
-              {page === 'users' && userAction === 'revoke' && <div className="admin-selected-action"><label>Quyền cần thu hồi<Dropdown value={revokeGrantId} onChange={event => setRevokeGrantId(event.target.value)}><option value="">Chọn quyền</option>{detail.grants?.filter(grant => !grant.revoked_at).map(grant => <option key={grant.id} value={grant.id}>{label(grant.role_code)} · {label(grant.scope_type)}{grant.campaign_id ? ` · Chiến dịch ${grant.campaign_id}` : ''}</option>)}</Dropdown></label>{revokeGrantId && <CommandForm key={revokeGrantId} spec={{ title: 'Thu hồi quyền', service: 'identity', path: `/grants/${revokeGrantId}/revoke`, warning: `Thu hồi quyền này của ${detail.username}?`, fields: [{ name: 'reason', label: 'Lý do thu hồi', type: 'textarea', required: true, maxLength: 500 }] }} onSuccess={success} />}</div>}
+              {page === 'users' && userAction === 'revoke' && <div className="admin-selected-action"><label>Quyền cần thu hồi<Dropdown value={revokeGrantId} onChange={event => setRevokeGrantId(event.target.value)}><option value="">Chọn quyền</option>{detail.grants?.filter(grant => !grant.revoked_at).map(grant => <option key={grant.id} value={grant.id}>{label(grant.role_code)} · {grantScopeLabel(grant)}{grant.campaign_id ? ` · Chiến dịch ${grant.campaign_id}` : ''}</option>)}</Dropdown></label>{revokeGrantId && <CommandForm key={revokeGrantId} spec={{ title: 'Thu hồi quyền', service: 'identity', path: `/grants/${revokeGrantId}/revoke`, warning: `Thu hồi quyền này của ${detail.username}?`, fields: [{ name: 'reason', label: 'Lý do thu hồi', type: 'textarea', required: true, maxLength: 500 }] }} onSuccess={success} />}</div>}
               {['users', 'grants', 'overview'].includes(page) && userAction === 'disable' && detail.status === 'ACTIVE' && (
                 <CommandForm
                   spec={{
@@ -348,7 +354,8 @@ export function Admin({ page }: { page: string }) {
                       const scopeDetails = [
                         values.campaign_id && `Chiến dịch ${values.campaign_id}`,
                       ].filter(Boolean).join(' · ');
-                      return `Cấp quyền ${label(values.role_code)} · ${label(values.scope_type)}${scopeDetails ? ` · ${scopeDetails}` : ''} cho ${detail.username}? Phiên hiện tại của người này sẽ bị thu hồi.`;
+                      const scopeName = values.scope_type === SUB_COORDINATOR_SCOPE ? subCoordinatorLabel : label(values.scope_type);
+                      return `Cấp quyền ${label(values.role_code)} · ${scopeName}${scopeDetails ? ` · ${scopeDetails}` : ''} cho ${detail.username}? Phiên hiện tại của người này sẽ bị thu hồi.`;
                     },
                     fields: [
                       {
@@ -365,12 +372,16 @@ export function Admin({ page }: { page: string }) {
                         type: 'select',
                         required: true,
                         defaultFor: (values) => (values.role_code === 'OPERATIONS_MANAGER' ? 'CAMPAIGN' : undefined),
-                        hintFor: (values) => (values.role_code === 'OPERATIONS_MANAGER' && values.scope_type === 'SYSTEM' ? systemOperationsWarning : undefined),
-                        optionsFor: (values) => (
-                          ['ADMIN', 'CITIZEN', 'VOLUNTEER'].includes(values.role_code)
+                        // A coordinator is either primary (SYSTEM) or a sub-coordinator that chooses its campaigns itself:
+                        // COORDINATOR at CAMPAIGN scope without a campaign. Same role, fewer rights; no campaign code to enter.
+                        optionsFor: (values) => values.role_code === 'COORDINATOR'
+                          ? [{ value: 'SYSTEM', label: 'Toàn hệ thống (điều phối viên chính)' }, { value: SUB_COORDINATOR_SCOPE, label: subCoordinatorLabel }]
+                          : (['ADMIN', 'CITIZEN', 'VOLUNTEER'].includes(values.role_code)
                             ? ['SYSTEM']
                             : values.role_code ? ['SYSTEM', 'CAMPAIGN'] : []
-                        ).map((value) => ({ value, label: label(value) })),
+                          ).map((value) => ({ value, label: label(value) })),
+                        hintFor: (values) => values.role_code === 'OPERATIONS_MANAGER' && values.scope_type === 'SYSTEM' ? systemOperationsWarning
+                          : values.scope_type === SUB_COORDINATOR_SCOPE ? subCoordinatorHint : undefined,
                         resetOnChange: ['campaign_id'],
                       },
                       { name: 'campaign_id', label: 'Chiến dịch', type: 'reference', required: true, visibleWhen: { field: 'scope_type', value: 'CAMPAIGN' }, placeholder: 'Dán mã chiến dịch cần cấp quyền' },
@@ -379,7 +390,7 @@ export function Admin({ page }: { page: string }) {
                     ],
                     build: (values) => ({
                       role_code: values.role_code,
-                      scope_type: values.scope_type,
+                      scope_type: values.scope_type === SUB_COORDINATOR_SCOPE ? 'CAMPAIGN' : values.scope_type,
                       ...(values.scope_type === 'CAMPAIGN' ? { campaign_id: values.campaign_id } : {}),
                       reason: values.reason?.trim() || 'Cấp quyền theo thao tác của quản trị viên.',
                     }),

@@ -322,18 +322,16 @@ export class StockService {
   ): Promise<void> {
     const rows = await manager.query(
       `SELECT id,balance_id,movement_type,delta_on_hand::text AS delta_on_hand,delta_reserved::text AS delta_reserved,
-              receipt_id,commitment_id,distribution_line_id,handoff_line_id,adjustment_id
+              receipt_id,commitment_id,adjustment_id
          FROM stock_movement WHERE id=$1`,
       [dto.compensates_movement_id],
     ) as Array<{
       id: string; balance_id: string; movement_type: string; delta_on_hand: string; delta_reserved: string;
-      receipt_id: string | null; commitment_id: string | null; distribution_line_id: string | null;
-      handoff_line_id: string | null; adjustment_id: string | null;
+      receipt_id: string | null; commitment_id: string | null; adjustment_id: string | null;
     }>;
     const movement = rows[0];
     if (!movement || movement.balance_id !== balance.id || !['OPENING', 'ADJUSTMENT'].includes(movement.movement_type) ||
-        quantityUnits(movement.delta_reserved, 3) !== 0n || movement.receipt_id || movement.commitment_id ||
-        movement.distribution_line_id || movement.handoff_line_id) {
+        quantityUnits(movement.delta_reserved, 3) !== 0n || movement.receipt_id || movement.commitment_id) {
       throw new AppError('VALIDATION_FAILED', { status: 400 });
     }
     if (quantityUnits(dto.delta_on_hand, Number(balance.scale)) !== -quantityUnits(movement.delta_on_hand, Number(balance.scale))) {

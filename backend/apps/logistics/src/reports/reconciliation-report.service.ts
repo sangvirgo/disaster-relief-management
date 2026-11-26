@@ -5,7 +5,6 @@ import type { DataSource } from 'typeorm';
 import { AppError } from '@c48/technical/errors/errors';
 import { encodeKeysetCursor } from '@c48/technical/pagination/keyset';
 import { LogisticsSessionService } from '../auth/logistics-session.service';
-import { physicalHandoffsLateralSql } from './reconciliation-report.helpers';
 import { decodeReportIdCursor } from './reports.helpers';
 import { reportScopeSql } from './reports.scope';
 import type { ReconciliationQueryDto } from './reports.dto';
@@ -21,10 +20,7 @@ interface ReconciliationRow {
   posted_movements: string;
   posted_reserved_movements: string;
   reserved: string;
-  issued_in_transit: string;
   delivered: string;
-  returned: string;
-  lost: string;
   balance_mismatch: boolean;
   commitment_counter_mismatch: boolean;
 }
@@ -52,7 +48,7 @@ export class ReconciliationReportService {
     const cursor = decodeReportIdCursor(query.cursor, filters);
     const values: unknown[] = [];
     const conditions = [
-      reportScopeSql(session.grants, ['REPORT_READ', 'DISTRIBUTION_REVIEW'], values, 'w', ['SYSTEM']),
+      reportScopeSql(session.grants, ['REPORT_READ'], values, 'w', ['SYSTEM']),
     ];
     values.push(query.warehouse_id);
     conditions.push(`b.warehouse_id=$${values.length}::uuid`);
@@ -74,10 +70,7 @@ export class ReconciliationReportService {
               COALESCE(movements.posted_movements,0)::text AS posted_movements,
               COALESCE(movements.posted_reserved_movements,0)::text AS posted_reserved_movements,
               b.reserved::text AS reserved,
-              COALESCE(custody.issued_in_transit,0)::text AS issued_in_transit,
-              (COALESCE(commitments.delivered,0)+COALESCE(physical_handoffs.delivered,0))::text AS delivered,
-              (COALESCE(commitments.returned,0)+COALESCE(physical_handoffs.returned,0))::text AS returned,
-              (COALESCE(commitments.lost,0)+COALESCE(physical_handoffs.lost,0))::text AS lost,
+              COALESCE(commitments.delivered,0)::text AS delivered,
               (b.on_hand<>COALESCE(movements.posted_movements,0) OR
                b.reserved<>COALESCE(movements.posted_reserved_movements,0)) AS balance_mismatch,
               COALESCE(commitments.counter_mismatch,false) AS commitment_counter_mismatch
@@ -94,31 +87,21 @@ export class ReconciliationReportService {
              FROM stock_movement movement WHERE movement.balance_id=b.id
          ) movements ON TRUE
          LEFT JOIN LATERAL (
-           SELECT SUM(line.in_transit_quantity) AS issued_in_transit
-             FROM distribution_line line
-            WHERE line.warehouse_id=b.warehouse_id AND line.item_id=b.item_id
-         ) custody ON TRUE
-         LEFT JOIN LATERAL (
+           -- Supply hand-over issues and delivers in one step, so delivered must equal issued, and issued must equal the
+           -- ISSUE movements written for the commitment.
            SELECT SUM(commitment.delivered_quantity) AS delivered,
-                  SUM(commitment.returned_quantity) AS returned,
-                  SUM(commitment.lost_quantity) AS lost,
                   BOOL_OR(
-                    commitment.delivered_quantity<>COALESCE(settlements.delivered,0) OR
-                    commitment.returned_quantity<>COALESCE(settlements.returned,0) OR
-                    commitment.lost_quantity<>COALESCE(settlements.lost,0)
+                    commitment.delivered_quantity<>commitment.issued_quantity OR
+                    commitment.issued_quantity<>COALESCE(issues.issued,0)
                   ) AS counter_mismatch
              FROM commitment
              LEFT JOIN LATERAL (
-               SELECT SUM(line.quantity) FILTER (WHERE settlement.settlement_type='DELIVERED') AS delivered,
-                      SUM(line.quantity) FILTER (WHERE settlement.settlement_type='RETURNED') AS returned,
-                      SUM(line.quantity) FILTER (WHERE settlement.settlement_type='LOST') AS lost
-                 FROM issued_line_settlement settlement
-                 JOIN handoff_line line ON line.id=settlement.handoff_line_id
-                WHERE settlement.commitment_id=commitment.id
-             ) settlements ON TRUE
+               SELECT -SUM(movement.delta_on_hand) AS issued
+                 FROM stock_movement movement
+                WHERE movement.commitment_id=commitment.id AND movement.movement_type='ISSUE'
+             ) issues ON TRUE
             WHERE commitment.warehouse_id=b.warehouse_id AND commitment.item_id=b.item_id
          ) commitments ON TRUE
-         ${physicalHandoffsLateralSql}
         WHERE ${conditions.join(' AND ')}
         ORDER BY b.id ASC LIMIT $${values.length}`,
       values,
@@ -134,10 +117,7 @@ export class ReconciliationReportService {
         posted_movements: row.posted_movements,
         posted_reserved_movements: row.posted_reserved_movements,
         reserved: row.reserved,
-        issued_in_transit: row.issued_in_transit,
         delivered: row.delivered,
-        returned: row.returned,
-        lost: row.lost,
         flags: {
           balance_mismatch: row.balance_mismatch,
           commitment_counter_mismatch: row.commitment_counter_mismatch,
@@ -151,7 +131,7 @@ export class ReconciliationReportService {
 
   private async authorizedWarehouse(warehouseId: string, grants: Parameters<typeof reportScopeSql>[0]): Promise<boolean> {
     const values: unknown[] = [warehouseId];
-    const scope = reportScopeSql(grants, ['REPORT_READ', 'DISTRIBUTION_REVIEW'], values, 'w', ['SYSTEM']);
+    const scope = reportScopeSql(grants, ['REPORT_READ'], values, 'w', ['SYSTEM']);
     const rows = await this.dataSource.query(
       `SELECT w.id FROM warehouse w WHERE w.id=$1::uuid AND ${scope} LIMIT 1`,
       values,

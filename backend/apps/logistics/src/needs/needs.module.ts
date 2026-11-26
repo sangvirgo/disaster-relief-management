@@ -6,12 +6,10 @@ import { LogisticsAuthModule } from '../auth/logistics-auth.module';
 import { LogisticsServiceTokenGuard } from '../auth/logistics-service-token.guard';
 import { ResponseCampaignModule } from '../integrations/response/response-campaign.module';
 import { NeedsController } from './needs.controller';
-import { NeedCommitmentsService } from './need-commitments.service';
 import { NeedNormsService } from './need-norms.service';
 import { NeedCommandsService } from './need-commands.service';
 import { NeedsQueriesService } from './needs-queries.service';
 import { NeedsService } from './needs.service';
-import { UnaccountedGoodsGuard } from '../pickup-tickets/unaccounted-goods.service';
 import {
   loadResponseAdmissionConfig, ResponseAdmissionClient, RESPONSE_ADMISSION_CLIENT,
   RESPONSE_ADMISSION_CONFIG,
@@ -23,10 +21,8 @@ import {
   providers: [
     NeedsService,
     NeedCommandsService,
-    NeedCommitmentsService,
     NeedsQueriesService,
     NeedNormsService,
-    UnaccountedGoodsGuard,
     LogisticsServiceTokenGuard,
     IdempotencyService,
     IdempotencyKeyInterceptor,
@@ -39,6 +35,6 @@ import {
         new CircuitBreakerClient(config.baseUrl, 'RESPONSE_UNAVAILABLE', { timeoutMs: config.timeoutMs, maxSockets: 10 }),
     },
   ],
-  exports: [NeedCommitmentsService],
+  exports: [ResponseAdmissionClient],
 })
 export class NeedsModule {}

@@ -29,8 +29,6 @@ interface CommitmentRow {
   released_quantity: string;
   issued_quantity: string;
   delivered_quantity: string;
-  returned_quantity: string;
-  lost_quantity: string;
   version: number | string;
 }
 
@@ -53,10 +51,8 @@ function totals(rows: readonly CommitmentRow[], scale: number): NeedTotals {
     const released = quantityUnits(row.released_quantity, scale);
     const issued = quantityUnits(row.issued_quantity, scale);
     const delivered = quantityUnits(row.delivered_quantity, scale);
-    const returned = quantityUnits(row.returned_quantity, scale);
-    const lost = quantityUnits(row.lost_quantity, scale);
     const reserved = quantity - released - issued;
-    const unsettledIssued = issued - delivered - returned - lost;
+    const unsettledIssued = issued - delivered;
     if (reserved < 0n || unsettledIssued < 0n) throw new AppError('INTERNAL_ERROR', { status: 500 });
     return {
       delivered: sum.delivered + delivered,
@@ -139,7 +135,7 @@ async function lockNeed(manager: Pick<EntityManager, 'query'>, needId: string, c
 async function lockCommitments(manager: Pick<EntityManager, 'query'>, needId: string): Promise<CommitmentRow[]> {
   return manager.query(
     `SELECT id,warehouse_id,quantity::text,released_quantity::text,issued_quantity::text,
-            delivered_quantity::text,returned_quantity::text,lost_quantity::text,version
+            delivered_quantity::text,version
        FROM commitment WHERE relief_need_id=$1 ORDER BY id FOR UPDATE`,
     [needId],
   ) as Promise<CommitmentRow[]>;

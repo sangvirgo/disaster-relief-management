@@ -11,7 +11,7 @@ export interface CycleCampaignTarget {
  *
  * Response lets the coordinator attach an unmatched SOS to a campaign later. The cycle's copied attribution normally stays
  * historical, but a cycle that only holds untouched proposals has nothing to keep historical: it is OPEN, has no live
- * intent, no DECLARED or CONFIRMED line and no commitment or pickup line. Only such a cycle adopts the campaign, so its
+ * intent, no DECLARED or CONFIRMED line and no commitment or supply request line. Only such a cycle adopts the campaign, so its
  * proposals reach the campaign's primary warehouse demand. Any other cycle keeps campaign_id NULL.
  *
  * Targets without a campaign are ignored. Returns the number of cycles updated.
@@ -30,7 +30,7 @@ export async function adoptCycleCampaigns(
         AND NOT EXISTS (SELECT 1 FROM cycle_intent i WHERE i.cycle_id=c.id AND i.state<>'ABORTED')
         AND NOT EXISTS (SELECT 1 FROM relief_need n WHERE n.cycle_id=c.id AND n.source<>'ESTIMATED')
         AND NOT EXISTS (SELECT 1 FROM relief_need n JOIN commitment m ON m.relief_need_id=n.id WHERE n.cycle_id=c.id)
-        AND NOT EXISTS (SELECT 1 FROM relief_need n JOIN pickup_ticket_line l ON l.relief_need_id=n.id WHERE n.cycle_id=c.id)
+        AND NOT EXISTS (SELECT 1 FROM relief_need n JOIN supply_request_line l ON l.relief_need_id=n.id WHERE n.cycle_id=c.id)
       RETURNING c.id`,
     [attached.map((target) => target.request_id), attached.map((target) => target.work_cycle), attached.map((target) => target.campaign_id)],
   ) as unknown;

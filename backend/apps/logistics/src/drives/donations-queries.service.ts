@@ -61,7 +61,7 @@ export class DonationsQueriesService {
     const attachments = canManage ? await this.dataSource.query(
       `SELECT a.id,a.state,a.size_bytes,a.detected_mime,a.created_at,a.dispute_id
          FROM logistics_attachment a
-        WHERE a.state='READY' AND a.handoff_id IS NULL
+        WHERE a.state='READY'
           AND (a.delivery_id=$1 OR a.dispute_id IN (SELECT id FROM donation_dispute WHERE delivery_id=$1))
         ORDER BY a.created_at DESC,a.id DESC LIMIT 10`,
       [id],

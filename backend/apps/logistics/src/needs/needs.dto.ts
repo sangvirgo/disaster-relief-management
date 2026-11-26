@@ -69,25 +69,6 @@ export class CancelNeedDto {
   reason!: string;
 }
 
-export class CreateNeedCommitmentDto {
-  @IsUUID('all')
-  warehouse_id!: string;
-
-  @IsString() @MaxLength(100) @Matches(decimalQuantity)
-  quantity!: string;
-}
-
-export class ReleaseCommitmentDto {
-  @Type(() => Number) @IsInt() @Min(1)
-  expected_version!: number;
-
-  @IsString() @MaxLength(100) @Matches(decimalQuantity)
-  quantity!: string;
-
-  @IsString() @MaxLength(1_000) @Matches(/\S/u)
-  reason!: string;
-}
-
 export class EstimateCategoryDto {
   @IsString() @Matches(/^[A-Z0-9_]{2,40}$/u)
   category!: string;
