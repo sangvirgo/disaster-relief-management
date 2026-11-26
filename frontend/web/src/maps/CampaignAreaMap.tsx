@@ -56,14 +56,18 @@ export type AreaEditor = {
   onChange: (center: { lat: number; lng: number }, radiusM: number) => void;
 };
 
-export type AreaExpansion = {
-  id: string;
+type AreaAnimationBase = {
   name: string;
   center: { lat: number; lng: number };
   fromRadiusM: number;
   toRadiusM: number;
   nonce: number;
 };
+
+export type AreaAnimation = AreaAnimationBase & (
+  | { kind: 'campaign'; id: string }
+  | { kind: 'draft'; id?: never }
+);
 
 const RADIUS_MIN_M = 500;
 const RADIUS_MAX_M = 300_000;
@@ -90,8 +94,8 @@ export function CampaignAreaMap({
   editActions,
   overlay,
   focusRequestId,
-  expansion,
-  onExpansionComplete,
+  animation,
+  onAnimationComplete,
   note,
   alert,
   height = 380,
@@ -111,9 +115,9 @@ export function CampaignAreaMap({
   note?: ReactNode;
   /** Pan/zoom to one SOS marker and pulse it; a new `nonce` re-triggers the focus. */
   focusRequestId?: { id: string; nonce: number } | null;
-  /** Animate a saved campaign area from its previous radius after the server confirms expansion. */
-  expansion?: AreaExpansion | null;
-  onExpansionComplete?: () => void;
+  /** Reveal a saved area after an update, or the editable draft when a SOS starts a new campaign. */
+  animation?: AreaAnimation | null;
+  onAnimationComplete?: () => void;
   alert?: ReactNode;
   height?: number | string;
   ariaLabel?: string;
@@ -132,8 +136,8 @@ export function CampaignAreaMap({
   campaignSelectRef.current = onCampaignSelect;
   const campaignEditRef = useRef(onCampaignEdit);
   campaignEditRef.current = onCampaignEdit;
-  const expansionCompleteRef = useRef(onExpansionComplete);
-  expansionCompleteRef.current = onExpansionComplete;
+  const animationCompleteRef = useRef(onAnimationComplete);
+  animationCompleteRef.current = onAnimationComplete;
   const focusedRef = useRef(false);
   const markersRef = useRef(new Map<string, L.CircleMarker>());
   const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
@@ -156,7 +160,7 @@ export function CampaignAreaMap({
       if (!current) return;
       const center = { lat: event.latlng.lat, lng: event.latlng.lng };
       current.onChange(center, current.radiusM);
-      const bounds = L.circle([center.lat, center.lng], { radius: current.radiusM }).getBounds();
+      const bounds = L.latLng(center.lat, center.lng).toBounds(current.radiusM * 2);
       map.stop();
       map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14, animate: true });
     });
@@ -177,7 +181,8 @@ export function CampaignAreaMap({
   }, []);
 
   const hideId = editor?.hideCampaignId;
-  const expandingId = expansion?.id;
+  const expandingId = animation?.kind === 'campaign' ? animation.id : undefined;
+  const revealingDraft = animation?.kind === 'draft';
   const editing = Boolean(editor);
   const centerLat = editor?.center?.lat;
   const centerLng = editor?.center?.lng;
@@ -188,7 +193,7 @@ export function CampaignAreaMap({
     if (!map || !layer) return;
     layer.clearLayers();
     map.getContainer().style.cursor = editing && centerLat === undefined ? 'crosshair' : '';
-    if (!editing || centerLat === undefined || centerLng === undefined || editRadius === undefined) return;
+    if (!editing || revealingDraft || centerLat === undefined || centerLng === undefined || editRadius === undefined) return;
     const center = { lat: centerLat, lng: centerLng };
     const circle = L.circle([center.lat, center.lng], {
       radius: editRadius, color: '#111827', weight: 3, dashArray: '8 5', fillColor: '#2563eb', fillOpacity: 0.12, interactive: false,
@@ -197,9 +202,6 @@ export function CampaignAreaMap({
       .bindTooltip('Kéo để di chuyển vùng').addTo(layer);
     const radiusMarker = L.marker(eastOf(center, editRadius), { icon: editHandleIcon('radius'), draggable: true, zIndexOffset: 2000 })
       .bindTooltip('Kéo để đổi bán kính').addTo(layer);
-    map.invalidateSize();
-    map.stop();
-    map.fitBounds(circle.getBounds(), { padding: [40, 40], maxZoom: 14, animate: false });
     const commit = (nextCenter: { lat: number; lng: number }, radius: number) =>
       editorRef.current?.onChange(nextCenter, clampRadius(Math.round(radius / 100) * 100, editorRef.current?.radiusRange));
     centerMarker.on('drag', () => {
@@ -213,7 +215,7 @@ export function CampaignAreaMap({
       circle.setRadius(radius);
     });
     radiusMarker.on('dragend', () => commit(center, map.distance([center.lat, center.lng], radiusMarker.getLatLng())));
-  }, [editing, centerLat, centerLng, editRadius]);
+  }, [editing, revealingDraft, centerLat, centerLng, editRadius]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -283,8 +285,8 @@ export function CampaignAreaMap({
     }
     boundsRef.current = bounds;
     map.invalidateSize();
-    if (bounds.length && !focusedRef.current) map.fitBounds(bounds, { padding: [24, 24], maxZoom: 12, animate: false });
-  }, [requests, campaigns, hideId, expandingId]);
+    if (bounds.length && !focusedRef.current && !editing) map.fitBounds(bounds, { padding: [24, 24], maxZoom: 12, animate: false });
+  }, [requests, campaigns, hideId, expandingId, editing]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -292,7 +294,7 @@ export function CampaignAreaMap({
     const selected = campaigns.find((campaign) => campaign.id === selectedCampaignId);
     if (!selected) {
       focusedRef.current = false;
-      if (boundsRef.current.length) map.fitBounds(boundsRef.current, { padding: [24, 24], maxZoom: 12, animate: false });
+      if (!editing && boundsRef.current.length) map.fitBounds(boundsRef.current, { padding: [24, 24], maxZoom: 12, animate: false });
       return;
     }
     focusedRef.current = true;
@@ -304,28 +306,31 @@ export function CampaignAreaMap({
     map.stop();
     map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14, animate: false });
     containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, [selectedCampaignId, campaigns]);
+  }, [selectedCampaignId, campaigns, editing]);
 
-  const expansionNonce = expansion?.nonce;
+  const animationNonce = animation?.nonce;
   useEffect(() => {
     const map = mapRef.current;
     const layer = expansionLayerRef.current;
-    if (!map || !layer || !expansion) return;
+    if (!map || !layer || !animation) return;
     layer.clearLayers();
-    const index = campaigns.findIndex(campaign => campaign.id === expansion.id);
+    const index = animation.kind === 'campaign' ? campaigns.findIndex(campaign => campaign.id === animation.id) : -1;
     const color = areaColor(Math.max(0, index));
-    const circle = L.circle([expansion.center.lat, expansion.center.lng], {
-      radius: expansion.fromRadiusM, color, weight: 3, fillColor: color, fillOpacity: 0.14,
-      className: 'campaign-area-circle campaign-area-circle--expanding', interactive: false,
+    const circle = L.circle([animation.center.lat, animation.center.lng], {
+      radius: Math.max(1, animation.fromRadiusM), color, weight: 3,
+      dashArray: animation.kind === 'draft' ? '8 5' : undefined,
+      fillColor: color, fillOpacity: 0.14,
+      className: `campaign-area-circle campaign-area-circle--${animation.kind === 'draft' ? 'revealing' : 'expanding'}`,
+      interactive: false,
     }).addTo(layer);
     map.invalidateSize();
     map.stop();
-    map.fitBounds(L.latLng(expansion.center.lat, expansion.center.lng).toBounds(expansion.toRadiusM * 2),
+    map.fitBounds(L.latLng(animation.center.lat, animation.center.lng).toBounds(animation.toRadiusM * 2),
       { padding: [40, 40], maxZoom: 14, animate: false });
     containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      circle.setRadius(expansion.toRadiusM);
-      expansionCompleteRef.current?.();
+      circle.setRadius(animation.toRadiusM);
+      animationCompleteRef.current?.();
       return () => layer.clearLayers();
     }
     let frame = 0;
@@ -334,15 +339,15 @@ export function CampaignAreaMap({
       startedAt ??= now;
       const progress = Math.min(1, (now - startedAt) / 2200);
       const eased = 1 - (1 - progress) ** 3;
-      circle.setRadius(expansion.fromRadiusM + (expansion.toRadiusM - expansion.fromRadiusM) * eased);
+      circle.setRadius(animation.fromRadiusM + (animation.toRadiusM - animation.fromRadiusM) * eased);
       if (progress < 1) frame = window.requestAnimationFrame(tick);
-      else expansionCompleteRef.current?.();
+      else animationCompleteRef.current?.();
     };
     frame = window.requestAnimationFrame(tick);
     return () => { window.cancelAnimationFrame(frame); layer.clearLayers(); };
-    // A new expansion command is the only reason to restart the animation.
+    // A new map command is the only reason to restart the animation.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expansionNonce]);
+  }, [animationNonce]);
 
   const focusNonce = focusRequestId?.nonce;
   const focusId = focusRequestId?.id;
@@ -381,8 +386,8 @@ export function CampaignAreaMap({
         {overlay && <div className="campaign-area-map__tools">{overlay}</div>}
         {note && <p className="campaign-area-map__note">{note}</p>}
         {alert && <div className="campaign-area-map__alert">{alert}</div>}
-        {expansion && <div className="campaign-area-map__expansion" role="status">
-          Đang mở rộng {expansion.name}: {(expansion.fromRadiusM / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} → {(expansion.toRadiusM / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} km
+        {animation && <div className="campaign-area-map__expansion" role="status">
+          {animation.kind === 'draft' ? 'Đang đặt vùng chiến dịch mới…' : `Đang mở rộng ${animation.name}: ${(animation.fromRadiusM / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} → ${(animation.toRadiusM / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} km`}
         </div>}
         {editActions && <div className="campaign-area-map__confirm" role="group" aria-label="Xác nhận thay đổi vùng chiến dịch">
           <span>Áp dụng vòng vừa chỉnh?</span>

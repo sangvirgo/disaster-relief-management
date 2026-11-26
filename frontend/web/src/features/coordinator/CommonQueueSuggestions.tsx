@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api, newCommandKey } from '../../api/client';
 import { useCursorNav } from '../../api/useCursorNav';
 import { Pager } from '../../components/ui/Pager';
-import { CampaignAreaMap } from '../../maps/CampaignAreaMap';
+import { CampaignAreaMap, type AreaAnimation } from '../../maps/CampaignAreaMap';
 
 type LatLng = { latitude: number; longitude: number };
 type NearestCampaign = {
@@ -83,9 +83,7 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
   const [cursor, setCursor, prevPage, pageIndex] = useCursorNav<string>('');
   const [choice, setChoice] = useState<Record<string, string>>({});
   const [mapFocus, setMapFocus] = useState<{ id: string; nonce: number } | null>(null);
-  const [areaExpansion, setAreaExpansion] = useState<{
-    id: string; name: string; center: { lat: number; lng: number }; fromRadiusM: number; toRadiusM: number; attachedCount: number; nonce: number;
-  } | null>(null);
+  const [areaAnimation, setAreaAnimation] = useState<(AreaAnimation & { attachedCount?: number }) | null>(null);
   // Map editor: draw a new campaign area, or adjust an existing one (kind 'adjust' carries the campaign id).
   const [editMode, setEditMode] = useState<{ kind: 'create' } | { kind: 'adjust'; id: string } | null>(null);
   const [draftCenter, setDraftCenter] = useState<{ lat: number; lng: number } | null>(null);
@@ -194,7 +192,7 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
         ...current,
         campaigns: current.campaigns.map(item => item.id === campaign.id ? { ...item, radius_m: radiusM } : item),
       } : current);
-      setAreaExpansion({ id: campaign.id, name: campaign.name, center: campaign.center,
+      setAreaAnimation({ kind: 'campaign', id: campaign.id, name: campaign.name, center: campaign.center,
         fromRadiusM: campaign.radius_m, toRadiusM: radiusM, attachedCount: result.attached_request_count ?? 0, nonce: Date.now() });
     } catch (cause) {
       setError(messageOf(cause));
@@ -203,34 +201,35 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
     }
   }
 
-  function finishAreaExpansion() {
-    if (!areaExpansion) return;
-    setAreaExpansion(null);
-    const attachedMessage = areaExpansion.attachedCount > 0
-      ? `Đã gắn ${areaExpansion.attachedCount} SOS trong vùng mới.`
+  function finishAreaAnimation() {
+    if (!areaAnimation) return;
+    setAreaAnimation(null);
+    if (areaAnimation.kind === 'draft') return;
+    const attachedCount = areaAnimation.attachedCount ?? 0;
+    const attachedMessage = attachedCount > 0
+      ? `Đã gắn ${attachedCount} SOS trong vùng mới.`
       : 'Chưa có SOS nào được gắn trong lần mở rộng này.';
-    setMessage(`Đã mở rộng vùng ${areaExpansion.name} đến ${km(areaExpansion.toRadiusM)} km. ${attachedMessage}`);
+    setMessage(`Đã mở rộng vùng ${areaAnimation.name} đến ${km(areaAnimation.toRadiusM)} km. ${attachedMessage}`);
     setCursor('');
     setRevision(value => value + 1);
     onChanged();
     setBusy(false);
   }
-  const createAndActivate = (name: string, center: LatLng, radiusM: number, success: string) => run(async () => {
-    const created = await post<{ id: string; version: number }>('/campaigns', {
-      name, center: { lat: center.latitude, lng: center.longitude }, radius_m: radiusM,
-    });
-    try {
-      await post(`/campaigns/${created.id}/activate`, { expected_version: created.version });
-      setSelectedCampaignId(created.id);
-    } catch (cause) {
-      throw new Error(`Đã tạo chiến dịch "${name}" nhưng chưa kích hoạt được: ${messageOf(cause)} Hãy kích hoạt trong danh sách chiến dịch bên dưới.`);
-    }
-  }, success);
-
   function startCreate() {
+    setAreaAnimation(null);
     setEditMode({ kind: 'create' }); setDraftCenter(null); setDraftRadius(NEW_CAMPAIGN_RADIUS_M); setDraftName('');
     setPendingAdjustment(false);
     setError(''); setMessage('');
+  }
+  function startCreateAt(name: string, center: LatLng, radiusM = NEW_CAMPAIGN_RADIUS_M) {
+    const position = { lat: center.latitude, lng: center.longitude };
+    setSelectedCampaignId(null);
+    setMapFocus(null);
+    setEditMode({ kind: 'create' });
+    setDraftCenter(position); setDraftRadius(radiusM); setDraftName(name);
+    setPendingAdjustment(false);
+    setError(''); setMessage('');
+    setAreaAnimation({ kind: 'draft', name, center: position, fromRadiusM: 0, toRadiusM: radiusM, nonce: Date.now() });
   }
   function startAdjust(id: string) {
     const campaign = data?.campaigns.find((item) => item.id === id);
@@ -240,7 +239,10 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
     setPendingAdjustment(false);
     setError(''); setMessage('');
   }
-  function cancelEdit() { setEditMode(null); setDraftCenter(null); setPendingAdjustment(false); setError(''); }
+  function cancelEdit() {
+    setEditMode(null); setDraftCenter(null); setPendingAdjustment(false); setError('');
+    setAreaAnimation(current => current?.kind === 'draft' ? null : current);
+  }
   const draftReady = Boolean(draftCenter) && Number.isInteger(draftRadius) && draftRadius >= 500 && draftRadius <= MAX_RADIUS_M;
   const coveredByDraft = useMemo(() => {
     if (!draftCenter || !data) return 0;
@@ -257,7 +259,12 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
       const created = await post<{ id: string; version: number }>('/campaigns', { name, center: draftCenter, radius_m: draftRadius });
       if (activate) {
         try { await post(`/campaigns/${created.id}/activate`, { expected_version: created.version }); }
-        catch (cause) { throw new Error(`Đã tạo chiến dịch "${name}" nhưng chưa kích hoạt được: ${messageOf(cause)}`); }
+        catch (cause) {
+          setSelectedCampaignId(created.id);
+          cancelEdit();
+          setRevision((value) => value + 1);
+          throw new Error(`Đã tạo bản nháp "${name}" nhưng chưa kích hoạt được: ${messageOf(cause)}. Hãy kích hoạt từ danh sách chiến dịch.`);
+        }
       }
       setSelectedCampaignId(created.id);
       cancelEdit();
@@ -308,22 +315,24 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
           </div>
           {editMode && <div className="campaign-tools__panel">
             <p className="campaign-tools__hint" role="status">
-              {!draftCenter ? 'Chạm lên bản đồ để đặt tâm vùng.' : 'Kéo ✥ để di chuyển, kéo ↔ để đổi bán kính.'}
+              {!draftCenter ? 'Chạm lên bản đồ để đặt tâm vùng.' : editMode.kind === 'create'
+                ? 'Vùng mới chưa lưu. Kéo ✥ để di chuyển, kéo ↔ để đổi bán kính, rồi xác nhận tạo.'
+                : 'Kéo ✥ để di chuyển, kéo ↔ để đổi bán kính.'}
             </p>
             {editMode.kind === 'create' && <label>Tên chiến dịch
               <input value={draftName} maxLength={200} onChange={(event) => setDraftName(event.target.value)} placeholder="Ví dụ: Cứu trợ lũ Hải Phòng" />
             </label>}
-            <label>Bán kính (m)
+            {editMode.kind === 'adjust' && <label>Bán kính (m)
               <input type="number" min={500} max={MAX_RADIUS_M} step={500} value={draftRadius}
-                onChange={(event) => { setDraftRadius(Math.round(Number(event.target.value))); if (editMode.kind === 'adjust') setPendingAdjustment(true); }} />
-            </label>
-            {draftReady && <span className="muted">≈ {km(draftRadius)} km · {coveredByDraft} SOS chưa thuộc vùng nằm trong vòng này</span>}
+                onChange={(event) => { setDraftRadius(Math.round(Number(event.target.value))); setPendingAdjustment(true); }} />
+            </label>}
+            {draftReady && editMode.kind === 'adjust' && <span className="muted">≈ {km(draftRadius)} km · {coveredByDraft} SOS chưa thuộc vùng nằm trong vòng này</span>}
             {adjusting && adjusting.status === 'ACTIVE' && <span className="muted">SOS chưa thuộc vùng nằm trong vùng mới sẽ được gắn vào chiến dịch này.</span>}
             {invalidCampaignId && <p className="notice warning" role="alert">Chiến dịch này có mã dữ liệu không hợp lệ nên chưa lưu được vùng.</p>}
             {error && <p className="notice error" role="alert">{error}</p>}
             {editMode.kind === 'create' && <div className="campaign-tools__actions">
-              <button type="button" className="button primary" disabled={busy || !draftReady || !draftName.trim()} onClick={() => void createFromDraft(true)}>Tạo và kích hoạt</button>
-              <button type="button" className="button secondary" disabled={busy || !draftReady || !draftName.trim()} onClick={() => void createFromDraft(false)}>Lưu nháp</button>
+              <button type="button" className="button primary" disabled={busy || areaAnimation?.kind === 'draft' || !draftReady || !draftName.trim()} onClick={() => void createFromDraft(true)}>Tạo và kích hoạt</button>
+              <button type="button" className="button secondary" disabled={busy || areaAnimation?.kind === 'draft' || !draftReady || !draftName.trim()} onClick={() => void createFromDraft(false)}>Lưu nháp</button>
               <button type="button" className="button secondary" disabled={busy} onClick={cancelEdit}>Hủy</button>
             </div>}
             {editMode.kind === 'adjust' && !pendingAdjustment && <div className="campaign-tools__actions">
@@ -333,14 +342,18 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
         </>}
         requests={selectedCampaignId ? campaignRequests : [...(data?.map_points ?? []), ...attachedPoints]}
         campaigns={data?.campaigns ?? []}
-        expansion={areaExpansion}
-        onExpansionComplete={finishAreaExpansion}
+        animation={areaAnimation}
+        onAnimationComplete={finishAreaAnimation}
         selectedCampaignId={selectedCampaignId}
         onCampaignSelect={(id) => { cancelEdit(); setSelectedCampaignId(id); }}
         onCampaignEdit={(id) => { setSelectedCampaignId(id); startAdjust(id); }}
         editor={editMode ? {
           center: draftCenter, radiusM: draftRadius, hideCampaignId: adjusting?.id,
-          onChange: (center, radiusM) => { setDraftCenter(center); setDraftRadius(radiusM); if (editMode.kind === 'adjust') setPendingAdjustment(true); },
+          onChange: (center, radiusM) => {
+            if (editMode.kind === 'create') setAreaAnimation(current => current?.kind === 'draft' ? null : current);
+            setDraftCenter(center); setDraftRadius(radiusM);
+            if (editMode.kind === 'adjust') setPendingAdjustment(true);
+          },
         } : null}
         editActions={editMode?.kind === 'adjust' && pendingAdjustment ? {
           onConfirm: () => void saveAdjusted(), onCancel: cancelEdit, busy, canConfirm: draftReady && !invalidCampaignId,
@@ -361,7 +374,7 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
               <li key={cluster.id}>
                 <span><strong>{cluster.count} SOS</strong> gần nhau · ưu tiên cao nhất {cluster.highest_priority ?? 'chưa rõ'} · vùng gợi ý {km(cluster.suggested_radius_m)} km</span>
                 <button type="button" className="button secondary" disabled={busy}
-                  onClick={() => createAndActivate(`Cụm SOS ${stamp()}`, cluster.center, cluster.suggested_radius_m, `Đã tạo và kích hoạt chiến dịch cho ${cluster.count} SOS trong cụm.`)}>
+                  onClick={() => startCreateAt(`Cụm SOS ${stamp()}`, cluster.center, cluster.suggested_radius_m)}>
                   Tạo chiến dịch cho cụm
                 </button>
               </li>
@@ -436,7 +449,7 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
                       </button>
                     )}
                     <button type="button" className="button secondary suggestion-actions__create" disabled={busy}
-                      onClick={() => void createAndActivate(`SOS ${item.tracking_code}`, item.location, NEW_CAMPAIGN_RADIUS_M, `Đã tạo và kích hoạt chiến dịch tại ${item.tracking_code}.`)}>
+                      onClick={() => startCreateAt(`SOS ${item.tracking_code}`, item.location)}>
                       Tạo chiến dịch mới tại đây
                     </button>
                   </div>
