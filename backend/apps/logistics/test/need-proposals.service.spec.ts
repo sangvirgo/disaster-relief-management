@@ -147,4 +147,35 @@ describe('NeedProposalsService', () => {
     expect(typeof result.cursor).toBe('string');
     expect((result.items as unknown[]).length).toBe(1);
   });
+
+  it('assigns a missing primary warehouse when proposals are read, instead of waiting for the sweep', async () => {
+    let assigned = false;
+    const query = jest.fn(async (sql: string): Promise<unknown[]> => {
+      if (sql.includes('FROM fulfillment_cycle AS unassigned')) return [{ total: 0 }];
+      if (sql.includes('FROM fulfillment_cycle c')) return [cycle];
+      if (sql.includes('FROM relief_need n JOIN item i')) return [];
+      if (sql.includes('FROM campaign_warehouse')) return assigned ? [{ campaign_id: campaignId, warehouse_id: warehouseId }] : [];
+      if (sql.includes('FROM stock_balance')) return [];
+      if (sql.includes('SELECT id,name FROM item')) return [];
+      throw new Error(`Unexpected SQL: ${sql.slice(0, 80)}`);
+    });
+    const reevaluateCampaign = jest.fn(async () => { assigned = true; });
+    const sessions = { require: jest.fn(async () => ({ userId: 'manager', grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' }] })) };
+    const service = new NeedProposalsService({ query } as unknown as DataSource, sessions as unknown as LogisticsSessionService,
+      { reevaluateCampaign } as never);
+    const result = await service.list({}, request) as { items: Array<{ warehouse: { id: string } | null }> };
+    expect(reevaluateCampaign).toHaveBeenCalledWith(campaignId, 'PROPOSAL_READ');
+    expect(result.items[0]?.warehouse).toEqual(expect.objectContaining({ id: warehouseId }));
+  });
+
+  it('still lists proposals when the lazy warehouse assignment fails', async () => {
+    const reevaluateCampaign = jest.fn(async () => { throw new Error('RESPONSE_UNAVAILABLE'); });
+    const { query } = setup([{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' }], { cycles: [cycle], lines: [] });
+    const sessions = { require: jest.fn(async () => ({ userId: 'manager', grants: [{ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' }] })) };
+    const service = new NeedProposalsService({ query } as unknown as DataSource, sessions as unknown as LogisticsSessionService,
+      { reevaluateCampaign } as never);
+    const result = await service.list({}, request) as { items: Array<{ warehouse: unknown }> };
+    expect(reevaluateCampaign).toHaveBeenCalledTimes(1);
+    expect(result.items[0]?.warehouse).toBeNull();
+  });
 });

@@ -67,7 +67,7 @@ describe('Identity internal request coordinator grants service', () => {
     const [sql, values] = query.mock.calls[0]!;
     expect(sql).toContain("g.role_code='COORDINATOR'");
     expect(sql).toContain("g.scope_type='SYSTEM'");
-    expect(sql).toContain("$1::uuid IS NOT NULL AND g.scope_type='CAMPAIGN' AND g.campaign_id=$1");
+    expect(sql).toContain("$1::uuid IS NOT NULL AND g.scope_type='CAMPAIGN' AND (g.campaign_id=$1 OR g.campaign_id IS NULL)");
     expect(values).toEqual([campaignId]);
   });
 });

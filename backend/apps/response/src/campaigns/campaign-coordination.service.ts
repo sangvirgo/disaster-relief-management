@@ -5,7 +5,7 @@ import { DataSource } from 'typeorm';
 import { AppError } from '@c48/technical/errors/errors';
 import { canonicalRequestHash, IdempotencyService, IdempotentResult } from '@c48/technical/idempotency/idempotency';
 import { decodeKeysetCursor, encodeKeysetCursor } from '@c48/technical/pagination/keyset';
-import { Grant } from '@c48/identity-contracts/permissions';
+import { Grant, isSubCoordinatorGrant } from '@c48/identity-contracts/permissions';
 import { ReporterSession, ReporterSessionService } from '../requests/reporter-session';
 import { openDangerStatuses, loadOperationsConfig } from '../operations/request-operations.helpers';
 
@@ -34,6 +34,11 @@ function rows<T>(value: SqlRows<T>): T[] {
 
 function primaryCoordinator(grants: readonly Grant[]): boolean {
   return grants.some((grant) => grant.role_code === 'COORDINATOR' && grant.scope_type === 'SYSTEM');
+}
+
+/** Primary coordinators, and sub-coordinators who choose campaigns themselves. */
+function anyCoordinator(grants: readonly Grant[]): boolean {
+  return primaryCoordinator(grants) || grants.some(isSubCoordinatorGrant);
 }
 
 function urgencyReasons(item: {
@@ -72,7 +77,7 @@ export class CampaignCoordinationService {
 
   async triage(request: Request): Promise<Record<string, unknown>> {
     const session = await this.sessions.require(request);
-    if (!primaryCoordinator(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
+    if (!anyCoordinator(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
     const overdueMinutes = loadOperationsConfig().overdueMinutes;
     const result = rows(await this.dataSource.query(
       `WITH active AS (
@@ -147,7 +152,7 @@ export class CampaignCoordinationService {
 
   async engage(campaignId: string, key: string, request: Request): Promise<IdempotentResult<Record<string, unknown>>> {
     const session = await this.sessions.require(request);
-    if (!primaryCoordinator(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
+    if (!anyCoordinator(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
     return this.idempotency.execute(this.dataSource, {
       scopeKey: `response.campaign-engagement:${session.userId}`,
       command: 'response.campaign.engage', key,
@@ -196,7 +201,7 @@ export class CampaignCoordinationService {
 
   async disengage(campaignId: string, key: string, request: Request): Promise<IdempotentResult<Record<string, unknown>>> {
     const session = await this.sessions.require(request);
-    if (!primaryCoordinator(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
+    if (!anyCoordinator(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
     return this.idempotency.execute(this.dataSource, {
       scopeKey: `response.campaign-engagement:${session.userId}`,
       command: 'response.campaign.disengage', key,
@@ -222,7 +227,7 @@ export class CampaignCoordinationService {
 
   async myEngagements(request: Request): Promise<Record<string, unknown>> {
     const session = await this.sessions.require(request);
-    if (!primaryCoordinator(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
+    if (!anyCoordinator(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
     const found = rows(await this.dataSource.query(
       `SELECT ce.*,c.name AS campaign_name,c.status AS campaign_status
          FROM campaign_engagement ce JOIN campaign c ON c.id=ce.campaign_id
@@ -325,9 +330,14 @@ export class CampaignCoordinationService {
     };
   }
 
+  /**
+   * Campaign overview. The primary coordinator sees every campaign and the counts of SOS without a campaign; a
+   * sub-coordinator sees only ACTIVE campaigns (the ones it may choose) and never the unassigned-queue counts.
+   */
   async overview(request: Request): Promise<Record<string, unknown>> {
     const session = await this.sessions.require(request);
-    if (!primaryCoordinator(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
+    if (!anyCoordinator(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
+    const primary = primaryCoordinator(session.grants);
     const overdueMinutes = loadOperationsConfig().overdueMinutes;
     const campaignRows = rows(await this.dataSource.query(
       `SELECT c.id,c.name,c.status,c.version,
@@ -343,7 +353,7 @@ export class CampaignCoordinationService {
                 ((r.status='SUBMITTED' AND r.received_at<now()-($1::int*interval '1 minute')) OR
                  (r.status='VERIFYING' AND r.verifying_since<now()-($1::int*interval '1 minute')) OR
                  (r.reporter_declared_danger AND r.status IN (${openDangerStatuses})))) AS overdue_count
-         FROM campaign c ORDER BY c.created_at DESC,c.id`, [overdueMinutes],
+         FROM campaign c ${primary ? '' : "WHERE c.status='ACTIVE'"} ORDER BY c.created_at DESC,c.id`, [overdueMinutes],
     ) as SqlRows<Record<string, unknown>>);
     const items = campaignRows.map((row) => {
       const coordinators = (row.active_coordinators ?? []) as Array<Record<string, unknown>>;
@@ -357,6 +367,7 @@ export class CampaignCoordinationService {
     const names = await this.sessions.lookupUsers(items.flatMap((item) => item.active_coordinators.map((person) => String(person.user_id))));
     const nameMap = new Map(names.map((item) => [item.id, item.display_name]));
     for (const item of items) item.active_coordinators = item.active_coordinators.map((person) => ({ ...person, display_name: nameMap.get(String(person.user_id)) ?? null }));
+    if (!primary) return { items };
     const queueRows = rows(await this.dataSource.query(
       `SELECT campaign_match_state,count(*)::int AS total FROM assistance_request
         WHERE campaign_id IS NULL AND campaign_match_state IN ('UNMATCHED','CONFLICT') GROUP BY campaign_match_state`,
@@ -473,7 +484,7 @@ export class CampaignCoordinationService {
 
   async myHistory(request: Request): Promise<Record<string, unknown>> {
     const session = await this.sessions.require(request);
-    if (!primaryCoordinator(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
+    if (!anyCoordinator(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
     const found = rows(await this.dataSource.query(
       `SELECT ce.*,c.name AS campaign_name,c.status AS campaign_status FROM campaign_engagement ce JOIN campaign c ON c.id=ce.campaign_id
         WHERE ce.user_id=$1 ORDER BY ce.started_at DESC,ce.id DESC LIMIT 500`, [session.userId],
@@ -485,7 +496,13 @@ export class CampaignCoordinationService {
   private async assertCampaignHistoryAccess(campaignId: string, session: ReporterSession): Promise<void> {
     const campaign = rows(await this.dataSource.query('SELECT 1 FROM campaign WHERE id=$1', [campaignId]) as SqlRows<{ '?column?': number }>);
     if (!campaign.length) throw new AppError('NOT_FOUND', { status: 404 });
-    if (!primaryCoordinator(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
+    if (primaryCoordinator(session.grants)) return;
+    if (!session.grants.some(isSubCoordinatorGrant)) throw new AppError('FORBIDDEN', { status: 403 });
+    // A sub-coordinator reads the history of campaigns it has worked on (any engagement, current or ended).
+    const worked = rows(await this.dataSource.query(
+      'SELECT 1 FROM campaign_engagement WHERE campaign_id=$1 AND user_id=$2 LIMIT 1', [campaignId, session.userId],
+    ) as SqlRows<{ '?column?': number }>);
+    if (!worked.length) throw new AppError('FORBIDDEN', { status: 403 });
   }
 
   private engagementView(row: EngagementRow): Record<string, unknown> {

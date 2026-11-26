@@ -93,8 +93,8 @@ async function createRequest(reporter, coordinates, suffix, idempotencyKey = key
 
 await Promise.all([responseDb.connect(), identityDb.connect()]);
 try {
-  const [primary, secondary, citizen, campaignManager] = await Promise.all([
-    login('coord1'), login('coord2'), login('citizen1'), login('ops_mgr'),
+  const [primary, secondary, citizen, campaignManager, subCoordinator] = await Promise.all([
+    login('coord1'), login('coord2'), login('citizen1'), login('ops_mgr'), login('coord3'),
   ]);
   const grants = await identityDb.query(
     `SELECT role_code,scope_type FROM role_grant WHERE user_id=$1 AND revoked_at IS NULL ORDER BY role_code,scope_type`,
@@ -103,6 +103,45 @@ try {
   assert.deepEqual(grants.rows, [{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }]);
   const retiredRole = await identityDb.query("SELECT count(*)::int AS count FROM role_grant WHERE role_code='CAMPAIGN_COORDINATOR'");
   assert.equal(retiredRole.rows[0].count, 0, 'the retired campaign coordinator role has no grants');
+
+  // Sub-coordinator: COORDINATOR at CAMPAIGN scope without a campaign. It chooses a campaign itself and works only that
+  // campaign; it never sees SOS without a campaign and never creates campaigns.
+  const subGrants = await identityDb.query(
+    `SELECT role_code,scope_type,campaign_id FROM role_grant WHERE user_id=$1 AND revoked_at IS NULL ORDER BY role_code,scope_type`,
+    [subCoordinator.id],
+  );
+  assert.deepEqual(subGrants.rows, [{ role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: null }]);
+  await responseDb.query(
+    "UPDATE campaign_engagement SET ended_at=now(),ended_reason='LEFT' WHERE user_id=$1 AND ended_at IS NULL", [subCoordinator.id],
+  );
+  const subEmpty = await call(responseUrl, 'requests?limit=50', { actor: subCoordinator });
+  expectSuccess(subEmpty);
+  assert.deepEqual(subEmpty.value.items, []);
+  const subNoEngagement = await command(subCoordinator, `requests/${requestIds.southPriority}/claim`, {});
+  expectVietnameseError(subNoEngagement, 403, 'FORBIDDEN');
+  const subOverview = await call(responseUrl, 'campaigns/overview', { actor: subCoordinator });
+  expectSuccess(subOverview);
+  assert.ok(subOverview.value.items.some((item) => item.id === campaignIds.south));
+  assert.ok(subOverview.value.items.every((item) => item.status === 'ACTIVE'));
+  assert.equal(subOverview.value.common_queue, undefined, 'the sub-coordinator never sees unassigned-queue counts');
+  expectSuccess(await call(responseUrl, 'campaigns/triage', { actor: subCoordinator }));
+  expectVietnameseError(await call(responseUrl, 'campaigns/common-queue/suggestions', { actor: subCoordinator }), 403, 'FORBIDDEN');
+  expectSuccess(await command(subCoordinator, `campaigns/${campaignIds.south}/engage`, undefined), 201);
+  const subQueue = await call(responseUrl, 'requests?limit=100', { actor: subCoordinator });
+  expectSuccess(subQueue);
+  assert.ok(subQueue.value.items.length > 0);
+  assert.ok(subQueue.value.items.every((item) => item.campaign_id === campaignIds.south));
+  const subConflict = await call(responseUrl, 'requests?campaign_match_state=CONFLICT&limit=50', { actor: subCoordinator });
+  expectSuccess(subConflict);
+  assert.deepEqual(subConflict.value.items, []);
+  const subDetail = await call(responseUrl, `requests/${requestIds.southPriority}`, { actor: subCoordinator });
+  expectSuccess(subDetail);
+  expectVietnameseError(await command(subCoordinator, 'campaigns', { name: 'Điều phối phụ không được tạo chiến dịch' }), 403, 'FORBIDDEN');
+  expectSuccess(await call(responseUrl, `campaigns/${campaignIds.south}/history?limit=50`, { actor: subCoordinator }));
+  expectSuccess(await command(subCoordinator, `campaigns/${campaignIds.south}/disengage`, undefined));
+  const subAfter = await call(responseUrl, 'requests?limit=50', { actor: subCoordinator });
+  expectSuccess(subAfter);
+  assert.deepEqual(subAfter.value.items, []);
 
   const triage = await call(responseUrl, 'campaigns/triage', { actor: primary });
   expectSuccess(triage);

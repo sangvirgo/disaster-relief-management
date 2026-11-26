@@ -12,7 +12,8 @@ export function isSelfGrant(actorId: string, userId: string): boolean {
 
 export function grantScopeIsValid(grant: GrantScopeInput): boolean {
   const campaign = grant.campaign_id ?? null;
-  const shape = grant.scope_type === 'SYSTEM' ? campaign === null : campaign !== null;
+  // A COORDINATOR at CAMPAIGN scope without a campaign is a sub-coordinator that chooses its campaigns in Response.
+  const shape = grant.scope_type === 'SYSTEM' ? campaign === null : campaign !== null || grant.role_code === 'COORDINATOR';
   if (!shape) return false;
   if (grant.role_code === 'ADMIN') return grant.scope_type === 'SYSTEM';
   if (grant.role_code === 'CITIZEN' || grant.role_code === 'VOLUNTEER') return grant.scope_type === 'SYSTEM';

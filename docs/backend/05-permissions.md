@@ -6,6 +6,8 @@ Roles are a code catalog. The current role set has six codes: `ADMIN`, `COORDINA
 
 ## 1. Role-to-permission map
 
+**Primary and sub-coordinator (user decision 2026-11-26).** Both hold the `COORDINATOR` role; no role is added. The primary coordinator has a `SYSTEM` grant. A sub-coordinator has a `COORDINATOR` grant at `CAMPAIGN` scope with `campaign_id = NULL` (allowed by migration `AllowSubCoordinatorGrant`). That grant authorizes nothing by itself. The sub-coordinator chooses ACTIVE campaigns itself (`POST /campaigns/{id}/engage`, at most 3, expires after 60 minutes without activity). For each active engagement, Response derives a campaign grant marked `engaged` that carries only `SUB_COORDINATOR_PERMISSIONS`: `REQUEST_QUEUE_READ`, `REQUEST_DETAIL_READ`, `MISSION_OVERDUE_READ`, `CAMPAIGN_READ`, `REQUEST_VERIFY`, `REQUEST_TRIAGE`, `REQUEST_CANCEL`, `REQUEST_REOPEN`, `REQUEST_RESOLVE`, `MISSION_ASSIGN` and `MISSION_RECORD_ON_BEHALF`. A sub-coordinator therefore never sees or handles SOS without a campaign (no `REQUEST_UNASSIGNED_QUEUE`, no common-queue suggestions, no campaign attachment). It cannot create SOS, create or manage campaigns, read reports or teams outside assignment, take over claims, or use Logistics. It can read `GET /campaigns/overview` (ACTIVE campaigns only, without `common_queue` counts) and `/campaigns/triage`. It can read history only for campaigns it has engaged. Demo accounts: `coord3`, `coord_extra`.
+
 ● = granted. Team leader/member is an explicit `team_member` relationship in Response. Citizen rights are based on ownership or a valid capability, not staff permissions.
 
 | Permission | CITIZEN | VOLUNTEER | COORDINATOR | OPERATIONS_MANAGER | REVIEWER | ADMIN |

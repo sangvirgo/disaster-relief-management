@@ -403,3 +403,75 @@
     transition: none;
   }
 }
+
+/* Hotspot map: choose a campaign by backlog, then take it in one click. */
+.hotspots { display: grid; gap: 14px; min-width: 0; }
+.hotspots__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.hotspots__header h2 { margin: 2px 0 4px; }
+.hotspots__header p { margin: 0; max-width: 62ch; }
+.hotspots__suggestion {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  padding: 14px 16px; border: 1px solid var(--color-emergency-border); border-left: 4px solid var(--color-emergency);
+  border-radius: 10px; background: var(--color-emergency-bg);
+}
+.hotspots__suggestion > div { display: grid; gap: 2px; min-width: 0; }
+.hotspots__suggestion span { color: var(--color-text-secondary); }
+.hotspots__filters, .sub-coordination__switch { display: flex; flex-wrap: wrap; gap: 8px; }
+.hotspots__chip {
+  min-height: 36px; padding: 6px 14px; border: 1px solid var(--color-surface-divider); border-radius: 999px;
+  background: var(--color-surface-card); color: var(--color-text-secondary); font: inherit; font-weight: 600; cursor: pointer;
+}
+.hotspots__chip[aria-pressed="true"] { border-color: var(--color-primary); background: var(--color-primary-bg); color: var(--color-primary-dark); }
+.hotspots__chip:focus-visible { outline: 3px solid #2563eb55; outline-offset: 2px; }
+.hotspots__layout { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(300px, 1fr); gap: 16px; align-items: start; }
+.hotspots__map, .hotspots__list { min-width: 0; }
+.hotspots__items { display: grid; gap: 10px; margin: 0 0 10px; padding: 0; list-style: none; }
+.hotspots__swatch { display: inline-block; width: 10px; height: 10px; margin-right: 4px; border-radius: 50%; vertical-align: middle; }
+.hotspots__swatch--hot { background: #dc2626; }
+.hotspots__swatch--warm { background: #f59e0b; }
+.hotspots__swatch--calm { background: #10b981; }
+.hotspot-card {
+  display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--color-surface-border);
+  border-left: 4px solid var(--color-success); border-radius: 10px; background: var(--color-surface-card);
+}
+.hotspot-card--hot { border-left-color: var(--color-emergency); }
+.hotspot-card--warm { border-left-color: var(--color-warning); }
+.hotspot-card.is-selected { box-shadow: 0 0 0 3px #2563eb33; border-color: var(--color-primary-border); }
+.hotspot-card__head {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 0; border: 0; background: none;
+  color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.hotspot-card__head:focus-visible { outline: 3px solid #2563eb55; outline-offset: 2px; border-radius: 6px; }
+.hotspot-card__rank {
+  display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+  background: var(--color-surface-subtle); font-weight: 700; font-size: 0.85rem;
+}
+.hotspot-card--hot .hotspot-card__rank { background: var(--color-emergency); color: var(--color-text-inverse); }
+.hotspot-card--warm .hotspot-card__rank { background: var(--color-warning); color: var(--color-text-inverse); }
+.hotspot-card__name { flex: 1 1 auto; min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
+.hotspot-card__metrics { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; }
+.hotspot-card__meta { margin: 0; color: var(--color-text-secondary); font-size: 0.9rem; }
+.hotspot-card__alert { color: var(--color-emergency-dark); }
+.hotspot-card__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.hotspot-card__actions .button { flex: 1 1 auto; }
+
+.sub-coordination { display: grid; gap: 14px; min-width: 0; }
+.sub-coordination__role { margin: 0; }
+.sub-coordination__sessions { display: grid; gap: 8px; padding: 14px 16px; }
+.sub-coordination__sessions ul { display: flex; flex-wrap: wrap; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.sub-coordination__sessions li {
+  display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 12px; border: 1px solid var(--color-surface-border);
+  border-radius: 10px; background: var(--color-surface-subtle);
+}
+.sub-coordination__sessions li.is-current { border-color: var(--color-primary); background: var(--color-primary-bg); }
+.sub-coordination__session { display: grid; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.sub-coordination__session small { color: var(--color-text-muted); }
+.sub-coordination__session:focus-visible { outline: 3px solid #2563eb55; outline-offset: 2px; border-radius: 6px; }
+
+@media (max-width: 900px) {
+  .hotspots__layout { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .sub-coordination__sessions li { flex: 1 1 100%; justify-content: space-between; }
+  .hotspots__suggestion .button { width: 100%; }
+}

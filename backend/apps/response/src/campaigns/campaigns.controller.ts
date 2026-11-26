@@ -8,6 +8,7 @@ import { CampaignActionDto, CampaignAreaDto, CampaignCreateDto, CommonQueueQuery
 import { CampaignCommandRequest, CampaignsService } from './campaigns.service';
 import { CampaignCoordinationService } from './campaign-coordination.service';
 import { ResponseServiceTokenGuard } from './service-token.guard';
+import { LogisticsCampaignWarehouseNotifier } from '../integrations/logistics/logistics-campaign-warehouse.client';
 import { noStore, requireIdempotencyKey as key } from '@c48/technical/http/response-headers';
 
 function replay(response: Response, result: { replay: boolean }): void {
@@ -16,7 +17,11 @@ function replay(response: Response, result: { replay: boolean }): void {
 
 @Controller()
 export class CampaignsController {
-  constructor(private readonly campaigns: CampaignsService, private readonly coordination: CampaignCoordinationService) {}
+  constructor(
+    private readonly campaigns: CampaignsService,
+    private readonly coordination: CampaignCoordinationService,
+    private readonly warehouses: LogisticsCampaignWarehouseNotifier,
+  ) {}
 
   @Get('campaigns/triage')
   async triage(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
@@ -111,6 +116,7 @@ export class CampaignsController {
     noStore(response);
     const result = await this.campaigns.patch(id, dto, key(request), request);
     replay(response, result);
+    if (!result.replay && (dto.center !== undefined || dto.radius_m !== undefined)) this.warehouses.campaignChanged(id);
     return result.value;
   }
 
@@ -157,6 +163,7 @@ export class CampaignsController {
     noStore(response);
     const result = await this.campaigns.changeArea(id, dto, key(request), request);
     replay(response, result);
+    if (!result.replay) this.warehouses.campaignChanged(id);
     return result.value;
   }
 
@@ -189,6 +196,8 @@ export class CampaignsController {
     noStore(response);
     const result = await this.campaigns.transition(id, action, dto, key(request), request);
     replay(response, result);
+    // A campaign that starts or resumes work needs its primary warehouse now, not on the next sweep.
+    if (!result.replay && (action === 'activate' || action === 'resume')) this.warehouses.campaignChanged(id);
     return result.value;
   }
 }

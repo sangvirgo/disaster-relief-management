@@ -41,4 +41,21 @@ describe('assistance request grant scope', () => {
     expect(requestScopeFilter([systemGrant], 'RESPONSE_REPORT_READ', [])).toBe('(TRUE)');
   });
 
+
+  it('limits a sub-coordinator to its engaged campaigns and the narrower permission set', () => {
+    const floating: Grant = { role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: null };
+    const engaged: Grant = { role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: campaignA, engaged: true };
+    expect(canAccessRequest({ grants: [floating] }, 'REQUEST_QUEUE_READ', { campaign_id: campaignA })).toBe(false);
+    expect(canAccessRequest({ grants: [floating] }, 'REQUEST_QUEUE_READ', { campaign_id: null })).toBe(false);
+    const session = { grants: [floating, engaged] };
+    expect(canAccessRequest(session, 'REQUEST_VERIFY', { campaign_id: campaignA })).toBe(true);
+    expect(canAccessRequest(session, 'MISSION_ASSIGN', { campaign_id: campaignA })).toBe(true);
+    expect(canAccessRequest(session, 'REQUEST_VERIFY', { campaign_id: campaignB })).toBe(false);
+    expect(canAccessRequest(session, 'REQUEST_VERIFY', { campaign_id: null })).toBe(false);
+    expect(canAccessRequest(session, 'NEED_MANAGE', { campaign_id: campaignA })).toBe(false);
+    const values: unknown[] = [];
+    expect(requestScopeFilter([floating], 'REQUEST_QUEUE_READ', [], 'r')).toBe('FALSE');
+    expect(requestScopeFilter(session.grants, 'REQUEST_QUEUE_READ', values, 'r')).toBe('(r.campaign_id=$1)');
+    expect(values).toEqual([campaignA]);
+  });
 });

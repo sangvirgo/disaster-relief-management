@@ -46,6 +46,37 @@ export interface Grant {
   role_code: Role;
   scope_type: ScopeType;
   campaign_id?: string | null;
+  /**
+   * Set only by Response on a campaign grant it derives from a sub-coordinator's active campaign engagement. Such a
+   * grant holds SUB_COORDINATOR_PERMISSIONS only. Never part of the Identity transport (validGrant rejects it).
+   */
+  engaged?: true;
+}
+
+/**
+ * Sub-coordinator (user decision 2026-11-26): a COORDINATOR grant at CAMPAIGN scope without a campaign. It chooses
+ * (engages) ACTIVE campaigns itself and, inside them only, verifies, prioritizes, assigns and resolves SOS. It never
+ * handles SOS without a campaign, never creates or manages campaigns, teams or logistics, and is not a new role.
+ */
+export const SUB_COORDINATOR_PERMISSIONS = [
+  'REQUEST_QUEUE_READ', 'REQUEST_DETAIL_READ', 'MISSION_OVERDUE_READ', 'CAMPAIGN_READ', 'REQUEST_VERIFY', 'REQUEST_TRIAGE',
+  'REQUEST_CANCEL', 'REQUEST_REOPEN', 'REQUEST_RESOLVE', 'MISSION_ASSIGN', 'MISSION_RECORD_ON_BEHALF',
+] as const satisfies readonly Permission[];
+
+/** The floating grant a sub-coordinator holds in Identity: COORDINATOR, CAMPAIGN scope, no campaign. */
+export function isSubCoordinatorGrant(grant: Pick<Grant, 'role_code' | 'scope_type' | 'campaign_id'>): boolean {
+  return grant.role_code === 'COORDINATOR' && grant.scope_type === 'CAMPAIGN' && !grant.campaign_id;
+}
+
+/** True for a sub-coordinator that has no SYSTEM coordinator grant as well. */
+export function isSubCoordinator(grants: readonly Grant[]): boolean {
+  return grants.some(isSubCoordinatorGrant) &&
+    !grants.some((grant) => grant.role_code === 'COORDINATOR' && grant.scope_type === 'SYSTEM');
+}
+
+/** Permissions a grant carries: the role catalog, narrowed for a campaign grant derived from an engagement. */
+export function grantPermissions(grant: Pick<Grant, 'role_code' | 'engaged'>): readonly string[] {
+  return grant.engaged ? SUB_COORDINATOR_PERMISSIONS : ROLE_PERMISSIONS[grant.role_code];
 }
 
 export interface ScopeTarget {
@@ -62,8 +93,7 @@ function matchesScope(grant: Grant, target: ScopeTarget): boolean {
 
 export function hasPermission(grants: readonly Grant[], permission: Permission, target: ScopeTarget): boolean {
   return grants.some((grant) => {
-    const permissions: readonly string[] = ROLE_PERMISSIONS[grant.role_code];
-    return permissions.includes(permission) && matchesScope(grant, target);
+    return grantPermissions(grant).includes(permission) && matchesScope(grant, target);
   });
 }
 
@@ -78,5 +108,6 @@ export function validGrant(value: unknown): value is Grant {
       typeof grant.role_code !== 'string' || !Object.hasOwn(ROLE_PERMISSIONS, grant.role_code) ||
       typeof grant.scope_type !== 'string' || !scopes.has(grant.scope_type)) return false;
   if (grant.scope_type === 'SYSTEM') return grant.campaign_id === null || grant.campaign_id === undefined;
+  if ((grant.campaign_id === null || grant.campaign_id === undefined) && grant.role_code === 'COORDINATOR') return true;
   return typeof grant.campaign_id === 'string' && uuidPattern.test(grant.campaign_id);
 }

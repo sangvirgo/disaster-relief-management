@@ -43,7 +43,13 @@ export type AreaMapCampaign = {
   status: string;
   center: { lat: number; lng: number };
   radius_m: number;
+  /** 0–1 urgency: tints the area from calm to red so the areas needing work stand out (hotspot view). */
+  heat?: number;
+  /** Short summary shown in the area tooltip, e.g. open SOS and P1 counts. */
+  summary?: string;
 };
+
+const heatColor = (heat: number) => (heat >= 0.66 ? '#dc2626' : heat >= 0.33 ? '#f59e0b' : '#10b981');
 
 export type AreaEditor = {
   /** Area being drawn or adjusted; null until the coordinator taps the map. */
@@ -227,19 +233,23 @@ export function CampaignAreaMap({
     campaigns.forEach((campaign, index) => {
       if (campaign.id === hideId || campaign.id === expandingId) return;
       const active = campaign.status === 'ACTIVE';
-      const color = areaColor(index);
+      const heat = campaign.heat == null ? null : Math.min(1, Math.max(0, campaign.heat));
+      const color = heat == null ? areaColor(index) : heatColor(heat);
+      const hint = campaignEditRef.current ? ' · nhấp đúp để chỉnh vùng' : campaignSelectRef.current ? ' · bấm để chọn' : '';
       L.circle([campaign.center.lat, campaign.center.lng], {
         radius: campaign.radius_m,
         color,
-        weight: 2,
+        weight: heat == null ? 2 : 2 + Math.round(heat * 2),
         dashArray: active ? undefined : '6 4',
         fillColor: color,
-        fillOpacity: 0.07,
+        fillOpacity: heat == null ? 0.07 : 0.08 + heat * 0.3,
         className: 'campaign-area-circle',
+      }).on('click', () => {
+        if (heat != null) campaignSelectRef.current?.(campaign.id);
       }).on('dblclick', (event: L.LeafletMouseEvent) => {
         L.DomEvent.stopPropagation(event);
         campaignEditRef.current?.(campaign.id);
-      }).bindTooltip(`${campaign.name} · nhấp đúp để chỉnh vùng`, { sticky: true }).addTo(layer);
+      }).bindTooltip(`${campaign.name}${campaign.summary ? ` · ${campaign.summary}` : ''}${hint}`, { sticky: true }).addTo(layer);
       // Name sits on the circle's northern edge, so nested circles get labels at different heights.
       const edge: L.LatLngTuple = [campaign.center.lat + campaign.radius_m / 111_320, campaign.center.lng];
       L.marker(edge, {
@@ -404,8 +414,9 @@ export function CampaignAreaMap({
               <button type="button" className="campaign-area-legend__button" aria-pressed={selectedCampaignId === campaign.id}
                 title={`${CAMPAIGN_STATUS_VI[campaign.status] ?? campaign.status} · bán kính ${(campaign.radius_m / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} km`}
                 onClick={() => onCampaignSelect?.(campaign.id)}>
-                <span className="campaign-area-legend__badge" style={{ borderColor: areaColor(index), color: areaColor(index) }}>{index + 1}</span>
+                <span className="campaign-area-legend__badge" style={{ borderColor: campaign.heat == null ? areaColor(index) : heatColor(campaign.heat), color: campaign.heat == null ? areaColor(index) : heatColor(campaign.heat) }}>{index + 1}</span>
                 <strong>{campaign.name}</strong>
+                {campaign.summary && <span className="muted">{campaign.summary}</span>}
                 {campaign.status !== 'ACTIVE' && <span className="muted">{CAMPAIGN_STATUS_VI[campaign.status] ?? campaign.status}</span>}
               </button>
             </li>

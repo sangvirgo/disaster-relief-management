@@ -2,13 +2,15 @@ import { Dropdown } from '../../components/ui/Dropdown';
 import { useEffect, useState } from 'react';
 import { api, newCommandKey } from '../../api/client';
 import { useUrlView } from '../../app/useUrlView';
-import type { Me } from '../../auth/session';
+import { isSubCoordinator, type Me } from '../../auth/session';
 import { StatusBadge } from '../../components/StatusBadge';
 import { Pager } from '../../components/ui/Pager';
 import { Coordinator } from './Coordinator';
 import { Campaigns } from './Campaigns';
 import { CommonQueueSuggestions } from './CommonQueueSuggestions';
 import { ScopedCampaignMap } from './ScopedCampaignMap';
+import { CampaignHotspots } from './CampaignHotspots';
+import { SubCoordination } from './SubCoordination';
 import { HistorySummary, MyHistory, Timeline, type EngagementItem, type HistoryItem, type HistorySummaryData } from './CampaignHistory';
 import './campaign-coordination.css';
 
@@ -30,13 +32,13 @@ type Overview = { items: OverviewCampaign[]; common_queue?: { unmatched: number;
 const OVERVIEW_PAGE_SIZE = 10;
 const campaignTabs = ['campaigns', 'routing', 'sos', 'workspace', 'history', 'choose', 'my-history'] as const;
 
-const reasonLabel: Record<string, string> = {
-  P1_UNHANDLED: 'Có SOS P1 chưa được xử lý', P2_UNHANDLED: 'Có SOS P2 chưa được xử lý',
-  P3_UNHANDLED: 'Có SOS P3 chưa được xử lý', P4_UNHANDLED: 'Có SOS P4 chưa được xử lý',
-  OVERDUE: 'Có SOS quá hạn', LONG_WAIT: 'Có SOS chờ lâu',
-  NO_COORDINATOR: 'Chưa có điều phối viên tham gia', ROUTINE: 'Không có dấu hiệu gấp nổi bật',
-};
 export function CampaignCoordination({ user, initialRequestId = '' }: { user: Me; initialRequestId?: string }) {
+  // A sub-coordinator chooses campaigns itself and only works their SOS: it gets its own, narrower workspace.
+  if (isSubCoordinator(user)) return <SubCoordination user={user} initialRequestId={initialRequestId} />;
+  return <PrimaryCampaignCoordination user={user} initialRequestId={initialRequestId} />;
+}
+
+function PrimaryCampaignCoordination({ user, initialRequestId = '' }: { user: Me; initialRequestId?: string }) {
   const opensSos = Boolean(initialRequestId) || Boolean(new URL(window.location.href).searchParams.get('sos_id'));
   // Tabs: SOS routing (default, map) · campaigns (overview + list) · SOS queue · coordination workspace · history.
   const [tab, setTab] = useUrlView('campaign_tab', campaignTabs, opensSos ? 'sos' : 'routing');
@@ -232,19 +234,9 @@ export function CampaignCoordination({ user, initialRequestId = '' }: { user: Me
       <Timeline items={history} />
       {cursor && <button className="button secondary" type="button" onClick={() => void loadMoreHistory()}>Tải các sự kiện cũ hơn</button>}
     </>}
-    {tab === 'choose' && <section aria-label="Chọn chiến dịch cần điều phối" className="record-list">
-      <h2>Chọn chiến dịch cần điều phối</h2><p>Các chiến dịch đang hoạt động được xếp theo số liệu SOS, thời gian chờ và số điều phối viên.</p>
-      {triage.map((campaign, index) => <article className="card" key={campaign.id}>
-        <div className="section-header"><div><span className="eyebrow">{index === 0 ? 'Gấp nhất hiện tại' : `Mức gấp ${index + 1}`}</span><h3>{campaign.name}</h3></div>
-          <strong>{campaign.urgency.active_coordinator_count} điều phối viên đang tham gia</strong></div>
-        <p>{campaign.urgency_reasons_vi.join(' · ') || campaign.urgency.reason_codes.map((code) => reasonLabel[code] ?? 'Cần theo dõi').join(' · ')}</p>
-        <p>SOS gấp nhất: {campaign.urgency.highest_priority ?? 'Không có'} · {campaign.urgency.highest_priority_unhandled_count} chưa xử lý · {campaign.urgency.overdue_count} quá hạn.</p>
-        <button className="button primary" type="button" disabled={loading || engagements.some((item) => item.campaign_id === campaign.id)} onClick={() => void engage(campaign.id)}>
-          {engagements.some((item) => item.campaign_id === campaign.id) ? 'Đang điều phối' : 'Bắt đầu điều phối'}
-        </button>
-      </article>)}
-      {!loading && !triage.length && <p className="empty">Hiện không có chiến dịch đang hoạt động.</p>}
-    </section>}
+    {tab === 'choose' && <CampaignHotspots triage={triage} overview={overviewCampaigns} engagedIds={engagements.map((item) => item.campaign_id)}
+      loading={loading} onEngage={(id) => void engage(id)} onOpen={(id) => { setSelectedId(id); setTab('workspace'); }}
+      onRefresh={() => setRefresh((value) => value + 1)} />}
     {tab === 'workspace' && <>
       {engagements.length > 0 ? <div className="card campaign-engagement-toolbar">
         <label className="campaign-engagement-toolbar__select">Chiến dịch đang điều phối <Dropdown value={selectedEngagement?.campaign_id ?? ''} onChange={(event) => setSelectedId(event.target.value)}>

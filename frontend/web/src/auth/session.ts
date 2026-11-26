@@ -1,5 +1,6 @@
 import { api, csrf, invalidateCsrf, newCommandKey } from '../api/client';
 import type { components as IdentityComponents } from '../api/generated/identity';
+import { isSubCoordinatorGrants } from './subCoordinator';
 
 export type Grant = IdentityComponents['schemas']['MeGrant'];
 export type Me = IdentityComponents['schemas']['MeResponse'];
@@ -85,3 +86,7 @@ export async function changePassword(current_password: string, new_password: str
 }
 export const roles = (user: Me | null) =>
   new Set(user?.grants.map((grant) => grant.role_code) || []);
+/** Sub-coordinator: see `isSubCoordinatorGrants`. */
+export function isSubCoordinator(user: Me | null): boolean {
+  return isSubCoordinatorGrants(user?.grants ?? []);
+}

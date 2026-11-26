@@ -1,5 +1,6 @@
 import type { Me } from '../auth/session';
-import { roles } from '../auth/session';
+import { isSubCoordinator, roles } from '../auth/session';
+import { SUB_COORDINATOR_PAGES } from '../auth/subCoordinator';
 import type { Service } from '../api/client';
 
 export type Workspace = 'citizen' | 'volunteer' | 'coordinator' | 'operations' | 'admin';
@@ -129,7 +130,8 @@ export function allowedPages(workspace: Workspace, user: Me | null): Page[] {
   return pages[workspace].filter((page) => {
     if (workspace === 'citizen') return true;
     if (workspace === 'volunteer') return r.has('VOLUNTEER');
-    if (workspace === 'coordinator') return r.has('COORDINATOR');
+    // A sub-coordinator only chooses campaigns and works their SOS; system dashboards, reports and teams stay primary.
+    if (workspace === 'coordinator') return r.has('COORDINATOR') && (!isSubCoordinator(user) || SUB_COORDINATOR_PAGES.includes(page.id));
     if (workspace === 'admin') return r.has('ADMIN');
     const manages = r.has('OPERATIONS_MANAGER');
     const reviews = r.has('REVIEWER');

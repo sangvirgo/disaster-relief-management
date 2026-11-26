@@ -1,12 +1,15 @@
-import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Inject, Injectable, OnModuleDestroy, Optional } from '@nestjs/common';
+import { InjectDataSource } from '@nestjs/typeorm';
+import type { DataSource } from 'typeorm';
 import type { Request } from 'express';
 import { AppError } from '@c48/technical/errors/errors';
 import { CircuitBreakerClient } from '@c48/technical/http/service-client';
-import { Grant, validGrant } from '@c48/identity-contracts/permissions';
+import { Grant, isSubCoordinatorGrant, validGrant } from '@c48/identity-contracts/permissions';
 import { ServiceTokenCache } from '@c48/technical/http/service-token-cache';
 import type { ServiceName } from '@c48/technical/security/service-token';
 import { RequestIntakeConfig, REQUEST_INTAKE_CONFIG } from './request-intake.service';
 import { reporterAccessClaims, ReporterAccessTokenClaims } from './reporter-token';
+import { ENGAGEMENT_TTL_MINUTES } from './engagement-ttl';
 
 export const REPORTER_SESSION_CLIENT = Symbol('REPORTER_SESSION_CLIENT');
 export const REPORTER_SESSION_CONFIG = Symbol('REPORTER_SESSION_CONFIG');
@@ -23,13 +26,16 @@ export interface ReporterSession {
   grants: Grant[];
 }
 
-/** A coordinator who may act on a request of one campaign. */
+/** A coordinator who may act on a request of one campaign. `engaged` marks a sub-coordinator working that campaign. */
 export interface RequestCoordinatorGrant {
   user_id: string;
   role_code: 'COORDINATOR';
   scope_type: 'SYSTEM' | 'CAMPAIGN';
   campaign_id: string | null;
+  engaged?: true;
 }
+
+const activeEngagementSql = `ended_at IS NULL AND last_active_at > now()-interval '${ENGAGEMENT_TTL_MINUTES} minutes'`;
 
 export type TeamLeaderEligibilityReason = 'USER_NOT_FOUND' | 'USER_INACTIVE' | 'VOLUNTEER_GRANT_REQUIRED';
 
@@ -82,6 +88,7 @@ export class ReporterSessionService implements OnModuleDestroy {
     @Inject(REPORTER_SESSION_CONFIG) config: ReporterSessionConfig,
     @Inject(REQUEST_INTAKE_CONFIG) private readonly intakeConfig: RequestIntakeConfig,
     @Inject(REPORTER_SESSION_CLIENT) private readonly client: CircuitBreakerClient,
+    @Optional() @InjectDataSource() private readonly dataSource?: DataSource,
   ) {
     this.serviceTokens = new ServiceTokenCache(client, config);
   }
@@ -123,10 +130,22 @@ export class ReporterSessionService implements OnModuleDestroy {
       if (typeof value.user_id !== 'string' || !uuidPattern.test(value.user_id)) return false;
       return value.role_code === 'COORDINATOR' && ['SYSTEM', 'CAMPAIGN'].includes(String(value.scope_type)) &&
         (value.scope_type === 'SYSTEM' ? value.campaign_id === null :
+          (value.campaign_id === null && campaignId !== null) ||
           (typeof value.campaign_id === 'string' && uuidPattern.test(value.campaign_id) && value.campaign_id === campaignId));
     });
     if (!valid) throw unavailable();
-    return items as RequestCoordinatorGrant[];
+    const all = items as RequestCoordinatorGrant[];
+    const fixed = all.filter((grant) => !(grant.scope_type === 'CAMPAIGN' && grant.campaign_id === null));
+    const subUserIds = [...new Set(all.filter((grant) => grant.scope_type === 'CAMPAIGN' && grant.campaign_id === null).map((grant) => grant.user_id))];
+    if (!campaignId || !subUserIds.length || !this.dataSource) return fixed;
+    // Identity only knows the floating grant; the campaign a sub-coordinator works on lives in the Response database.
+    const engaged = (await this.dataSource.query(
+      `SELECT DISTINCT user_id FROM campaign_engagement WHERE campaign_id=$1 AND user_id=ANY($2::uuid[]) AND ${activeEngagementSql}`,
+      [campaignId, subUserIds],
+    ) as Array<{ user_id: string }>).map(({ user_id }) => user_id);
+    return [...fixed, ...engaged.map((userId): RequestCoordinatorGrant => ({
+      user_id: userId, role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: campaignId, engaged: true,
+    }))];
   }
 
   async teamLeaderEligibility(userId: string): Promise<TeamLeaderEligibility> {
@@ -269,7 +288,29 @@ export class ReporterSessionService implements OnModuleDestroy {
     if (value.active === false && value.user_id === claims.sub) throw new AppError('SESSION_EXPIRED', { status: 401 });
     if (value.active !== true || value.user_id !== claims.sub || !Array.isArray(value.grants) || !value.grants.every(validGrant)) throw unavailable();
     const grants = value.grants as Grant[];
-    return { userId: claims.sub, grants };
+    return { userId: claims.sub, grants: [...grants, ...await this.engagedGrants(claims.sub, grants)] };
+  }
+
+  /**
+   * A sub-coordinator (floating COORDINATOR campaign grant) acts only inside the ACTIVE campaigns it is engaged in.
+   * Each such engagement becomes a campaign grant marked `engaged`, which carries SUB_COORDINATOR_PERMISSIONS only, so
+   * every existing campaign-scope check applies unchanged. Activity keeps the engagement alive (at most one write a minute).
+   */
+  private async engagedGrants(userId: string, grants: readonly Grant[]): Promise<Grant[]> {
+    if (!this.dataSource || !grants.some(isSubCoordinatorGrant)) return [];
+    await this.dataSource.query(
+      `UPDATE campaign_engagement ce SET last_active_at=now()
+         FROM campaign c
+        WHERE c.id=ce.campaign_id AND c.status='ACTIVE' AND ce.user_id=$1 AND ce.ended_at IS NULL
+          AND ce.last_active_at > now()-interval '${ENGAGEMENT_TTL_MINUTES} minutes'
+          AND ce.last_active_at < now()-interval '1 minute'`, [userId],
+    );
+    const active = await this.dataSource.query(
+      `SELECT DISTINCT ce.campaign_id FROM campaign_engagement ce JOIN campaign c ON c.id=ce.campaign_id
+        WHERE ce.user_id=$1 AND c.status='ACTIVE' AND ce.ended_at IS NULL
+          AND ce.last_active_at > now()-interval '${ENGAGEMENT_TTL_MINUTES} minutes'`, [userId],
+    ) as Array<{ campaign_id: string }>;
+    return active.map(({ campaign_id }): Grant => ({ role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id, engaged: true }));
   }
 
 }

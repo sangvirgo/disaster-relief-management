@@ -53,6 +53,30 @@ describe('CampaignCoordinationService triage', () => {
     await expect(service.overview(request)).rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
     expect(dataSourceQuery).not.toHaveBeenCalled();
   });
+
+  it('shows a sub-coordinator only ACTIVE campaigns and never the unassigned-queue counts', async () => {
+    const { service, dataSourceQuery } = fixture([{ role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: null }]);
+    (service as unknown as { sessions: { lookupUsers: () => Promise<unknown[]> } }).sessions.lookupUsers = async () => [];
+    await expect(service.overview(request)).resolves.toEqual({ items: [] });
+    expect(dataSourceQuery).toHaveBeenCalledTimes(1);
+    expect(dataSourceQuery.mock.calls[0]?.[0]).toContain("WHERE c.status='ACTIVE'");
+  });
+
+  it('keeps the unassigned-SOS suggestions for the primary coordinator only', async () => {
+    const { service, dataSourceQuery } = fixture([{ role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: null }]);
+    await expect(service.commonQueueSuggestions({}, request)).rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
+    expect(dataSourceQuery).not.toHaveBeenCalled();
+  });
+
+  it('lets a sub-coordinator read only the history of campaigns it has worked on', async () => {
+    const worked = fixture([{ role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: null }], (sql) =>
+      sql.includes('FROM campaign WHERE id') || sql.includes('FROM campaign_engagement WHERE campaign_id') ? [{}] : []);
+    (worked.service as unknown as { sessions: { lookupUsers: () => Promise<unknown[]> } }).sessions.lookupUsers = async () => [];
+    await expect(worked.service.historySummary(campaignA, request)).resolves.toBeDefined();
+    const never = fixture([{ role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: null }], (sql) =>
+      sql.includes('FROM campaign WHERE id') ? [{}] : []);
+    await expect(never.service.historySummary(campaignA, request)).rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 });
+  });
 });
 
 describe('CampaignCoordinationService engagements', () => {

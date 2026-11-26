@@ -11,6 +11,7 @@ import { AddCampaignCoordinatorRole1794960000000 } from './database/migrations/A
 import { RetireLegacyStaffRoles1795046400000 } from './database/migrations/RetireLegacyStaffRoles1795046400000';
 import { RetireCampaignCoordinatorRole1795132800000 } from './database/migrations/RetireCampaignCoordinatorRole1795132800000';
 import { AddPasswordResetOtp1795651200000 } from './database/migrations/AddPasswordResetOtp1795651200000';
+import { AllowSubCoordinatorGrant1795694400000 } from './database/migrations/AllowSubCoordinatorGrant1795694400000';
 import { AuthModule } from './auth/auth.module';
 import { AuditModule } from './audit/audit.module';
 import { IdentityDashboardModule } from './dashboard/dashboard.module';
@@ -20,7 +21,7 @@ import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forRoot(postgresOptions([InitialIdentity1710000000000, AddAuthEmailOtpGoogle1792953600000, AddPendingEmailRegistration1792953600001, GrantExternalIdentitySelect1794144543000, RemoveRegionScope1794700800000, RemoveOrganizationIdentity1794787200000, AddCampaignCoordinatorRole1794960000000, RetireLegacyStaffRoles1795046400000, RetireCampaignCoordinatorRole1795132800000, AddPasswordResetOtp1795651200000], 'identity')),
+    TypeOrmModule.forRoot(postgresOptions([InitialIdentity1710000000000, AddAuthEmailOtpGoogle1792953600000, AddPendingEmailRegistration1792953600001, GrantExternalIdentitySelect1794144543000, RemoveRegionScope1794700800000, RemoveOrganizationIdentity1794787200000, AddCampaignCoordinatorRole1794960000000, RetireLegacyStaffRoles1795046400000, RetireCampaignCoordinatorRole1795132800000, AddPasswordResetOtp1795651200000, AllowSubCoordinatorGrant1795694400000], 'identity')),
     HealthModule,
     AuthModule,
     UsersModule,

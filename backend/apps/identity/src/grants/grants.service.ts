@@ -81,7 +81,7 @@ export class GrantsService {
     const actorId = actor.auth!.userId;
     if (isSelfGrant(actorId, userId)) throw new AppError('FORBIDDEN', { status: 403 });
     if (!grantScopeIsValid(dto)) throw new AppError('SCOPE_INVALID', { status: 400 });
-    if (dto.scope_type === 'CAMPAIGN') await this.campaigns.assertActiveCampaign(dto.campaign_id!);
+    if (dto.scope_type === 'CAMPAIGN' && dto.campaign_id) await this.campaigns.assertActiveCampaign(dto.campaign_id);
     return this.idempotency.execute(this.dataSource, {
       scopeKey: `user:${actorId}`, command: 'identity.grants.create', key: actor.idempotencyKey!,
       requestHash: canonicalRequestHash({ userId, ...dto }), databaseErrorMappings: { unique: { role_grant_live_uq: 'GRANT_EXISTS' } },

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import type { DataSource } from 'typeorm';
@@ -6,6 +6,7 @@ import { AppError } from '@c48/technical/errors/errors';
 import { decodeKeysetCursor, encodeKeysetCursor } from '@c48/technical/pagination/keyset';
 import { hasPermission } from '@c48/identity-contracts/permissions';
 import { LogisticsSessionService } from '../auth/logistics-session.service';
+import { CampaignWarehouseService } from '../campaign-warehouses/campaign-warehouses.service';
 import { decimalFromUnits, quantityUnits } from '../common/quantity';
 import { NEED_REASON_CODES, needReasonText, NeedReasonCode } from '../needs/need-reasons';
 import { NeedProposalQueryDto } from './need-proposals.dto';
@@ -64,11 +65,16 @@ function sosFacts(basis: Record<string, unknown> | null): Record<string, number>
   };
 }
 
+const MAX_LAZY_ASSIGNMENTS = 5;
+
 @Injectable()
 export class NeedProposalsService {
+  private readonly logger = new Logger(NeedProposalsService.name);
+
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly sessions: LogisticsSessionService,
+    @Optional() private readonly campaignWarehouses?: CampaignWarehouseService,
   ) {}
 
   async list(query: NeedProposalQueryDto, request: Request): Promise<Record<string, unknown>> {
@@ -133,10 +139,7 @@ export class NeedProposalsService {
     ) as ProposalLineRow[];
 
     const campaignsOnPage = [...new Set(page.map((row) => row.campaign_id).filter((id): id is string => Boolean(id)))];
-    const primaries = campaignsOnPage.length === 0 ? [] : await this.dataSource.query(
-      "SELECT campaign_id,warehouse_id FROM campaign_warehouse WHERE role='PRIMARY' AND campaign_id=ANY($1::uuid[])",
-      [campaignsOnPage],
-    ) as Array<{ campaign_id: string; warehouse_id: string }>;
+    const primaries = await this.primaryWarehouses(campaignsOnPage);
     const primaryByCampaign = new Map(primaries.map((row) => [row.campaign_id, row.warehouse_id]));
     const warehouseIds = [...new Set(primaries.map((row) => row.warehouse_id))];
     const itemIds = [...new Set(lines.map((line) => line.item_id))];
@@ -230,5 +233,28 @@ export class NeedProposalsService {
           AND EXISTS (SELECT 1 FROM relief_need n WHERE n.cycle_id=unassigned.id AND n.source='ESTIMATED' AND n.status='OPEN')`,
     ) as Array<{ total: number | string }>;
     return Number(rows[0]?.total ?? 0);
+  }
+
+  /**
+   * PRIMARY warehouse per campaign. A campaign that has none yet (new or just moved) is assigned now instead of waiting
+   * for the 15-minute sweep; at most MAX_LAZY_ASSIGNMENTS per read, and a failure only leaves the proposal without a warehouse.
+   */
+  private async primaryWarehouses(campaignIds: string[]): Promise<Array<{ campaign_id: string; warehouse_id: string }>> {
+    if (campaignIds.length === 0) return [];
+    const read = () => this.dataSource.query(
+      "SELECT campaign_id,warehouse_id FROM campaign_warehouse WHERE role='PRIMARY' AND campaign_id=ANY($1::uuid[])",
+      [campaignIds],
+    ) as Promise<Array<{ campaign_id: string; warehouse_id: string }>>;
+    const found = await read();
+    const missing = campaignIds.filter((id) => !found.some((row) => row.campaign_id === id)).slice(0, MAX_LAZY_ASSIGNMENTS);
+    if (!missing.length || !this.campaignWarehouses) return found;
+    for (const campaignId of missing) {
+      try {
+        await this.campaignWarehouses.reevaluateCampaign(campaignId, 'PROPOSAL_READ');
+      } catch (error) {
+        this.logger.warn({ code: error instanceof Error ? error.name : 'UNKNOWN' }, 'Lazy campaign warehouse assignment failed');
+      }
+    }
+    return read();
   }
 }

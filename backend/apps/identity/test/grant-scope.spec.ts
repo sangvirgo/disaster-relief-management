@@ -8,7 +8,8 @@ describe('Identity grant scope shape', () => {
     expect(grantScopeIsValid({ role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: 'campaign' })).toBe(true);
     expect(grantScopeIsValid({ role_code: 'ADMIN', scope_type: 'CAMPAIGN', campaign_id: 'campaign' })).toBe(false);
     expect(grantScopeIsValid({ role_code: 'COORDINATOR', scope_type: 'SYSTEM', campaign_id: 'campaign' })).toBe(false);
-    expect(grantScopeIsValid({ role_code: 'COORDINATOR', scope_type: 'CAMPAIGN' })).toBe(false);
+    // Sub-coordinator: COORDINATOR at CAMPAIGN scope without a campaign (chooses campaigns itself in Response).
+    expect(grantScopeIsValid({ role_code: 'COORDINATOR', scope_type: 'CAMPAIGN' })).toBe(true);
     expect(grantScopeIsValid({ role_code: 'OPERATIONS_MANAGER', scope_type: 'SYSTEM' })).toBe(true);
     expect(grantScopeIsValid({ role_code: 'OPERATIONS_MANAGER', scope_type: 'CAMPAIGN', campaign_id: 'campaign' })).toBe(true);
     expect(grantScopeIsValid({ role_code: 'OPERATIONS_MANAGER', scope_type: 'CAMPAIGN' })).toBe(false);

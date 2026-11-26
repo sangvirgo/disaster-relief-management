@@ -29,7 +29,9 @@ FROM (VALUES
   ('10d', 'vol_leader2',    'Đội trưởng tình nguyện 2'),
   ('10e', 'vol_member1',    'Tình nguyện viên 1'),
   ('10f', 'citizen1',       'Người dân 1'),
-  ('110', 'citizen2',       'Người dân 2')
+  ('110', 'citizen2',       'Người dân 2'),
+  ('111', 'coord_extra',    'Điều phối viên phụ bổ sung'),
+  ('125', 'coord3',         'Điều phối viên phụ 3')
 ) AS v(suffix, username, display_name)
 ON CONFLICT DO NOTHING;
 
@@ -46,7 +48,10 @@ FROM (VALUES
   ('10d', 'VOLUNTEER',          'SYSTEM',   NULL::uuid),
   ('10e', 'VOLUNTEER',          'SYSTEM',   NULL::uuid),
   ('10f', 'CITIZEN',            'SYSTEM',   NULL::uuid),
-  ('110', 'CITIZEN',            'SYSTEM',   NULL::uuid)
+  ('110', 'CITIZEN',            'SYSTEM',   NULL::uuid),
+  -- Sub-coordinators: COORDINATOR at CAMPAIGN scope without a campaign; they choose (engage) campaigns themselves.
+  ('111', 'COORDINATOR',        'CAMPAIGN', NULL::uuid),
+  ('125', 'COORDINATOR',        'CAMPAIGN', NULL::uuid)
 ) AS g(suffix, role_code, scope_type, campaign_id)
 JOIN app_user u ON u.id = pg_temp.u(g.suffix)
 WHERE NOT EXISTS (
