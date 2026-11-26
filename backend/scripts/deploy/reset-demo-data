@@ -130,8 +130,10 @@ main() {
   [[ ${#SEED_PASSWORD} -ge 10 ]] || die 'the demo password must have at least 10 characters (set SEED_PASSWORD in backend/.env); nothing was changed'
 
   mkdir -p -m 700 "$STATE_DIR"
-  exec 9>"$STATE_DIR/release.lock"
-  flock -n 9 || die 'a release, rollback or reset is already running'
+  if [[ "${C48_RELEASE_LOCK_HELD:-0}" != 1 ]]; then # set only by `release deploy --reset-data`, which already holds the lock
+    exec 9>"$STATE_DIR/release.lock"
+    flock -n 9 || die 'a release, rollback or reset is already running'
+  fi
 
   safety_dump || die 'the safety dump failed; nothing was deleted'
 

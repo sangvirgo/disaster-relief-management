@@ -239,3 +239,41 @@ test('a release fails and rolls back when nginx cannot start with the new config
     assert.equal(box.release('current'), 'aaa');
   } finally { box.cleanup(); }
 });
+
+test('--reset-data reseeds with the new checkout reset script under the held lock and records the release', () => {
+  const box = sandbox();
+  try {
+    assert.equal(box.run('deploy', 'aaa').status, 0);
+    const resetScript = join(box.root, 'backend/scripts/deploy/reset-demo-data');
+    writeFileSync(resetScript, `#!/usr/bin/env bash\nprintf 'reset %s lock_held=%s tag=%s\\n' "$*" "$C48_RELEASE_LOCK_HELD" "$(grep '^C48_IMAGE_TAG=' "$(dirname "$0")/../../.env")" >> "${box.calls}"\nexit "\${FAKE_RESET_STATUS:-0}"\n`);
+    const result = box.run('deploy', 'bbb', '--reset-data', '--purge-evidence');
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.equal(box.release('current'), 'bbb');
+    assert.equal(box.release('previous'), 'aaa');
+    const log = readFileSync(box.calls, 'utf8');
+    assert.match(log, /reset --reset --purge-evidence lock_held=1 tag=C48_IMAGE_TAG=bbb/u, 'reset runs after the tag switch, holding the lock');
+  } finally { box.cleanup(); }
+});
+
+test('a failed --reset-data release stops without an automatic rollback and keeps the previous release for a manual one', () => {
+  const box = sandbox();
+  try {
+    assert.equal(box.run('deploy', 'aaa').status, 0);
+    writeFileSync(join(box.root, 'backend/scripts/deploy/reset-demo-data'), '#!/usr/bin/env bash\nexit 1\n');
+    const result = box.run('deploy', 'bbb', '--reset-data');
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /no automatic rollback/u);
+    assert.equal(box.release('current'), 'aaa');
+    assert.equal(box.release('previous'), 'aaa');
+    assert.equal(box.envTag(), 'bbb');
+  } finally { box.cleanup(); }
+});
+
+test('release rejects unknown deploy options and --purge-evidence without --reset-data', () => {
+  const box = sandbox();
+  try {
+    assert.match(box.run('deploy', 'aaa', '--wipe').stderr, /unknown option: --wipe/u);
+    assert.match(box.run('deploy', 'aaa', '--purge-evidence').stderr, /requires --reset-data/u);
+    assert.equal(box.release('current'), null);
+  } finally { box.cleanup(); }
+});

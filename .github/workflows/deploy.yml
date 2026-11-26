@@ -11,6 +11,21 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      reset_data:
+        description: 'Xóa và nạp lại dữ liệu mẫu khi triển khai (dùng khi migration không giữ được dữ liệu cũ)'
+        required: false
+        type: boolean
+        default: false
+      purge_evidence:
+        description: 'Khi nạp lại dữ liệu: xóa luôn ảnh/video minh chứng trên S3 (không đụng bucket sao lưu)'
+        required: false
+        type: boolean
+        default: true
+      password:
+        description: 'Mật khẩu đặt lại dữ liệu (chỉ cần khi chọn nạp lại dữ liệu mẫu)'
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -113,7 +128,20 @@ jobs:
       TAG: ${{ github.sha }}
       INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
       AWS_REGION: ${{ vars.AWS_REGION }}
+      # Only a manual run can reset data; a push always deploys without touching it.
+      RESET_DATA: ${{ github.event_name == 'workflow_dispatch' && inputs.reset_data }}
+      PURGE: ${{ github.event_name == 'workflow_dispatch' && inputs.reset_data && inputs.purge_evidence }}
     steps:
+      - name: Check the reset password
+        if: github.event_name == 'workflow_dispatch' && inputs.reset_data
+        env:
+          PASSWORD: ${{ inputs.password }}
+          RESET_PASSWORD: ${{ secrets.RESET_PASSWORD }}
+        run: |
+          echo "::add-mask::$PASSWORD"
+          [ -n "$RESET_PASSWORD" ] || { echo "::error::Chưa cấu hình secret RESET_PASSWORD trong environment production."; exit 1; }
+          [ "$PASSWORD" = "$RESET_PASSWORD" ] || { echo "::error::Sai mật khẩu đặt lại: không có gì bị xóa."; exit 1; }
+
       - uses: aws-actions/configure-aws-credentials@v6
         with:
           # Environment secrets of `production` (only jobs on main may read them). The IAM user may only send a shell
@@ -127,7 +155,11 @@ jobs:
           set -euo pipefail
           # The host checks out this exact commit, then runs its own release script (pre-deploy dump, migrations,
           # health checks, automatic rollback). TAG is the commit SHA, so it cannot contain shell metacharacters.
-          jq -n --arg tag "$TAG" '{commands: ["bash -c \"set -euo pipefail; export HOME=/root; cd /opt/c48; git fetch --quiet origin; git checkout --quiet --detach \($tag); exec bash backend/scripts/deploy/release deploy \($tag)\""]}' > ssm-parameters.json
+          # --reset-data wipes and reseeds with this commit's migrations and seed (for a migration that refuses old demo data).
+          flags=''
+          [ "$RESET_DATA" = true ] && flags=' --reset-data'
+          [ "$PURGE" = true ] && flags="$flags --purge-evidence"
+          jq -n --arg tag "$TAG" --arg flags "$flags" '{commands: ["bash -c \"set -euo pipefail; export HOME=/root; cd /opt/c48; git fetch --quiet origin; git checkout --quiet --detach \($tag); exec bash backend/scripts/deploy/release deploy \($tag)\($flags) < /dev/null\""]}' > ssm-parameters.json
           command_id="$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name AWS-RunShellScript \

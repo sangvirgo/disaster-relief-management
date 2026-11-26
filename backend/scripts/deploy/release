@@ -2,6 +2,10 @@
 # Release, roll back and inspect the production stack on the AWS host (design: docs/c48-deployment-architecture.md 5.3).
 #
 #   release deploy <image-tag>   pull images, pre-deploy dump, migrate, start, health-check; roll back on failure
+#   release deploy <image-tag> --reset-data [--purge-evidence]
+#                                pull images, then wipe and reseed the demo data with THIS release's migrations and seed
+#                                (reset-demo-data from the new checkout). For migrations that refuse to keep old demo data.
+#                                No automatic rollback once the reset has started: the database may already use the new schema.
 #   release rollback             return to the previous release (images, Compose file from Git, previous .env)
 #   release status               show current/previous release and container state
 #
@@ -206,14 +210,32 @@ restore_previous() { # shared by `rollback` and the automatic rollback inside `d
   log "rolled back to $previous. The database was NOT restored: only restore $STATE_DIR/pre-deploy if the failed migration changed data incompatibly."
 }
 
+# Wipe and reseed with the reset script of the commit being deployed, so its migrations and seed always match the images.
+# release.lock is already held here; the child inherits it and is told not to take it again.
+reset_data() {
+  local -a flags=(--reset)
+  [[ "$1" == 1 ]] && flags+=(--purge-evidence)
+  C48_RELEASE_LOCK_HELD=1 bash "$ROOT/backend/scripts/deploy/reset-demo-data" "${flags[@]}" < /dev/null
+}
+
 cmd_deploy() {
-  local tag="${1:-}" current
-  valid_tag "$tag" || die 'usage: release deploy <image-tag> (letters, digits, dot, dash, underscore)'
+  local tag="${1:-}" current reset=0 purge=0 deployed=0
+  valid_tag "$tag" || die 'usage: release deploy <image-tag> [--reset-data [--purge-evidence]] (tag: letters, digits, dot, dash, underscore)'
+  shift
+  while (( $# )); do
+    case "$1" in
+      --reset-data) reset=1 ;;
+      --purge-evidence) purge=1 ;;
+      *) die "unknown option: $1" ;;
+    esac
+    shift
+  done
+  (( purge == 0 || reset == 1 )) || die '--purge-evidence requires --reset-data'
   [[ -f "$ENV_FILE" ]] || die 'backend/.env is missing; run backend/scripts/deploy/init-env first'
   [[ "$(image_source)" == registry ]] || die 'C48_IMAGE_SOURCE must be registry on the production host'
   prepare_state
   current="$(read_release current)"
-  log "deploying $tag (current: ${current:-none})"
+  log "deploying $tag (current: ${current:-none})$( (( reset )) && echo ', with a demo data reset')"
 
   checkout_release "$tag"
   registry_login
@@ -223,7 +245,17 @@ cmd_deploy() {
   fi
   set_env_value C48_IMAGE_TAG "$tag"
 
-  if main_compose pull "${APP_IMAGES[@]}" && predeploy_dump && migrate && start_stack && wait_healthy; then
+  if (( reset )); then
+    if main_compose pull "${APP_IMAGES[@]}"; then
+      # From here on the old data is gone or being replaced: rolling the code back would not bring it back.
+      reset_data "$purge" || die "release $tag failed during the data reset; no automatic rollback (the database may already use the new schema). Run 'release deploy $tag --reset-data' again, or 'release rollback' followed by 'reset-demo-data --reset'. The data before the reset is in $STATE_DIR/pre-reset."
+      recreate_nginx && wait_healthy && deployed=1
+    fi
+  elif main_compose pull "${APP_IMAGES[@]}" && predeploy_dump && migrate && start_stack && wait_healthy; then
+    deployed=1
+  fi
+
+  if (( deployed )); then
     write_release current "$tag"
     prune_images
     install_systemd_units
@@ -255,7 +287,7 @@ main() {
     deploy) cmd_deploy "$@" ;;
     rollback) cmd_rollback ;;
     status) cmd_status ;;
-    *) printf 'Usage: release deploy <image-tag> | rollback | status\n' >&2; return 2 ;;
+    *) printf 'Usage: release deploy <image-tag> [--reset-data [--purge-evidence]] | rollback | status\n' >&2; return 2 ;;
   esac
 }
 
