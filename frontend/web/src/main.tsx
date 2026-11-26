@@ -95,6 +95,7 @@ function IntakeReview({ user }: { user: Me }) {
     url.searchParams.delete('view');
     url.searchParams.delete('section');
     url.searchParams.delete('ticket_id');
+    url.searchParams.delete('dist_status');
     window.history.replaceState(null, '', url);
   }
   const current = step === 'review' && !canReview ? 'intake' : step;
@@ -1533,6 +1534,7 @@ function writeRoute(workspace: Workspace, page: string, user: Me | null, mode: '
     url.searchParams.delete('sos_tab');
     url.searchParams.delete('campaign_tab');
     url.searchParams.delete('ticket_id');
+    url.searchParams.delete('dist_status');
     url.searchParams.delete('warehouse_id');
     url.searchParams.delete('warehouse_name');
   } else {

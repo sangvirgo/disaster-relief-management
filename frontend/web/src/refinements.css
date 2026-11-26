@@ -1833,6 +1833,9 @@
 /* Hidden tab panels inside an operations record must never reserve space (a display rule was overriding [hidden]). */
 #operations-detail-tabpanel > [hidden] { display: none !important; }
 .need-commitments { margin-top: 24px; border-top: 1px solid #dce5f2; padding-top: 20px; }
+.distribution-filter-row { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; margin: 12px 0 20px; }
+.distribution-filter-row .filter { min-width: min(260px, 100%); margin: 0; }
+.distribution-filter-row .clear-receipt-filters { min-height: 48px; }
 .need-action-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; }
 .need-action-header h3 { margin: 0; }
 .need-action-menu { position: relative; width: max-content; max-width: 100%; }

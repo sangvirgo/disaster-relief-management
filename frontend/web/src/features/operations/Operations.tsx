@@ -510,11 +510,19 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           warehouseOptions={warehouseOptions} campaigns={references.campaigns || []} items={references.items || []} itemScales={references.itemScales || []} itemUnits={references.itemUnits || []}
           refreshKey={revision} onChanged={() => setRevision((value) => value + 1)} onRefresh={() => { setCursor(''); setRevision(value => value + 1); }} />}
         {distributionPages.has(page) && (
-          <div className="tabs distribution-status-tabs" role="group" aria-label="Lọc phiếu theo bước">
-            {([['', 'Tất cả'], ['DRAFT', 'Chờ duyệt'], ['APPROVED', 'Chờ xuất kho'], ['DISPATCHED', 'Đang bàn giao'], ['RECONCILED', 'Hoàn tất'], ['CANCELLED', 'Đã hủy']] as const).map(([value, title]) => (
-              <button key={value} type="button" className={distStatus === value ? 'active' : ''} aria-pressed={distStatus === value}
-                onClick={() => { setDistStatus(value); setCursor(''); setSelected(null); }}>{title}</button>
-            ))}
+          <div className="distribution-filter-row">
+            <label className="filter">
+              Trạng thái phiếu
+              <Dropdown value={distStatus} onChange={(event) => { setDistStatus(event.target.value); setCursor(''); setSelected(null); setDetail(null); }}>
+                <option value="">Tất cả</option>
+                <option value="DRAFT">Chờ duyệt</option>
+                <option value="APPROVED">Chờ xuất kho</option>
+                <option value="DISPATCHED">Đang bàn giao</option>
+                <option value="RECONCILED">Hoàn tất</option>
+                <option value="CANCELLED">Đã hủy</option>
+              </Dropdown>
+            </label>
+            {distStatus && <button type="button" className="button secondary clear-receipt-filters" onClick={() => { setDistStatus(''); setCursor(''); setSelected(null); setDetail(null); }}>Xóa bộ lọc</button>}
           </div>
         )}
         {page === 'review' && (
