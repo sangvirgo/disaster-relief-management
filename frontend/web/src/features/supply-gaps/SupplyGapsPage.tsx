@@ -1,7 +1,7 @@
 import { roles, type Me } from '../../auth/session';
 import { useUrlView } from '../../app/useUrlView';
 import { supplySections } from '../../app/routeViews';
-import { PageHeader } from '../../components/ui/PageHeader';
+
 import { Tabs } from '../../components/ui/Tabs';
 import { ItemCatalogPage } from '../catalog/ItemCatalogPage';
 import { NormEditor } from './NormEditor';
@@ -17,10 +17,7 @@ export function SupplyGapsPage({ user }: { user: Me }) {
 
   return (
     <div className="operations-workspace supply-page">
-      <PageHeader
-        title="Thiếu hàng và danh mục"
-        description="Hệ thống tự so sánh nhu cầu các chiến dịch với tồn kho và đề xuất mở đợt quyên góp khi sắp thiếu."
-      />
+      <p className="muted">Cảnh báo được cập nhật theo đợt quét nhu cầu và tồn kho. Bấm Làm mới để lấy kết quả đã xử lý gần nhất.</p>
       {canManage && <Tabs
         ariaLabel="Thiếu hàng và danh mục"
         idBase="supply-page"

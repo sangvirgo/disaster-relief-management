@@ -221,7 +221,7 @@ export function TrackingActions({
         <form className="form-stack" onSubmit={supplement} noValidate>
           <p>Thông tin bổ sung sau xác minh sẽ được điều phối viên rà soát trước khi áp dụng.</p>
           <label>
-            Mô tả mới
+            Mô tả tình hình cập nhật
             <textarea
               maxLength={2001}
               aria-invalid={Boolean((supplementAttempted || supplementTouched.description) && descriptionError)}
@@ -233,6 +233,7 @@ export function TrackingActions({
               }}
               onBlur={() => setSupplementTouched((current) => ({ ...current, description: true }))}
             />
+            <small>Nội dung được chấp nhận sẽ thay thế mô tả hiện tại. Hãy giữ lại các chi tiết còn đúng như người mắc kẹt, người cần dìu và lối tiếp cận.</small>
             {(supplementAttempted || supplementTouched.description) && descriptionError && <small className="field-error" role="alert">{descriptionError}</small>}
           </label>
           <label>

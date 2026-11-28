@@ -1747,6 +1747,7 @@
 .drive-location-field { display: grid; gap: 4px; }
 .drive-location-field .location-picker { margin-top: 0; }
 .warehouse-map-pin svg { display: block; width: 44px; height: 44px; overflow: visible; filter: drop-shadow(0 2px 5px #0f172a66); }
+.warehouse-map-pin--compact svg { width: 28px; height: 28px; margin: 8px; }
 .warehouse-icon-bg { fill: #fff; stroke: #17212f; stroke-width: 2; }
 .warehouse-icon-lines { fill: none; stroke: #303030; stroke-width: 2.3; stroke-linecap: round; stroke-linejoin: round; }
 .warehouse-icon-wheel { fill: #fff; }

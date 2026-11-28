@@ -48,7 +48,8 @@ function draftCardStyle(point: { x: number; y: number; width: number; height: nu
   return { left, top, width, right: 'auto', bottom: 'auto' };
 }
 
-export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, error = false, selectedId, onSelectWarehouse, onEditWarehouse, onSelectDrive, onHover, onEmptyClick, toolbar, hoverCard, placing = false, onMapClick, banner, creatingWarehouse = false, editingWarehouse = false, draft, onDraftChange }: {
+export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, error = false, selectedId, onSelectWarehouse, onEditWarehouse, onSelectDrive, onHover, onEmptyClick, toolbar, hoverCard, placing = false, onMapClick, banner, creatingWarehouse = false, editingWarehouse = false, draft, onDraftChange, searchPoint }: {
+  searchPoint?: { latitude: number; longitude: number } | null;
   placing?: boolean; onMapClick?: (lat: number, lng: number) => void; banner?: React.ReactNode;
   rows: Coverage[]; campaigns?: MapCampaign[]; loading?: boolean; error?: boolean; selectedId?: string | null;
   onSelectWarehouse?: (warehouseId: string) => void; onEditWarehouse?: (warehouseId: string) => void; onSelectDrive?: (driveId: string, warehouseId: string) => void; onHover?: (target: HoverTarget) => void; onEmptyClick?: () => void;
@@ -83,7 +84,6 @@ export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, er
   const [zoomComplete, setZoomComplete] = useState(false);
   const [draftReady, setDraftReady] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(6);
-  const draftMoveToken = useRef(0);
   const selectionTimer = useRef<number | null>(null);
 
   const focusWarehouse = (map: L.Map, row: Coverage) => {
@@ -95,7 +95,8 @@ export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, er
 
   useEffect(() => {
     if (!containerRef.current) return;
-    const map = L.map(containerRef.current, { center: [16.1, 107.7], zoom: 6 });
+    const map = L.map(containerRef.current, { center: [16.1, 107.7], zoom: 6, zoomControl: false });
+    L.control.zoom({ zoomInTitle: 'Phóng to', zoomOutTitle: 'Thu nhỏ' }).addTo(map);
     if (tileUrl) L.tileLayer(tileUrl, { attribution: tileAttribution, maxZoom: 19 }).addTo(map);
     else maplibreGL({ style: mapStyleUrl, locale: { 'Map.Title': 'Bản đồ' } }).addTo(map);
     mapRef.current = map;
@@ -103,19 +104,11 @@ export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, er
     draftLayerRef.current = L.layerGroup().addTo(map);
     map.on('click', (event: L.LeafletMouseEvent) => {
       if (creatingRef.current) {
-        const token = ++draftMoveToken.current;
-        setZoomComplete(false);
-        setDraftReady(false);
-        map.stop();
         const radius = draftRef.current?.radiusM ?? 5000;
         draftChangeRef.current?.({ lat: event.latlng.lat, lng: event.latlng.lng, radiusM: radius });
-        map.once('moveend', () => {
-          if (token === draftMoveToken.current && creatingRef.current) {
-            setZoomComplete(true);
-            setDraftReady(true);
-          }
-        });
-        map.flyTo(event.latlng, map.getSize().x < 450 ? 9 : 11, { duration: 0.55 });
+        map.setView(event.latlng, map.getSize().x < 450 ? 9 : 11, { animate: false });
+        setZoomComplete(true);
+        setDraftReady(true);
       } else if (placingRef.current) mapClickRef.current?.(event.latlng.lat, event.latlng.lng);
       else emptyClickRef.current?.();
     });
@@ -167,7 +160,7 @@ export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, er
         title: `Kho: ${row.name}`,
         zIndexOffset: selected ? 1600 : 1200,
         icon: L.divIcon({
-          className: 'warehouse-map-pin',
+          className: `warehouse-map-pin${zoomLevel < 9 && !selected ? ' warehouse-map-pin--compact' : ''}`,
           html: warehouseIconHtml(selected),
           iconSize: [44, 44], iconAnchor,
         }),
@@ -225,6 +218,10 @@ export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, er
   }, [rows, creatingWarehouse, editingWarehouse]);
 
   useEffect(() => {
+    if (searchPoint && creatingRef.current) mapRef.current?.fire('click', { latlng: L.latLng(searchPoint.latitude, searchPoint.longitude) });
+  }, [searchPoint]);
+
+  useEffect(() => {
     const container = mapRef.current?.getContainer();
     if (container) container.style.cursor = placing || creatingWarehouse ? 'crosshair' : '';
   }, [placing, creatingWarehouse]);
@@ -236,10 +233,10 @@ export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, er
     layer.clearLayers();
     if ((!creatingWarehouse && !editingWarehouse) || !draft || !zoomComplete) return;
     const circle = L.circle([draft.lat, draft.lng], { radius: draft.radiusM, color: '#1d4ed8', weight: 3, fillColor: '#3b82f6', fillOpacity: 0.12, dashArray: '8 5', interactive: false }).addTo(layer);
-    const center = L.marker([draft.lat, draft.lng], { draggable: true, autoPan: true, icon: L.divIcon({ className: 'warehouse-draft-pin warehouse-map-pin', html: warehouseIconHtml(true), iconSize: [44, 44], iconAnchor: [22, 22] }) }).addTo(layer);
+    const center = L.marker([draft.lat, draft.lng], { title: 'Kéo để đổi vị trí kho', alt: 'Vị trí kho đang chọn', draggable: true, autoPan: true, icon: L.divIcon({ className: 'warehouse-draft-pin warehouse-map-pin', html: warehouseIconHtml(true), iconSize: [44, 44], iconAnchor: [22, 22] }) }).addTo(layer);
     const radiusLng = (lat: number, lng: number, radius: number) => lng + radius / (111_320 * Math.max(0.1, Math.cos(lat * Math.PI / 180)));
     const handleLng = radiusLng(draft.lat, draft.lng, draft.radiusM);
-    const handle = L.marker([draft.lat, handleLng], { draggable: true, autoPan: true, icon: L.divIcon({ className: 'warehouse-radius-handle', html: '<span aria-hidden="true">↔</span>', iconSize: [32, 32], iconAnchor: [16, 16] }) }).addTo(layer);
+    const handle = L.marker([draft.lat, handleLng], { title: 'Kéo để đổi bán kính phục vụ; có thể nhập bán kính trong biểu mẫu', alt: 'Điều chỉnh bán kính phục vụ', draggable: true, autoPan: true, icon: L.divIcon({ className: 'warehouse-radius-handle', html: '<span aria-hidden="true">↔</span>', iconSize: [32, 32], iconAnchor: [16, 16] }) }).addTo(layer);
     center.on('drag', () => {
       const point = center.getLatLng();
       circle.setLatLng(point);
@@ -260,7 +257,6 @@ export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, er
 
   useEffect(() => {
     if (creatingWarehouse) {
-      ++draftMoveToken.current;
       setZoomComplete(false);
       setDraftReady(false);
       mapRef.current?.stop();

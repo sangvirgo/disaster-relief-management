@@ -1,5 +1,5 @@
 import { Dropdown } from '../../components/ui/Dropdown';
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, newCommandKey } from '../../api/client';
 import { LocationPicker, type Point } from '../../maps/LocationPicker';
 
@@ -22,12 +22,13 @@ const toLocalInput = (iso: string | null) => iso ? new Date(new Date(iso).getTim
 const toIso = (local: string) => local ? new Date(local).toISOString() : null;
 
 /** Creates a donation drive, or (with `edit`) adjusts a DRAFT one. `lockedWarehouseId` fixes the receiving warehouse. */
-export function DriveCreateForm({ warehouses, campaigns, items, itemScales, onSuccess, lockedWarehouseId, edit, areaFor, initialLocation }: {
+export function DriveCreateForm({ warehouses, campaigns, items, itemScales, onSuccess, lockedWarehouseId, edit, areaFor, initialLocation, onDirtyChange }: {
   warehouses: Option[]; campaigns: Option[]; items: Option[]; itemScales: Option[]; onSuccess: () => void;
   lockedWarehouseId?: string; edit?: DriveEdit;
   /** Service area of a warehouse; the drop-off point must lie inside it. */
   areaFor: (warehouseId: string) => WarehouseArea | null;
   initialLocation?: Point | null;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [title, setTitle] = useState(edit?.initial.title ?? '');
   const [description, setDescription] = useState(edit?.initial.description ?? '');
@@ -42,6 +43,9 @@ export function DriveCreateForm({ warehouses, campaigns, items, itemScales, onSu
     : !location ? 'Hãy chọn vị trí điểm quyên góp trên bản đồ.'
     : distanceMetres(area, location) > area.radiusM ? `Vị trí phải nằm trong vùng phục vụ của ${area.name} (bán kính ${(area.radiusM / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} km).` : '';
   const [lines, setLines] = useState<DriveItem[]>(edit?.initial.lines.length ? edit.initial.lines : [emptyItem()]);
+  const draftSignature = JSON.stringify({ title, description, warehouseId, campaignId, opensAt, closesAt, location, locationNote, lines });
+  const originalDraft = useRef(draftSignature);
+  useEffect(() => { onDirtyChange?.(draftSignature !== originalDraft.current); }, [draftSignature, onDirtyChange]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const pending = useRef<{ key: string; body: Record<string, unknown> } | null>(null);
@@ -69,7 +73,9 @@ export function DriveCreateForm({ warehouses, campaigns, items, itemScales, onSu
   }
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (busy) return;
     setError('');
+    if (hasInvalidFields) { setError('Điền đủ tên, mô tả, kho, vị trí trong vùng phục vụ và số lượng hợp lệ cho từng vật phẩm.'); return; }
     if (lines.some(line => !line.item_id || !line.target_quantity)) {
       setError('Hãy chọn vật phẩm và nhập số lượng mục tiêu cho từng dòng.'); return;
     }
@@ -123,9 +129,10 @@ export function DriveCreateForm({ warehouses, campaigns, items, itemScales, onSu
     <fieldset className="drive-location-field"><legend>Điểm quyên góp trên bản đồ *</legend>
       <small className="muted">Chọn nơi người dân mang hàng đến. Vòng tròn trên bản đồ là vùng phục vụ của kho; điểm phải nằm trong vòng đó. Người quyên góp sẽ được gợi ý đợt gần họ nhất.</small>
       <LocationPicker value={location} initiallyOpen={Boolean(warehouseId) && !location} toggleLabel={location ? 'Đổi điểm quyên góp' : undefined}
+        validatePoint={point => !area ? 'Chọn kho có vùng phục vụ trước khi đặt điểm quyên góp.' : distanceMetres(area, point) > area.radiusM ? `Điểm này nằm ngoài vùng phục vụ của ${area.name}. Hãy chọn bên trong vòng tròn.` : ''}
         overlay={area ? { areas: [{ id: 'warehouse-area', label: `Vùng phục vụ ${area.name}`, latitude: area.latitude, longitude: area.longitude, radiusM: area.radiusM }] } : undefined}
         onSelect={(point, address) => { setLocation(point); if (point && address && !locationNote) setLocationNote(address); pending.current = null; setError(''); }} />
-      {location && <small>Đã chọn điểm quyên góp trên bản đồ.</small>}
+      {location && !locationError && <small>Điểm quyên góp nằm trong vùng phục vụ của kho.</small>}
       {warehouseId && locationError && <small className="field-error" role="alert">{locationError}</small>}
       <label><span>Chỉ dẫn tìm điểm (nếu có)</span><input maxLength={501} value={locationNote} onChange={event => { setLocationNote(event.target.value); pending.current = null; }} placeholder="Ví dụ: cổng chính nhà văn hóa, sảnh tầng 1" /></label>
     </fieldset>

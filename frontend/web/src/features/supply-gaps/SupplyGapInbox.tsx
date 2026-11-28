@@ -45,6 +45,7 @@ export function SupplyGapInbox({ user }: { user: Me }) {
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
   const [notice, setNotice] = useState('');
+  const [createdDriveId, setCreatedDriveId] = useState('');
   const [refs, setRefs] = useState<Refs>({ campaigns: new Map(), warehouses: new Map(), unitByItem: new Map() });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<SupplyGap | null>(null);
@@ -219,7 +220,7 @@ export function SupplyGapInbox({ user }: { user: Me }) {
           ))}
         </Dropdown>
       </div>
-      {notice && <p className="notice" role="status">{notice}</p>}
+      {notice && <div className="notice" role="status"><p>{notice}</p>{createdDriveId && <a className="button" href={`?workspace=operations&page=assets&view=warehouses&edit_drive=${encodeURIComponent(createdDriveId)}`}>Mở và chỉnh sửa bản nháp</a>}</div>}
       {error && <p className="notice error" role="alert">{error}</p>}
       {loading && <Skeleton rows={3} label="Đang tải đề xuất quyên góp…" />}
       {!loading && !error && !items.length && (
@@ -297,6 +298,7 @@ export function SupplyGapInbox({ user }: { user: Me }) {
               dismissSpec={dismissSpec(detail)}
               onAccepted={(result) => {
                 const driveId = (result as SupplyGap | undefined)?.drive_id;
+                setCreatedDriveId(driveId || '');
                 reloadAfterChange(driveId ? `Đã tạo đợt quyên góp nháp (mã ${shortId(driveId)}). Đề xuất đã được chuyển sang trạng thái đã tạo đợt quyên góp.` : 'Đã tạo đợt quyên góp nháp.');
               }}
               onDismissed={() => reloadAfterChange('Đã bỏ qua đề xuất. Đề xuất sẽ không hiện lại trong thời gian làm nguội.')}
@@ -376,7 +378,7 @@ function SupplyGapDetail({
 
       <section aria-label="Bản nháp đợt quyên góp">
         <h3>Bản nháp đợt quyên góp</h3>
-        {gap.status === 'ACCEPTED' && gap.drive_id && <p>Đã tạo đợt quyên góp (mã {shortId(gap.drive_id)}). Đợt này ở trạng thái nháp cho đến khi được mở.</p>}
+        {gap.status === 'ACCEPTED' && gap.drive_id && <div><p>Đợt quyên góp đã được tạo ở trạng thái nháp.</p><a className="button" href={`?workspace=operations&page=assets&view=warehouses&edit_drive=${encodeURIComponent(gap.drive_id)}`}>Mở và chỉnh sửa bản nháp</a></div>}
         {gap.status === 'DISMISSED' && (
           <p>Đã bỏ qua{gap.dismissed_reason ? `: ${gap.dismissed_reason}` : '.'}{gap.dismissed_until ? ` Không hiện lại đến ${dateLabel(gap.dismissed_until.slice(0, 10))}.` : ''}</p>
         )}

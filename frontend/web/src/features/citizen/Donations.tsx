@@ -585,6 +585,31 @@ export function Donations({ user }: { user: Me | null }) {
     return (
       <>{nav}
       <div className="grid-two donation-layout">
+        {user && <section className="card donation-owned-list">
+          <div className="section-header"><div><h2>Phiếu quyên góp của tôi</h2><p>Chọn một phiếu để xem trạng thái mới nhất.</p></div><button type="button" className="button secondary refresh-action" disabled={ownedLoading} onClick={() => setOwnedRevision((value) => value + 1)}>Làm mới danh sách</button></div>
+          <form className="donation-history-search" onSubmit={(event) => { event.preventDefault(); if (ownedSearch.trim() === ownedSearchTerm) setOwnedRevision((value) => value + 1); else setOwnedSearchTerm(ownedSearch.trim()); }}>
+            <label htmlFor="donation-history-search">Tìm theo mã phiếu, định danh hoặc đợt quyên góp</label>
+            <div className="donation-lookup-code-row">
+              <input id="donation-history-search" type="search" value={ownedSearch} maxLength={120} disabled={ownedLoading}
+                onChange={(event) => setOwnedSearch(event.target.value)} placeholder="Nhập từ khóa cần tìm" />
+              {ownedSearchTerm && <button type="button" className="button secondary" disabled={ownedLoading} onClick={() => { setOwnedSearch(''); setOwnedSearchTerm(''); }}>Xóa lọc</button>}
+            </div>
+          </form>
+          {ownedLoading && <p role="status">Đang tải đóng góp của bạn…</p>}
+          {ownedError && <p className="notice error" role="alert">{ownedError}</p>}
+          {!ownedLoading && !ownedError && ownedFor === accountKey && !ownedDonations.length && <div className="donation-history-empty">
+            {ownedSearchTerm ? <><p>Không tìm thấy phiếu quyên góp phù hợp.</p><button type="button" className="button secondary" onClick={() => { setOwnedSearch(''); setOwnedSearchTerm(''); }}>Xóa từ khóa tìm kiếm</button></>
+              : <><p>Chưa có phiếu quyên góp nào gắn với tài khoản này.</p><button type="button" className="button secondary" onClick={() => trackIdInput.current?.focus()}>Tra cứu phiếu đã có</button></>}
+          </div>}
+          <div className="record-list">
+            {(ownedFor === accountKey ? ownedDonations : []).map((donation) => <button type="button" key={donation.id}
+              className="record record-clickable" aria-label={`Xem phiếu quyên góp ${donation.public_code}`}
+              onClick={() => { setTrackId(donation.id); void lookupDonation(donation.id, ''); }}>
+              <span><strong>{donation.drive_title}</strong><small>Phiếu {donation.public_code} · Tạo lúc {new Date(donation.created_at).toLocaleString('vi-VN')}</small></span>
+              <span className="record-actions"><StatusBadge status={donation.status} /><small>{donation.has_count_result ? 'Đã có kết quả kiểm đếm' : 'Chờ kết quả kiểm đếm'}</small></span>
+            </button>)}
+          </div>
+        </section>}
         <section className="card donation-lookup-card">
           <h2>Tra cứu đóng góp</h2>
           <p>Nhập định danh bản khai để xem tiến độ. Không cần mã bảo mật, dù bạn đã đăng nhập hay đang là khách.</p>
@@ -675,31 +700,6 @@ export function Donations({ user }: { user: Me | null }) {
             </details>
           )}
         </section>
-        {user && <section className="card donation-owned-list">
-          <div className="section-header"><div><h2>Phiếu quyên góp của tôi</h2><p>Chọn một phiếu để xem trạng thái mới nhất.</p></div><button type="button" className="button secondary refresh-action" disabled={ownedLoading} onClick={() => setOwnedRevision((value) => value + 1)}>Làm mới danh sách</button></div>
-          <form className="donation-history-search" onSubmit={(event) => { event.preventDefault(); if (ownedSearch.trim() === ownedSearchTerm) setOwnedRevision((value) => value + 1); else setOwnedSearchTerm(ownedSearch.trim()); }}>
-            <label htmlFor="donation-history-search">Tìm theo mã phiếu, định danh hoặc đợt quyên góp</label>
-            <div className="donation-lookup-code-row">
-              <input id="donation-history-search" type="search" value={ownedSearch} maxLength={120} disabled={ownedLoading}
-                onChange={(event) => setOwnedSearch(event.target.value)} placeholder="Nhập từ khóa cần tìm" />
-              {ownedSearchTerm && <button type="button" className="button secondary" disabled={ownedLoading} onClick={() => { setOwnedSearch(''); setOwnedSearchTerm(''); }}>Xóa lọc</button>}
-            </div>
-          </form>
-          {ownedLoading && <p role="status">Đang tải đóng góp của bạn…</p>}
-          {ownedError && <p className="notice error" role="alert">{ownedError}</p>}
-          {!ownedLoading && !ownedError && ownedFor === accountKey && !ownedDonations.length && <div className="donation-history-empty">
-            {ownedSearchTerm ? <><p>Không tìm thấy phiếu quyên góp phù hợp.</p><button type="button" className="button secondary" onClick={() => { setOwnedSearch(''); setOwnedSearchTerm(''); }}>Xóa từ khóa tìm kiếm</button></>
-              : <><p>Chưa có phiếu quyên góp nào gắn với tài khoản này.</p><button type="button" className="button secondary" onClick={() => trackIdInput.current?.focus()}>Tra cứu phiếu đã có</button></>}
-          </div>}
-          <div className="record-list">
-            {(ownedFor === accountKey ? ownedDonations : []).map((donation) => <button type="button" key={donation.id}
-              className="record record-clickable" aria-label={`Xem phiếu quyên góp ${donation.public_code}`}
-              onClick={() => { setTrackId(donation.id); void lookupDonation(donation.id, ''); }}>
-              <span><strong>{donation.drive_title}</strong><small>Phiếu {donation.public_code} · Tạo lúc {new Date(donation.created_at).toLocaleString('vi-VN')}</small></span>
-              <span className="record-actions"><StatusBadge status={donation.status} /><small>{donation.has_count_result ? 'Đã có kết quả kiểm đếm' : 'Chờ kết quả kiểm đếm'}</small></span>
-            </button>)}
-          </div>
-        </section>}
         {tracking && trackingFor === accountKey && (
           <DetailSurface modal open label="Chi tiết phiếu quyên góp" className="donation-tracking-dialog" onClose={invalidateTracking}>
             <div className="donation-tracking-heading">
@@ -990,7 +990,7 @@ export function Donations({ user }: { user: Me | null }) {
                 <h2>Khai báo vật phẩm</h2><button type="button" className="modal-close-button" aria-label="Đóng cửa sổ khai báo" onClick={closeDeclaration}>×</button>
               </div>
             <form className="form-stack" onSubmit={declare} noValidate>
-              <p className="required-note"><span className="required-mark" aria-hidden="true">*</span> Số lượng dự kiến của ít nhất một vật phẩm là bắt buộc.</p>
+              <p className="required-note"><span className="required-mark" aria-hidden="true">*</span> Số lượng mang đến của ít nhất một vật phẩm là bắt buộc.</p>
               <div className="form-grid">
                 <label>
                   <span>Họ tên người đóng góp <span className="required-mark" aria-hidden="true">*</span></span>
@@ -1057,7 +1057,7 @@ export function Donations({ user }: { user: Me | null }) {
 
                       </div>
                       <label className="donation-declaration-quantity">
-                        <span>Số lượng dự kiến ({item.unit_name})</span>
+                        <span>Số lượng mang đến ({item.unit_name})</span>
                         <input
                           type="number"
                           min="0"
@@ -1081,7 +1081,7 @@ export function Donations({ user }: { user: Me | null }) {
               </div>
               {selected.items[0] && (declarationAttempted || Object.keys(declarationTouched).some((field) => field.startsWith('quantity:'))) && !hasPositiveQuantity && <small className="field-error" role="alert">Số lượng của ít nhất một vật phẩm là bắt buộc.</small>}
               <p className="notice">
-                Bản khai chỉ ghi số dự kiến. Nhân viên sẽ đếm thực tế, người khác duyệt độc lập rồi
+                Bản khai ghi số lượng bạn mang đến, chưa cộng vào tồn kho. Nhân viên kiểm đếm thực tế, người thứ hai kiểm đếm độc lập rồi
                 mới ghi sổ kho.
               </p>
               <button

@@ -7,7 +7,7 @@ import { Button } from '../../components/ui/Button';
 import { Dropdown } from '../../components/ui/Dropdown';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { timeLabel } from '../../i18n/labels';
-import { quantityFitsScale } from '../../i18n/quantity';
+import { prepareSupplyLines, validSupplyQuantity } from './supplyDraft';
 import {
   deadlineText, isUrgent, quantityText, suggestionBasisLabels, supplyStatusLabels, supplyStatusTones,
   type MissionSupply, type SuggestionBasis, type SupplySuggestion, type SupplyTeamRequest,
@@ -96,7 +96,7 @@ export function MissionSupplyPanel({ missionId, missionStatus, onBehalf = false 
       )}
       {history.length > 0 && (
         <div className="supply-panel__history">
-          <button type="button" className="link-button" aria-expanded={showHistory} onClick={() => setShowHistory((value) => !value)}>
+          <button type="button" className="button secondary supply-history-toggle" aria-expanded={showHistory} onClick={() => setShowHistory((value) => !value)}>
             {showHistory ? 'Ẩn yêu cầu trước' : `Xem ${history.length} yêu cầu trước`}
           </button>
           {showHistory && (
@@ -152,11 +152,12 @@ function OpenRequest({ request, canCancel, onChanged }: { request: SupplyTeamReq
         <small className={urgent ? 'supply-deadline supply-deadline--urgent' : 'supply-deadline'}>{deadlineText(request.expires_at)}</small>
       </div>
       <div className="supply-open__where">
-        <p><strong>Nhận tại:</strong> {request.warehouse.name}</p>
-        {request.warehouse.address_note && <p className="muted">{request.warehouse.address_note}</p>}
-        {mapUrl && <a href={mapUrl} target="_blank" rel="noopener noreferrer">Chỉ đường đến kho ↗</a>}
-        <p className="muted">Đọc mã này cho nhân viên kho để nhận hàng.</p>
+        <div><span className="supply-open__eyebrow">Điểm nhận hàng</span><strong>{request.warehouse.name}</strong>
+          {request.warehouse.address_note && <p>{request.warehouse.address_note}</p>}
+        </div>
+        {mapUrl && <a className="button supply-directions" href={mapUrl} target="_blank" rel="noopener noreferrer" aria-label="Chỉ đường đến kho, mở Google Maps trong thẻ mới"><span aria-hidden="true">↗</span> Chỉ đường đến kho</a>}
       </div>
+      <p className="supply-open__hint">Đọc mã nhận hàng cho nhân viên kho khi đến lấy hàng.</p>
       <ul className="supply-card__items" aria-label="Hàng đã giữ cho đội">
         {request.lines.map((line) => (
           <li key={line.item_id}>
@@ -195,30 +196,42 @@ function RequestForm({ missionId, onBehalf, onCancel, onCreated }: {
   const [adding, setAdding] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [suggestionNotice, setSuggestionNotice] = useState('');
+  const [catalogFailed, setCatalogFailed] = useState(false);
+  const [lookupRevision, setLookupRevision] = useState(0);
 
   useEffect(() => {
     let live = true;
+    setLoading(true);
+    setCatalogFailed(false);
+    setSuggestionNotice('');
+    setError('');
     Promise.allSettled([
       api<SupplySuggestion>('logistics', `/supply-requests/suggestion?mission_id=${encodeURIComponent(missionId)}`),
       fetchAll<{ id?: string; name?: string; status?: string; unit?: { display_name?: string; scale?: number } }>('logistics', '/items'),
     ]).then(([suggestion, items]) => {
       if (!live) return;
       if (suggestion.status === 'fulfilled') {
-        setLines(suggestion.value.lines.map((line) => ({
+        if (!suggestion.value.lines.length) setSuggestionNotice('Chưa có gợi ý vật phẩm từ dữ liệu đã xử lý. Bạn có thể chọn hàng và số lượng theo nhu cầu thực tế của đội.');
+        setLines(current => current.length ? current : suggestion.value.lines.map((line) => ({
           item_id: line.item_id, item_name: line.item_name, unit_name: line.unit_name, quantity: line.quantity, basis: line.basis,
         })));
       }
+      if (suggestion.status === 'rejected') setSuggestionNotice('Chưa tải được gợi ý vật phẩm. Bạn vẫn có thể chọn hàng từ danh mục nếu danh mục đã tải được.');
       if (items.status === 'fulfilled') {
         setCatalog(items.value.filter((item) => item.id && item.status === 'ACTIVE').map((item) => ({
           id: item.id!, name: item.name || 'Mặt hàng', unit_name: item.unit?.display_name || '', scale: Number(item.unit?.scale ?? 0),
         })));
       }
+      else setCatalogFailed(true);
       if (suggestion.status === 'rejected' && items.status === 'rejected') setError('Không tải được gợi ý và danh mục hàng. Hãy thử lại.');
     }).finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
-  }, [missionId]);
+  }, [missionId, lookupRevision]);
 
-  const scaleOf = (itemId: string) => catalog.find((item) => item.id === itemId)?.scale ?? 3;
+  const scaleOf = (itemId: string) => catalog.find((item) => item.id === itemId)?.scale ?? -1;
+  const quantityError = (line: DraftLine) => scaleOf(line.item_id) < 0 ? 'Chưa tải được đơn vị vật phẩm. Hãy thử tải lại danh mục.'
+    : validSupplyQuantity(line.quantity, scaleOf(line.item_id)) ? '' : `Nhập số lớn hơn 0, tối đa ${scaleOf(line.item_id)} chữ số thập phân.`;
   const available = catalog.filter((item) => !lines.some((line) => line.item_id === item.id));
 
   function update(index: number, quantity: string) {
@@ -236,10 +249,9 @@ function RequestForm({ missionId, onBehalf, onCancel, onCreated }: {
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    const chosen = lines.filter((line) => line.quantity.trim() !== '' && Number(line.quantity) > 0);
-    if (!chosen.length) { setError('Chọn ít nhất một mặt hàng với số lượng lớn hơn 0.'); return; }
-    const invalid = chosen.find((line) => !quantityFitsScale(line.quantity, scaleOf(line.item_id)));
-    if (invalid) { setError(`Số lượng của "${invalid.item_name}" không hợp lệ với đơn vị ${invalid.unit_name}.`); return; }
+    const prepared = prepareSupplyLines(lines, scaleOf);
+    const chosen = prepared.lines;
+    if (!chosen) { setError(lines.length ? 'Kiểm tra các số lượng được đánh dấu bên dưới. Chưa có mặt hàng nào được gửi.' : 'Chọn ít nhất một mặt hàng với số lượng lớn hơn 0.'); return; }
     setBusy(true);
     setError('');
     try {
@@ -274,8 +286,9 @@ function RequestForm({ missionId, onBehalf, onCancel, onCreated }: {
               </div>
               <label className="supply-form__qty">
                 <span className="visually-hidden">Số lượng {line.item_name}</span>
-                <input inputMode="decimal" value={line.quantity} onChange={(event) => update(index, event.target.value)} />
+                <input inputMode="decimal" value={line.quantity} aria-invalid={Boolean(quantityError(line))} aria-describedby={quantityError(line) ? `${addId}-${line.item_id}-error` : undefined} onChange={(event) => update(index, event.target.value)} />
                 <span>{line.unit_name}</span>
+                {quantityError(line) && <small id={`${addId}-${line.item_id}-error`} className="field-error">{quantityError(line)}</small>}
               </label>
               <Button type="button" variant="ghost" size="sm" aria-label={`Bỏ ${line.item_name}`}
                 onClick={() => setLines((current) => current.filter((_, at) => at !== index))}>Bỏ</Button>
@@ -283,6 +296,8 @@ function RequestForm({ missionId, onBehalf, onCancel, onCreated }: {
           ))}
         </ul>
       )}
+      {suggestionNotice && <p className="notice" role="status">{suggestionNotice}</p>}
+      {catalogFailed && <div className="notice error" role="alert"><p>Chưa tải được danh mục và đơn vị vật phẩm. Các số lượng đang nhập được giữ nguyên.</p><Button type="button" variant="secondary" onClick={() => setLookupRevision(value => value + 1)}>Thử tải lại danh mục</Button></div>}
       {available.length > 0 && (
         <label className="filter supply-form__add" htmlFor={addId}>
           <span>Thêm mặt hàng</span>

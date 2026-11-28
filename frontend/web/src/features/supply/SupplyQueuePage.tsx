@@ -8,7 +8,6 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Dropdown } from '../../components/ui/Dropdown';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { PageHeader } from '../../components/ui/PageHeader';
 import { ListNav } from '../../components/ui/Pager';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { Tabs } from '../../components/ui/Tabs';
@@ -83,6 +82,9 @@ export function SupplyQueuePage() {
   }, [status, dialog]);
 
   function changeStatus(value: string) {
+    setRows([]);
+    setNext('');
+    setLoading(true);
     setStatus(value as SupplyStatus);
     setCursor('');
     setNotice('');
@@ -96,18 +98,14 @@ export function SupplyQueuePage() {
 
   return (
     <div className="operations-workspace supply-page">
-      <PageHeader
-        title="Giao hàng cho đội cứu hộ"
-        description="Đội gửi yêu cầu từ nhiệm vụ, hệ thống tự chọn kho và giữ hàng. Khi đội đến, hỏi mã nhận hàng 6 số rồi bấm Giao hàng."
-        actions={<Button variant="secondary" disabled={loading} onClick={() => setRevision((value) => value + 1)}>Làm mới</Button>}
-      />
       <section className="card supply-queue">
+        <div className="supply-queue__intro"><p>Soạn hàng theo yêu cầu. Khi đội đến, nhập mã 6 số để xác nhận bàn giao.</p><Button variant="secondary" disabled={loading} onClick={() => setRevision((value) => value + 1)}>Làm mới</Button></div>
         <div className="supply-queue__toolbar">
           <Tabs items={STATUS_TABS} value={status} onChange={changeStatus} ariaLabel="Trạng thái yêu cầu hàng" idBase="supply-queue" />
           {warehouses.length > 1 && (
             <label className="filter supply-queue__filter" htmlFor={filterId}>
               <span>Kho</span>
-              <Dropdown id={filterId} value={warehouseId} onChange={(event) => { setWarehouseId(event.target.value); setCursor(''); }}>
+              <Dropdown id={filterId} value={warehouseId} onChange={(event) => { setRows([]); setNext(''); setLoading(true); setWarehouseId(event.target.value); setCursor(''); }}>
                 <option value="">Tất cả kho</option>
                 {warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
               </Dropdown>
@@ -126,7 +124,7 @@ export function SupplyQueuePage() {
             />
           ) : (
             <ul className="supply-queue__list" aria-busy={loading}>
-              {rows.map((row) => <QueueCard key={row.id} row={row} onHandOver={() => setDialog({ mode: 'handover', row })}
+              {rows.map((row) => <QueueCard key={row.id} row={row} disabled={loading || Boolean(error)} onHandOver={() => setDialog({ mode: 'handover', row })}
                 onCancel={() => setDialog({ mode: 'cancel', row })} />)}
             </ul>
           )}
@@ -142,7 +140,7 @@ export function SupplyQueuePage() {
   );
 }
 
-function QueueCard({ row, onHandOver, onCancel }: { row: SupplyQueueRow; onHandOver: () => void; onCancel: () => void }) {
+function QueueCard({ row, disabled, onHandOver, onCancel }: { row: SupplyQueueRow; disabled: boolean; onHandOver: () => void; onCancel: () => void }) {
   const urgent = row.status === 'READY' && isUrgent(row.expires_at);
   return (
     <li className={`supply-card${urgent ? ' supply-card--urgent' : ''}`}>
@@ -163,8 +161,8 @@ function QueueCard({ row, onHandOver, onCancel }: { row: SupplyQueueRow; onHandO
       </ul>
       {row.status === 'READY' && (
         <div className="supply-card__actions">
-          <Button variant="ghost" onClick={onCancel}>Không giao được</Button>
-          <Button onClick={onHandOver}>Giao hàng</Button>
+          <Button variant="ghost" disabled={disabled} onClick={onCancel}>Không giao được</Button>
+          <Button disabled={disabled} onClick={onHandOver}>Giao hàng</Button>
         </div>
       )}
     </li>
@@ -196,20 +194,20 @@ function HandOverDialog({ row, onClose, onDone, onStale }: { row: SupplyQueueRow
   }
   return (
     <DetailSurface modal open heading={`Giao hàng cho ${row.team_name}`} label="Giao hàng cho đội" onClose={onClose} className="supply-dialog">
-      <form onSubmit={submit} className="supply-dialog__body">
-        <p>Kiểm tra đủ hàng dưới đây, hỏi đội mã nhận hàng rồi nhập vào ô bên dưới.</p>
-        <ul className="supply-card__items">
+      <form onSubmit={submit} className="supply-dialog__body" aria-busy={busy}>
+        <p className="supply-dialog__warehouse">{row.warehouse.name}</p>
+        <div className="supply-dialog__goods"><h3>Hàng bàn giao</h3><ul className="supply-card__items">
           {row.lines.map((line) => <li key={line.item_id}><span>{line.item_name}</span><strong>{quantityText(line.quantity, line.unit_name)}</strong></li>)}
-        </ul>
-        <label htmlFor={codeId} className="supply-code-field">
-          <span>Mã nhận hàng của đội</span>
-          <input id={codeId} inputMode="numeric" autoComplete="off" autoFocus maxLength={6} placeholder="••••••"
-            value={code} onChange={(event) => setCode(normalizePickupCode(event.target.value))} aria-describedby={`${codeId}-hint`} />
-          <small id={`${codeId}-hint`} className="muted">Mã gồm 6 chữ số, hiển thị trong nhiệm vụ của trưởng đội.</small>
-        </label>
-        {error && <p className="notice error" role="alert">{error}</p>}
+        </ul></div>
+        <div className="supply-pickup-field" data-static-label>
+          <label htmlFor={codeId}>Mã nhận hàng của đội</label>
+          <p id={`${codeId}-hint`}>Nhờ đội trưởng đọc mã 6 số trong nhiệm vụ.</p>
+          <input id={codeId} type="text" inputMode="numeric" autoComplete="off" autoFocus maxLength={6} placeholder="••••••" disabled={busy}
+            value={code} onChange={(event) => { setCode(normalizePickupCode(event.target.value)); setError(''); }} aria-invalid={Boolean(error)} aria-describedby={`${codeId}-hint${error ? ` ${codeId}-error` : ''}`} />
+          {error && <p id={`${codeId}-error`} className="field-error" role="alert">{error}</p>}
+        </div>
         <div className="supply-dialog__actions">
-          <Button type="button" variant="secondary" onClick={onClose}>Quay lại</Button>
+          <Button type="button" variant="secondary" disabled={busy} onClick={onClose}>Quay lại</Button>
           <Button type="submit" loading={busy} disabled={code.length !== 6}>Xác nhận đã giao</Button>
         </div>
       </form>

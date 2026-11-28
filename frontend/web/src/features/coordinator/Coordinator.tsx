@@ -306,7 +306,7 @@ function SosCommandPopup({ spec, onSuccess, onStale }: { spec: CommandSpec; onSu
   const [open, setOpen] = useState(false);
   if (!spec.fields) return <CommandForm spec={spec} onSuccess={onSuccess} onStale={onStale} />;
   return <div className="sos-action-entry">
-    <button type="button" className="button" onClick={() => setOpen(true)}>{spec.title}</button>
+    <button type="button" className={`button${spec.tone === 'secondary' ? ' secondary' : spec.tone === 'danger' ? ' secondary command-danger' : ''}`} onClick={() => setOpen(true)}>{spec.title}</button>
     <DetailSurface modal open={open} label={spec.title} className="sos-command-dialog" onClose={() => setOpen(false)}>
       <CommandForm spec={spec} onSuccess={() => { setOpen(false); onSuccess(); }} onStale={onStale} />
     </DetailSurface>
@@ -1187,7 +1187,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
             </header>
             {detail.campaign_id && <section className="sos-campaign-context" aria-label="Chiến dịch của SOS">
               <div><small>Chiến dịch cứu trợ</small><strong>{campaignOptions.find(campaign => campaign.value === detail.campaign_id)?.label ?? 'Chiến dịch đã gắn'}</strong></div>
-              <fieldset disabled={claimBlockedBy(detail, currentUserId)}>              {canSeeUnassigned && detail.campaign_id &&
+              <fieldset disabled={claimBlockedBy(detail, currentUserId)}>              {canSeeUnassigned && detail.campaign_id && !['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) &&
                 secondaryCommand({
                   title: 'Gỡ khỏi chiến dịch',
                   hideTitle: true,
@@ -1199,7 +1199,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 })}
 </fieldset>
             </section>}
-            <section className="claim-panel" aria-label="Nhận xử lý hồ sơ">
+            {!['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) && <section className="claim-panel" aria-label="Nhận xử lý hồ sơ">
               {detail.handled_by && claimActive(detail) ? (
                 <p role="status" className="notice">
                   {detail.handled_by === currentUserId
@@ -1215,7 +1215,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
               ) : (
                 <button type="button" className="button secondary" disabled={claimBusy || claimBlockedBy(detail, currentUserId)} onClick={() => void runClaim('claim')}>Nhận xử lý</button>
               )}
-            </section>
+            </section>}
             <div className="sos-detail-tabs" role="tablist" aria-label="Thông tin hồ sơ SOS" onKeyDown={(event) => {
               const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
               const current = tabs.indexOf(document.activeElement as HTMLButtonElement);
@@ -1315,10 +1315,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                     <dt title="Điểm từ dấu hiệu trong hồ sơ SOS; không phải độ tin cậy của AI">Điểm quy tắc</dt>
                     <dd>{rule?.score != null ? <><b>{rule.score}</b>/100</> : '—'}</dd>
                   </div>
-                  <div>
-                    <dt title="Mức chắc chắn do AI tự ước tính, chưa phải xác suất đúng đã kiểm định">Độ tin cậy</dt>
-                    <dd>{aiDone && ai.confidence != null ? <><b>{Math.round(ai.confidence * 100)}%</b></> : '—'}</dd>
-                  </div>
+
                   <div className="sos-decision__aistatus">
                     <dt>Trạng thái AI</dt>
                     <dd>{aiDone ? 'Đã đánh giá' : (advisoryStatusLabels[aiStatus ?? ''] ?? 'Chưa có đánh giá')}</dd>
@@ -1391,7 +1388,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                       <p className="sos-ai-card__verdict">
                         {ai.suggested_priority ? <PriorityBadge priority={ai.suggested_priority} /> : <span>Chưa xác định mức</span>}
                         {ai.score != null && <span>Điểm nguy cơ <b>{ai.score}</b>/100</span>}
-                        {ai.confidence != null && <span title="Mức chắc chắn do AI tự ước tính, chưa phải xác suất đúng đã kiểm định">Độ tin cậy ~{Math.round(ai.confidence * 100)}%</span>}
+
                       </p>
                       {extracted?.summary && <p>{extracted.summary}</p>}
                       {ai.reasons.length > 0 && <p className="muted">Căn cứ: {ai.reasons.join(' · ')}</p>}
@@ -1416,7 +1413,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                     <strong>Cần đối chiếu số người:</strong>
                     {aiCountMismatches.map(key => <p key={key}>{advisoryFactLabels[key]} — hồ sơ: {detail.subject[key] ?? 'Chưa rõ'}; AI: {String(aiFacts?.[key])}.</p>)}
                   </div>}
-                  <p className="sos-ai-card__note">Chỉ để tham khảo — điều phối viên quyết định mức ưu tiên và giao đội.</p>
+                  <p className="sos-ai-card__note">Tóm tắt do AI tạo có thể thiếu hoặc sai chi tiết. Đối chiếu thông tin người báo trước khi quyết định ưu tiên và giao đội.</p>
                 </section>
               );
             })()}
@@ -1788,14 +1785,20 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                   requestId={detail.id}
                   version={detail.version}
                   kind="resolve"
+                  blockers={(detail.active_missions?.items || []).map(mission => ({
+                    text: `${detail.mission_history?.items.find(row => row.id === mission.id)?.team_name || 'Đội cứu hộ'}: ${label(mission.status)} — mở nhiệm vụ để xử lý`,
+                    href: `#active-mission-${mission.id}`,
+                  }))}
                   hideTitle
                   onCompleted={done}
                   onStale={refreshAfterConflict}
                 /></div>
               )}
+              {['RESOLVED', 'CLOSED'].includes(detail.status) && <div className="sos-terminal-actions">
               {detail.status === 'RESOLVED' &&
                 command({
                   title: 'Đóng yêu cầu',
+                  hideTitle: true,
                   service: 'response',
                   path: `/requests/${detail.id}/close`,
                   version: detail.version,
@@ -1804,6 +1807,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
               {['RESOLVED', 'CLOSED'].includes(detail.status) &&
                 command({
                   title: 'Mở lại yêu cầu',
+                  tone: 'secondary',
                   service: 'response',
                   path: `/requests/${detail.id}/reopen`,
                   version: detail.version,
@@ -1812,6 +1816,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                     { name: 'reason', label: 'Lý do mở lại', type: 'textarea', required: true, maxLength: 2000 },
                   ],
                 })}
+              </div>}
               </div>
             </div>
             </fieldset>
@@ -1877,7 +1882,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 <h3>Nhiệm vụ đang giao ({detail.active_missions.items.length})</h3>
                 <div className="record-list">
                   {detail.active_missions.items.map((m) => (
-                    <div className="candidate" key={m.id}>
+                    <div className="candidate" key={m.id} id={`active-mission-${m.id}`}>
                       <strong>Mã nhiệm vụ: {m.id.slice(0, 8)}</strong>
                       <p>
                         Trạng thái: {label(m.status)} · Đội: {detail.mission_history?.items.find((mission) => mission.team_id === m.team_id)?.team_name ?? 'Đội cứu hộ'} ·{' '}

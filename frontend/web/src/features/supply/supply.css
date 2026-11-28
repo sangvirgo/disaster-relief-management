@@ -1,6 +1,22 @@
 /* Supply requests: warehouse queue (operations) and the mission panel (team, coordinator). Uses the shared tokens only. */
 
 .supply-page { display: grid; gap: var(--space-4); }
+.supply-queue__intro { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.supply-queue__intro p { margin: 0; color: var(--color-text-secondary); }
+.record-detail-dialog.supply-dialog { width: min(560px, calc(100vw - 32px)); padding: 0; }
+.supply-dialog .detail-surface-header { padding: 20px 24px 0; align-items: flex-start; }
+.supply-dialog .detail-surface-header h2 { font-size: 22px; line-height: 1.35; }
+.supply-dialog .supply-dialog__body { padding: 12px 24px 24px; min-width: 0; gap: 20px; }
+.supply-dialog__warehouse { margin: 0; color: var(--color-text-secondary); }
+.supply-dialog__goods h3 { margin: 0 0 8px; font-size: 14px; color: var(--color-text-secondary); }
+.supply-pickup-field { display: grid; gap: 8px; }
+.supply-pickup-field label { font-weight: 650; }
+.supply-pickup-field p { margin: 0; font-size: 14px; color: var(--color-text-secondary); }
+.supply-pickup-field input { width: 100%; min-width: 0; height: 64px; border: 1px solid var(--color-surface-border); border-radius: 12px; background: var(--color-surface-subtle); font-size: 28px; font-weight: 700; letter-spacing: .45em; padding: 10px 10px 10px calc(10px + .45em); text-align: center; font-variant-numeric: tabular-nums; }
+.supply-pickup-field input:focus { outline: 3px solid var(--color-primary-bg); border-color: var(--color-primary); }
+.supply-pickup-field input[aria-invalid='true'] { border-color: var(--color-emergency); background: var(--color-emergency-bg); }
+.supply-pickup-field p.field-error { color: var(--color-emergency-dark); }
+.supply-dialog__actions { padding-top: 16px; border-top: 1px solid var(--color-surface-border); }
 
 .supply-queue { display: grid; gap: var(--space-4); }
 .supply-queue__toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--space-3); }
@@ -66,7 +82,14 @@
 }
 .supply-code span { color: var(--color-text-secondary); }
 .supply-code strong { font: 700 var(--text-display) var(--font-family); letter-spacing: 0.3em; color: var(--color-primary-dark); }
-.supply-open__where p { margin: 0 0 var(--space-1); }
+.supply-open__where { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; padding: 16px; background: var(--color-surface-subtle); border: 1px solid var(--color-surface-border); border-radius: 12px; }
+.supply-open__where > div { flex: 1 1 240px; min-width: 0; }
+.supply-open__where strong { display: block; margin: 4px 0; font-size: 17px; }
+.supply-open__where p { margin: 0; color: var(--color-text-secondary); overflow-wrap: anywhere; }
+.supply-open__eyebrow { font-size: 13px; color: var(--color-text-secondary); }
+.supply-open__where .supply-directions { flex: none; gap: 8px; min-height: 44px; text-decoration: none; white-space: normal; }
+.supply-open__hint { margin: 0; font-size: 14px; color: var(--color-text-secondary); }
+.supply-history-toggle { min-height: 40px; }
 .supply-inline-form { display: grid; gap: var(--space-2); }
 .supply-inline-form label { display: grid; gap: var(--space-1); }
 
@@ -83,7 +106,8 @@
   border-radius: var(--radius-sm);
 }
 .supply-form__lines li > div { display: grid; min-width: 0; }
-.supply-form__qty { display: flex; align-items: center; gap: var(--space-2); }
+.supply-form__qty { display: grid; grid-template-columns: 96px auto; align-items: center; gap: var(--space-2); }
+.supply-form__qty .field-error { grid-column: 1 / -1; max-width: 220px; }
 .supply-form__qty input { width: 96px; text-align: right; }
 
 @media (max-width: 640px) {

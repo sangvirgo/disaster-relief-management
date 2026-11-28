@@ -13,6 +13,7 @@ function isFloatingControl(control: Element | null): control is FloatingControl 
 }
 
 function getFloatingField(label: HTMLLabelElement): { control: FloatingControl; group: HTMLElement | null } | null {
+  if (label.closest('[data-static-label]')) return null;
   const nestedControls = Array.from(label.querySelectorAll('input, select, textarea'));
   if (nestedControls.length === 1 && isFloatingControl(nestedControls[0]))
     return { control: nestedControls[0], group: null };

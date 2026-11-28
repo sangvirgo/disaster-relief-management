@@ -154,7 +154,8 @@ export function CampaignAreaMap({
 
   useEffect(() => {
     if (!containerRef.current) return;
-    const map = L.map(containerRef.current, { center: [16.1, 107.7], zoom: 6 });
+    const map = L.map(containerRef.current, { center: [16.1, 107.7], zoom: 6, zoomControl: false });
+    L.control.zoom({ zoomInTitle: 'Phóng to', zoomOutTitle: 'Thu nhỏ' }).addTo(map);
     if (tileUrl) {
       L.tileLayer(tileUrl, { attribution: tileAttribution, maxZoom: 19 }).addTo(map);
     } else {
@@ -208,9 +209,9 @@ export function CampaignAreaMap({
     const circle = L.circle([center.lat, center.lng], {
       radius: editRadius, color: '#111827', weight: 3, dashArray: '8 5', fillColor: '#2563eb', fillOpacity: 0.12, interactive: false,
     }).addTo(layer);
-    const centerMarker = L.marker([center.lat, center.lng], { icon: editHandleIcon('center'), draggable: true, zIndexOffset: 2000 })
+    const centerMarker = L.marker([center.lat, center.lng], { title: 'Di chuyển tâm vùng chiến dịch', alt: 'Tâm vùng chiến dịch', icon: editHandleIcon('center'), draggable: true, zIndexOffset: 2000 })
       .bindTooltip('Kéo để di chuyển vùng').addTo(layer);
-    const radiusMarker = L.marker(eastOf(center, editRadius), { icon: editHandleIcon('radius'), draggable: true, zIndexOffset: 2000 })
+    const radiusMarker = L.marker(eastOf(center, editRadius), { title: 'Điều chỉnh bán kính vùng chiến dịch', alt: 'Bán kính vùng chiến dịch', icon: editHandleIcon('radius'), draggable: true, zIndexOffset: 2000 })
       .bindTooltip('Kéo để đổi bán kính').addTo(layer);
     const commit = (nextCenter: { lat: number; lng: number }, radius: number) =>
       editorRef.current?.onChange(nextCenter, clampRadius(Math.round(radius / 100) * 100, editorRef.current?.radiusRange));

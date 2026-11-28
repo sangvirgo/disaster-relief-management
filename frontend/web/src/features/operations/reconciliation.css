@@ -1,0 +1,9 @@
+.reconciliation-summary-table { min-width: 980px; }
+.reconciliation-summary-table caption { text-align: left; padding: 0 0 12px; color: var(--color-text-secondary); font-size: 14px; }
+.reconciliation-summary-table th:first-child { min-width: 160px; }
+.reconciliation-summary-table thead th { white-space: normal; max-width: 125px; line-height: 1.45; }
+.reconciliation-summary-table th, .reconciliation-summary-table td { padding: 12px 10px; }
+.reconciliation-status { display: inline-flex; padding: 6px 10px; border-radius: 8px; font-size: 13px; font-weight: 600; }
+.reconciliation-status--success { background: #ecfdf5; color: #065f46; }
+.reconciliation-status--warning { background: #fff7ed; color: #9a3412; }
+.reconciliation-status--muted { background: var(--color-surface-subtle); color: var(--color-text-secondary); }

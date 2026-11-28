@@ -7,6 +7,7 @@ import { WarehouseCoverageMap, type Coverage, type HoverTarget, type MapCampaign
 import { DriveCreateForm, distanceMetres, type DriveEdit, type WarehouseArea } from './DriveCreateForm';
 import { MapHoverDetails } from './MapHoverDetails';
 import { OpeningStockForm } from './OpeningStockForm';
+import { LocationPicker, type Point } from '../../maps/LocationPicker';
 
 type Option = { value: string; label: string };
 type Warehouse = {
@@ -46,6 +47,7 @@ export function WarehouseMapManager({ canManage, canManageDrives, warehouseOptio
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<Dialog | null>(null);
+  const [driveDirty, setDriveDirty] = useState(false);
   const [revision, setRevision] = useState(0);
   const [actionError, setActionError] = useState('');
   const [placing, setPlacing] = useState(false);
@@ -54,11 +56,25 @@ export function WarehouseMapManager({ canManage, canManageDrives, warehouseOptio
   const [editingWarehouseId, setEditingWarehouseId] = useState<string | null>(null);
   const [draft, setDraft] = useState<WarehouseDraft | null>(null);
   const [draftName, setDraftName] = useState('');
+  const [searchedPoint, setSearchedPoint] = useState<Point | null>(null);
   const [draftBusy, setDraftBusy] = useState(false);
   const [draftError, setDraftError] = useState('');
   const draftKey = useRef<string | null>(null);
   const [hovered, setHovered] = useState<HoverTarget | null>(null);
   const addMenuRef = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const driveId = url.searchParams.get('edit_drive');
+    if (!canManageDrives || !driveId || !/^[0-9a-f-]{36}$/i.test(driveId)) return;
+    let live = true;
+    void api<Drive>('logistics', `/donation-drives/${encodeURIComponent(driveId)}`).then(drive => {
+      if (!live) return;
+      if (drive.status !== 'DRAFT') { setActionError('Đợt này không còn là bản nháp. Hãy chọn trên bản đồ để xem trạng thái mới.'); return; }
+      setSelectedId(drive.intake_warehouse_id);
+      setDialog({ kind: 'edit-drive', drive });
+    }).catch(error => { if (live) setActionError(error instanceof Error ? error.message : 'Chưa mở được bản nháp.'); });
+    return () => { live = false; };
+  }, [canManageDrives]);
 
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -253,7 +269,7 @@ export function WarehouseMapManager({ canManage, canManageDrives, warehouseOptio
       : !editingWarehouseId && (canManage || canManageDrives) && <details ref={addMenuRef} className="warehouse-map-add-menu">
         <summary>＋ Thêm</summary>
         <div className="warehouse-map-add-menu__items">
-          {canManage && <button type="button" onClick={() => { addMenuRef.current?.removeAttribute('open'); setCreatingWarehouse(true); setPlacing(false); setSelectedId(null); setHovered(null); setPlaceMessage(''); }}>Kho</button>}
+          {canManage && <button type="button" onClick={() => { addMenuRef.current?.removeAttribute('open'); setCreatingWarehouse(true); setSearchedPoint(null); setPlacing(false); setSelectedId(null); setHovered(null); setPlaceMessage(''); }}>Kho</button>}
           {canManageDrives && <button type="button" onClick={() => { addMenuRef.current?.removeAttribute('open'); setPlacing(true); setPlaceMessage(''); }}>Đợt quyên góp</button>}
         </div>
       </details>}
@@ -293,7 +309,7 @@ export function WarehouseMapManager({ canManage, canManageDrives, warehouseOptio
       <input id="warehouse-draft-name" autoFocus required maxLength={200} value={draftName} onChange={event => { setDraftName(event.target.value); draftKey.current = null; }} placeholder="Nhập tên kho" />
       <button type="submit" className="warehouse-map-editor__confirm" aria-label={draftBusy ? 'Đang tạo kho' : 'Xác nhận tạo kho'} title={draftName.trim() ? 'Xác nhận tạo kho' : 'Nhập tên kho để xác nhận'} disabled={draftBusy || !draftName.trim() || radiusInvalid}>{draftBusy ? '…' : '✓'}</button>
     </div>
-    <small>Bán kính {radiusKm} km · Kéo nút ↔ để điều chỉnh.</small>
+    <label>Bán kính phục vụ (km)<input type="number" min="0.5" max="200" step="0.5" value={draft.radiusM / 1000} disabled={draftBusy} onChange={event => { const radiusM = Number(event.target.value) * 1000; setDraft(current => current ? { ...current, radiusM } : current); draftKey.current = null; }} /></label>
     {draftError && <p className="notice error" role="alert">{draftError}</p>}
     {radiusInvalid && <p className="notice error" role="alert">Bán kính phải từ 0,5 đến 200 km.</p>}
   </form>;
@@ -308,21 +324,22 @@ export function WarehouseMapManager({ canManage, canManageDrives, warehouseOptio
     </div>
   </form>;
   return <div className="warehouse-manager">
+    {creatingWarehouse && <LocationPicker initiallyOpen hideMap hideToggle selectOnPick value={searchedPoint} onSelect={setSearchedPoint} />}
     <div className="warehouse-manager__layout">
       <div className="warehouse-manager__map">
         <WarehouseCoverageMap placing={placing} onMapClick={placeAt} banner={creatingWarehouse ? (draft ? undefined : 'Chạm vào bản đồ để đặt kho.') : editingWarehouseId ? 'Đang chỉnh kho trên bản đồ. Kéo tâm hoặc nút ở mép vòng tròn, rồi bấm “Lưu thay đổi”.' : placing ? (placeMessage || 'Chạm vào bản đồ, bên trong vòng tròn của một kho, để đặt điểm quyên góp. Nhấn Esc để hủy.') : undefined} rows={rows} campaigns={showCampaigns ? campaignRows : []} loading={state === 'loading'} error={state === 'error'} selectedId={selectedId}
           onSelectWarehouse={(id) => select(id)} onEditWarehouse={canManage ? beginWarehouseMapEdit : undefined} onSelectDrive={(driveId, warehouseId) => select(warehouseId, driveId)} onHover={target => { if (!creatingWarehouse && !editingWarehouseId && !placing) setHovered(target); }} onEmptyClick={() => { if (!editingWarehouseId) { setHovered(null); setSelectedId(null); } }} toolbar={toolbar} hoverCard={creatingWarehouse ? draftEditor : editingWarehouseId ? editEditor : hoverCard}
-          creatingWarehouse={creatingWarehouse} editingWarehouse={Boolean(editingWarehouseId)} draft={draft} onDraftChange={next => { setDraft(next); setDraftError(''); draftKey.current = null; }} />
+          searchPoint={searchedPoint} creatingWarehouse={creatingWarehouse} editingWarehouse={Boolean(editingWarehouseId)} draft={draft} onDraftChange={next => { setDraft(next); setDraftError(''); draftKey.current = null; }} />
       </div>
     </div>
-    {dialog && <DetailSurface modal open onClose={() => setDialog(null)} className="operations-management-dialog"
+    {dialog && <DetailSurface modal open protectUnsaved={dialog.kind === 'new-drive' || dialog.kind === 'edit-drive'} hasUnsavedChanges={driveDirty} onClose={() => setDialog(null)} className="operations-management-dialog"
       heading={dialog.kind === 'edit-warehouse' ? 'Sửa kho' : dialog.kind === 'opening-stock' ? 'Khai báo tồn đầu kỳ' : dialog.kind === 'new-drive' ? 'Thêm đợt quyên góp' : dialog.kind === 'edit-drive' ? 'Sửa đợt quyên góp' : dialog.action === 'pause' ? 'Tạm dừng đợt quyên góp' : 'Đóng đợt quyên góp'}
       label="Quản lý kho và đợt quyên góp">
       {dialog.kind === 'edit-warehouse' && <><button type="button" className="button secondary" onClick={() => setDialog({ kind: 'opening-stock', warehouse: dialog.warehouse })}>Quản lý tồn đầu kỳ</button><CommandForm key={`wh-${dialog.warehouse.id}-${dialog.warehouse.version}`} spec={warehouseSpec(dialog.warehouse)} onSuccess={refresh} onStale={refresh} /></>}
       {dialog.kind === 'opening-stock' && dialog.warehouse.id && <OpeningStockForm key={`opening-${dialog.warehouse.id}`}
         warehouse={{ id: dialog.warehouse.id, name: dialog.warehouse.name || 'kho' }} items={items} itemScales={itemScales} itemUnits={itemUnits} onSuccess={refresh} />}
-      {dialog.kind === 'new-drive' && <DriveCreateForm warehouses={warehouseOptions} campaigns={campaigns} items={items} itemScales={itemScales} lockedWarehouseId={dialog.warehouseId} areaFor={areaFor} initialLocation={dialog.location} onSuccess={refresh} />}
-      {dialog.kind === 'edit-drive' && <DriveCreateForm warehouses={warehouseOptions} campaigns={campaigns} items={items} itemScales={itemScales} lockedWarehouseId={dialog.drive.intake_warehouse_id} areaFor={areaFor} edit={driveEdit(dialog.drive)} onSuccess={refresh} />}
+      {dialog.kind === 'new-drive' && <DriveCreateForm warehouses={warehouseOptions} campaigns={campaigns} items={items} itemScales={itemScales} lockedWarehouseId={dialog.warehouseId} areaFor={areaFor} initialLocation={dialog.location} onDirtyChange={setDriveDirty} onSuccess={refresh} />}
+      {dialog.kind === 'edit-drive' && <DriveCreateForm warehouses={warehouseOptions} campaigns={campaigns} items={items} itemScales={itemScales} lockedWarehouseId={dialog.drive.intake_warehouse_id} areaFor={areaFor} edit={driveEdit(dialog.drive)} onDirtyChange={setDriveDirty} onSuccess={refresh} />}
       {dialog.kind === 'drive-action' && <CommandForm key={`${dialog.action}-${dialog.drive.id}-${dialog.drive.version}`} onSuccess={refresh} onStale={refresh}
         spec={{ title: dialog.action === 'pause' ? 'Tạm dừng đợt' : 'Đóng đợt', hideTitle: true, service: 'logistics', path: `/donation-drives/${dialog.drive.id}/${dialog.action}`, version: dialog.drive.version,
           fields: [{ name: 'reason', label: dialog.action === 'pause' ? 'Lý do tạm dừng' : 'Lý do đóng', required: true, maxLength: 500 }],

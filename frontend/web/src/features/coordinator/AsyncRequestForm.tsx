@@ -12,6 +12,7 @@ export function AsyncRequestForm({
   hideTitle = false,
   onCompleted,
   onStale,
+  blockers = [],
 }: {
   requestId: string;
   version: number;
@@ -19,6 +20,7 @@ export function AsyncRequestForm({
   hideTitle?: boolean;
   onCompleted: () => void;
   onStale?: () => void;
+  blockers?: { text: string; href: string }[];
 }) {
   const [reason, setReason] = useState('');
   const [basis, setBasis] = useState('');
@@ -71,7 +73,7 @@ export function AsyncRequestForm({
   async function submit(event: FormEvent) {
     event.preventDefault();
     setTouched({ reason: true, basis: true });
-    if (invalid) return;
+    if (invalid || blockers.length > 0) return;
     if (
       !(await confirmAction(
         kind === 'cancel'
@@ -123,6 +125,7 @@ export function AsyncRequestForm({
   return (
     <form className="form-stack command-form" onSubmit={submit} noValidate>
       {!hideTitle && <h3>{kind === 'cancel' ? 'Hủy yêu cầu' : 'Kết thúc xử lý yêu cầu'}</h3>}
+      {blockers.length > 0 && <div className="notice warning" role="status"><strong>Chưa thể kết thúc yêu cầu</strong><ul>{blockers.map(blocker => <li key={blocker.href}><a href={blocker.href}>{blocker.text}</a></li>)}</ul></div>}
       {!operationId && (
         <>
           <label>
@@ -165,7 +168,7 @@ export function AsyncRequestForm({
               {touched.basis && basisError && <small className="field-error" id="async-request-basis-error" role="alert">{basisError}</small>}
             </label>
           )}
-          <button className="button" disabled={busy || invalid}>
+          <button className="button" disabled={busy || invalid || blockers.length > 0}>
             {busy ? 'Đang gửi lệnh…' : kind === 'cancel' ? 'Xác nhận hủy' : 'Gửi đề nghị kết thúc'}
           </button>
         </>

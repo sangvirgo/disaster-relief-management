@@ -1604,6 +1604,11 @@ function normalizeSubview(url: URL, workspace: Workspace, page: string, user: Me
   if (!(workspace === 'operations' && page === 'intake' && (intakeSteps as readonly string[]).includes(opsStep)
     && (opsStep !== 'review' || roles(user).has('REVIEWER')))) url.searchParams.delete('step');
   const sosId = url.searchParams.get('sos_id');
+  const missionId = url.searchParams.get('mission_id');
+  if (!(workspace === 'volunteer' && page === 'missions' && missionId && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(missionId))) {
+    url.searchParams.delete('mission_id');
+    url.searchParams.delete('mission_tab');
+  } else if (!['overview', 'history'].includes(url.searchParams.get('mission_tab') || '')) url.searchParams.delete('mission_tab');
   if (!(workspace === 'coordinator' && ['campaigns', 'queue', 'verify', 'triage', 'assign'].includes(page)
     && sosId && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(sosId))) {
     url.searchParams.delete('sos_id');
@@ -1632,6 +1637,8 @@ function writeRoute(workspace: Workspace, page: string, user: Me | null, mode: '
     url.searchParams.delete('sos_id');
     url.searchParams.delete('sos_tab');
     url.searchParams.delete('campaign_tab');
+    url.searchParams.delete('mission_id');
+    url.searchParams.delete('mission_tab');
     url.searchParams.delete('warehouse_id');
     url.searchParams.delete('warehouse_name');
   } else {
@@ -1699,7 +1706,6 @@ function App() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [selectedTrackingCode, setSelectedTrackingCode] = useState('');
-  const [selectedMissionId, setSelectedMissionId] = useState('');
   const [selectedRequestId, setSelectedRequestId] = useState('');
   const [sharingTeamId, setSharingTeamId] = useState('');
   const [sharingMessage, setSharingMessage] = useState('');
@@ -1729,7 +1735,6 @@ function App() {
     setPageId('sos');
     writeRoute('citizen', 'sos', null, 'replace');
     setSelectedTrackingCode('');
-    setSelectedMissionId('');
     setSelectedRequestId('');
     setSharingTeamId('');
     setSharingMessage('');
@@ -1798,7 +1803,6 @@ function App() {
           setMenuOpen(false);
           routeAfterLogin(value);
           setSelectedTrackingCode('');
-          setSelectedMissionId('');
           setSelectedRequestId('');
           setSharingTeamId('');
         })
@@ -1891,7 +1895,6 @@ function App() {
       setWorkspace(route.workspace);
       setPageId(route.page);
       setSelectedTrackingCode('');
-      setSelectedMissionId('');
       setSelectedRequestId('');
       setMenuOpen(false);
       setProfileMenuOpen(false);
@@ -1936,7 +1939,6 @@ function App() {
       setSelectedTrackingCode('');
       if (user) { try { sessionStorage.removeItem(`c48:citizen-tracking:${user.id}`); } catch {} }
     }
-    setSelectedMissionId('');
     setSelectedRequestId('');
     setPageId(id);
     if (workspace === 'coordinator' && id === pageId && ['queue', 'verify', 'triage', 'assign'].includes(id)) {
@@ -2215,14 +2217,15 @@ function App() {
                     setPageId('campaigns');
                     writeRoute('coordinator', 'campaigns', user);
                   } : undefined} onOpenMission={workspace === 'volunteer' ? (missionId) => {
-                    setSelectedMissionId(missionId);
                     setPageId('missions');
                     writeRoute('volunteer', 'missions', user);
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('mission_id', missionId);
+                    window.history.replaceState(null, '', url);
                   } : undefined} />
                 ) : workspace === 'volunteer' ? (
-                  <Volunteer key={`${selected.id}:${selectedMissionId}`} page={selected.id} currentUserId={user!.id} initialMissionId={selectedMissionId}
+                  <Volunteer key={selected.id} page={selected.id} currentUserId={user!.id}
                     sharingTeamId={sharingTeamId} sharingMessage={sharingMessage}
-                    onClearInitialMission={() => setSelectedMissionId('')}
                     onToggleSharing={(teamId) => { setSharingTeamId((current) => current === teamId ? '' : teamId); setSharingMessage(''); }} />
                 ) : (workspace === 'coordinator' || workspace === 'admin') && selected.id === 'dashboard' ? (
                   <RoleDashboard role={workspace} />

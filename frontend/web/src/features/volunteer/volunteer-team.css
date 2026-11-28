@@ -324,6 +324,8 @@
 }
 
 @media (max-width: 600px) {
+  .volunteer-team-profile { flex-direction: column; gap: 10px; }
+  .volunteer-team-profile > div { width: 100%; }
   .volunteer-team-detail-heading {
     align-items: flex-start;
     flex-direction: column;

@@ -62,6 +62,7 @@ export function ReceiptCountForm({
   const [allowUnexpected, setAllowUnexpected] = useState(false);
   const [driveLoading, setDriveLoading] = useState(true);
   const [driveRevision, setDriveRevision] = useState(0);
+  const initializedItems = useRef(false);
   const [lines, setLines] = useState<Line[]>(
     existing?.lines?.length
       ? existing.lines.map((line) => ({
@@ -140,13 +141,15 @@ export function ReceiptCountForm({
   useEffect(() => {
     let live = true;
     setDriveLoading(true);
-    fetchAll<Drive & { id: string }>('logistics', '/donation-drives')
-      .then(drives => { if (!live) return; const drive = drives.find(candidate => candidate.id === driveId);
-        if (!drive) throw new Error('Không tìm thấy đợt quyên góp của biên nhận trong phạm vi được cấp quyền.');
-        if (!existing?.lines?.length && !heldRelease) setLines(
-          (confirm && initialItems?.length ? initialItems.map(item => ({ item_id: item.id })) : confirm ? drive.items : drive.items.slice(0, 1))
-            .map(item => ({ ...empty(), item_id: item.item_id }))
-        );
+    Promise.all([
+      api<Drive>('logistics', `/donation-drives/${encodeURIComponent(driveId)}`),
+      create && !confirm ? api<{ declaration?: { lines?: { item_id: string }[] } }>('logistics', `/public/donations/${encodeURIComponent(deliveryId)}`, { credentials: 'omit' }) : Promise.resolve(null),
+    ]).then(([drive, declaration]) => { if (!live) return;
+        if (!initializedItems.current && !existing?.lines?.length && !heldRelease) {
+          const itemIds = initialItems?.length ? initialItems.map(item => ({ item_id: item.id })) : declaration?.declaration?.lines || drive.items;
+          setLines(itemIds.map(item => ({ ...empty(), item_id: item.item_id })));
+          initializedItems.current = true;
+        }
         setDriveItems(drive.items.map(item => ({
         id: item.item_id, name: item.item_name,
         unit: { display_name: item.unit_name, scale: Number(item.scale) },

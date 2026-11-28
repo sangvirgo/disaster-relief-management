@@ -29,7 +29,8 @@ export function DriveNearbyMap({ drives, position, selectedId, onSelect }: {
 
   useEffect(() => {
     if (!containerRef.current) return;
-    const map = L.map(containerRef.current, { center: [16.1, 107.7], zoom: 6 });
+    const map = L.map(containerRef.current, { center: [16.1, 107.7], zoom: 6, zoomControl: false });
+    L.control.zoom({ zoomInTitle: 'Phóng to', zoomOutTitle: 'Thu nhỏ' }).addTo(map);
     if (tileUrl) L.tileLayer(tileUrl, { attribution: tileAttribution, maxZoom: 19 }).addTo(map);
     else maplibreGL({ style: mapStyleUrl, locale: { 'Map.Title': 'Bản đồ' } }).addTo(map);
     mapRef.current = map;

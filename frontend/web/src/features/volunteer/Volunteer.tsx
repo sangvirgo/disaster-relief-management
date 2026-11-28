@@ -1,28 +1,27 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { api, ApiError, newCommandKey, upload } from '../../api/client';
+import { EvidenceGallery } from '../../components/EvidenceGallery';
+import { api, ApiError, newCommandKey } from '../../api/client';
 import { fetchAll } from '../../api/fetchAll';
 import { useCursorNav, LIST_PAGE_SIZE } from '../../api/useCursorNav';
 import { ListNav } from '../../components/ui/Pager';
-import { SelectedFiles } from '../../components/ui/SelectedFiles';
 import { label, timeLabel } from '../../i18n/labels';
-import { evidenceFileError as missionEvidenceError } from '../../i18n/evidence';
+import { MissionEvidenceUpload } from './MissionEvidenceUpload';
 import type { components as ResponseComponents } from '../../api/generated/response';
 import { googleMapsDirectionsUrl } from '../../maps/googleMaps';
 import { LocationPicker, type Point } from '../../maps/LocationPicker';
 import { confirmAction } from '../../components/confirmAction';
 import { Tabs } from '../../components/ui/Tabs';
 import { useUrlView } from '../../app/useUrlView';
+import { useUrlRecord } from '../../app/useUrlRecord';
 import { missionViews, noticeViews } from '../../app/routeViews';
 import { TeamMembers } from './TeamMembers';
 import { TeamReadinessForm } from './TeamReadinessForm';
-import { DetailSurface } from '../../components/DetailSurface';
 import { MissionSupplyPanel } from '../supply/MissionSupplyPanel';
 import './volunteer-missions.css';
 import './volunteer-team.css';
 
 type Mission = ResponseComponents['schemas']['MissionView'];
 type MissionDetail = ResponseComponents['schemas']['MissionDetail'];
-type EvidenceItem = { id: string; state: string; size_bytes: number; created_at: string };
 type Team = {
   id: string;
   name: string;
@@ -47,6 +46,7 @@ const teamDetailTabs: { id: TeamDetailTab; label: string }[] = [
   { id: 'location', label: 'Vị trí' },
 ];
 type MissionDetailTab = 'overview' | 'history';
+const missionDetailViews = ['overview', 'history'] as const;
 const missionDetailTabs: { id: MissionDetailTab; label: string }[] = [
   { id: 'overview', label: 'Tình huống & thao tác' },
   { id: 'history', label: 'Minh chứng & lịch sử' },
@@ -243,9 +243,9 @@ export function Notices({ onOpenMission, onOpenRequest }: {
   );
 }
 
-export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingMessage = '', onToggleSharing, onClearInitialMission }: {
-  page: string; currentUserId: string; initialMissionId?: string; sharingTeamId?: string; sharingMessage?: string;
-  onToggleSharing?: (teamId: string) => void; onClearInitialMission?: () => void;
+export function Volunteer({ page, sharingTeamId = '', sharingMessage = '', onToggleSharing }: {
+  page: string; currentUserId: string; sharingTeamId?: string; sharingMessage?: string;
+  onToggleSharing?: (teamId: string) => void;
 }) {
   const isTeam = page === 'team';
   const [items, setItems] = useState<Mission[] | Team[]>([]);
@@ -257,7 +257,8 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
 
   // Selected mission and detailed state
   const [selectedMission, setSelectedMission] = useState<Mission | null>(null);
-  const [missionDetailTab, setMissionDetailTab] = useState<MissionDetailTab>('overview');
+  const [missionId, selectMissionId] = useUrlRecord('mission_id');
+  const [missionDetailTab, setMissionDetailTab] = useUrlView('mission_tab', missionDetailViews, 'overview');
   const [missionSelectionRevision, setMissionSelectionRevision] = useState(0);
   const [missionDetail, setMissionDetail] = useState<MissionDetail | null>(null);
   const missionCardRef = useRef<HTMLElement | null>(null);
@@ -288,10 +289,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
     setMissionFormTouched({});
     setMissionFormAttempted({});
   }, [selectedMission?.id, missionSelectionRevision]);
-  const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
-  const [completionFile, setCompletionFile] = useState<File | null>(null);
-  const [completionPreviewUrl, setCompletionPreviewUrl] = useState('');
-  const [evidenceUrls, setEvidenceUrls] = useState<Record<string, string>>({});
+  const [evidencePending, setEvidencePending] = useState(false);
 
   const [teamActivityLoaded, setTeamActivityLoaded] = useState(false);
   const [teamActivityError, setTeamActivityError] = useState('');
@@ -319,7 +317,6 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
   const [teamPoint, setTeamPoint] = useState<Point | null>(null);
   const [teamAccuracy, setTeamAccuracy] = useState<number | null>(null);
   const [teamMessage, setTeamMessage] = useState('');
-  const [savedPositionTeam, setSavedPositionTeam] = useState<string | null>(null);
   const [teamDetailTab, setTeamDetailTab] = useState<TeamDetailTab>('overview');
 
   useEffect(() => {
@@ -339,31 +336,16 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
   }, [isTeam, selectedTeam?.id, revision, teamSelectionRevision]);
 
   const commandKeyRef = useRef<string | null>(null);
-  const completionUploadKeyRef = useRef<{ file: File; key: string } | null>(null);
-  const completionFileInputRef = useRef<HTMLInputElement | null>(null);
-  const evidenceFileInputRef = useRef<HTMLInputElement | null>(null);
-
   useEffect(() => {
-    if (isTeam) return;
-    const missionId = initialMissionId;
-    if (!missionId) return;
-    let live = true;
-    api<MissionDetail>('response', `/missions/${encodeURIComponent(missionId)}`)
-      .then((mission) => { if (live) setSelectedMission(mission); })
-      .catch((cause) => {
-        if (live) {
-          setError(cause instanceof Error ? cause.message : 'Không thể mở nhiệm vụ đã chọn.');
-        }
-      });
-    return () => { live = false; };
-  }, [initialMissionId, isTeam]);
-
-  useEffect(() => {
-    if (!completionFile || !completionFile.type.startsWith('image/')) return;
-    const url = URL.createObjectURL(completionFile);
-    setCompletionPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [completionFile]);
+    commandKeyRef.current = null;
+    setShowDeclineForm(false);
+    setShowCompleteForm(false);
+    setShowFailForm(false);
+    setDeclineReason('');
+    setProgressNote('');
+    setOutcomeNote('');
+    setEvidencePending(false);
+  }, [missionId]);
 
   // Load list of missions or teams
   useEffect(() => {
@@ -422,16 +404,16 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
 
   // Load mission details on selection
   useEffect(() => {
-    if (!selectedMission?.id) {
+    if (isTeam || !missionId) {
       setMissionDetail(null);
       return;
     }
     let live = true;
     setMissionLoading(true);
     setActionMessage('');
-    api<MissionDetail>('response', `/missions/${encodeURIComponent(selectedMission.id)}`)
+    api<MissionDetail>('response', `/missions/${encodeURIComponent(missionId)}`)
       .then((detail) => {
-        if (live) setMissionDetail(detail);
+        if (live) { setMissionDetail(detail); setSelectedMission(detail); }
       })
       .catch((cause) => {
         if (live)
@@ -445,13 +427,13 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
     return () => {
       live = false;
     };
-  }, [selectedMission?.id, revision, missionSelectionRevision]);
+  }, [isTeam, missionId, revision, missionSelectionRevision]);
 
   useEffect(() => {
     if (isTeam || !selectedMission?.id) return;
     missionCardRef.current?.scrollIntoView({ behavior: 'instant', block: 'start' });
     missionHeadingRef.current?.focus({ preventScroll: true });
-  }, [isTeam, selectedMission?.id, initialMissionId, missionSelectionRevision]);
+  }, [isTeam, selectedMission?.id, missionSelectionRevision]);
 
   function refreshAll() {
     setRevision((val) => val + 1);
@@ -464,14 +446,10 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
     setMissionFormAttempted({});
     setProgressNote('');
     setOutcomeNote('');
-    setEvidenceFile(null);
-    setCompletionFile(null);
-    setCompletionPreviewUrl('');
-    completionUploadKeyRef.current = null;
-    if (completionFileInputRef.current) completionFileInputRef.current.value = '';
   }
 
   function selectMission(mission: Mission) {
+    selectMissionId(mission.id, { mission_tab: 'overview' });
     setMissionDetailTab('overview');
     if (selectedMission?.id === mission.id) {
       window.requestAnimationFrame(() => {
@@ -491,16 +469,11 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
     setShowFailForm(false);
     setProgressNote('');
     setOutcomeNote('');
-    setEvidenceFile(null);
-    setCompletionFile(null);
-    setCompletionPreviewUrl('');
-    completionUploadKeyRef.current = null;
-    if (completionFileInputRef.current) completionFileInputRef.current.value = '';
     commandKeyRef.current = null;
   }
 
   function returnToMissionList() {
-    onClearInitialMission?.();
+    selectMissionId('', { mission_tab: 'overview' });
     setSelectedMission(null);
     setMissionDetail(null);
     setMissionDetailTab('overview');
@@ -513,10 +486,6 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
     setOutcomeNote('');
     setMissionFormTouched({});
     setMissionFormAttempted({});
-    setEvidenceFile(null);
-    setCompletionFile(null);
-    setCompletionPreviewUrl('');
-    completionUploadKeyRef.current = null;
     commandKeyRef.current = null;
     window.requestAnimationFrame(() => {
       const firstMission = missionListRef.current?.querySelector<HTMLElement>('.mission-table-open');
@@ -574,21 +543,10 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
     to: 'EN_ROUTE' | 'ON_SCENE' | 'COMPLETED' | 'FAILED',
     extra?: { note?: string; outcome_note?: string }
   ) {
+    if (busy || evidencePending || missionLoading) return;
     setBusy(true);
     setActionMessage('');
     try {
-      if (to === 'COMPLETED' && completionFile) {
-        const validationError = missionEvidenceError(completionFile);
-        if (validationError) {
-          setActionMessage(validationError);
-          return;
-        }
-        if (completionUploadKeyRef.current?.file !== completionFile)
-          completionUploadKeyRef.current = { file: completionFile, key: newCommandKey() };
-        await upload('response', `/missions/${mission.id}/evidence`, completionFile, {
-          idempotencyKey: completionUploadKeyRef.current.key,
-        });
-      }
       commandKeyRef.current ||= newCommandKey();
       const body: Record<string, unknown> = {
         expected_version: mission.version,
@@ -606,57 +564,17 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
       setActionMessage(`Đã cập nhật tiến độ: ${label(to)}.`);
       refreshAll();
     } catch (cause) {
-      if (cause instanceof ApiError && cause.code === 'STORAGE_UNAVAILABLE')
-        completionUploadKeyRef.current = null;
       if (cause instanceof ApiError && cause.code === 'VERSION_CONFLICT') {
         commandKeyRef.current = null;
         setRevision((value) => value + 1);
       }
       setActionMessage(
         cause instanceof Error
-          ? `${cause.message}${to === 'COMPLETED' && completionFile ? ' Tệp đã chọn vẫn được giữ; hãy thử lại hoặc bỏ tệp để báo cáo không kèm ảnh.' : ''}`
+          ? cause.message
           : 'Không thể cập nhật tiến độ nhiệm vụ.'
       );
     } finally {
       setBusy(false);
-    }
-  }
-
-  async function uploadMissionEvidence(event: FormEvent, missionId: string) {
-    event.preventDefault();
-    if (!evidenceFile) return;
-    const validationError = missionEvidenceError(evidenceFile);
-    if (validationError) {
-      setActionMessage(validationError);
-      return;
-    }
-    setBusy(true);
-    setActionMessage('');
-    try {
-      commandKeyRef.current ||= newCommandKey();
-      await upload('response', `/missions/${missionId}/evidence`, evidenceFile, {
-        idempotencyKey: commandKeyRef.current,
-      });
-      setActionMessage('Đã tải minh chứng nhiệm vụ lên hệ thống thành công.');
-      setEvidenceFile(null);
-      refreshAll();
-    } catch (cause) {
-      setActionMessage(
-        cause instanceof Error ? cause.message : 'Chưa tải được tệp minh chứng lên hệ thống.'
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function downloadEvidence(evidenceId: string) {
-    try {
-      const result = await api<{ url: string }>('response', `/evidence/${evidenceId}/download`);
-      setEvidenceUrls((prev) => ({ ...prev, [evidenceId]: result.url }));
-    } catch (cause) {
-      setActionMessage(
-        cause instanceof Error ? cause.message : 'Không thể mở liên kết minh chứng.'
-      );
     }
   }
 
@@ -718,13 +636,13 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
           location: {
             type: 'Point',
             coordinates: [teamPoint.longitude, teamPoint.latitude],
-            source: teamAccuracy ? 'GPS' : 'MANUAL_PIN',
+            source: teamAccuracy !== null ? 'GPS' : 'MANUAL_PIN',
           },
           captured_at: new Date().toISOString(),
           accuracy_m: teamAccuracy,
         },
       });
-      setSavedPositionTeam(team.name);
+      setTeamMessage(`Đã cập nhật vị trí của ${team.name} lúc ${timeLabel(new Date().toISOString())}.`);
       setTeamPoint(null);
       setTeamAccuracy(null);
       refreshAll();
@@ -747,17 +665,16 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
     previousMissionFilter.current = missionFilter;
     const current = missionDetail || selectedMission;
     if (current && !matchesMissionFilter(current, missionFilter)) {
+      selectMissionId('');
       setSelectedMission(null);
       setMissionDetail(null);
       setActionMessage('');
-      setCompletionFile(null);
-      setEvidenceFile(null);
     }
   }, [missionFilter, missionDetail, selectedMission]);
   function changeMissionFilter(value: typeof missionViews[number]) {
     setMissionFilter(value);
   }
-  const activeMission = missionDetail || selectedMission;
+  const activeMission = !missionId ? null : missionDetail?.id === missionId ? missionDetail : selectedMission?.id === missionId ? selectedMission : null;
   const canManageMission = activeMission?.can_manage_mission === true;
   const directionsUrl = activeMission && googleMapsDirectionsUrl(activeMission.location);
   const selectedTeamCanBeManaged = Boolean(selectedTeam &&
@@ -795,20 +712,15 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
 
   return (
     <div className={`grid-two ${isTeam ? 'volunteer-teams-layout volunteer-team-workspace' : 'volunteer-missions-layout'}`}>
-      {savedPositionTeam && <DetailSurface modal open label="Đã lưu vị trí đội cứu hộ"
-        heading="Đã cập nhật vị trí" className="volunteer-position-success-dialog"
-        onClose={() => setSavedPositionTeam(null)}>
-        <div className="volunteer-position-success-content">
-          <span className="volunteer-position-success-icon" aria-hidden="true">✓</span>
-          <p>Vị trí mới của <strong>{savedPositionTeam}</strong> đã được lưu thành công.</p>
-          <p>Điều phối viên có thể dùng vị trí này khi chọn đội phù hợp cho tín hiệu SOS.</p>
-          <button type="button" className="button" onClick={() => setSavedPositionTeam(null)}>Đã hiểu</button>
-        </div>
-      </DetailSurface>}
       {/* Danh sách nhiệm vụ hoặc đội */}
       {isTeam && loading && !selectedTeam && <section className="card volunteer-team-detail-card" role="status">Đang tải thông tin đội cứu hộ…</section>}
-      {(isTeam ? !selectedTeam && !loading : !activeMission) && <section className={`card ${isTeam ? 'volunteer-team-list-card' : 'mission-list-panel'}`} ref={missionListRef}>
-        <div className="section-header"><h2>{isTeam ? 'Đội của tôi' : 'Nhiệm vụ và tiến độ'}</h2><button type="button" className="button secondary refresh-action" disabled={loading || busy} onClick={() => { setCursor(''); refreshAll(); }}>Làm mới</button></div>
+      {!isTeam && missionId && !activeMission && <section className="card" aria-label="Chi tiết nhiệm vụ">
+        {actionMessage ? <p role="alert" className="notice error">{actionMessage}</p> : <p role="status">Đang mở nhiệm vụ…</p>}
+        <button type="button" className="button secondary" onClick={returnToMissionList}>Danh sách nhiệm vụ</button>
+        {actionMessage && <button type="button" className="button" disabled={missionLoading} onClick={() => setRevision(value => value + 1)}>Thử tải lại</button>}
+      </section>}
+      {(isTeam ? !selectedTeam && !loading : !missionId) && <section className={`card ${isTeam ? 'volunteer-team-list-card' : 'mission-list-panel'}`} ref={missionListRef}>
+        <div className="section-header"><h2>{isTeam ? 'Đội của tôi' : 'Danh sách nhiệm vụ'}</h2><button type="button" className="button secondary refresh-action" disabled={loading || busy} onClick={() => { setCursor(''); refreshAll(); }}>Làm mới</button></div>
         <p className="mission-list-intro">{isTeam ? 'Chọn một đội để xem hồ sơ và các thao tác quản lý.' : 'Chọn một nhiệm vụ trong bảng để xem tình huống, tiến độ và minh chứng.'}</p>
         {error && (
           <p role="alert" className="notice error">
@@ -822,7 +734,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
 
         {!isTeam && <div className="mission-filters" role="group" aria-label="Lọc nhiệm vụ">
           {([['all', 'Tất cả'], ['new', 'Mới nhận'], ['active', 'Đang thực hiện'], ['history', 'Lịch sử']] as const).map(([value, text]) =>
-            <button type="button" className="button secondary" aria-pressed={missionFilter === value} disabled={busy} key={value} onClick={() => changeMissionFilter(value)}>{text}</button>)}
+            <button type="button" className="button secondary" aria-pressed={missionFilter === value} disabled={busy || evidencePending || missionLoading} key={value} onClick={() => changeMissionFilter(value)}>{text}</button>)}
         </div>}
         {!isTeam && !loading && !error && items.length > 0 && !visibleMissions.length && <p>Chưa có nhiệm vụ trong nhóm này trên các trang đã tải. Hãy tải thêm nếu còn dữ liệu.</p>}
         {isTeam ? (
@@ -845,7 +757,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                     key={team.id}
                     onClick={() => selectTeam(team)}
                   >
-                    <td><code className="mission-table-code" title={team.id}>{team.id}</code></td>
+                    <td><code className="mission-table-code" title={team.id}>ĐỘI-{team.id.slice(-6).toUpperCase()}</code></td>
                     <td>
                       <button type="button" className="mission-table-open volunteer-team-table-open" aria-pressed={selectedTeam?.id === team.id} onClick={(event) => { event.stopPropagation(); selectTeam(team); }}>
                         <strong>{team.name}</strong>
@@ -889,7 +801,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                     key={mission.id}
                     onClick={() => selectMission(mission)}
                   >
-                    <td><code className="mission-table-code" title={mission.id}>{mission.id}</code></td>
+                    <td><code className="mission-table-code" title={mission.id}>NV-{mission.id.slice(-6).toUpperCase()}</code></td>
                     <td>
                       <button type="button" className="mission-table-open" aria-pressed={selectedMission?.id === mission.id} onClick={(event) => { event.stopPropagation(); selectMission(mission); }}>
                         <strong>{label(mission.category)}</strong>
@@ -1032,12 +944,13 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                         <div className="volunteer-team-manual-location">
                           <div className="volunteer-team-section-heading">
                             <div><h4>Cập nhật thủ công</h4><p>Dùng GPS thiết bị hoặc ghim vị trí trên bản đồ.</p></div>
-                            <button type="button" className="button secondary" onClick={getTeamDeviceLocation} disabled={busy}>
+                            <button type="button" className="button secondary" onClick={getTeamDeviceLocation} disabled={busy || evidencePending || missionLoading}>
                               Lấy vị trí GPS
                             </button>
                           </div>
                           <LocationPicker
                             value={teamPoint}
+                            initiallyOpen selectOnPick
                             onSelect={(point) => { setTeamPoint(point); setTeamAccuracy(null); }}
                           />
                           {teamPoint && (
@@ -1046,7 +959,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                               {teamAccuracy ? ` (độ chính xác ~${Math.round(teamAccuracy)}m)` : ''}
                             </p>
                           )}
-                          {teamPoint && <button type="button" className="button" disabled={busy} onClick={() => updateTeamPosition(selectedTeam)}>Lưu vị trí mới</button>}
+                          {teamPoint && <button type="button" className="button" disabled={busy || evidencePending || missionLoading} onClick={() => updateTeamPosition(selectedTeam)}>Lưu vị trí mới</button>}
                         </div>
                       </> : <p className="muted">Vị trí chỉ có thể cập nhật bởi trưởng đội dùng ứng dụng.</p>}
                     </div>
@@ -1059,8 +972,8 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
           <>
             <div className="mission-detail-heading"><div><h2 ref={missionHeadingRef} tabIndex={-1}>Chi tiết nhiệm vụ</h2>{activeMission && <small>Giao nhiệm vụ lúc {timeLabel(activeMission.created_at)}</small>}</div>
               {activeMission && <div className="mission-detail-heading__actions">
-                <button type="button" className="button secondary refresh-action" disabled={loading || missionLoading || busy} onClick={() => { setCursor(''); refreshAll(); }}>Làm mới</button>
-                <button type="button" className="button secondary mission-back-to-list" onClick={returnToMissionList}>← Danh sách nhiệm vụ</button>
+                <button type="button" className="button secondary refresh-action" disabled={loading || missionLoading || busy || evidencePending} onClick={() => { setCursor(''); refreshAll(); }}>Làm mới</button>
+                <button type="button" className="button secondary mission-back-to-list" disabled={busy || evidencePending || missionLoading} onClick={returnToMissionList}>← Danh sách nhiệm vụ</button>
               </div>}
             </div>
             {!activeMission && (
@@ -1173,7 +1086,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                   <MissionSupplyPanel missionId={activeMission.id} missionStatus={activeMission.status} />
                 )}
 
-                {missionDetailTab === 'overview' && <div className="volunteer-mission-tab-content volunteer-mission-progress">
+                <div hidden={missionDetailTab !== 'overview'} className="volunteer-mission-tab-content volunteer-mission-progress">
                 {['OFFERED', 'ACCEPTED', 'EN_ROUTE', 'ON_SCENE'].includes(activeMission.status) ? (
                   <h3>{canManageMission ? 'Thao tác điều hành nhiệm vụ' : 'Theo dõi nhiệm vụ'}</h3>
                 ) : (
@@ -1190,14 +1103,14 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                   <div className="action-grid">
                     <button
                       className="button"
-                      disabled={busy}
+                      disabled={busy || evidencePending || missionLoading}
                       onClick={() => acceptMission(activeMission)}
                     >
                       Tiếp nhận nhiệm vụ
                     </button>
                     <button
                       className="button secondary"
-                      disabled={busy}
+                      disabled={busy || evidencePending || missionLoading}
                       onClick={() => setShowDeclineForm(!showDeclineForm)}
                     >
                       Từ chối nhiệm vụ
@@ -1240,7 +1153,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                   <div className="action-grid">
                     <button
                       className="button"
-                      disabled={busy}
+                      disabled={busy || evidencePending || missionLoading}
                       onClick={() => transitionMission(activeMission, 'EN_ROUTE')}
                     >
                       Bắt đầu di chuyển tới hiện trường
@@ -1253,7 +1166,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                   <div className="action-grid">
                     <button
                       className="button"
-                      disabled={busy}
+                      disabled={busy || evidencePending || missionLoading}
                       onClick={() => transitionMission(activeMission, 'ON_SCENE')}
                     >
                       Đã tới hiện trường
@@ -1267,7 +1180,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                     {activeMission.status === 'ON_SCENE' && (
                       <button
                         className="button"
-                        disabled={busy}
+                        disabled={busy || evidencePending || missionLoading}
                         onClick={() => {
                           setShowCompleteForm(true);
                           setShowFailForm(false);
@@ -1278,7 +1191,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                     )}
                     <button
                       className="button secondary"
-                      disabled={busy}
+                      disabled={busy || evidencePending || missionLoading}
                       onClick={() => {
                         setShowFailForm(true);
                         setShowCompleteForm(false);
@@ -1318,44 +1231,7 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                       />
                       {(missionFormAttempted.outcome || missionFormTouched.outcome) && outcomeNoteError && <small id="mission-outcome-note-error" className="field-error" role="alert">{outcomeNoteError}</small>}
                     </label>
-                    <label className="tracking-file-picker">
-                      <input
-                        ref={completionFileInputRef}
-                        type="file"
-                        accept="image/jpeg,image/png,video/mp4"
-                        aria-invalid={Boolean(completionFile && missionEvidenceError(completionFile))}
-                        aria-describedby={completionFile && missionEvidenceError(completionFile) ? 'mission-completion-file-error' : undefined}
-                        onChange={(event) => {
-                          const file = event.target.files?.[0] || null;
-                          setCompletionFile(file);
-                          setCompletionPreviewUrl('');
-                          completionUploadKeyRef.current = null;
-                          setActionMessage(file ? missionEvidenceError(file) || '' : '');
-                          event.currentTarget.blur();
-                        }}
-                      />
-                      <span className="tracking-file-icon" aria-hidden="true">↑</span>
-                      <span>
-                        <strong>{completionFile ? completionFile.name : 'Thêm ảnh hoặc video khi hoàn thành'}</strong>
-                        <small>Không bắt buộc · JPEG, PNG hoặc MP4</small>
-                      </span>
-                    </label>
-                    {completionFile && (
-                      <div className="mission-evidence-preview">
-                        {completionPreviewUrl && <img src={completionPreviewUrl} alt="Ảnh hiện trường đã chọn" />}
-                        <span>{completionFile.name} · {(completionFile.size / (1024 * 1024)).toFixed(1)} MB</span>
-                        <button className="button secondary" type="button" onClick={() => {
-                          setCompletionFile(null);
-                          setCompletionPreviewUrl('');
-                          completionUploadKeyRef.current = null;
-                          if (completionFileInputRef.current) completionFileInputRef.current.value = '';
-                          setActionMessage('');
-                        }}>Bỏ tệp</button>
-                      </div>
-                    )}
-                    {completionFile && missionEvidenceError(completionFile) && <small className="field-error" id="mission-completion-file-error" role="alert">{missionEvidenceError(completionFile)}</small>}
-                    <p className="account-hint">Nếu chọn tệp, Web sẽ tải minh chứng trước rồi mới ghi nhận hoàn thành. Ảnh tối đa 10 MB; video MP4 tối đa 50 MB.</p>
-                    <button className="button" disabled={busy || Boolean(outcomeNoteError) || Boolean(completionFile && missionEvidenceError(completionFile))}>
+                    <button className="button" disabled={busy || evidencePending || Boolean(outcomeNoteError)}>
                       Xác nhận hoàn thành nhiệm vụ
                     </button>
                   </form>
@@ -1390,85 +1266,24 @@ export function Volunteer({ page, initialMissionId, sharingTeamId = '', sharingM
                       />
                       {(missionFormAttempted.failed || missionFormTouched.failed) && progressNoteError && <small id="mission-failure-reason-error" className="field-error" role="alert">{progressNoteError}</small>}
                     </label>
-                    <button className="button" disabled={busy || Boolean(progressNoteError)}>
+                    <button className="button" disabled={busy || evidencePending || Boolean(progressNoteError)}>
                       Xác nhận báo cáo thất bại
                     </button>
                   </form>
                 )}
 
-                {/* 5. Tải ảnh minh chứng hiện trường giải cứu lên MinIO */}
-                {canManageMission && ['ACCEPTED', 'EN_ROUTE', 'ON_SCENE'].includes(
-                  activeMission.status
-                ) && (
-                  <form
-                    className="form-stack command-form"
-                    onSubmit={(e) => uploadMissionEvidence(e, activeMission.id)}
-                  >
-                    <h4>Tải minh chứng hiện trường</h4>
-                    <p>
-                      Ảnh hoặc video về tiến độ, bàn giao vật tư hay hiện trường (JPEG, PNG,
-                      MP4).
-                    </p>
-                    <label className="tracking-file-picker">
-                      <input
-                        ref={evidenceFileInputRef}
-                        type="file"
-                        required
-                        accept="image/jpeg,image/png,video/mp4"
-                        aria-invalid={Boolean(evidenceFile && missionEvidenceError(evidenceFile))}
-                        aria-describedby={evidenceFile && missionEvidenceError(evidenceFile) ? 'mission-evidence-file-error' : undefined}
-                        onChange={(e) => { setEvidenceFile(e.target.files?.[0] || null); setActionMessage(''); }}
-                      />
-                      <span className="tracking-file-icon" aria-hidden="true">↑</span>
-                      <span>
-                        <strong>{evidenceFile ? evidenceFile.name : 'Chọn ảnh hoặc video hiện trường'} <span className="required-mark" aria-hidden="true">*</span></strong>
-                        <small>JPEG, PNG hoặc MP4</small>
-                      </span>
-                    </label>
-                    <SelectedFiles files={evidenceFile ? [evidenceFile] : []} onRemove={() => { setEvidenceFile(null); if (evidenceFileInputRef.current) evidenceFileInputRef.current.value = ''; }} />
-                    {evidenceFile && missionEvidenceError(evidenceFile) && <small className="field-error" id="mission-evidence-file-error" role="alert">{missionEvidenceError(evidenceFile)}</small>}
-                    <button className="button secondary" disabled={busy || !evidenceFile || Boolean(missionEvidenceError(evidenceFile))}>
-                      {busy ? 'Đang xử lý…' : 'Tải minh chứng lên'}
-                    </button>
-                  </form>
-                )}
+                {canManageMission && ['ACCEPTED', 'EN_ROUTE', 'ON_SCENE'].includes(activeMission.status) &&
+                  <MissionEvidenceUpload key={activeMission.id} missionId={activeMission.id} disabled={busy}
+                    onBusyChange={setEvidencePending} onSaved={() => setRevision(value => value + 1)} />}
 
-                </div>}
+                </div>
 
                 {missionDetailTab === 'history' && <div className="volunteer-mission-tab-content volunteer-mission-history">
                 {/* Hiển thị danh sách minh chứng đã có */}
                 <div className="volunteer-mission-history-section">
                     <div className="volunteer-mission-history-heading"><h3>Minh chứng đã lưu</h3><span>{missionDetail?.evidence?.items.length || 0}</span></div>
                     {missionDetail?.evidence?.items && missionDetail.evidence.items.length > 0 ? (
-                    <div className="record-list">
-                      {(missionDetail.evidence.items as EvidenceItem[]).map((ev) => (
-                        <div className="record" key={ev.id}>
-                          <span>
-                            {label(ev.state)} · {timeLabel(ev.created_at)} ·{' '}
-                            {Math.ceil(ev.size_bytes / 1024)} KB
-                          </span>
-                          <span>
-                            <button
-                              className="button secondary"
-                              type="button"
-                              onClick={() => downloadEvidence(ev.id)}
-                            >
-                              Lấy liên kết xem
-                            </button>
-                            {evidenceUrls[ev.id] && (
-                              <a
-                                className="button secondary"
-                                href={evidenceUrls[ev.id]}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                Mở tệp
-                              </a>
-                            )}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                    <EvidenceGallery items={missionDetail.evidence.items} />
                     ) : <p className="empty">Chưa có minh chứng được lưu cho nhiệm vụ này.</p>}
                 </div>
 

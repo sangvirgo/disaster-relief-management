@@ -86,6 +86,7 @@ export function LocationPicker({
   overlay,
   weather,
   onLocate,
+  validatePoint,
 }: {
   value: Point | null;
   onSelect: (point: Point | null, address?: string) => void;
@@ -103,6 +104,7 @@ export function LocationPicker({
   weather?: LocationWeather | null;
   /** Adds a "use my current location" icon button on the map. */
   onLocate?: () => void;
+  validatePoint?: (point: Point) => string;
 }) {
   const [open, setOpen] = useState(initiallyOpen);
   const activeGoogleKey = envApiKey;
@@ -684,6 +686,7 @@ export function LocationPicker({
     }
     if (!centerPoint) return;
     const point = chosenSearchRef.current?.point ?? centerPoint;
+    if (validatePoint?.(point)) return;
     confirmedPointRef.current = point;
     setDraftPoint(point);
     setPinDropKey((current) => current + 1);
@@ -775,7 +778,7 @@ export function LocationPicker({
                 {selectOnPick
                   ? hideMap
                     ? 'Nhập địa chỉ rồi chọn một gợi ý, hoặc chạm bản đồ bên dưới để chọn tâm vùng ngay.'
-                    : 'Nhập địa chỉ rồi chọn một gợi ý, hoặc chạm bản đồ để chọn tâm vùng ngay.'
+                    : 'Nhập địa chỉ rồi chọn một gợi ý, hoặc chạm bản đồ để chọn vị trí.'
                   : 'Nhập địa chỉ rồi chọn một gợi ý, hoặc nhấn thẳng lên bản đồ để đặt ghim, rồi bấm “Xác nhận vị trí”.'}
               </small>
               {searching && (
@@ -867,13 +870,14 @@ export function LocationPicker({
               type="button"
               className="location-confirm-button"
               onClick={() => void confirmCenter()}
-              disabled={!draftPoint}
+              disabled={!draftPoint || Boolean(draftPoint && validatePoint?.(draftPoint))}
             >
               Xác nhận vị trí
             </button>}
           </div>}
 
-          {selectedAddress && (
+          {draftPoint && validatePoint?.(draftPoint) && <p className="field-error" role="alert">{validatePoint(draftPoint)}</p>}
+          {selectedAddress && !(draftPoint && validatePoint?.(draftPoint)) && (
             <p className="location-selection-status" role="status">
               {selectedAddress}
             </p>

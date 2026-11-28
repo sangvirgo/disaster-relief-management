@@ -216,6 +216,9 @@
 .volunteer-mission-tabs {
   margin: 0;
 }
+@media (max-width: 480px) {
+  .volunteer-mission-tabs > button { flex: 1 1 0; min-width: 0; white-space: normal; line-height: 1.4; padding: 10px 8px; font-size: 14px; }
+}
 
 .volunteer-mission-panel {
   display: grid;
@@ -422,3 +425,23 @@
 .volunteer-mission-facts > div { padding: 4px 0; background: transparent; border: 0; }
 .volunteer-mission-progress .action-grid { display: flex; flex-wrap: wrap; gap: 10px; }
 .volunteer-mission-progress .action-grid > .button { width: auto; flex: 0 1 auto; }
+
+.mission-evidence-upload { display: grid; gap: 10px; padding-top: 16px; border-top: 1px solid var(--color-surface-border); }
+.mission-evidence-upload__heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+.mission-evidence-upload__heading h4 { margin: 0; font-size: 15px; }
+.mission-evidence-upload__heading small { color: var(--color-text-secondary); }
+.mission-evidence-upload__controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.mission-upload-control { position: relative; display: flex; align-items: center; gap: 12px; min-width: 0; min-height: 48px; padding: 6px; border: 1px solid var(--color-surface-border); border-radius: 10px; background: var(--color-surface-card); cursor: pointer; }
+.mission-evidence-upload__controls .mission-upload-control { flex: 1 1 280px; }
+.mission-upload-control input[type='file'] { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); border: 0; }
+.mission-upload-control:focus-within { outline: 3px solid var(--color-primary-bg); border-color: var(--color-primary); }
+.mission-upload-control__button { flex: 0 0 auto; padding: 8px 12px; border-radius: 7px; background: var(--color-primary-bg); color: var(--color-primary-dark); font-weight: 650; font-size: 14px; }
+.mission-upload-control__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text-secondary); font-size: 14px; }
+.volunteer-mission-progress[hidden] { display: none; }
+.mission-upload-list { display: grid; gap: 8px; list-style: none; padding: 0; margin: 0; }
+.mission-upload-list li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 12px; background: var(--color-surface-subtle); border-radius: 8px; }
+.mission-upload-list li > div:first-child { min-width: 0; flex: 1 1 220px; }
+.mission-upload-list strong { display: block; overflow-wrap: anywhere; font-size: 14px; }
+.mission-upload-list small { display: block; margin-top: 4px; }
+.mission-upload-list__actions { display: flex; gap: 8px; }
+@media (max-width: 480px) { .mission-upload-control { flex-wrap: wrap; } .mission-upload-control__name { white-space: normal; overflow-wrap: anywhere; } }

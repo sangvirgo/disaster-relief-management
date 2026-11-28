@@ -1,3 +1,4 @@
+import { ReconciliationTable, reconciliationMetrics, reconciliationResult } from './ReconciliationTable';
 import { Dropdown } from '../../components/ui/Dropdown';
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../../api/client';
@@ -119,6 +120,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   const visibleDriveItemPage = Math.min(driveItemPage, driveItemPageCount - 1);
   useEffect(() => setDriveItemPage(0), [selected?.id]);
   const [error, setError] = useState('');
+  const [workflowNotice, setWorkflowNotice] = useState('');
   const [loading, setLoading] = useState(true);
   const [revision, setRevision] = useState(0);
   const [references, setReferences] = useState<ReferenceOptions>({});
@@ -309,6 +311,14 @@ export function Operations({ page, user }: { page: string; user: Me }) {
       <CommandForm key={spec.path + String(spec.version ?? '')} spec={spec} onSuccess={() => done()} onStale={() => setRevision((value) => value + 1)} />
     );
   }
+  function counted(result?: { confirmation?: { matched: boolean; posted?: boolean } }) {
+    const confirmation = result?.confirmation;
+    setWorkflowNotice(confirmation
+      ? confirmation.matched ? confirmation.posted ? 'Hai lượt kiểm đếm khớp nhau. Biên nhận đã ghi sổ kho.' : 'Hai lượt kiểm đếm khớp nhau. Kiểm tra trạng thái biên nhận để theo dõi ghi sổ.'
+        : 'Hai lượt kiểm đếm chưa khớp. Hàng chưa được ghi sổ; mở mục “Cần đếm lại” để xử lý.'
+      : 'Đã gửi kết quả kiểm đếm. Cần người thứ hai kiểm đếm độc lập trước khi ghi sổ.');
+    done();
+  }
   const id = detail?.id;
   const version = number(detail?.version);
   const status = string(detail?.delivery_status || detail?.status);
@@ -378,7 +388,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           <div className="filter-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', margin: '12px 0' }}>
             {page === 'review' && (
               <div className="receipt-status-filters" style={{ gridColumn: '1 / -1', margin: 0 }} role="group" aria-label="Việc cần làm">
-                {([['DECLARED', 'Cần đếm'], ['PENDING_REVIEW', 'Cần xác nhận'], ['', 'Tất cả']] as const).map(([value, title]) => (
+                {([['DECLARED', 'Cần đếm'], ['COUNTING', 'Cần đếm lại'], ['PENDING_REVIEW', 'Cần xác nhận'], ['', 'Tất cả']] as const).map(([value, title]) => (
                   <button key={value} type="button" aria-pressed={receiptStatus === value} className={receiptStatus === value ? 'active' : ''}
                     onClick={() => { setReceiptStatus(value); setCursor(''); setSelected(null); setDetail(null); }}>{title}</button>
                 ))}
@@ -459,6 +469,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           </Dropdown>
         </label>}
         {!ready && <p>Chọn kho hoặc chiến dịch để tải báo cáo theo phạm vi được cấp quyền.</p>}
+        {workflowNotice && <p className="notice" role="status">{workflowNotice}</p>}
         {loading && <p role="status">Đang tải dữ liệu…</p>}
         {error && (
           <p className="notice error" role="alert">
@@ -523,6 +534,8 @@ export function Operations({ page, user }: { page: string; user: Me }) {
               </table>
             </div>
           </>
+        ) : page === 'reports' && report === 'reconciliation' ? (
+          <ReconciliationTable rows={items} />
         ) : page === 'assets' ? null : (
           <div className="operations-table-scroll" role="region" aria-label={`Bảng ${headings[page] || 'bản ghi'}`} tabIndex={0}>
             <table className={`operations-record-table${page === 'drives' ? ' operations-record-table--drives' : ''}`}>
@@ -550,11 +563,12 @@ export function Operations({ page, user }: { page: string; user: Me }) {
         {selected && inlineActions && <p style={{ margin: '0 0 12px' }}>
           {string(selected.drive_title) || 'Đợt quyên góp'}{selected.donor_name ? ` · ${string(selected.donor_name)}` : ''}{selected.warehouse_name ? ` · ${string(selected.warehouse_name)}` : ''} · <StatusBadge status={string(selected.status)} />
         </p>}
-        {selected && detail && !['stock', 'assets', 'drives'].includes(page) && !inlineActions && <Tabs items={[
+        {selected && detail && !['stock', 'assets', 'drives'].includes(page) && !stockDetail && !inlineActions && <Tabs items={[
           { id: 'overview', label: 'Thông tin' },
           { id: 'details', label: page === 'reports' ? 'Số liệu' : page === 'drives' ? 'Vật phẩm tiếp nhận' : 'Chi tiết' },
           ...(showActionsTab && !inlineActions ? [{ id: 'actions', label: 'Thao tác' }] : []),
         ]} value={detailTab} onChange={setDetailTab} ariaLabel="Nội dung bản ghi" idBase="operations-detail" />}
+        {page === 'drives' && status === 'DRAFT' && id && (rights.has('COORDINATOR') || rights.has('OPERATIONS_MANAGER')) && <a className="button secondary" href={`?workspace=operations&page=assets&view=warehouses&edit_drive=${encodeURIComponent(String(id))}`}>Sửa bản nháp</a>}
         {selected && <div id="operations-detail-tabpanel" style={page === 'review' ? { display: 'flex', flexDirection: 'column' } : undefined}>
         {detail && (
           <>
@@ -765,11 +779,11 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             {page === 'reports' && report === 'reconciliation' && <section className="reconciliation-section"><h3>Đối soát {string((detail.item as Row)?.name)}</h3>
               <div className="operations-table-scroll" role="region" aria-label="Bảng đối soát vật phẩm" tabIndex={0}>
                 <table className="reconciliation-table"><thead><tr><th scope="col">Chỉ tiêu</th><th scope="col">Số lượng ({string((detail.unit as Row)?.display_name)})</th></tr></thead><tbody>
-                  {Object.entries({ intake_accepted: 'Đã tiếp nhận', posted_movements: 'Tồn theo sổ', posted_reserved_movements: 'Giữ chỗ theo sổ', reserved: 'Đang giữ cho đội', delivered: 'Đã giao cho đội' }).map(([key, title]) => <tr key={key}><th scope="row">{title}</th><td>{quantity(detail[key])}</td></tr>)}
+                  {reconciliationMetrics.map(([key, title]) => <tr key={key}><th scope="row">{title}</th><td>{quantity(detail[key])}</td></tr>)}
                 </tbody></table>
-              </div><p className="reconciliation-result">{Object.values((detail.flags as Row) || {}).some(Boolean) ? 'Có chênh lệch cần rà soát giữa sổ kho và số đã giao cho đội.' : 'Chưa ghi nhận chênh lệch đối soát.'}</p>
+              </div><p className="reconciliation-result">{reconciliationResult(detail.flags).text}</p>
             </section>}
-            {page === 'reports' && report === 'stock-summary' && <p className="muted">Số lượng tồn thực tế, đã giữ và có thể xuất được hiển thị ở tab Thông tin.</p>}
+
             {count && !(page === 'review' && reviewTab === 'receipts' && status === 'PENDING_REVIEW' && rights.has('REVIEWER') && !detail.review && !ownPendingCount) && (
               <div className="candidate">
                 {status === 'POSTED' && !detail.review && <p className="notice warning" role="status">Phiếu đã ghi sổ trước đó. Lần kiểm đếm bổ sung này đang chờ duyệt độc lập; số tiếp nhận mới chưa được cộng vào tồn kho.</p>}
@@ -866,7 +880,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                   driveTitle={string(selected.drive_title)}
                   version={0}
                   existing={null}
-                  onSuccess={done}
+                  onSuccess={counted}
                 />
               )}
               {page === 'intake' &&
@@ -906,7 +920,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                         }[];
                       } | null
                     }
-                    onSuccess={done}
+                    onSuccess={counted}
                   />
                 )}
               {page === 'intake' && receiptId && ['REJECTED', 'CANCELLED'].includes(status) && (
@@ -927,7 +941,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                       unit: { display_name: string(line.unit_name), scale: Number(line.unit_scale ?? 0) },
                     })) : []}
                     confirm={{ countRevision: Number(count.revision), declarationRevision: Number(count.declaration_revision) }}
-                    onSuccess={done}
+                    onSuccess={counted}
                   />
                 )}
               {page === 'review' &&

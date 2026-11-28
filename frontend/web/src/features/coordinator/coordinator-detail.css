@@ -148,6 +148,12 @@
 .sos-tab-group:not([hidden]) { display: grid; gap: var(--space-4); }
 .sos-tab-group[hidden] { display: none !important; }
 .sos-actions[hidden] { display: none !important; }
+.coordinator-detail-surface .sos-actions > .sos-tab-group > .sos-terminal-actions { display: flex; flex: 1 1 100%; flex-wrap: wrap; align-items: center; gap: 12px; padding-block: 16px; border-top: 1px solid var(--color-surface-border); }
+.coordinator-detail-surface .sos-terminal-actions > .command-form,
+.coordinator-detail-surface .sos-terminal-actions > .sos-action-entry { flex: 0 1 auto; margin: 0; padding: 0; border: 0; background: transparent; }
+.coordinator-detail-surface .sos-terminal-actions .button { min-height: 44px; margin: 0; }
+.coordinator-detail-surface .sos-terminal-actions .sos-action-entry > .button.secondary { background: #fff7ed; border-color: #fed7aa; color: #9a3412; }
+.coordinator-detail-surface .sos-terminal-actions .sos-action-entry > .button.secondary:hover { background: #ffedd5; border-color: #fdba74; }
 .coordinator-detail-surface .sos-actions > .sos-tab-group:not([hidden]) { display: flex; flex: 1 1 100%; flex-wrap: wrap; align-items: stretch; gap: var(--space-2); }
 .coordinator-detail-surface .sos-actions > .sos-tab-group > * { flex: 1 1 220px; min-width: 0; }
 .coordinator-detail-surface .sos-actions > .sos-tab-group:not([hidden]) { align-items: stretch; }
