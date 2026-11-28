@@ -219,3 +219,4 @@
     transition: none;
   }
 }
+.team-skill-tags { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 12px; }

@@ -716,6 +716,8 @@ export function Volunteer({ page, currentUserId, sharingTeamId = '', sharingMess
   }, [draftScope, currentDraftScope, currentUserId, activeMission?.id, activeMission?.status, canManageMission, outcomeNote, progressNote, declineReason, showCompleteForm, showFailForm]);
   useUnsavedWork(hasMissionDraft && !draftSaved, 'Trình duyệt chưa lưu được ghi chú nhiệm vụ. Rời trang sẽ mất nội dung chưa gửi. Bạn vẫn muốn rời đi?');
   const currentSituation = activeMission?.current_situation;
+  const missionDescription = (currentSituation ? currentSituation.description : activeMission?.description) || 'Chưa có mô tả tình huống được cung cấp.';
+  const hasUpdateMarker = /Cập nhật\s*:/iu.test(missionDescription);
   // Mission destination remains the approved assignment; a later SOS location needs coordinator review.
   const situationLocation = activeMission?.location;
   const situationLocationChanged = Boolean(currentSituation && JSON.stringify(currentSituation.location?.coordinates) !== JSON.stringify(activeMission?.location?.coordinates));
@@ -881,12 +883,30 @@ export function Volunteer({ page, currentUserId, sharingTeamId = '', sharingMess
             )}
             {selectedTeam && (
               <div className="volunteer-team-detail">
-                <div className="volunteer-team-profile">
+                <div className="volunteer-team-profile team-profile-header">
                   <div>
-                    <span className="volunteer-team-kind">{label(selectedTeam.kind)}</span>
-                    <h3>{selectedTeam.name}</h3>
+                    <div className="team-profile-meta">
+                      <span className="volunteer-team-kind">{label(selectedTeam.kind)}</span>
+                      {selectedTeamCanBeManaged && <span className="chip team-leader-badge">Bạn đang quản lý đội này</span>}
+                    </div>
+                    <div className="volunteer-team-title-row">
+                      <h3>{selectedTeam.name}</h3>
+                      <span className={`chip team-availability-status team-header-status ${selectedTeam.availability === 'AVAILABLE' && selectedTeam.status === 'ACTIVE' && teamActivityLoaded && !busyTeamIds.has(selectedTeam.id) ? 'is-ready' : ''}`}>
+                          <span className="team-availability-dot" aria-hidden="true" />
+                          {!teamActivityLoaded ? 'Đang kiểm tra' : busyTeamIds.has(selectedTeam.id) ? 'Đang có nhiệm vụ' : label(selectedTeam.availability)}
+                      </span>
+                      {selectedTeamCanBeManaged && selectedTeam.status === 'ACTIVE' && selectedTeam.availability === 'AVAILABLE' && (
+                        <button
+                          type="button"
+                          className="button danger team-header-pause"
+                          disabled={busy || teamLoading}
+                          onClick={() => toggleTeamAvailability(selectedTeam)}
+                        >
+                          Chuyển sang Tạm ngưng
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  {selectedTeamCanBeManaged && <span className="chip team-leader-badge">Bạn đang quản lý đội này</span>}
                 </div>
                 {teamMessage && <p className="notice" role="status">{teamMessage}</p>}
                 <Tabs
@@ -907,7 +927,6 @@ export function Volunteer({ page, currentUserId, sharingTeamId = '', sharingMess
                   {teamDetailTab === 'overview' && (
                     <div className="volunteer-team-overview">
                       <dl className="volunteer-team-facts">
-                        <div><dt>Khả năng nhận nhiệm vụ</dt><dd>{label(selectedTeam.availability)}</dd></div>
                         <div><dt>Tình trạng nhiệm vụ</dt><dd>{!teamActivityLoaded ? 'Chưa cập nhật được nhiệm vụ' : busyTeamIds.has(selectedTeam.id) ? 'Đang có nhiệm vụ' : 'Không có nhiệm vụ đang hoạt động'}</dd></div>
                         <div><dt>Chế độ báo cáo</dt><dd>{label(selectedTeam.reporting_mode)}</dd></div>
                         <div><dt>Trạng thái hồ sơ</dt><dd>{selectedTeam.status === 'ACTIVE' ? 'Đang hoạt động' : label(selectedTeam.status)}</dd></div>
@@ -937,24 +956,7 @@ export function Volunteer({ page, currentUserId, sharingTeamId = '', sharingMess
                   )}
                   {teamDetailTab === 'overview' && (
                     <div className="volunteer-team-panel-content">
-                      <div className="volunteer-team-section-heading">
-                        <div><h4>Trạng thái sẵn sàng</h4><p>Kiểm soát việc đội có thể tiếp nhận nhiệm vụ mới.</p></div>
-                        <span className={`chip team-availability-status ${selectedTeam.availability === 'AVAILABLE' && selectedTeam.status === 'ACTIVE' && teamActivityLoaded && !busyTeamIds.has(selectedTeam.id) ? 'is-ready' : ''}`}>
-                          <span className="team-availability-dot" aria-hidden="true" />
-                          {!teamActivityLoaded ? 'Đang kiểm tra' : busyTeamIds.has(selectedTeam.id) ? 'Đang có nhiệm vụ' : label(selectedTeam.availability)}
-                        </span>
-                      </div>
                       {selectedTeam.readiness_required && <p className="notice warning" role="status">Đội cần xác nhận sẵn sàng trở lại sau khi nhiệm vụ đang hoạt động bị hủy.</p>}
-                      {selectedTeamCanBeManaged && selectedTeam.status === 'ACTIVE' && selectedTeam.availability === 'AVAILABLE' && (
-                        <button
-                          type="button"
-                          className="button secondary"
-                          disabled={busy || teamLoading}
-                          onClick={() => toggleTeamAvailability(selectedTeam)}
-                        >
-                          Chuyển sang Tạm ngưng
-                        </button>
-                      )}
                       {selectedTeamCanBeManaged && selectedTeam.status === 'ACTIVE' && selectedTeam.availability !== 'AVAILABLE' && (
                         teamActivityError ? <p className="notice error" role="alert">{teamActivityError}</p>
                           : !teamActivityLoaded ? <p role="status">Đang kiểm tra nhiệm vụ của đội trước khi xác nhận sẵn sàng…</p>
@@ -1067,12 +1069,10 @@ export function Volunteer({ page, currentUserId, sharingTeamId = '', sharingMess
                 <div className="volunteer-mission-context">
                   <h3>{currentSituation ? 'Tình huống đã được duyệt' : 'Tình huống khi giao nhiệm vụ'}</h3>
                   {currentSituation && <p className="muted">Duyệt lúc {new Date(currentSituation.approved_at).toLocaleString('vi-VN')}{currentSituation.changed_since_assignment ? ' · Có cập nhật sau khi giao nhiệm vụ' : ''}</p>}
-                  <p>{(currentSituation ? currentSituation.description : activeMission.description) || 'Chưa có mô tả tình huống được cung cấp.'}</p>
-                  {currentSituation?.changed_since_assignment && <details>
-                    <summary>Xem tình huống lúc giao nhiệm vụ</summary>
-                    <p>Số người: {activeMission.people_affected ?? 'Chưa rõ'}</p>
-                    <p>{activeMission.description || 'Chưa có mô tả.'}</p>
-                  </details>}
+                  {missionDescription.split(/(?=Cập nhật\s*:)/iu).map((part, index) => {
+                    const update = part.match(/^(Cập nhật\s*:)([\s\S]*)$/iu);
+                    return <p key={index}>{update ? <><strong>Cập nhật:</strong>{update[2]}</> : currentSituation?.changed_since_assignment && !hasUpdateMarker && index === 0 ? <><strong>Cập nhật:</strong> {part}</> : part}</p>;
+                  })}
                   {!currentSituation && <small>Đây là thông tin tại thời điểm giao việc. Liên hệ điều phối viên để kiểm tra cập nhật mới.</small>}
                   {situationLocationChanged && <p className="notice warning">SOS có vị trí cập nhật. Liên hệ điều phối viên xác nhận điểm đến; chỉ đường bên dưới dùng vị trí lúc giao nhiệm vụ.</p>}
                 </div>

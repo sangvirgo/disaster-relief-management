@@ -148,7 +148,40 @@ function fixture(options: { members?: Record<string, Member>; activeTeamId?: str
 }
 
 describe('TeamsMembershipService', () => {
-  it('adds an active account as a MEMBER and returns the persisted audit timestamp', async () => {
+  it('returns no next page when every matching volunteer already belongs to a team', async () => {
+    const { service, sessions, managerQuery } = fixture();
+    const person = { id: userId, username: 'vol_one', display_name: 'Tình nguyện viên' };
+    const search = jest.fn<ReporterSessionService['searchActiveUsers']>()
+      .mockResolvedValueOnce({ items: [person], more: true, cursor: 'source-1' })
+      .mockResolvedValueOnce({ items: [person], more: false });
+    sessions.searchActiveUsers = search;
+    managerQuery.mockImplementation(async () => [{ user_id: userId }] as never);
+    await expect(service.listMemberCandidates(teamId, { query: 'vol', limit: 1 }, request))
+      .resolves.toEqual({ items: [], more: false });
+    expect(search).toHaveBeenCalledTimes(2);
+  });
+
+  it('fills pages after membership filtering and keeps the first next candidate across cursors', async () => {
+    const { service, sessions, managerQuery } = fixture();
+    const person = (id: string) => ({ id, username: `vol_${id}`, display_name: 'Tình nguyện viên' });
+    const search = jest.fn<ReporterSessionService['searchActiveUsers']>().mockImplementation(async (_query, cursor) => {
+      if (!cursor) return { items: [person(userId)], more: true, cursor: 'assigned' };
+      if (cursor === 'assigned') return { items: [person(actorId)], more: true, cursor: 'first' };
+      if (cursor === 'first') return { items: [person(teamId)], more: true, cursor: 'second' };
+      return { items: [person(userId)], more: false };
+    });
+    sessions.searchActiveUsers = search;
+    managerQuery.mockImplementation(async (_sql, params = []) => (params[0] as string[]).includes(userId) ? [{ user_id: userId }] as never : []);
+    const first = await service.listMemberCandidates(teamId, { query: 'vol', limit: 1 }, request);
+    expect(first.items.map(item => item.user_id)).toEqual([actorId]);
+    expect(first.more).toBe(true);
+    const second = await service.listMemberCandidates(teamId, { query: 'vol', limit: 1, cursor: first.cursor }, request);
+    expect(second.items.map(item => item.user_id)).toEqual([teamId]);
+    expect(second.more).toBe(false);
+    expect(second).not.toHaveProperty('cursor');
+  });
+
+  it('adds an active volunteer as a MEMBER and returns the persisted audit timestamp', async () => {
     const { service, state } = fixture();
 
     await expect(service.addMember(teamId, { user_id: userId }, idempotencyKey, request)).resolves.toEqual({
@@ -161,11 +194,12 @@ describe('TeamsMembershipService', () => {
   });
 
   it.each([
-    [{ active: false, reason: 'USER_NOT_FOUND' }, 'NOT_FOUND', 404],
-    [{ active: false, reason: 'USER_INACTIVE' }, 'STATE_TRANSITION_INVALID', 409],
+    [{ eligible: false, reason: 'USER_NOT_FOUND' }, 'NOT_FOUND', 404],
+    [{ eligible: false, reason: 'USER_INACTIVE' }, 'STATE_TRANSITION_INVALID', 409],
+    [{ eligible: false, reason: 'VOLUNTEER_GRANT_REQUIRED' }, 'STATE_TRANSITION_INVALID', 409],
   ] as const)('maps Identity member eligibility %s to the stable API error', async (result, code, status) => {
     const { service, sessions, managerQuery } = fixture();
-    (sessions.activeUserCheck as jest.Mock).mockResolvedValue(result);
+    (sessions.teamLeaderEligibility as jest.Mock).mockResolvedValue(result);
 
     await expect(service.addMember(teamId, { user_id: userId }, idempotencyKey, request))
       .rejects.toMatchObject({ code, status });
@@ -219,12 +253,12 @@ describe('TeamsMembershipService', () => {
   it('replays an add snapshot without rechecking whether the account is still active', async () => {
     const { service, sessions } = fixture();
     const first = await service.addMember(teamId, { user_id: userId }, idempotencyKey, request);
-    (sessions.activeUserCheck as jest.Mock).mockResolvedValue({ active: false, reason: 'USER_INACTIVE' });
+    (sessions.teamLeaderEligibility as jest.Mock).mockResolvedValue({ eligible: false, reason: 'USER_INACTIVE' });
 
     await expect(service.addMember(teamId, { user_id: userId }, idempotencyKey, request)).resolves.toEqual({
       status: 201, replay: true, value: first.value,
     });
-    expect(sessions.activeUserCheck).toHaveBeenCalledTimes(1);
+    expect(sessions.teamLeaderEligibility).toHaveBeenCalledTimes(1);
   });
 
   it('replays the original add result after the member is removed and rejoins', async () => {

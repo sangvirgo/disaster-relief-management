@@ -34,6 +34,9 @@ export class LookupUsersDto {
 }
 
 export class SearchActiveUsersDto {
+  @IsOptional() @IsIn(['VOLUNTEER'])
+  role_code?: 'VOLUNTEER';
+
   @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
   @IsString() @MinLength(2) @MaxLength(64) @Matches(/\S/u)
   query!: string;

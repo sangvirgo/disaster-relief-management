@@ -78,7 +78,7 @@ export function TeamMembers({ teamId, onManageChange, addOpen, onOpenAdd, onClos
       if (generation !== searchGeneration.current) return;
       setCandidates(page.items);
       setSelectedCandidate(null);
-      setCandidateNext(page.cursor || '');
+      setCandidateNext(page.more ? page.cursor || '' : '');
       setSearched(true);
     } catch (cause) {
       if (generation === searchGeneration.current)
@@ -217,7 +217,7 @@ export function TeamMembers({ teamId, onManageChange, addOpen, onOpenAdd, onClos
     {addOpen && <DetailSurface modal open canClose={() => !busyId} onClose={closeAddDialog} label="Thêm thành viên vào đội" heading="Thêm thành viên" className="team-member-dialog"><div className="team-member-add">
       {!loading && !canManage && <p className="notice error" role="alert">Bạn không có quyền thêm thành viên vào đội này.</p>}
       {canManage && <>
-      <p className="muted team-member-add__intro">Tìm theo tên hoặc tên đăng nhập của người cần thêm. Kết quả chỉ gồm tài khoản chưa thuộc đội; người được thêm cần có vai trò tình nguyện viên.</p>
+      <p className="muted team-member-add__intro">Tìm theo tên hoặc tên đăng nhập. Chỉ hiển thị tình nguyện viên đang hoạt động và chưa tham gia đội nào.</p>
       <form className="team-member-search" noValidate onSubmit={(event) => void search(event)}>
         <label htmlFor="team-member-query">Tìm người tham gia</label>
         <div className="team-member-search-row">
@@ -236,7 +236,7 @@ export function TeamMembers({ teamId, onManageChange, addOpen, onOpenAdd, onClos
       {searchTerm.length >= 2 && searchTerm.length <= 64 && <div className="team-member-search-results" aria-busy={searching}>
       {searchError && <p className="notice error" role="alert">{searchError}</p>}
       {searching && <p className="team-member-search-status" role="status">Đang tìm người phù hợp…</p>}
-      {searched && !searching && !searchError && candidates.length === 0 && <p className="empty" role="status">{candidateNext ? 'Trang này không có người có thể thêm. Chọn “Trang sau” để xem tiếp.' : 'Không tìm thấy tài khoản phù hợp chưa tham gia đội. Thử tên hoặc tên đăng nhập khác.'}</p>}
+      {searched && !searching && !searchError && candidates.length === 0 && <p className="empty" role="status">{candidatePage === 0 ? 'Không tìm thấy tình nguyện viên phù hợp chưa tham gia đội nào. Hãy thử tên hoặc tên đăng nhập khác.' : 'Không còn tình nguyện viên phù hợp trên trang này. Hãy quay lại trang trước hoặc tìm tên khác.'}</p>}
       {candidates.length > 0 && <div className="team-member-results-heading"><strong>Kết quả phù hợp</strong><span>{candidates.length}{candidateNext ? '+' : ''} người</span></div>}
       <div className="team-member-candidates">
         {candidates.map((candidate) => <button type="button" className={`team-member-row team-member-candidate-choice${selectedCandidate?.user_id === candidate.user_id ? ' is-selected' : ''}`}
@@ -247,7 +247,7 @@ export function TeamMembers({ teamId, onManageChange, addOpen, onOpenAdd, onClos
           <span className="team-member-candidate-check" aria-hidden="true">{selectedCandidate?.user_id === candidate.user_id ? '✓' : ''}</span>
         </button>)}
       </div>
-      <ListNav page={candidatePage} hasNext={Boolean(candidateNext)} loading={searching || Boolean(busyId)} onPrev={prevCandidates} onNext={() => candidateNext && setCandidateCursor(candidateNext)} count={candidates.length} noun="kết quả" />
+      {!searching && !searchError && (candidates.length > 0 || candidatePage > 0) && <ListNav page={candidatePage} hasNext={Boolean(candidateNext) && candidates.length > 0} loading={Boolean(busyId)} onPrev={prevCandidates} onNext={() => candidateNext && setCandidateCursor(candidateNext)} count={candidates.length} noun="kết quả" />}
       {selectedCandidate && <button type="button" className="button team-member-confirm-add" disabled={Boolean(busyId)}
         onClick={() => void add(selectedCandidate)}>{busyId ? 'Đang thêm…' : `Thêm ${selectedCandidate.display_name} vào đội`}</button>}
       </div>}

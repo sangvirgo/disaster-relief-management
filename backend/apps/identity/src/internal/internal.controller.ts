@@ -43,7 +43,7 @@ export class InternalController {
   ): Promise<Record<string, unknown>> {
     noStore(response);
     if (request.serviceCaller !== 'response') throw new AppError('FORBIDDEN', { status: 403 });
-    return this.internalService.searchActiveUsers(dto.query, dto.cursor, dto.limit);
+    return this.internalService.searchActiveUsers(dto.query, dto.cursor, dto.limit, dto.role_code);
   }
 
   @Post('users\\:check-active')

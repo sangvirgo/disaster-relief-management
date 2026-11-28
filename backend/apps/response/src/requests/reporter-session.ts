@@ -231,7 +231,7 @@ export class ReporterSessionService implements OnModuleDestroy {
     let result;
     try {
       result = await this.client.post<unknown>('/api/v1/identity/internal/users:search', {
-        query: query.trim(), ...(cursor ? { cursor } : {}), limit,
+        query: query.trim(), ...(cursor ? { cursor } : {}), limit, role_code: 'VOLUNTEER',
       }, {
         headers: { authorization: `Bearer ${token}` },
       });

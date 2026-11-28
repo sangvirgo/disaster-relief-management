@@ -1,6 +1,24 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { InternalService } from '../src/internal/internal.service';
 
+describe('Volunteer candidate search', () => {
+  it('filters active SYSTEM volunteer grants before pagination and scopes its cursor to that filter', async () => {
+    const query = jest.fn(async (_sql: string, _values: unknown[]) => [
+      { id: '00000000-0000-4000-8000-000000000002', username: 'hoa', display_name: 'Hoa', created_at: new Date('2026-11-28T00:00:00Z') },
+      { id: '00000000-0000-4000-8000-000000000001', username: 'ha', display_name: 'Hà', created_at: new Date('2026-11-27T00:00:00Z') },
+    ]);
+    const service = Object.assign(Object.create(InternalService.prototype), { introspectionDataSource: { query } }) as InternalService;
+    const page = await service.searchActiveUsers('ho', undefined, 1, 'VOLUNTEER');
+    const sql = query.mock.calls[0]![0];
+    expect(sql).toContain("g.role_code = 'VOLUNTEER'");
+    expect(sql).toContain("g.scope_type = 'SYSTEM'");
+    expect(sql).toContain('g.revoked_at IS NULL');
+    expect(page.items).toHaveLength(1);
+    expect(page.more).toBe(true);
+    await expect(service.searchActiveUsers('ho', page.cursor, 1)).rejects.toMatchObject({ code: 'CURSOR_INVALID' });
+  });
+});
+
 describe('Identity internal active user check service', () => {
   const userId = '00000000-0000-4000-8000-000000000001';
 

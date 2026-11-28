@@ -273,6 +273,20 @@
   background: #fff;
 }
 
+.volunteer-mission-context {
+  border-color: #bdd5fb;
+  border-left: 4px solid var(--color-primary);
+  background: #f1f7ff;
+}
+.volunteer-mission-context strong { color: #173e7a; }
+.volunteer-team-title-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; }
+.volunteer-team-title-row > h3 { margin: 0; }
+.team-profile-header > div { width: 100%; min-width: 0; }
+.team-profile-meta { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.team-profile-meta .volunteer-team-kind { margin: 0; }
+.volunteer-team-title-row .team-header-pause { margin: 0 0 0 auto; width: auto; }
+.volunteer-team-title-row .team-header-status.is-ready { color: #087443; background: #eafaf0; border-color: #a6dfbd; }
+
 .volunteer-mission-context h3,
 .volunteer-mission-contacts h3,
 .volunteer-mission-progress > h3,

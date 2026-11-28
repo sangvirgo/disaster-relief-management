@@ -120,20 +120,29 @@ export class TeamsMembershipService {
       throw new AppError('CURSOR_INVALID', { status: 400 });
     }
 
-    const page = await this.sessions.searchActiveUsers(query, cursor?.sort[0] as string | undefined, dto.limit ?? 50);
-    const ids = page.items.map(({ id }) => id);
-    const assigned = ids.length ? await this.dataSource.query(
-      'SELECT user_id FROM team_member WHERE user_id=ANY($1::uuid[]) AND left_at IS NULL', [ids],
-    ) as Array<{ user_id: string }> : [];
-    const assignedIds = new Set(assigned.map(({ user_id }) => user_id));
-
-    return {
-      items: page.items.filter(({ id }) => !assignedIds.has(id)).map(({ id, username, display_name }) => ({
-        user_id: id, username, display_name,
-      })),
-      more: page.more,
-      ...(page.cursor ? { cursor: encodeKeysetCursor([page.cursor], teamId, filters) } : {}),
-    };
+    const limit = dto.limit ?? 50;
+    type Candidate = { user_id: string; username: string; display_name: string };
+    const items: Candidate[] = [];
+    let sourceCursor = cursor?.sort[0] as string | undefined;
+    // Identity paginates volunteers; Response owns membership. Fill the visible page
+    // after excluding assigned people, and look ahead before promising another page.
+    for (;;) {
+      const beforePage = sourceCursor;
+      const page = await this.sessions.searchActiveUsers(query, sourceCursor, Math.max(1, limit - items.length));
+      const ids = page.items.map(({ id }) => id);
+      const assigned = ids.length ? await this.dataSource.query(
+        'SELECT user_id FROM team_member WHERE user_id=ANY($1::uuid[]) AND left_at IS NULL', [ids],
+      ) as Array<{ user_id: string }> : [];
+      const assignedIds = new Set(assigned.map(({ user_id }) => user_id));
+      const available = page.items.filter(({ id }) => !assignedIds.has(id));
+      if (items.length === limit && available.length) {
+        return { items, more: true, cursor: encodeKeysetCursor([beforePage!], teamId, filters) };
+      }
+      items.push(...available.map(({ id, username, display_name }) => ({ user_id: id, username, display_name })));
+      if (!page.more || !page.cursor) return { items, more: false };
+      if (page.cursor === sourceCursor) throw new AppError('IDENTITY_UNAVAILABLE', { status: 503 });
+      sourceCursor = page.cursor;
+    }
   }
 
   async addMember(
@@ -153,11 +162,7 @@ export class TeamsMembershipService {
       requestHash: canonicalRequestHash({ team_id: teamId, actor_user_id: session.userId, dto }),
       databaseErrorMappings: memberErrorMappings,
       execute: async (manager) => {
-        const account = await this.sessions.activeUserCheck(dto.user_id);
-        if (!account.active) {
-          if (account.reason === 'USER_NOT_FOUND') throw new AppError('NOT_FOUND', { status: 404 });
-          throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
-        }
+        await this.assertEligibleLeader(dto.user_id);
         const lockedTeam = await this.findTeam(manager, teamId, true);
         await this.assertCanManage(lockedTeam, session, manager);
         const activeTeams = await manager.query(

@@ -65,7 +65,7 @@ export function CoordinatorTeams({ user }: { user: Me }) {
           aria-label={`Xem chi tiết ${team.name}`} onClick={() => setSelectedId(team.id)}
           onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedId(team.id); } }}>
           <th scope="row">{team.name}</th>
-          <td>{team.skills.length ? team.skills.map((code) => skills.find((item) => item.code === code)?.display_name || label(code)).join(', ') : 'Chưa gắn kỹ năng'}</td>
+          <td><div className="team-skill-tags">{team.skills.length ? team.skills.map(code => <span className="chip" key={code}>{skills.find(item => item.code === code)?.display_name || label(code)}</span>) : 'Chưa gắn kỹ năng'}</div></td>
           <td><span className={`team-status-dot${team.status !== 'ACTIVE' || team.availability !== 'AVAILABLE' ? ' is-inactive' : ''}`} />{team.status === 'ACTIVE' ? label(team.availability) : label(team.status)}
             <small>{team.position ? positionAge(team.position.age_s) : 'Chưa có vị trí'}</small></td>
         </tr>)}</tbody>
@@ -76,7 +76,7 @@ export function CoordinatorTeams({ user }: { user: Me }) {
       {showCreate && <TeamCreateForm skills={skills} onSuccess={(id) => { setShowCreate(false); setSelectedId(id); refresh(); }} />}
     </DetailSurface>}
     {selected && <DetailSurface key={selected.id} modal open onClose={closeDetail} label={`Chi tiết đội ${selected.name}`} heading={selected.name} className="team-detail-dialog">
-      {isAdmin ? <TeamSkillsForm key={`skills-${selected.id}-${selected.version}`} teamId={selected.id} version={selected.version} current={selected.skills} skills={skills} onSuccess={refresh} /> : <section><h3>Kỹ năng của đội</h3><p>{selected.skills.map(code => skills.find(skill => skill.code === code)?.display_name || label(code)).join(', ') || 'Chưa khai báo kỹ năng'}</p></section>}
+      {isAdmin ? <TeamSkillsForm key={`skills-${selected.id}-${selected.version}`} teamId={selected.id} version={selected.version} current={selected.skills} skills={skills} onSuccess={refresh} /> : <section><h3>Kỹ năng của đội</h3><div className="team-skill-tags">{selected.skills.length ? selected.skills.map(code => <span className="chip" key={code}>{skills.find(skill => skill.code === code)?.display_name || label(code)}</span>) : 'Chưa khai báo kỹ năng'}</div></section>}
       <section className="team-member-section" aria-label="Thành viên đội">
         <TeamMembers key={`${selected.id}-${revision}`} teamId={selected.id} readOnly={!isAdmin} onManageChange={ignoreManageChange} addOpen={addMemberOpen}
           onOpenAdd={() => setAddMemberOpen(true)} onCloseAdd={() => { setAddMemberOpen(false); refresh(); }} />

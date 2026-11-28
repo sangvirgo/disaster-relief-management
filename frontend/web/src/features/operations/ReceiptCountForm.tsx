@@ -6,7 +6,8 @@ import { fetchAll } from '../../api/fetchAll';
 import { loadStaffDrive } from '../../api/staffDrive';
 import { useUnsavedWork } from '../../app/useUnsavedWork';
 import { clearCountDraft, readCountDraft, writeCountDraft, type CountLine as Line } from './countDraft';
-import { evidenceFileError } from '../../i18n/evidence';
+import { appendCountEvidence, uploadCountEvidence, type CountEvidence } from './countEvidence';
+import { CountEvidenceFiles } from './CountEvidenceFiles';
 import './receipt-count.css';
 
 type Item = { id: string; name: string; unit: { display_name: string; scale: number } };
@@ -81,24 +82,26 @@ export function ReceiptCountForm({
   const [error, setError] = useState('');
   const [itemsError, setItemsError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [evidence, setEvidence] = useState<File | null>(null);
-  useUnsavedWork((dirty && !draftSaved) || Boolean(evidence) || busy, busy
+  const [evidence, setEvidence] = useState<CountEvidence[]>([]);
+  const [fileSelectionChanged, setFileSelectionChanged] = useState(false);
+  const [fileMessage, setFileMessage] = useState('');
+  const pendingEvidence = evidence.some(entry => entry.state !== 'ready');
+  useUnsavedWork((dirty && !draftSaved) || pendingEvidence || busy, busy
     ? 'Kết quả đang được gửi, chưa xác nhận hoàn tất. Bạn vẫn muốn rời đi?'
-    : evidence ? 'Tệp minh chứng chưa được gửi. Nếu rời đi, bạn cần chọn lại tệp. Bạn vẫn muốn rời đi?'
+    : pendingEvidence ? 'Tệp minh chứng chưa được gửi. Nếu rời đi, bạn cần chọn lại tệp. Bạn vẫn muốn rời đi?'
     : 'Không lưu được bản nháp trên trình duyệt. Rời biểu mẫu sẽ mất số liệu chưa gửi. Bạn vẫn muốn rời đi?');
   const [touched, setTouched] = useState<Record<string, boolean>>(restored?.touched || {});
   const [attempted, setAttempted] = useState(false);
   const key = useRef<string | null>(null);
   const createKey = useRef<string | null>(null);
-  const evidenceKey = useRef<string | null>(null);
   const createdReceipt = useRef<{ id: string; version: number } | null>(null);
   useEffect(() => {
     if (!dirty) return;
-    const save = () => setDraftSaved(writeCountDraft(draftScope, { lines, note, advanced, allowUnexpected, touched, evidenceName: evidence?.name || restored?.evidenceName || '' }));
+    const save = () => setDraftSaved(writeCountDraft(draftScope, { lines, note, advanced, allowUnexpected, touched, evidenceName: fileSelectionChanged ? evidence.filter(entry => entry.state !== 'ready').map(entry => entry.file.name).join(', ') : restored?.evidenceName || '' }));
     save();
     const timer = window.setInterval(save, 60_000);
     return () => window.clearInterval(timer);
-  }, [dirty, lines, note, advanced, allowUnexpected, touched, evidence, userId, deliveryId, version, confirm?.countRevision, confirm?.declarationRevision]);
+  }, [dirty, lines, note, advanced, allowUnexpected, touched, evidence, fileSelectionChanged, userId, deliveryId, version, confirm?.countRevision, confirm?.declarationRevision]);
   const existingItems: Item[] = [...(initialItems || []), ...(existing?.lines || []).filter(line => line.item_id).map(line => ({
     id: line.item_id!, name: line.item_name || line.item_id!,
     unit: { display_name: itemUnitName(line.item_id, line.unit_name), scale: Number(line.unit_scale ?? 0) },
@@ -195,7 +198,7 @@ export function ReceiptCountForm({
   async function submit(event: FormEvent) {
     event.preventDefault();
     setAttempted(true);
-    if (hasInvalidFields || (evidence && evidenceFileError(evidence))) return;
+    if (busy || hasInvalidFields) return;
     setError('');
     setBusy(true);
     try {
@@ -210,12 +213,11 @@ export function ReceiptCountForm({
       }
       const targetReceipt = createdReceipt.current?.id || receiptId;
       const targetVersion = createdReceipt.current?.version ?? version;
-      if (evidence) {
-        evidenceKey.current ||= newCommandKey();
-        await upload('logistics', `/public/donations/${encodeURIComponent(deliveryId)}/evidence`, evidence, {
-          idempotencyKey: evidenceKey.current,
-        });
-      }
+      const failed = await uploadCountEvidence(evidence,
+        entry => upload<{ state: string }>('logistics', `/public/donations/${encodeURIComponent(deliveryId)}/evidence`, entry.file, { idempotencyKey: entry.key }),
+        (entryKey, patch) => setEvidence(current => current.map(entry => entry.key === entryKey ? { ...entry, ...patch } : entry)),
+      );
+      if (failed) throw new Error(`${failed} tệp chưa tải lên được. Kết quả kiểm đếm chưa gửi. Hãy kiểm tra lỗi từng tệp rồi bấm gửi lại; tệp đã tải thành công sẽ được giữ nguyên.`);
       const result = await api<{ confirmation?: { matched: boolean; mismatched_items: string[] } }>('logistics', `/donation-receipts/${encodeURIComponent(targetReceipt)}/${confirm ? 'confirmations' : 'counts'}`, {
         method: 'POST',
         idempotencyKey: key.current,
@@ -250,7 +252,7 @@ export function ReceiptCountForm({
     setRestored(null);
     setDirty(false);
     setDraftSaved(false);
-    setNote(''); setTouched({}); setEvidence(null); setAllowUnexpected(false);
+    setNote(''); setTouched({}); setEvidence([]); setFileSelectionChanged(true); setFileMessage(''); setAllowUnexpected(false);
     setAdvanced(heldRelease);
     setLines(existing?.lines?.length ? existing.lines.map(line => ({
       item_id: line.item_id || '', counted_quantity: normalizeQuantity(line.counted_quantity) || '',
@@ -318,6 +320,7 @@ export function ReceiptCountForm({
             .filter((field) => fieldErrors[field] && showFieldError(field, field.endsWith('item_id') ? line.item_id : line[field.split('.')[1] as keyof Line] as string))
             .map((field) => fieldErrors[field]);
           return <div key={index} className={`count-form__line${line.outside ? ' count-form__line--outside' : ''}`}>
+            {line.outside && <em className="count-form__flag">Ngoài đợt</em>}
             <div className="count-form__row" role="row" style={{ gridTemplateColumns }}>
               <span role="cell" className="count-form__item">
                 {fixedItem(line) ? <><strong>{item?.name || 'Vật phẩm'}</strong><small>{itemUnitName(item?.id, item?.unit.display_name)}</small></>
@@ -333,7 +336,6 @@ export function ReceiptCountForm({
                       </option>
                     ))}
                   </Dropdown>}
-                {line.outside && <em className="count-form__flag">Ngoài đợt</em>}
               </span>
               {columns.map(([field, title]) => <span role="cell" key={field} className="count-form__qty">
                 <input
@@ -390,16 +392,22 @@ export function ReceiptCountForm({
         {showFieldError('note', note) && fieldErrors.note && <small className="field-error" role="alert">{fieldErrors.note}</small>}
       </label>}
       {!heldRelease && <div className="count-form__evidence">
-        <span>Ảnh hoặc video minh chứng <small>(không bắt buộc)</small></span>
+        <span>Ảnh hoặc video minh chứng <small>(không bắt buộc, tối đa 5 tệp)</small></span>
         <label className="count-form__file">
-          <input type="file" accept="image/jpeg,image/png,video/mp4" onChange={event => { setDirty(true); setEvidence(event.target.files?.[0] || null); key.current = null; evidenceKey.current = null; }} />
-          <span className="button secondary">Chọn tệp</span>
-          <span className="count-form__file-name">{evidence ? evidence.name : 'Chưa chọn tệp (JPG, PNG hoặc MP4)'}</span>
+          <input type="file" multiple aria-label="Chọn minh chứng kiểm đếm" accept="image/jpeg,image/png,video/mp4" onChange={event => {
+            const chosen = appendCountEvidence(evidence, Array.from(event.target.files || []), newCommandKey);
+            setDirty(true); setFileSelectionChanged(true); setEvidence(chosen.entries); setFileMessage(chosen.error);
+            event.target.value = '';
+          }} />
+          <span className="button secondary">{evidence.length ? 'Chọn thêm tệp' : 'Chọn tệp'}</span>
+          <span className="count-form__file-name" aria-live="polite">{evidence.length ? `Đã chọn ${evidence.length}/5 tệp` : 'Chưa chọn tệp (JPG, PNG hoặc MP4)'}</span>
         </label>
-        {evidence && evidenceFileError(evidence) && <small className="field-error" role="alert">{evidenceFileError(evidence)}</small>}
+        <small>Ảnh tối đa 10 MB/tệp, video tối đa 50 MB/tệp. Tệp được tải lên khi gửi kết quả đếm.</small>
+        {fileMessage && <small className="field-error" role="alert">{fileMessage}</small>}
+        <CountEvidenceFiles entries={evidence} onRemove={entryKey => { setFileSelectionChanged(true); setEvidence(current => current.filter(entry => entry.key !== entryKey)); setFileMessage(''); }} />
       </div>}
       {error && <p className="notice error" role="alert">{error}</p>}
-      <button className="button count-form__submit" disabled={busy || driveLoading || !driveItems.length || hasInvalidFields || Boolean(evidence && evidenceFileError(evidence))}>
+      <button className="button count-form__submit" disabled={busy || driveLoading || !driveItems.length || hasInvalidFields}>
         {busy ? 'Đang gửi…' : confirm ? 'Gửi xác nhận kiểm đếm' : 'Gửi kết quả đếm'}
       </button>
       </fieldset>

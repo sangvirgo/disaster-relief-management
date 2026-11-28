@@ -96,13 +96,13 @@ export class InternalService implements OnModuleInit, OnModuleDestroy {
     return { items };
   }
 
-  async searchActiveUsers(query: string, pageCursor?: string, requestedLimit = 50): Promise<{
+  async searchActiveUsers(query: string, pageCursor?: string, requestedLimit = 50, roleCode?: 'VOLUNTEER'): Promise<{
     items: Array<{ id: string; username: string; display_name: string }>;
     more: boolean;
     cursor?: string;
   }> {
     const normalizedQuery = query.trim().toLowerCase();
-    const filters = { query: normalizedQuery, status: 'ACTIVE' };
+    const filters = { query: normalizedQuery, status: 'ACTIVE', role_code: roleCode ?? null };
     const cursor = pageCursor ? decodeKeysetCursor(pageCursor, filters) : undefined;
     if (cursor && (cursor.sort.length !== 1 || typeof cursor.sort[0] !== 'string' ||
         !Number.isFinite(new Date(cursor.sort[0]).getTime()) || !userIdPattern.test(cursor.id))) {
@@ -111,6 +111,10 @@ export class InternalService implements OnModuleInit, OnModuleDestroy {
 
     const values: unknown[] = [];
     const where = ["status = 'ACTIVE'"];
+    if (roleCode === 'VOLUNTEER') where.push(`EXISTS (
+      SELECT 1 FROM role_grant g WHERE g.user_id = app_user.id AND g.role_code = 'VOLUNTEER'
+        AND g.scope_type = 'SYSTEM' AND g.revoked_at IS NULL
+    )`);
     const escaped = normalizedQuery.replace(/[\\%_]/g, '\\$&') + '%';
     values.push(escaped);
     where.push(`(lower(username::text) LIKE $1 ESCAPE E'\\\\' OR lower(display_name) LIKE $1 ESCAPE E'\\\\')`);
