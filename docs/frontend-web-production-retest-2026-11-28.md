@@ -84,3 +84,10 @@ Recommended next priorities: provide evidence access after posting without leaki
 
 The global pin spreading and dashed connector experiment was removed at the user's request. Warehouse and drive marker placement now uses the previous display logic; the resize pan:false correction remains. The earlier exact-selection result for the removed layout no longer describes the current implementation; marker overlap at nationwide zoom remains an open finding. Local 5174 visual inspection confirmed compact markers around their original locations with no connector lines. Web unit tests after removal: 86 passed; the two tests belonging solely to the removed layout were removed with that implementation.
 
+
+## Pre-push verification and upstream merge
+
+Merged upstream ced0d12 after reporting two conflicting header/next-step regions in Coordinator.tsx. The user chose to retain upstream's compact header and auto-claim behavior while preserving this batch's fixes and one-step referral dialog. Visual retest on 5174 confirmed the new header and requested dialog. No conflict markers remain.
+
+Final merged source checks: Web 86/86 tests and build passed; backend Jest 171 suites passed, one skipped, 1,136 tests passed and eight skipped. Backend script tests: 156 passed, one skipped, no failures on Linux. The initial full Windows npm test invocation passed Jest but failed 48 script checks due to Windows paths, Bash and line endings. The script group was rerun from a tracked-source LF archive inside the existing local Response container, without a new container/database/volume. It used a blank fixture .env and an OpenSSL binary/libraries already available in the local Postgres container, scoped to a temporary directory. Initial Linux attempts exposed missing fixture/tool prerequisites; the complete rerun passed after those prerequisites were provided. Docker/AWS/database commands in these script tests are doubles, not live operations. Contracts check passed after merge; lint had zero errors and 14 existing warnings.
+
