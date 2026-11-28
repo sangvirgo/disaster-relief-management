@@ -174,10 +174,37 @@ describe('RequestClaimService.release', () => {
 });
 
 describe('RequestClaimGuard on coordination commands', () => {
-  async function guard(fx: ReturnType<typeof fixture>, session: { userId: string; grants: Grant[] }, deps: ReturnType<typeof dependencies>) {
+  async function guard(fx: ReturnType<typeof fixture>, session: { userId: string; grants: Grant[] }, deps: ReturnType<typeof dependencies>,
+    command = 'response.requests.verify') {
     const service = new RequestClaimGuard(deps.sessions as never, deps.persistence as never);
-    return service.assertCanCoordinate(fx.manager as never, requestId, session, 'response.requests.verify');
+    return service.assertCanCoordinate(fx.manager as never, requestId, session, command);
   }
+
+  it('makes the first coordinator who works an unclaimed SOS its handler and records the claim', async () => {
+    const fx = fixture();
+    const deps = dependencies({ userId: me, grants: [campaignCoordinator(campaignOne)] });
+    await guard(fx, { userId: me, grants: [campaignCoordinator(campaignOne)] }, deps);
+    const update = fx.queries.find(({ sql }) => sql.startsWith('UPDATE assistance_request') && sql.includes('handled_by=$2'));
+    expect(update?.values).toEqual([requestId, me]);
+    expect(deps.persistence.insertEvent).toHaveBeenCalledWith(expect.anything(), requestId, me, 'CLAIMED', 'STAFF',
+      'VERIFIED', 'VERIFIED', null, expect.objectContaining({ automatic: true, command: 'response.requests.verify' }));
+  });
+
+  it('takes over an expired claim when working the SOS', async () => {
+    const fx = fixture({ handled_by: other, handled_at: minutesAgo(30) });
+    const deps = dependencies({ userId: me, grants: [campaignCoordinator(campaignOne)] });
+    await guard(fx, { userId: me, grants: [campaignCoordinator(campaignOne)] }, deps, 'response.requests.triage');
+    expect(deps.persistence.insertEvent).toHaveBeenCalledWith(expect.anything(), requestId, me, 'CLAIMED', 'STAFF',
+      'VERIFIED', 'VERIFIED', null, expect.objectContaining({ previous_handled_by: other, automatic: true }));
+  });
+
+  it('does not claim an SOS that is only routed between campaigns', async () => {
+    const fx = fixture();
+    const deps = dependencies({ userId: me, grants: [systemCoordinator] });
+    await guard(fx, { userId: me, grants: [systemCoordinator] }, deps, 'response.requests.attach-campaign');
+    expect(fx.queries.some(({ sql }) => sql.startsWith('UPDATE assistance_request'))).toBe(false);
+    expect(deps.persistence.insertEvent).not.toHaveBeenCalled();
+  });
 
   it('lets a coordinator operate on an unclaimed request', async () => {
     const fx = fixture();

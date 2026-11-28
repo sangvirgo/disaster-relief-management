@@ -550,6 +550,9 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
   onRequestClosed?: () => void;
 }) {
   const subCoordinator = isSubCoordinator(user ?? null);
+  // Reporting a team position for a team without GPS needs a system-wide coordinator grant (TEAM_POSITION_SET_ANY).
+  const canReportTeamPosition = Boolean(user?.grants.some((grant) => grant.scope_type === 'SYSTEM'
+    && grant.role_code === 'COORDINATOR'));
   const restoredView = useRef<QueueView | null>(null);
   if (!restoredView.current) restoredView.current = readQueueView(currentUserId, page);
   const [queue, setQueue] = useState<Queue | null>(null);
@@ -1004,8 +1007,6 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
             {queue && <p className="muted">Cập nhật lúc {timeLabel(queue.generated_at)}</p>}
           </div>
           <div className="queue-filter-toolbar">
-            <button type="button" className="icon-button" title="Làm mới SOS" aria-label="Làm mới SOS" disabled={loading}
-              onClick={() => setRevision((value) => value + 1)}><span aria-hidden="true">↻</span></button>
             {!subCoordinator && <TeamReadinessQueue refreshRevision={revision} onChanged={() => { setRevision(value => value + 1); setDetailRevision(value => value + 1); }} />}
           </div>
         </div>
@@ -1017,21 +1018,22 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
               onChange={(event) => setQueueSearch(event.target.value)} />
             <button type="submit" disabled={loading}>Tìm</button>
           </span>
-          <span className="filter-bar__select">
+          <span className="filter-bar__select" data-static-label>
             <Dropdown value={queueStatus} aria-label="Trạng thái yêu cầu" onChange={(event) => { setQueueStatus(event.target.value); setCursor(''); }}>
               {queueStatuses.map(([status, name]) => <option key={status} value={status}>{name}</option>)}
             </Dropdown>
           </span>
-          <span className="filter-bar__select">
+          <span className="filter-bar__select" data-static-label>
             <Dropdown value={reviewLane} aria-label="Nhóm rà soát" onChange={(event) => { setReviewLane(event.target.value); setCursor(''); }}>
               {[
-                ['NORMAL', 'Nhóm: thông thường'],
-                ['RATE_LIMITED_REVIEW', 'Nhóm: báo lặp cần rà soát'],
-                ['PROXY_QUOTA_REVIEW', 'Nhóm: báo hộ cần rà soát'],
+                ['NORMAL', 'SOS thông thường'],
+                ['RATE_LIMITED_REVIEW', 'Báo lặp cần rà soát'],
+                ['PROXY_QUOTA_REVIEW', 'Báo hộ cần rà soát'],
               ].map(([value, name]) => <option key={value} value={value}>{name}</option>)}
             </Dropdown>
           </span>
-          <button type="button" className="filter-chip" aria-pressed={overdue} onClick={() => { setOverdue(!overdue); setCursor(''); }}>Cần chú ý</button>
+          <button type="button" className="filter-chip" aria-pressed={overdue} title="Chỉ hiện SOS đã quá thời hạn xử lý"
+            onClick={() => { setOverdue(!overdue); setCursor(''); }}>Quá hạn</button>
           {canSeeUnassigned && <button type="button" className="filter-chip" aria-pressed={unassignedOnly}
             title="SOS chưa gắn chiến dịch" onClick={() => { setUnassignedOnly(!unassignedOnly); setCursor(''); setSelected(null); }}>Chưa có chiến dịch</button>}
           {(queueSearchTerm || queueStatus || reviewLane !== 'NORMAL' || overdue || unassignedOnly) && <button type="button" className="filter-bar__clear" disabled={loading}
@@ -1039,7 +1041,9 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
               setQueueSearch(''); setQueueSearchTerm(''); setQueueStatus(''); setReviewLane('NORMAL'); setOverdue(false); setUnassignedOnly(false);
               setCursor(''); setSelected(null); setDetail(null);
             }}>Xóa bộ lọc</button>}
-          {queue && <span className="filter-bar__summary"><strong>{queue.items.length}</strong> SOS trên trang</span>}
+          <span className="filter-bar__summary" role="status">{queue ? <><strong>{queue.items.length}</strong> SOS trên trang</> : 'Đang tải…'}</span>
+          <button type="button" className="icon-button" title="Làm mới danh sách SOS" aria-label="Làm mới danh sách SOS" disabled={loading}
+            onClick={() => setRevision((value) => value + 1)}><span aria-hidden="true">↻</span></button>
         </form>
         {loading && <p role="status">Đang cập nhật danh sách…</p>}
         {error && (
@@ -1090,7 +1094,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
           </>
         )}
       </section>}
-      {selected && <section className="card coordinator-detail-surface sos-detail-page"><button type="button" className="button secondary sos-back-to-list" onClick={returnToList}>← Danh sách SOS</button><section
+      {selected && <section className="card coordinator-detail-surface sos-detail-page"><button type="button" className="text-action sos-back-to-list" onClick={returnToList}>← Danh sách SOS</button><section
         className="queue-detail-card"
         ref={detailPanelRef}
       >
@@ -1126,6 +1130,11 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                   ? <PriorityBadge priority={detail.priority as 'P1' | 'P2' | 'P3' | 'P4'} />
                   : <span className="sos-head__nopriority">Chưa chọn ưu tiên</span>}
               </div>
+              <div className="sos-head__buttons">
+              {!['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) && <button type="button" className="button primary sos-head__next"
+                onClick={() => { const target = ['SUBMITTED', 'VERIFYING', 'VERIFIED'].includes(detail.status) ? 'overview' : 'dispatch'; changeTab(target); window.requestAnimationFrame(() => document.getElementById('sos-detail-content')?.scrollIntoView({ behavior: 'smooth', block: 'start' })); }}>
+                {['SUBMITTED', 'VERIFYING'].includes(detail.status) ? 'Xác minh thông tin' : detail.status === 'VERIFIED' ? 'Chọn mức ưu tiên' : completedInCurrentCycle && !detail.active_missions?.items.length ? 'Xác nhận kết quả SOS' : 'Giao đội và theo dõi'} <span aria-hidden="true">→</span>
+              </button>}
               <fieldset className="sos-head__actions" disabled={claimBlockedBy(detail, currentUserId)}>
               {!['RESOLVING', 'RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) &&
                 secondaryCommand({
@@ -1142,45 +1151,38 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                   warning: 'Cơ quan tiếp nhận cần chịu trách nhiệm xử lý toàn bộ, Reliva sẽ không tiếp tục theo dõi tín hiệu này',
                 }, undefined, referralDone)}
               </fieldset>
-              <p className="sos-head__sub">{label(detail.category)} · tiếp nhận {timeLabel(detail.received_at)}</p>
+              </div>
+              {/* One meta line replaces the boxed strip: category, time, campaign and who handles the SOS. */}
+              <p className="sos-head__sub sos-head__meta">
+                <span>{label(detail.category)} · tiếp nhận {timeLabel(detail.received_at)}</span>
+                {!campaignId && <span>Chiến dịch: <strong>{detail.campaign_id ? campaignOptions.find(campaign => campaign.value === detail.campaign_id)?.label ?? 'Chiến dịch đã gắn' : 'Chưa có chiến dịch'}</strong>
+                  {detail.campaign_id && canSeeUnassigned && !['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) &&
+                    <fieldset className="sos-strip__action" disabled={claimBlockedBy(detail, currentUserId)}>
+                      {secondaryCommand({
+                        title: 'Gỡ khỏi chiến dịch',
+                        hideTitle: true,
+                        service: 'response',
+                        path: `/requests/${detail.id}/detach-campaign`,
+                        version: detail.version,
+                        fields: [],
+                        warning: 'Xác nhận gỡ yêu cầu này khỏi chiến dịch?',
+                      })}
+                    </fieldset>}</span>}
+                {!['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) && <span aria-label="Người xử lý hồ sơ" role="status">Người xử lý: <strong>{detail.handled_by && claimActive(detail)
+                  ? detail.handled_by === currentUserId ? 'Bạn' : detail.handled_by_name || 'Điều phối viên khác'
+                  : 'Chưa có'}</strong>
+                  {detail.handled_by === currentUserId && claimActive(detail)
+                    ? <button type="button" className="text-action" disabled={claimBusy} onClick={() => void runClaim('release')}>Trả về hàng đợi</button>
+                    : !claimBlockedBy(detail, currentUserId) && <button type="button" className="text-action" disabled={claimBusy}
+                      title="Bạn cũng tự được ghi nhận khi xác minh, đặt ưu tiên hoặc giao đội." onClick={() => void runClaim('claim')}>Nhận xử lý</button>}
+                  {claimBlockedBy(detail, currentUserId) && <em> (bạn chỉ xem)</em>}
+                </span>}
+              </p>
               {activeTab !== 'dispatch' && completedInCurrentCycle && !detail.active_missions?.items.length &&
                 !['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) && (
                   <p className="notice" role="status">Đội đã hoàn thành nhiệm vụ cứu hộ. SOS chưa kết thúc{detail.needs_relief_supplies ? '; nhu cầu vật tư được theo dõi riêng.' : '.'}</p>
                 )}
             </header>
-            {/* One compact strip instead of three stacked boxes: campaign, who handles it, and the next step. */}
-            <div className={`sos-strip${subCoordinator ? ' sos-strip--sub' : ''}`}>
-              {!subCoordinator && <section className="sos-strip__cell" aria-label="Chiến dịch của SOS">
-                <small>Chiến dịch</small>
-                <strong>{detail.campaign_id ? campaignOptions.find(campaign => campaign.value === detail.campaign_id)?.label ?? 'Chiến dịch đã gắn' : 'Chưa có chiến dịch'}</strong>
-                {detail.campaign_id && canSeeUnassigned && !['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) &&
-                  <fieldset className="sos-strip__action" disabled={claimBlockedBy(detail, currentUserId)}>
-                    {secondaryCommand({
-                      title: 'Gỡ khỏi chiến dịch',
-                      hideTitle: true,
-                      service: 'response',
-                      path: `/requests/${detail.id}/detach-campaign`,
-                      version: detail.version,
-                      fields: [],
-                      warning: 'Xác nhận gỡ yêu cầu này khỏi chiến dịch?',
-                    })}
-                  </fieldset>}
-              </section>}
-              {!['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) && <section className="sos-strip__cell" aria-label="Nhận xử lý hồ sơ">
-                <small>Người xử lý</small>
-                <strong role="status">{detail.handled_by && claimActive(detail)
-                  ? detail.handled_by === currentUserId ? 'Bạn đang xử lý' : detail.handled_by_name || 'Điều phối viên khác'
-                  : 'Chưa có người nhận'}</strong>
-                {detail.handled_by === currentUserId && claimActive(detail)
-                  ? <button type="button" className="text-action" disabled={claimBusy} onClick={() => void runClaim('release')}>Trả về hàng đợi</button>
-                  : <button type="button" className="button primary small" disabled={claimBusy || claimBlockedBy(detail, currentUserId)} onClick={() => void runClaim('claim')}>Nhận xử lý</button>}
-              </section>}
-              {!['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) && <nav className="sos-strip__cell sos-strip__next" aria-label="Bước xử lý SOS">
-                <small>Bước tiếp theo</small>
-                <strong>{['SUBMITTED', 'VERIFYING'].includes(detail.status) ? 'Xác minh thông tin' : detail.status === 'VERIFIED' ? 'Chọn mức ưu tiên' : completedInCurrentCycle && !detail.active_missions?.items.length ? 'Xác nhận kết quả SOS' : 'Giao đội và theo dõi'}</strong>
-                <button type="button" className="text-action" onClick={() => { const target = ['SUBMITTED', 'VERIFYING', 'VERIFIED'].includes(detail.status) ? 'overview' : 'dispatch'; changeTab(target); window.requestAnimationFrame(() => document.getElementById('sos-detail-content')?.scrollIntoView({ behavior: 'smooth', block: 'start' })); }}>Đi tới →</button>
-              </nav>}
-            </div>
             {claimError && <p role="alert" className="notice warning">{claimError}</p>}
             <div className="sos-detail-tabs" role="tablist" aria-label="Thông tin hồ sơ SOS" onKeyDown={(event) => {
               const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
@@ -1677,9 +1679,11 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                   {candidates?.items.length === 0 && (
                     <div role="status" className="dispatch-empty">
                       <strong>Chưa có đội phù hợp để giao nhiệm vụ</strong>
-                      <p>{subCoordinator
-                        ? 'Liên hệ trưởng đội hoặc điều phối viên chính để xác nhận đội sẵn sàng và cập nhật vị trí. Sau đó bấm “Tải lại đội phù hợp”.'
-                        : 'Đội cần sẵn sàng, có vị trí mới và phù hợp yêu cầu. Kiểm tra trong mục Đội cứu hộ rồi tải lại danh sách.'}</p>
+                      <p>{canReportTeamPosition && candidates.unknown_position.some((candidate) => candidate.team.reporting_mode === 'COORDINATOR')
+                        ? 'Có đội chưa có GPS: báo vị trí của đội ở mục bên dưới rồi bấm “Tải lại đội phù hợp”.'
+                        : subCoordinator
+                          ? 'Liên hệ trưởng đội hoặc điều phối viên chính để xác nhận đội sẵn sàng và cập nhật vị trí. Sau đó bấm “Tải lại đội phù hợp”.'
+                          : 'Đội cần sẵn sàng, có vị trí mới và phù hợp yêu cầu. Kiểm tra trong mục Đội cứu hộ rồi tải lại danh sách.'}</p>
                     </div>
                   )}
                   {[...(candidates?.items ?? [])].sort((a, b) => Number(b.suggested) - Number(a.suggested)).map((candidate, _index, all) => (
@@ -1736,9 +1740,9 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                     </div>
                     </OptionalFold>
                   ))}
-                  {!subCoordinator && Boolean(candidates?.unknown_position.some((candidate) => candidate.team.reporting_mode === 'COORDINATOR')) &&
+                  {canReportTeamPosition && Boolean(candidates?.unknown_position.some((candidate) => candidate.team.reporting_mode === 'COORDINATOR')) &&
                     <details className="sos-fold">
-                      <summary>Cập nhật vị trí đội do điều phối viên báo</summary>
+                      <summary>Báo vị trí cho đội chưa có GPS ({candidates?.unknown_position.filter((candidate) => candidate.team.reporting_mode === 'COORDINATOR').length})</summary>
                       {candidates?.unknown_position.filter((candidate) => candidate.team.reporting_mode === 'COORDINATOR').map((candidate) =>
                         <CoordinatorTeamPositionForm key={candidate.team.id} teamId={candidate.team.id} teamName={candidate.team.name}
                           onSuccess={() => setDetailRevision((value) => value + 1)} />)}
