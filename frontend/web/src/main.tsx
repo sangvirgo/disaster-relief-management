@@ -30,8 +30,9 @@ import {
 import { useUrlView } from './app/useUrlView';
 import { canNavigateAway } from './app/navigationGuard';
 import { assetViews, donationViews, intakeSteps, missionViews, noticeViews, reportViews, reviewViews, supplySections } from './app/routeViews';
-import { label, requestStatusLabel, timeLabel } from './i18n/labels';
-import { CitizenAccount, CitizenRequests, requestStatusTone } from './features/citizen/CitizenAccount';
+import { label, timeLabel } from './i18n/labels';
+import { CitizenAccount, CitizenRequests } from './features/citizen/CitizenAccount';
+import { TrackingProgress } from './features/citizen/TrackingProgress';
 import { clearAllSosDrafts } from './features/citizen/sosDraft';
 import { clearAllCountDrafts } from './features/operations/countDraft';
 import { clearAllMissionDrafts } from './features/volunteer/missionDraft';
@@ -62,7 +63,6 @@ declare global {
 import './sos.css';
 import './workflow.css';
 import './refinements.css';
-import { rescueProgressMessage } from './features/citizen/rescueProgress';
 import './styles/tokens.css';
 import './components/ui/Badge.css';
 import './components/ui/PageHeader.css';
@@ -1098,44 +1098,7 @@ function Tracking({
           {error ? <p role="alert" className="notice error">{error}</p> : <p role="status">Đang tải tiến độ SOS…</p>}
         </section>
       )}
-      {data && (
-        <section className="card tracking-progress-card">
-          {user && initialCode && (
-            <button className="tracking-back" type="button" onClick={onBack}>
-              <span aria-hidden="true">←</span> Quay lại danh sách
-            </button>
-          )}
-          <h2>Tiến độ SOS {text(data.tracking_code)}</h2>
-          <span className={`chip request-status request-status--${requestStatusTone(data.status)}`}>
-            {requestStatusLabel(data.status)}
-          </span>
-          {rescueProgressMessage(data.status, data.rescue_progress) && <p className="notice" role="status">{rescueProgressMessage(data.status, data.rescue_progress)}. Xem lịch sử để theo dõi các bước tiếp theo.</p>}
-          <p>Tiếp nhận lúc: {timeLabel(data.received_at)}</p>
-          {data.current_description && <div className="tracking-situation">
-            <h3>Tình huống đang ghi nhận</h3>
-            {data.current_description.split(/(?=Cập nhật\s*:)/iu).map((part, index) => {
-              const update = part.match(/^(Cập nhật\s*:)([\s\S]*)$/iu);
-              return <p key={index}>{update ? <><strong>Cập nhật:</strong>{update[2]}</> : part}</p>;
-            })}
-          </div>}
-          {data.status === 'DUPLICATE' && data.duplicate_of_code && (
-            <p className="notice">Yêu cầu này trùng với hồ sơ {data.duplicate_of_code}. Nếu hồ sơ gốc thuộc tài khoản của bạn, hãy quay lại danh sách để xem tiến độ hồ sơ đó.</p>
-          )}
-          {data.status === 'REJECTED' && data.rejection_reason && (
-            <p className="notice">Lý do từ chối: {data.rejection_reason}</p>
-          )}
-          <div className="timeline">
-            {data.timeline.map((entry, index) => {
-              return (
-                <div className="timeline-item" key={index}>
-                  <strong>{label(entry.public_text_code || entry.event_type)}</strong>
-                  <small>{timeLabel(entry.occurred_at)}</small>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
+      {data && <TrackingProgress data={data} onBack={user && initialCode ? onBack : undefined} />}
       {data && verified && (
         <TrackingActions
           key={data.id}

@@ -23,6 +23,14 @@ const tileAttribution =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
 const PIN_PICK_ZOOM = 13;
+const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+/** Glide to a point: a short pan when already close enough, otherwise a smooth zoom-in; instant for reduced motion. */
+function glideTo(map: L.Map, latlng: L.LatLngExpression, minZoom = PIN_PICK_ZOOM) {
+  map.stop();
+  if (reducedMotion()) { map.setView(latlng, Math.max(map.getZoom(), minZoom), { animate: false }); return; }
+  if (map.getZoom() >= minZoom) map.panTo(latlng, { animate: true, duration: 0.35, easeLinearity: 0.25 });
+  else map.flyTo(latlng, minZoom, { duration: 0.6, easeLinearity: 0.25 });
+}
 const pinMarkup = '<span class="location-pin-head"><span></span></span><span class="location-pin-shadow"></span>';
 
 const pinIcon = L.divIcon({
@@ -242,6 +250,8 @@ export function LocationPicker({
     }, wait);
   }
 
+  const pickPointRef = useRef<(point: Point) => void>(() => undefined);
+  pickPointRef.current = (point: Point) => pickPoint(point);
   function pickPoint(point: Point) {
     chosenSearchRef.current = null;
     if (selectionModeRef.current.selectOnPick) {
@@ -307,8 +317,8 @@ export function LocationPicker({
     // A click chooses a point. Native map dragging does not emit this selection action.
     map.on('click', (event: L.LeafletMouseEvent) => {
       const point = { latitude: event.latlng.lat, longitude: event.latlng.lng };
-      map.setView(event.latlng, Math.max(map.getZoom(), PIN_PICK_ZOOM), { animate: false });
-      pickPoint(point);
+      glideTo(map, event.latlng);
+      pickPointRef.current(point);
     });
 
     // Ép Leaflet render lại kích thước sau khi container xuất hiện
@@ -334,8 +344,25 @@ export function LocationPicker({
       return;
     }
     const position: L.LatLngTuple = [draftPoint.latitude, draftPoint.longitude];
-    if (pinMarkerRef.current) pinMarkerRef.current.setLatLng(position);
-    else pinMarkerRef.current = L.marker(position, { icon: pinIcon, interactive: false, keyboard: false }).addTo(map);
+    let marker = pinMarkerRef.current;
+    if (marker) {
+      const at = marker.getLatLng();
+      if (at.lat !== position[0] || at.lng !== position[1]) marker.setLatLng(position);
+    } else {
+      // Draggable so the person can nudge the pin precisely instead of re-clicking.
+      marker = L.marker(position, { icon: pinIcon, draggable: true, keyboard: false, autoPan: true, title: 'Kéo để chỉnh vị trí' }).addTo(map);
+      marker.on('dragstart', () => marker?.getElement()?.classList.add('is-dragging'));
+      marker.on('dragend', () => {
+        const element = marker?.getElement();
+        element?.classList.remove('is-dragging');
+        const at = marker!.getLatLng();
+        pickPointRef.current({ latitude: at.lat, longitude: at.lng });
+      });
+      pinMarkerRef.current = marker;
+    }
+    // Replay a short drop animation each time the pin lands somewhere new.
+    const head = marker.getElement()?.querySelector('.location-pin-marker');
+    if (head && !reducedMotion()) { head.classList.remove('is-dropping'); void (head as HTMLElement).offsetWidth; head.classList.add('is-dropping'); }
   }, [draftPoint, open, mapEngine]);
 
   // Area overlay: the configured radius around the chosen point, plus other areas as dashed context.
@@ -366,7 +393,7 @@ export function LocationPicker({
     if (!value || (confirmedPointRef.current && samePoint(confirmedPointRef.current, value))) return;
     const { latitude, longitude } = value;
     if (mapEngine === 'osm' && leafletMapRef.current) {
-      leafletMapRef.current.setView([latitude, longitude], Math.max(leafletMapRef.current.getZoom(), PIN_PICK_ZOOM), { animate: false });
+      glideTo(leafletMapRef.current, [latitude, longitude]);
     } else if (mapEngine === 'google' && googleMapRef.current) {
       googleMapRef.current.setCenter({ lat: latitude, lng: longitude });
       googleMapRef.current.setZoom(Math.max(googleMapRef.current.getZoom() ?? 6, PIN_PICK_ZOOM));
@@ -651,7 +678,7 @@ export function LocationPicker({
     if (!point) return;
     const { latitude: lat, longitude: lon } = point;
     if (leafletMapRef.current) {
-      leafletMapRef.current.setView([lat, lon], PIN_PICK_ZOOM, { animate: false });
+      glideTo(leafletMapRef.current, [lat, lon]);
     }
     const label = resolvedLabel || [item.name, item.address].filter(Boolean).join(' · ');
     chosenSearchRef.current = { point, label };

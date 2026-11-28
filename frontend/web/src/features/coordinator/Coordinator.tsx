@@ -1140,42 +1140,40 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                   <p className="notice" role="status">Đội đã hoàn thành nhiệm vụ cứu hộ. SOS chưa kết thúc{detail.needs_relief_supplies ? '; nhu cầu vật tư được theo dõi riêng.' : '.'}</p>
                 )}
             </header>
-            {detail.campaign_id && <section className="sos-campaign-context" aria-label="Chiến dịch của SOS">
-              <div><small>Chiến dịch cứu trợ</small><strong>{campaignOptions.find(campaign => campaign.value === detail.campaign_id)?.label ?? 'Chiến dịch đã gắn'}</strong></div>
-              <fieldset disabled={claimBlockedBy(detail, currentUserId)}>              {canSeeUnassigned && detail.campaign_id && !['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) &&
-                secondaryCommand({
-                  title: 'Gỡ khỏi chiến dịch',
-                  hideTitle: true,
-                  service: 'response',
-                  path: `/requests/${detail.id}/detach-campaign`,
-                  version: detail.version,
-                  fields: [],
-                  warning: 'Xác nhận gỡ yêu cầu này khỏi chiến dịch?',
-                })}
-</fieldset>
-            </section>}
-            {!['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) && <section className="claim-panel" aria-label="Nhận xử lý hồ sơ">
-              {detail.handled_by && claimActive(detail) ? (
-                <p role="status" className="notice">
-                  {detail.handled_by === currentUserId
-                    ? 'Bạn đang nhận xử lý hồ sơ này. Nhớ nhả khi không còn xử lý.'
-                    : `Hồ sơ đang do ${detail.handled_by_name || 'người khác'} xử lý.`}
-                </p>
-              ) : (
-                <p className="muted">Chưa có người nhận xử lý. Nhận xử lý để các điều phối viên khác biết bạn đang theo dõi hồ sơ này.</p>
-              )}
-              {claimError && <p role="alert" className="notice warning">{claimError}</p>}
-              {detail.handled_by === currentUserId && claimActive(detail) ? (
-                <button type="button" className="button secondary" disabled={claimBusy} onClick={() => void runClaim('release')}>Nhả xử lý</button>
-              ) : (
-                <button type="button" className="button secondary" disabled={claimBusy || claimBlockedBy(detail, currentUserId)} onClick={() => void runClaim('claim')}>Nhận xử lý</button>
-              )}
-            </section>}
-            {!['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) && <nav className="sos-next-step" aria-label="Bước xử lý SOS">
-              <div><strong>{['SUBMITTED', 'VERIFYING'].includes(detail.status) ? '1. Xác minh thông tin' : detail.status === 'VERIFIED' ? '2. Chọn mức ưu tiên' : '3. Giao đội và theo dõi'}</strong>
-                <span>{['SUBMITTED', 'VERIFYING'].includes(detail.status) ? 'Đối chiếu tình huống người báo và gợi ý trước khi quyết định.' : detail.status === 'VERIFIED' ? 'Mức ưu tiên do điều phối viên quyết định.' : 'Kiểm tra đội, tiến độ và hàng cứu trợ trong mục Điều phối.'}</span></div>
-              <button type="button" className="button secondary" onClick={() => { const target = ['SUBMITTED', 'VERIFYING', 'VERIFIED'].includes(detail.status) ? 'overview' : 'dispatch'; changeTab(target); window.requestAnimationFrame(() => document.getElementById('sos-detail-content')?.scrollIntoView({ behavior: 'smooth', block: 'start' })); }}>{detail.status === 'VERIFIED' ? 'Đến phần chọn ưu tiên' : ['SUBMITTED', 'VERIFYING'].includes(detail.status) ? 'Đến phần xác minh' : 'Mở điều phối đội'}</button>
-            </nav>}
+            {/* One compact strip instead of three stacked boxes: campaign, who handles it, and the next step. */}
+            <div className="sos-strip">
+              <section className="sos-strip__cell" aria-label="Chiến dịch của SOS">
+                <small>Chiến dịch</small>
+                <strong>{detail.campaign_id ? campaignOptions.find(campaign => campaign.value === detail.campaign_id)?.label ?? 'Chiến dịch đã gắn' : 'Chưa có chiến dịch'}</strong>
+                {detail.campaign_id && canSeeUnassigned && !['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) &&
+                  <fieldset className="sos-strip__action" disabled={claimBlockedBy(detail, currentUserId)}>
+                    {secondaryCommand({
+                      title: 'Gỡ khỏi chiến dịch',
+                      hideTitle: true,
+                      service: 'response',
+                      path: `/requests/${detail.id}/detach-campaign`,
+                      version: detail.version,
+                      fields: [],
+                      warning: 'Xác nhận gỡ yêu cầu này khỏi chiến dịch?',
+                    })}
+                  </fieldset>}
+              </section>
+              {!['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) && <section className="sos-strip__cell" aria-label="Nhận xử lý hồ sơ">
+                <small>Người xử lý</small>
+                <strong role="status">{detail.handled_by && claimActive(detail)
+                  ? detail.handled_by === currentUserId ? 'Bạn đang xử lý' : detail.handled_by_name || 'Điều phối viên khác'
+                  : 'Chưa có người nhận'}</strong>
+                {detail.handled_by === currentUserId && claimActive(detail)
+                  ? <button type="button" className="text-action" disabled={claimBusy} onClick={() => void runClaim('release')}>Nhả xử lý</button>
+                  : <button type="button" className="button primary small" disabled={claimBusy || claimBlockedBy(detail, currentUserId)} onClick={() => void runClaim('claim')}>Nhận xử lý</button>}
+              </section>}
+              {!['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) && <nav className="sos-strip__cell sos-strip__next" aria-label="Bước xử lý SOS">
+                <small>Bước tiếp theo</small>
+                <strong>{['SUBMITTED', 'VERIFYING'].includes(detail.status) ? 'Xác minh thông tin' : detail.status === 'VERIFIED' ? 'Chọn mức ưu tiên' : 'Giao đội và theo dõi'}</strong>
+                <button type="button" className="text-action" onClick={() => { const target = ['SUBMITTED', 'VERIFYING', 'VERIFIED'].includes(detail.status) ? 'overview' : 'dispatch'; changeTab(target); window.requestAnimationFrame(() => document.getElementById('sos-detail-content')?.scrollIntoView({ behavior: 'smooth', block: 'start' })); }}>Đi tới →</button>
+              </nav>}
+            </div>
+            {claimError && <p role="alert" className="notice warning">{claimError}</p>}
             <div className="sos-detail-tabs" role="tablist" aria-label="Thông tin hồ sơ SOS" onKeyDown={(event) => {
               const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
               const current = tabs.indexOf(document.activeElement as HTMLButtonElement);

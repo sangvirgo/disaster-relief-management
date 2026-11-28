@@ -292,3 +292,20 @@
 .sos-next-step > div { display: grid; gap: 4px; flex: 1 1 260px; }
 .sos-next-step span { font-size: 13px; color: var(--color-text-secondary); }
 .suggestion-received { margin: 6px 0; font-size: 13px; color: var(--color-text-secondary); }
+
+/* SOS detail: one status strip (campaign · handler · next step) replaces three stacked boxes (2026-11-28). */
+.sos-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); margin: 12px 0 16px;
+  border: 1px solid var(--color-surface-border, #e2e8f0); border-radius: 12px; background: var(--color-surface-subtle, #f8fafc); overflow: hidden; }
+.sos-strip__cell { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; padding: 12px 16px; }
+.sos-strip__cell + .sos-strip__cell { border-left: 1px solid var(--color-surface-border, #e2e8f0); }
+.sos-strip__cell small { color: var(--color-text-secondary); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+.sos-strip__cell strong { overflow-wrap: anywhere; font-size: 14.5px; }
+.sos-strip__next { background: #eff6ff; }
+.sos-strip__action { margin: 0; padding: 0; border: 0; min-width: 0; }
+.sos-strip__action .secondary-command { margin: 0; padding: 0; border: 0; background: transparent; }
+.sos-strip__action .button { min-height: 0; height: auto; padding: 0; border: 0; background: none; color: var(--color-text-secondary); font-size: 13px; font-weight: 700; text-decoration: underline; }
+.text-action { padding: 0; border: 0; background: none; color: var(--color-primary, #2563eb); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.text-action:hover { text-decoration: underline; }
+.text-action:disabled { opacity: .5; cursor: not-allowed; }
+.sos-head__actions .button { background: transparent; }
+@media (max-width: 720px) { .sos-strip__cell + .sos-strip__cell { border-left: 0; border-top: 1px solid var(--color-surface-border, #e2e8f0); } }

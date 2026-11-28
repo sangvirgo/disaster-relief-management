@@ -356,3 +356,19 @@
 .sos-submit-hint { display: block; margin-bottom: 6px; color: var(--color-text-secondary); font-size: 13px; }
 .sos-char-count { display: block; margin-top: 4px; color: var(--color-text-secondary); font-size: 12px; text-align: right; }
 .sos-char-count.is-over { color: #b91c1c; font-weight: 700; }
+
+/* Smoother map pin (2026-11-28): drop-in on placement, lift while dragging. */
+.location-pin-icon { cursor: grab; }
+.location-pin-icon.is-dragging { cursor: grabbing; }
+.location-pin-icon .location-pin-marker { transform-origin: 50% 100%; transition: transform 160ms ease; }
+.location-pin-icon.is-dragging .location-pin-marker { transform: translateY(-8px) scale(1.08); }
+.location-pin-marker.is-dropping { animation: location-pin-drop 380ms cubic-bezier(.2, .9, .3, 1.2); }
+@keyframes location-pin-drop {
+  0% { transform: translateY(-18px); opacity: .4; }
+  70% { transform: translateY(2px); opacity: 1; }
+  100% { transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .location-pin-icon .location-pin-marker { transition: none; }
+  .location-pin-marker.is-dropping { animation: none; }
+}
