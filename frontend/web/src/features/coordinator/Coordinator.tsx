@@ -987,99 +987,49 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
   return (
     <div className="coordinator-layout coordinator-sos-layout">
       {!selected && <section className="card">
-        <h2>{title[page] || title.queue}</h2>
-        <div className="queue-filter-toolbar">
-          <button
-            type="button"
-            className="button secondary queue-refresh-button"
-            onClick={() => setRevision((value) => value + 1)}
-          >
-            <span aria-hidden="true">↻</span> Làm mới SOS
-          </button>
-          <TeamReadinessQueue refreshRevision={revision} onChanged={() => { setRevision(value => value + 1); setDetailRevision(value => value + 1); }} />
-        </div>
-        <form className="queue-search-form" onSubmit={submitQueueSearch} role="search">
-          <label htmlFor="coordinator-sos-search">Tìm SOS theo mã SOS hoặc số điện thoại</label>
-          <div className="queue-search-row">
-            <input
-              id="coordinator-sos-search"
-              type="search"
-              value={queueSearch}
-              maxLength={32}
-              onChange={(event) => setQueueSearch(event.target.value)}
-              placeholder="Nhập mã SOS hoặc số điện thoại"
-              autoComplete="off"
-            />
-            <button type="submit" className="button secondary" disabled={loading}>Tìm kiếm</button>
-            {queueSearchTerm && <button type="button" className="button secondary" disabled={loading}
-              onClick={() => { setQueueSearch(''); setQueueSearchTerm(''); setCursor(''); setSelected(null); setDetail(null); }}>
-              Xóa lọc
-            </button>}
+        <div className="queue-header">
+          <div>
+            <h2>{title[page] || title.queue}</h2>
+            {queue && <p className="muted">Cập nhật lúc {timeLabel(queue.generated_at)}</p>}
           </div>
-        </form>
-        <div className="queue-filter-fields queue-filter-quick">
-            <label className="queue-status-field">
-            <span>Trạng thái yêu cầu</span>
-            <span className="queue-status-select-wrap">
-              <Dropdown
-                value={queueStatus}
-                onChange={(event) => {
-                  setQueueStatus(event.target.value);
-                  setCursor('');
-                }}
-              >
-                {queueStatuses.map(([status, name]) => (
-                  <option key={status} value={status}>
-                    {name}
-                  </option>
-                ))}
-              </Dropdown>
-            </span>
-            </label>
-            <label className="queue-status-field">
-            <span>Nhóm rà soát</span>
-            <span className="queue-status-select-wrap">
-              <Dropdown
-                value={reviewLane}
-                onChange={(event) => {
-                  setReviewLane(event.target.value);
-                  setCursor('');
-                }}
-              >
-                {[
-                  ['NORMAL', 'Thông thường'],
-                  ['RATE_LIMITED_REVIEW', 'Báo lặp cần rà soát'],
-                  ['PROXY_QUOTA_REVIEW', 'Báo hộ cần rà soát'],
-                ].map(([value, name]) => <option key={value} value={value}>{name}</option>)}
-              </Dropdown>
-            </span>
-            </label>
-            <label className="check queue-attention-filter">
-            <input
-              type="checkbox"
-              checked={overdue}
-              onChange={(event) => {
-                setOverdue(event.target.checked);
-                setCursor('');
-              }}
-            />
-            Chỉ xem yêu cầu cần chú ý
-            </label>
-            {canSeeUnassigned && (
-              <label className="check queue-attention-filter">
-                <input
-                  type="checkbox"
-                  checked={unassignedOnly}
-                  onChange={(event) => {
-                    setUnassignedOnly(event.target.checked);
-                    setCursor('');
-                    setSelected(null);
-                  }}
-                />
-                Hàng chờ chung (chưa gắn chiến dịch)
-              </label>
-            )}
+          <div className="queue-filter-toolbar">
+            <button type="button" className="icon-button" title="Làm mới SOS" aria-label="Làm mới SOS" disabled={loading}
+              onClick={() => setRevision((value) => value + 1)}><span aria-hidden="true">↻</span></button>
+            <TeamReadinessQueue refreshRevision={revision} onChanged={() => { setRevision(value => value + 1); setDetailRevision(value => value + 1); }} />
+          </div>
         </div>
+        <form className="filter-bar queue-filter-bar" onSubmit={submitQueueSearch} role="search" aria-label="Tìm và lọc SOS">
+          <span className="filter-search">
+            <span className="filter-search__icon" aria-hidden="true">⌕</span>
+            <input id="coordinator-sos-search" type="search" value={queueSearch} maxLength={32} autoComplete="off"
+              aria-label="Tìm SOS theo mã SOS hoặc số điện thoại" placeholder="Mã SOS hoặc số điện thoại"
+              onChange={(event) => setQueueSearch(event.target.value)} />
+            <button type="submit" disabled={loading}>Tìm</button>
+          </span>
+          <span className="filter-bar__select">
+            <Dropdown value={queueStatus} aria-label="Trạng thái yêu cầu" onChange={(event) => { setQueueStatus(event.target.value); setCursor(''); }}>
+              {queueStatuses.map(([status, name]) => <option key={status} value={status}>{name}</option>)}
+            </Dropdown>
+          </span>
+          <span className="filter-bar__select">
+            <Dropdown value={reviewLane} aria-label="Nhóm rà soát" onChange={(event) => { setReviewLane(event.target.value); setCursor(''); }}>
+              {[
+                ['NORMAL', 'Nhóm: thông thường'],
+                ['RATE_LIMITED_REVIEW', 'Nhóm: báo lặp cần rà soát'],
+                ['PROXY_QUOTA_REVIEW', 'Nhóm: báo hộ cần rà soát'],
+              ].map(([value, name]) => <option key={value} value={value}>{name}</option>)}
+            </Dropdown>
+          </span>
+          <button type="button" className="filter-chip" aria-pressed={overdue} onClick={() => { setOverdue(!overdue); setCursor(''); }}>Cần chú ý</button>
+          {canSeeUnassigned && <button type="button" className="filter-chip" aria-pressed={unassignedOnly}
+            title="SOS chưa gắn chiến dịch" onClick={() => { setUnassignedOnly(!unassignedOnly); setCursor(''); setSelected(null); }}>Chưa có chiến dịch</button>}
+          {(queueSearchTerm || queueStatus || reviewLane !== 'NORMAL' || overdue || unassignedOnly) && <button type="button" className="filter-bar__clear" disabled={loading}
+            onClick={() => {
+              setQueueSearch(''); setQueueSearchTerm(''); setQueueStatus(''); setReviewLane('NORMAL'); setOverdue(false); setUnassignedOnly(false);
+              setCursor(''); setSelected(null); setDetail(null);
+            }}>Xóa bộ lọc</button>}
+          {queue && <span className="filter-bar__summary"><strong>{queue.items.length}</strong> SOS trên trang</span>}
+        </form>
         {loading && <p role="status">Đang cập nhật danh sách…</p>}
         {error && (
           <p className="notice error" role="alert">
@@ -1088,7 +1038,6 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
         )}
         {queue && (
           <>
-            <p className="muted">Cập nhật: {timeLabel(queue.generated_at)}</p>
             {queue.items.length === 0 && (
               <div className="empty">{queueSearchTerm
                 ? 'Không tìm thấy SOS phù hợp với mã hoặc số điện thoại đã nhập.'
@@ -1976,7 +1925,8 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
   );
 }
 
-export function CoordinatorMap() {
+export function CoordinatorMap({ embedded = false }: { embedded?: boolean }) {
+  if (embedded) return <section className="card heatmap-embedded" aria-label="Bản đồ nhiệt SOS"><HeatmapPanel /></section>;
   return (
     <section className="card">
       <h2>Bản đồ nhiệt SOS</h2>

@@ -1978,3 +1978,53 @@
 .conflict-candidates__info small { flex-basis: 100%; color: var(--color-text-secondary); }
 .conflict-candidates__warn { color: #b91c1c; }
 .common-queue-suggestions .suggestion-head > .conflict-candidates { order: 3; flex-basis: 100%; }
+
+/* ---------- Shared filter controls (2026-11-28) ----------
+   One look for every filter area: a wrapping bar holding a search box, compact selects, a segmented switch,
+   toggle chips, a live result summary and an icon refresh button. */
+.filter-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; margin: 0 0 12px; padding: 10px 12px;
+  border: 1px solid var(--color-surface-border, #e2e8f0); border-radius: 12px; background: var(--color-surface-subtle, #f8fafc); }
+.filter-bar__select { flex: 0 1 220px; min-width: 160px; }
+.filter-bar__select .ui-dropdown__trigger { min-height: 38px; padding: 6px 12px; border-radius: 999px; font-size: 13.5px; font-weight: 600; }
+.filter-bar__summary { margin-left: auto; color: var(--color-text-secondary); font-size: 13px; white-space: nowrap; }
+.filter-bar__summary strong { color: var(--color-text-primary, #0f172a); font-size: 15px; }
+.filter-bar__clear { padding: 4px 8px; border: 0; background: none; color: var(--color-primary, #2563eb); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.filter-bar__clear:hover { text-decoration: underline; }
+.filter-search { display: flex; align-items: center; flex: 1 1 260px; min-width: 200px; gap: 6px; padding: 0 6px 0 12px; border: 1px solid #cbd9ed;
+  border-radius: 999px; background: #fff; }
+.filter-search:focus-within { border-color: var(--color-primary, #2563eb); box-shadow: 0 0 0 3px #2563eb22; }
+.filter-search__icon { color: var(--color-text-secondary); }
+.filter-search input { flex: 1 1 auto; min-width: 0; min-height: 36px; padding: 0; border: 0; background: transparent; font: inherit; font-size: 14px; outline: none; box-shadow: none; }
+.filter-search button { min-height: 30px; padding: 3px 10px; border: 0; border-radius: 999px; background: var(--color-primary-bg, #eff6ff); color: var(--color-primary-dark, #1d4ed8); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.segmented { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; border: 1px solid #dbe3ef; border-radius: 999px; background: #eef2f7; }
+.segmented button { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 4px 14px; border: 0; border-radius: 999px; background: transparent;
+  color: var(--color-text-secondary); font: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; }
+.segmented button[aria-pressed="true"] { background: #fff; color: var(--color-primary-dark, #1d4ed8); box-shadow: 0 1px 3px #0f172a26; }
+.segmented button:focus-visible, .filter-chip:focus-visible, .icon-button:focus-visible { outline: 3px solid #2563eb55; outline-offset: 2px; }
+.segmented__count { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: #dc2626; color: #fff; font-size: 11.5px; }
+.filter-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 4px 12px; border: 1px solid #cbd9ed; border-radius: 999px;
+  background: #fff; color: var(--color-text-secondary); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.filter-chip::before { content: ''; width: 8px; height: 8px; border-radius: 50%; border: 2px solid currentColor; }
+.filter-chip[aria-pressed="true"] { border-color: var(--color-primary, #2563eb); background: var(--color-primary-bg, #eff6ff); color: var(--color-primary-dark, #1d4ed8); }
+.filter-chip[aria-pressed="true"]::before { background: currentColor; }
+.icon-button { display: inline-grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 1px solid #cbd9ed; border-radius: 50%; background: #fff;
+  color: var(--color-text-primary, #0f172a); font-size: 17px; cursor: pointer; }
+.icon-button:hover { border-color: var(--color-primary, #2563eb); }
+.icon-button:disabled { opacity: .5; cursor: progress; }
+/* Older filter pills get the same chip look. */
+.hotspots__chip, .history-filter button, .common-queue-suggestions .campaign-filters button {
+  min-height: 34px; padding: 4px 14px; border: 1px solid #cbd9ed; border-radius: 999px; background: #fff;
+  color: var(--color-text-secondary); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.hotspots__chip[aria-pressed="true"], .history-filter button[aria-pressed="true"], .common-queue-suggestions .campaign-filters button[aria-pressed="true"] {
+  border-color: var(--color-primary, #2563eb); background: var(--color-primary-bg, #eff6ff); color: var(--color-primary-dark, #1d4ed8); }
+.heatmap-embedded { padding-top: 14px; }
+@media (max-width: 640px) {
+  .filter-bar__summary { margin-left: 0; flex-basis: 100%; }
+  .filter-bar__select { flex: 1 1 100%; }
+}
+.queue-header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+.queue-header h2 { margin: 0; }
+.queue-header .muted { margin: 2px 0 0; font-size: 13px; }
+.coordinator-layout .queue-header .queue-filter-toolbar { align-items: center; margin: 0; }
+.history-tab { display: grid; gap: 12px; }
+.history-toolbar__campaign { flex: 1 1 320px; max-width: 460px; }

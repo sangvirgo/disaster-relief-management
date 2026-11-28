@@ -11,7 +11,7 @@ import { CommonQueueSuggestions } from './CommonQueueSuggestions';
 import { ScopedCampaignMap } from './ScopedCampaignMap';
 import { CampaignHotspots } from './CampaignHotspots';
 import { SubCoordination } from './SubCoordination';
-import { HistorySummary, MyHistory, Timeline, type EngagementItem, type HistoryItem, type HistorySummaryData } from './CampaignHistory';
+import { CampaignHistoryTab, type EngagementItem } from './CampaignHistory';
 import './campaign-coordination.css';
 
 type TriageCampaign = {
@@ -27,7 +27,6 @@ type OverviewCampaign = {
   active_coordinators: Array<{ user_id: string; display_name: string | null; started_at: string; last_active_at: string }>;
   request_counts: Record<string, number>; active_claim_count: number; overdue_count: number; has_active_coordinator: boolean;
 };
-type Summary = HistorySummaryData;
 type Overview = { items: OverviewCampaign[]; common_queue?: { unmatched: number; conflict: number } };
 const OVERVIEW_PAGE_SIZE = 10;
 const campaignTabs = ['campaigns', 'routing', 'sos', 'workspace', 'history', 'choose', 'my-history'] as const;
@@ -51,10 +50,6 @@ function PrimaryCampaignCoordination({ user, initialRequestId = '' }: { user: Me
   const [engagements, setEngagements] = useState<Engagement[]>([]);
   const [selectedId, setSelectedId] = useState('');
   const [historyId, setHistoryId] = useState('');
-  const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [summary, setSummary] = useState<Summary | null>(null);
-  const [myHistory, setMyHistory] = useState<Engagement[]>([]);
-  const [cursor, setCursor] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [refresh, setRefresh] = useState(0);
@@ -113,28 +108,9 @@ function PrimaryCampaignCoordination({ user, initialRequestId = '' }: { user: Me
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Không thể dừng điều phối chiến dịch.'); }
     finally { setLoading(false); }
   }
-  async function showHistory(campaignId: string) {
+  function showHistory(campaignId: string) {
     if (!campaignId) return;
-    setHistoryId(campaignId); setHistory([]); setSummary(null); setCursor(''); setError(''); setTab('history');
-    try {
-      const [timeline, totals] = await Promise.all([
-        api<{ items: HistoryItem[]; cursor?: string }>('response', `/campaigns/${campaignId}/history?limit=50`),
-        api<Summary>('response', `/campaigns/${campaignId}/history/summary`),
-      ]);
-      setHistory(timeline.items); setCursor(timeline.cursor ?? ''); setSummary(totals);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Không thể tải lịch sử cứu trợ.'); }
-  }
-  async function loadMoreHistory() {
-    if (!cursor || !historyId) return;
-    try {
-      const page = await api<{ items: HistoryItem[]; cursor?: string }>('response', `/campaigns/${historyId}/history?limit=50&cursor=${encodeURIComponent(cursor)}`);
-      setHistory((items) => [...items, ...page.items]); setCursor(page.cursor ?? '');
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Không thể tải thêm lịch sử.'); }
-  }
-  async function showMyHistory() {
-    setError(''); setTab('my-history');
-    try { setMyHistory((await api<{ items: Engagement[] }>('response', '/me/coordination-history')).items); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : 'Không thể tải lịch sử điều phối của bạn.'); }
+    setHistoryId(campaignId); setError(''); setTab('history');
   }
 
   // A coordinator with only campaign-scoped grants works their assigned campaigns and never handles unassigned/conflict SOS.
@@ -149,7 +125,7 @@ function PrimaryCampaignCoordination({ user, initialRequestId = '' }: { user: Me
   return <section className="campaign-coordination">
     <div className="tabs" role="tablist" aria-label="Điều phối chiến dịch">
       {tabs.map(([id, title]) => <button key={id} type="button" role="tab" aria-selected={activeTab(id)} className={activeTab(id) ? 'active' : ''}
-        onClick={() => id === 'my-history' ? void showMyHistory() : setTab(id as typeof campaignTabs[number])}>{title}</button>)}
+        onClick={() => setTab(id as typeof campaignTabs[number])}>{title}</button>)}
     </div>
     {error && <p role="alert" className="notice error">{error}</p>}
     {loading && <p role="status">Đang cập nhật dữ liệu điều phối…</p>}
@@ -208,7 +184,7 @@ function PrimaryCampaignCoordination({ user, initialRequestId = '' }: { user: Me
                       : campaign.overdue_count > 0 ? <span className="campaign-overview__attention">{campaign.overdue_count} SOS quá hạn</span>
                         : <span className="campaign-overview__quiet">Đang theo dõi</span>}
                   </td>
-                  <td data-label="Lịch sử"><button className="button secondary campaign-overview__history" type="button" onClick={() => void showHistory(campaign.id)}>Lịch sử</button></td>
+                  <td data-label="Lịch sử"><button className="button secondary campaign-overview__history" type="button" onClick={() => showHistory(campaign.id)}>Lịch sử</button></td>
                 </tr>;
               })}</tbody>
             </table>
@@ -226,28 +202,19 @@ function PrimaryCampaignCoordination({ user, initialRequestId = '' }: { user: Me
       </div>
     </>}
     {tab === 'routing' && isScopedCoordinator && <ScopedCampaignMap campaigns={overviewCampaigns} campaignIds={scopedCampaignIds} />}
-    {tab === 'routing' && !isScopedCoordinator && <div className="map-layer-switch" role="group" aria-label="Chọn lớp bản đồ SOS">
+    {tab === 'routing' && !isScopedCoordinator && <div className="segmented map-layer-switch" role="group" aria-label="Chọn lớp bản đồ SOS">
       <button type="button" aria-pressed={mapLayer === 'areas'} onClick={() => setMapLayer('areas')}>
-        <strong>Phân vùng chiến dịch</strong><small>Vùng chiến dịch và SOS chưa có chiến dịch ({unassignedRequestCount})</small>
+        Phân vùng chiến dịch{unassignedRequestCount > 0 && <span className="segmented__count" title="SOS chưa có chiến dịch">{unassignedRequestCount}</span>}
       </button>
-      <button type="button" aria-pressed={mapLayer === 'density'} onClick={() => setMapLayer('density')}>
-        <strong>Mật độ SOS</strong><small>Bản đồ nhiệt SOS đã và chưa xác minh, lọc theo loại sự cố</small>
-      </button>
+      <button type="button" aria-pressed={mapLayer === 'density'} onClick={() => setMapLayer('density')}>Mật độ SOS</button>
     </div>}
-    {tab === 'routing' && !isScopedCoordinator && mapLayer === 'density' && <div className="report-heatmap"><CoordinatorMap /></div>}
+    {tab === 'routing' && !isScopedCoordinator && mapLayer === 'density' && <CoordinatorMap embedded />}
     {tab === 'routing' && !isScopedCoordinator && mapLayer === 'areas' && <CommonQueueSuggestions onChanged={() => { setQueueRevision((value) => value + 1); setRefresh((value) => value + 1); }}
       loads={overviewCampaigns.map((campaign) => ({ id: campaign.id, overdue: campaign.overdue_count, coordinators: campaign.active_coordinators.length,
         open: Object.entries(campaign.request_counts ?? {}).filter(([status]) => !['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(status)).reduce((sum, [, count]) => sum + count, 0) }))} />}
     {tab === 'sos' && <Coordinator key={`sos-${queueRevision}-${initialRequestId}`} page="queue" currentUserId={user.id} user={user} canSeeUnassigned={!isScopedCoordinator} initialRequestId={initialRequestId} />}
-    {tab === 'history' && <>
-      <p><button className="button secondary" type="button" onClick={() => void showMyHistory()}>Xem lịch sử điều phối của tôi</button></p>
-      <label className="campaign-history-select">Chiến dịch <Dropdown value={historyId} onChange={(event) => void showHistory(event.target.value)}>
-        <option value="">Chọn chiến dịch</option>{overviewCampaigns.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-      </Dropdown></label>
-      <HistorySummary summary={summary} />
-      <Timeline items={history} />
-      {cursor && <button className="button secondary" type="button" onClick={() => void loadMoreHistory()}>Tải các sự kiện cũ hơn</button>}
-    </>}
+    {(tab === 'history' || tab === 'my-history') && <CampaignHistoryTab key={tab} initialMode={tab === 'my-history' ? 'mine' : 'campaign'}
+      campaigns={overviewCampaigns} campaignId={historyId} preferredIds={engagements.map((item) => item.campaign_id)} onCampaignChange={setHistoryId} />}
     {tab === 'choose' && <CampaignHotspots triage={triage} overview={overviewCampaigns} engagedIds={engagements.map((item) => item.campaign_id)}
       loading={loading} onEngage={(id) => void engage(id)} onOpen={(id) => { setSelectedId(id); setTab('workspace'); }}
       onRefresh={() => setRefresh((value) => value + 1)} />}
@@ -262,10 +229,6 @@ function PrimaryCampaignCoordination({ user, initialRequestId = '' }: { user: Me
         </div>
       </div> : <div className="empty">Bạn chưa tham gia điều phối chiến dịch nào. Hãy chọn chiến dịch gấp.</div>}
       {selectedEngagement && <Coordinator key={selectedEngagement.campaign_id} page="queue" currentUserId={user.id} user={user} campaignId={selectedEngagement.campaign_id} />}
-    </>}
-    {tab === 'my-history' && <>
-      <p><button className="button secondary" type="button" onClick={() => setTab('history')}>← Lịch sử theo chiến dịch</button></p>
-      <MyHistory items={myHistory} />
     </>}
   </section>;
 }

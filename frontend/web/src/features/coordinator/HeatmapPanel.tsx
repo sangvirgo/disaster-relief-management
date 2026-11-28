@@ -520,31 +520,32 @@ export function HeatmapPanel({
 
   return (
     <div className={`heatmap-panel${compact ? ' heatmap-panel-compact' : ''}`}>
-      {showLayers && <div className="tabs heatmap-layer-tabs" role="group" aria-label="Lớp dữ liệu SOS">
+      {compact && showLayers && <div className="tabs heatmap-layer-tabs" role="group" aria-label="Lớp dữ liệu SOS">
         <button type="button" className={layer === 'confirmed' ? 'active' : ''}
           onClick={() => setLayer('confirmed')}>Đã xác minh</button>
         <button type="button" className={layer === 'unverified' ? 'active' : ''}
           onClick={() => setLayer('unverified')}>Chưa xác minh</button>
       </div>}
-      {!compact && <>
-      <label className="heatmap-category-filter">
-        <span>Loại sự cố</span>
-        <span className="heatmap-category-select-wrap"><Dropdown value={category} onChange={(event) => setCategory(event.target.value)} aria-label="Lọc bản đồ nhiệt theo loại sự cố">
-          <option value="">Tất cả loại sự cố</option>
-          {incidentCategories.map((code) => <option key={code} value={code}>{label(code)}</option>)}
-        </Dropdown></span>
-      </label>
-      <div className="heatmap-context" role="status">
-        <span className="heatmap-context-dot" aria-hidden="true" />
-        <strong>Lớp mật độ: {layer === 'unverified' ? 'SOS chưa xác minh' : 'SOS đã xác minh'}</strong>
-        <span>{category ? `· ${label(category)}` : '· Tất cả loại sự cố'} · trong 7 ngày gần đây</span>
-      </div>
-      {selected?.status && <p className="muted">SOS đang chọn: {selected.trackingCode} · {requestStatusLabel(selected.status)}. Ghim vị trí được hiển thị riêng với lớp mật độ.</p>}
-      <button type="button" className="button secondary heatmap-refresh" disabled={loading}
-        onClick={() => setRefresh((value) => value + 1)}><span aria-hidden="true">↻</span> Làm mới SOS trên bản đồ</button>
-      </>}
+      {!compact && <div className="filter-bar heatmap-toolbar" role="group" aria-label="Lọc bản đồ nhiệt SOS">
+        {showLayers && <div className="segmented" role="group" aria-label="Lớp dữ liệu SOS">
+          <button type="button" aria-pressed={layer === 'unverified'} onClick={() => setLayer('unverified')}>Chưa xác minh</button>
+          <button type="button" aria-pressed={layer === 'confirmed'} onClick={() => setLayer('confirmed')}>Đã xác minh</button>
+        </div>}
+        <span className="filter-bar__select" data-static-label>
+          <Dropdown value={category} onChange={(event) => setCategory(event.target.value)} aria-label="Lọc theo loại sự cố">
+            <option value="">Mọi loại sự cố</option>
+            {incidentCategories.map((code) => <option key={code} value={code}>{label(code)}</option>)}
+          </Dropdown>
+        </span>
+        <span className="filter-bar__summary" role="status">
+          <strong>{loading && !data ? '…' : count}</strong> SOS · 7 ngày gần đây
+        </span>
+        <button type="button" className="icon-button" disabled={loading} title="Làm mới bản đồ" aria-label="Làm mới SOS trên bản đồ"
+          onClick={() => setRefresh((value) => value + 1)}><span aria-hidden="true">↻</span></button>
+      </div>}
+      {!compact && selected?.status && <p className="muted">SOS đang chọn: {selected.trackingCode} · {requestStatusLabel(selected.status)}. Ghim vị trí được hiển thị riêng với lớp mật độ.</p>}
       <>
-        {loading && <p role="status">Đang cập nhật bản đồ nhiệt…</p>}
+        {loading && compact && <p role="status">Đang cập nhật bản đồ nhiệt…</p>}
         {error && <p className="notice error" role="alert">{error}</p>}
         <HeatmapCanvas hideCellPins={compact && Boolean(selected)} cells={visibleCells} selected={selected} onResolutionChange={onResolutionChange} onZoomChange={onZoomChange} heatOpacity={heatOpacity}
           weather={showWeather ? weatherData?.locations ?? [] : []}

@@ -1,4 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { api } from '../../api/client';
+import { LIST_PAGE_SIZE, useCursorNav } from '../../api/useCursorNav';
+import { Dropdown } from '../../components/ui/Dropdown';
+import { Pager } from '../../components/ui/Pager';
+import { StatusBadge } from '../../components/StatusBadge';
 
 export type HistoryItem = {
   occurred_at: string; event_type: string; actor: { id: string; display_name: string | null } | null;
@@ -104,4 +109,92 @@ export function MyHistory({ items }: { items: EngagementItem[] }) {
       <p className="muted">{dateTime(item.started_at)} → {item.active ? 'hiện tại' : item.ended_at ? dateTime(item.ended_at) : 'phiên hết hạn'}</p></div>
     <span className={`history-badge${item.active ? ' history-badge--live' : ''}`}>{item.active ? 'Đang điều phối' : 'Đã kết thúc'}</span>
   </li>)}</ul>;
+}
+
+const HISTORY_PAGE_SIZE = 30;
+type HistoryCampaign = { id: string; name: string; status: string };
+
+/**
+ * Lịch sử tab: one switch between a campaign's timeline and the coordinator's own sessions. A campaign is preselected
+ * (the one the coordinator works, else the first listed) so the tab never opens empty; events are paged by cursor.
+ */
+export function CampaignHistoryTab({ campaigns, campaignId, preferredIds, onCampaignChange, initialMode = 'campaign' }: {
+  campaigns: HistoryCampaign[]; campaignId: string; preferredIds: string[];
+  onCampaignChange: (id: string) => void; initialMode?: 'campaign' | 'mine';
+}) {
+  const [mode, setMode] = useState<'campaign' | 'mine'>(initialMode);
+  const [items, setItems] = useState<HistoryItem[]>([]);
+  const [summary, setSummary] = useState<HistorySummaryData | null>(null);
+  const [mine, setMine] = useState<EngagementItem[] | null>(null);
+  const [minePage, setMinePage] = useState(0);
+  const [cursor, setCursor, prevPage, pageIndex] = useCursorNav<string>('');
+  const [next, setNext] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const selected = campaigns.find((campaign) => campaign.id === campaignId);
+
+  useEffect(() => {
+    if (mode !== 'campaign' || campaignId || !campaigns.length) return;
+    onCampaignChange(campaigns.find((campaign) => preferredIds.includes(campaign.id))?.id ?? campaigns[0]!.id);
+  }, [mode, campaignId, campaigns, preferredIds, onCampaignChange]);
+  useEffect(() => { setCursor(''); }, [campaignId, setCursor]);
+  useEffect(() => {
+    if (mode !== 'campaign' || !campaignId) return;
+    let live = true;
+    setLoading(true); setError('');
+    const params = new URLSearchParams({ limit: String(HISTORY_PAGE_SIZE) });
+    if (cursor) params.set('cursor', cursor);
+    void Promise.all([
+      api<{ items: HistoryItem[]; cursor?: string; more?: boolean }>('response', `/campaigns/${campaignId}/history?${params}`),
+      cursor ? Promise.resolve(null) : api<HistorySummaryData>('response', `/campaigns/${campaignId}/history/summary`),
+    ]).then(([page, totals]) => {
+      if (!live) return;
+      setItems(page.items); setNext(page.more === false ? '' : page.cursor ?? '');
+      if (totals) setSummary(totals);
+    }).catch((cause) => { if (live) setError(cause instanceof Error ? cause.message : 'Không thể tải lịch sử cứu trợ.'); })
+      .finally(() => { if (live) setLoading(false); });
+    return () => { live = false; };
+  }, [mode, campaignId, cursor]);
+  useEffect(() => {
+    if (mode !== 'mine' || mine) return;
+    let live = true;
+    setLoading(true); setError('');
+    void api<{ items: EngagementItem[] }>('response', '/me/coordination-history')
+      .then((value) => { if (live) setMine(value.items); })
+      .catch((cause) => { if (live) setError(cause instanceof Error ? cause.message : 'Không thể tải lịch sử điều phối của bạn.'); })
+      .finally(() => { if (live) setLoading(false); });
+    return () => { live = false; };
+  }, [mode, mine]);
+
+  const mineItems = mine ?? [];
+  const mineShown = mineItems.slice(minePage * LIST_PAGE_SIZE, (minePage + 1) * LIST_PAGE_SIZE);
+  return <section className="history-tab">
+    <div className="filter-bar history-toolbar">
+      <div className="segmented" role="group" aria-label="Chọn loại lịch sử">
+        <button type="button" aria-pressed={mode === 'campaign'} onClick={() => setMode('campaign')}>Theo chiến dịch</button>
+        <button type="button" aria-pressed={mode === 'mine'} onClick={() => setMode('mine')}>Phiên điều phối của tôi</button>
+      </div>
+      {mode === 'campaign' && <span className="filter-bar__select history-toolbar__campaign">
+        <Dropdown value={campaignId} aria-label="Chiến dịch" onChange={(event) => onCampaignChange(event.target.value)}>
+          {!campaigns.length && <option value="">Chưa có chiến dịch</option>}
+          {campaigns.map((campaign) => <option key={campaign.id} value={campaign.id}>{campaign.name}</option>)}
+        </Dropdown>
+      </span>}
+      {mode === 'campaign' && selected && <span className="filter-bar__summary"><StatusBadge status={selected.status} /></span>}
+    </div>
+    {error && <p className="notice error" role="alert">{error}</p>}
+    {loading && <p role="status" className="muted">Đang tải lịch sử…</p>}
+    {mode === 'campaign' && <>
+      {!campaigns.length && !loading && <p className="empty">Chưa có chiến dịch trong phạm vi được cấp quyền.</p>}
+      {selected && <HistorySummary summary={summary} />}
+      {selected && <Timeline items={items} />}
+      {selected && <Pager page={pageIndex} hasNext={Boolean(next)} loading={loading} count={items.length} noun="sự kiện"
+        onPrev={prevPage} onNext={() => next && setCursor(next)} />}
+    </>}
+    {mode === 'mine' && mine && <>
+      <MyHistory items={mineShown} />
+      <Pager page={minePage} hasNext={(minePage + 1) * LIST_PAGE_SIZE < mineItems.length} loading={loading} count={mineShown.length} noun="phiên"
+        onPrev={() => setMinePage((value) => Math.max(0, value - 1))} onNext={() => setMinePage((value) => value + 1)} />
+    </>}
+  </section>;
 }

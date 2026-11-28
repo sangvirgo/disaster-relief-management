@@ -15,7 +15,36 @@ import './teams-page.css';
 
 const ignoreManageChange = () => {};
 
-type Team = { id: string; name: string; availability: string; status: string; version: number; skills: string[]; position: { age_s: number } | null };
+type Team = {
+  id: string; name: string; availability: string; status: string; version: number; skills: string[];
+  kind?: string; reporting_mode?: string; readiness_required?: boolean; external_contact_note?: string | null;
+  position: { age_s: number; accuracy_m?: number | null; source?: string } | null;
+};
+const TEAM_KIND: Record<string, string> = { VOLUNTEER: 'Đội tình nguyện', MILITARY: 'Lực lượng vũ trang', GOVERNMENT: 'Lực lượng chính quyền', OTHER: 'Đơn vị khác' };
+const REPORTING: Record<string, string> = { APP: 'Đội tự cập nhật trên ứng dụng', COORDINATOR: 'Điều phối viên cập nhật thay đội' };
+const POSITION_SOURCE: Record<string, string> = { GPS: 'GPS của đội', MANUAL_PIN: 'Đội tự ghim', COORDINATOR_REPORTED: 'Điều phối viên cập nhật' };
+
+/** At-a-glance facts for the team dialog: readiness, how it reports, where it was last seen. */
+function TeamFacts({ team }: { team: Team }) {
+  const ready = team.status === 'ACTIVE' && team.availability === 'AVAILABLE';
+  const minutes = team.position ? Math.round(team.position.age_s / 60) : null;
+  const fresh = minutes != null && minutes <= 30;
+  return <section className="team-facts" aria-label="Tình trạng đội">
+    <div className="team-facts__badges">
+      <span className={`team-chip ${ready ? 'team-chip--ok' : 'team-chip--off'}`}>{team.status === 'ACTIVE' ? label(team.availability) : label(team.status)}</span>
+      {team.kind && <span className="team-chip">{TEAM_KIND[team.kind] ?? 'Đơn vị khác'}</span>}
+      {team.readiness_required && <span className="team-chip team-chip--warn">Chờ xác nhận sẵn sàng</span>}
+    </div>
+    <dl className="team-facts__grid">
+      <div><dt>Cách cập nhật</dt><dd>{team.reporting_mode ? REPORTING[team.reporting_mode] ?? 'Chưa rõ' : 'Chưa rõ'}</dd></div>
+      <div><dt>Vị trí gần nhất</dt><dd className={team.position ? (fresh ? 'is-fresh' : 'is-stale') : 'is-stale'}>
+        {team.position ? positionAge(team.position.age_s) : 'Chưa có vị trí'}
+        {team.position?.source && <small>{POSITION_SOURCE[team.position.source] ?? 'Nguồn khác'}{team.position.accuracy_m ? ` · sai số ~${Math.round(team.position.accuracy_m)} m` : ''}</small>}
+      </dd></div>
+      {team.external_contact_note && <div className="team-facts__wide"><dt>Đầu mối liên lạc</dt><dd>{team.external_contact_note}</dd></div>}
+    </dl>
+  </section>;
+}
 
 
 function positionAge(ageSeconds: number): string {
@@ -76,6 +105,7 @@ export function CoordinatorTeams({ user }: { user: Me }) {
       {showCreate && <TeamCreateForm skills={skills} onSuccess={(id) => { setShowCreate(false); setSelectedId(id); refresh(); }} />}
     </DetailSurface>}
     {selected && <DetailSurface key={selected.id} modal open onClose={closeDetail} label={`Chi tiết đội ${selected.name}`} heading={selected.name} className="team-detail-dialog">
+      <TeamFacts team={selected} />
       {isAdmin ? <TeamSkillsForm key={`skills-${selected.id}-${selected.version}`} teamId={selected.id} version={selected.version} current={selected.skills} skills={skills} onSuccess={refresh} /> : <section><h3>Kỹ năng của đội</h3><div className="team-skill-tags">{selected.skills.length ? selected.skills.map(code => <span className="chip" key={code}>{skills.find(skill => skill.code === code)?.display_name || label(code)}</span>) : 'Chưa khai báo kỹ năng'}</div></section>}
       <section className="team-member-section" aria-label="Thành viên đội">
         <TeamMembers key={`${selected.id}-${revision}`} teamId={selected.id} readOnly={!isAdmin} onManageChange={ignoreManageChange} addOpen={addMemberOpen}
