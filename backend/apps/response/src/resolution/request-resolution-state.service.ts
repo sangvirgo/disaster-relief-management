@@ -124,7 +124,7 @@ export class RequestResolutionStateService {
           SET status='TRIAGED',work_cycle=work_cycle+1,campaign_id=$3,
               attribution_locked_at=NULL,logistics_admitted_at=NULL,resolution_seal_id=NULL,resolved_at=NULL,
               version=version+1
-        WHERE id=$1 AND version=$2 AND status=ANY($5::request_status[])
+        WHERE id=$1 AND version=$2 AND status=ANY($4::request_status[])
         RETURNING id,status,version,work_cycle,campaign_id,reporter_user_id`,
       [requestId, dto.expected_version, campaignId, ['RESOLVED', 'CLOSED']],
     ) as [Array<RequestStateRow>, number];

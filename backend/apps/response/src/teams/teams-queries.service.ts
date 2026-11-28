@@ -67,6 +67,7 @@ export class TeamsQueriesService {
     };
     if (query.availability) add((index) => `t.availability=$${index}`, query.availability);
     if (query.status) add((index) => `t.status=$${index}`, query.status);
+    if (query.reporting_mode) add((index) => `t.reporting_mode=$${index}`, query.reporting_mode);
     values.push(cursor?.sort[0] ?? null, cursor?.id ?? null);
     conditions.push(`($${values.length - 1}::uuid IS NULL OR (t.id,t.id)>($${values.length - 1}::uuid,$${values.length}::uuid))`);
     const limit = query.limit ?? 50;

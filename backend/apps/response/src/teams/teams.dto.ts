@@ -17,6 +17,10 @@ export class TeamPageQueryDto {
 
   @IsOptional() @IsIn(['ACTIVE', 'INACTIVE'])
   declare status?: 'ACTIVE' | 'INACTIVE';
+
+  /** COORDINATOR lists teams without accounts (police, army, local groups) whose updates a coordinator records. */
+  @IsOptional() @IsIn(['APP', 'COORDINATOR'])
+  declare reporting_mode?: 'APP' | 'COORDINATOR';
 }
 
 export class TeamMembersPageQueryDto {

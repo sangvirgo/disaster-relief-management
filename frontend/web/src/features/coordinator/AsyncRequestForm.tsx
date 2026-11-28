@@ -4,7 +4,7 @@ import { label } from '../../i18n/labels';
 import { confirmAction } from '../../components/confirmAction';
 
 type Kind = 'cancel' | 'resolve';
-type ResolveBasis = 'RESCUE_COMPLETED' | 'SUPPLY_ONLY' | 'NO_ACTION_REQUIRED';
+export type ResolveBasis = 'RESCUE_COMPLETED' | 'SUPPLY_ONLY' | 'NO_ACTION_REQUIRED';
 const resolveBases: { value: ResolveBasis; title: string; hint: string; template: string }[] = [
   { value: 'RESCUE_COMPLETED', title: 'Nhiệm vụ cứu hộ đã hoàn thành', hint: 'Đội đã báo hoàn thành và minh chứng phù hợp.',
     template: 'Đội cứu hộ đã hoàn thành nhiệm vụ; đã đối chiếu báo cáo và minh chứng, người dân đã an toàn.' },
@@ -22,6 +22,7 @@ export function AsyncRequestForm({
   onStale,
   blockers = [],
   suggestedBasis,
+  disabledBases = {},
 }: {
   requestId: string;
   version: number;
@@ -32,6 +33,8 @@ export function AsyncRequestForm({
   blockers?: { text: string; href: string }[];
   /** Pre-selected outcome basis (the coordinator still reviews it, writes the reason and confirms). */
   suggestedBasis?: ResolveBasis;
+  /** Bases the backend would reject for this SOS, with the Vietnamese reason shown beside them. */
+  disabledBases?: Partial<Record<ResolveBasis, string>>;
 }) {
   const [reason, setReason] = useState('');
   const [basis, setBasis] = useState<string>(kind === 'resolve' ? suggestedBasis ?? '' : '');
@@ -141,20 +144,23 @@ export function AsyncRequestForm({
         <>
           {kind === 'resolve' && (
             <fieldset className="resolve-basis" aria-describedby={touched.basis && basisError ? 'async-request-basis-error' : undefined}>
-              <legend>1. Căn cứ kết thúc <span className="required-mark" aria-hidden="true">*</span></legend>
+              <legend>Căn cứ kết thúc <span className="required-mark" aria-hidden="true">*</span></legend>
               <div className="resolve-basis__options">
-                {resolveBases.map((option) => <label key={option.value} className={`resolve-basis__option${basis === option.value ? ' selected' : ''}`}>
-                  <input type="radio" name={`resolve-basis-${requestId}`} value={option.value} checked={basis === option.value}
-                    onChange={() => { setBasis(option.value); setTouched((current) => ({ ...current, basis: true })); key.current = null; }} />
-                  <span><strong>{option.title}</strong><small>{option.hint}</small></span>
-                </label>)}
+                {resolveBases.map((option) => {
+                  const blocked = disabledBases[option.value];
+                  return <label key={option.value} className={`resolve-basis__option${basis === option.value ? ' selected' : ''}${blocked ? ' disabled' : ''}`}>
+                    <input type="radio" name={`resolve-basis-${requestId}`} value={option.value} checked={basis === option.value} disabled={Boolean(blocked)}
+                      onChange={() => { setBasis(option.value); setTouched((current) => ({ ...current, basis: true })); key.current = null; }} />
+                    <span className="resolve-basis__text" title={option.hint}>{option.title}{blocked && <small>{blocked}</small>}</span>
+                  </label>;
+                })}
               </div>
               {touched.basis && basisError && <small className="field-error" id="async-request-basis-error" role="alert">{basisError}</small>}
             </fieldset>
           )}
           <div className="resolve-reason">
             <div className="resolve-reason__label">
-              <label htmlFor={`async-request-reason-${requestId}`}>{kind === 'resolve' ? '2. Nội dung đã đối chiếu' : 'Lý do'} <span className="required-mark" aria-hidden="true">*</span></label>
+              <label htmlFor={`async-request-reason-${requestId}`}>{kind === 'resolve' ? 'Nội dung đã đối chiếu' : 'Lý do'} <span className="required-mark" aria-hidden="true">*</span></label>
               {kind === 'resolve' && resolveBases.some((option) => option.value === basis) && <button type="button" className="text-action resolve-reason__template"
                 onClick={() => { setReason(resolveBases.find((option) => option.value === basis)!.template); setTouched((current) => ({ ...current, reason: true })); key.current = null; }}>
                 Điền câu gợi ý</button>}

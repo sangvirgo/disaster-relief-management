@@ -12,7 +12,7 @@ import { AsyncRequestForm } from './AsyncRequestForm';
 import { hasCurrentFailureReview } from './missionFailureReview';
 import { HeatmapPanel } from './HeatmapPanel';
 import { ContactAttemptPanel } from './ContactAttemptPanel';
-import { CoordinatorTeamPositionForm } from './CoordinatorTeamPositionForm';
+import { ExternalTeamsPanel } from './ExternalTeamsPanel';
 import { operationIdFromTimeline, ResolutionOperationPanel } from './ResolutionOperationPanel';
 import { RequestTimeline } from './RequestTimeline';
 import { RequestEvidencePanel } from './RequestEvidencePanel';
@@ -583,6 +583,26 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
     requestId: string; missionId: string; cycle: number | null; error: boolean
   } | null>(null);
   const [showAdditionalDispatch, setShowAdditionalDispatch] = useState(false);
+  const [closeoutOpen, setCloseoutOpen] = useState(false);
+  // Per-viewer convenience: hide the map column (button or the M key) to give the record the full width.
+  const [mapHidden, setMapHidden] = useState(() => { try { return window.localStorage.getItem('c48:sos-map-hidden') === '1'; } catch { return false; } });
+  const toggleMap = useCallback(() => setMapHidden((value) => {
+    try { window.localStorage.setItem('c48:sos-map-hidden', value ? '0' : '1'); } catch { /* storage unavailable */ }
+    return !value;
+  }), []);
+  useEffect(() => {
+    if (!selected) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== 'm' || event.ctrlKey || event.metaKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return;
+      if (document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]')) return;
+      event.preventDefault();
+      toggleMap();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selected, toggleMap]);
   const [campaignOptions, setCampaignOptions] = useState<{
     value: string; label: string; center: { lat: number; lng: number } | null
   }[]>([]);
@@ -1125,7 +1145,10 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
         )}
         {selected && !detail && !detailError && <p role="status">Đang tải hồ sơ…</p>}
         {detail && (
-          <>
+          <div className={`sos-detail-split${detail.subject.location ? '' : ' sos-detail-split--nomap'}${mapHidden ? ' sos-detail-split--map-hidden' : ''}`}>
+          {mapHidden && <button type="button" className="sos-map-show" onClick={toggleMap} title="Hiện bản đồ (phím M)">
+            <span aria-hidden="true">🗺</span> Hiện bản đồ <kbd>M</kbd></button>}
+          <div className="sos-detail-split__main">
             <header className="sos-head" data-danger={detail.declared_danger ? 'true' : undefined}>
               <div className="sos-head__title">
                 <h2>{detail.tracking_code}</h2>
@@ -1188,24 +1211,6 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 )}
             </header>
             {claimError && <p role="alert" className="notice warning">{claimError}</p>}
-            {/* The location map with weather layers is always open, above the tabs, for every coordinator (main or sub). */}
-            <section className="sos-location-map" aria-labelledby="sos-location-map-title">
-              <div className="sos-location-map__head">
-                <h3 id="sos-location-map-title">Vị trí SOS và thời tiết</h3>
-                {detail.subject.location && <span className="muted">
-                  {detail.subject.location.coordinates[1].toFixed(5)}, {detail.subject.location.coordinates[0].toFixed(5)}
-                </span>}
-              </div>
-              {detail.subject.location
-                ? <HeatmapPanel compact showLayers={false} weatherLayers selected={{
-                  id: detail.id,
-                  trackingCode: detail.tracking_code,
-                  status: detail.status,
-                  longitude: detail.subject.location.coordinates[0],
-                  latitude: detail.subject.location.coordinates[1],
-                }} />
-                : <p className="notice">Hồ sơ chưa có tọa độ nên không thể hiển thị trên bản đồ. Liên hệ người báo để xác nhận vị trí.</p>}
-            </section>
             <div className="sos-detail-tabs" role="tablist" aria-label="Thông tin hồ sơ SOS" onKeyDown={(event) => {
               const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
               const current = tabs.indexOf(document.activeElement as HTMLButtonElement);
@@ -1461,8 +1466,9 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
             <fieldset className="claim-guard sos-actions-guard" disabled={claimBlockedBy(detail, currentUserId)} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
             <div className="action-grid sos-actions" id="request-actions" tabIndex={-1} hidden={activeTab !== 'overview' && activeTab !== 'dispatch'}>
               <div className="sos-tab-group sos-action-row" hidden={activeTab !== 'dispatch'}>
-              {canSeeUnassigned && !detail.campaign_id &&
-                secondaryCommand({
+              {canSeeUnassigned && !detail.campaign_id && <div className="dispatch-campaign-bar">
+                <span><span aria-hidden="true">⚑</span> SOS chưa thuộc chiến dịch nào</span>
+                {secondaryCommand({
                   title: 'Gắn vào chiến dịch cứu trợ',
                   service: 'response',
                   path: `/requests/${detail.id}/attach-campaign`,
@@ -1481,6 +1487,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                   ],
                   warning: 'Xác nhận gắn yêu cầu này vào chiến dịch đã chọn?',
                 })}
+              </div>}
               {detail.timeline.items.some((event) => event.event_type === 'AUTHORITY_REFERRED') && (
                 <p className="notice sos-referral-status" role="status">
                   Đã ghi nhận chuyển cơ quan chức năng lúc {timeLabel(detail.timeline.items.find((event) => event.event_type === 'AUTHORITY_REFERRED')!.occurred_at)}. Xem chi tiết trong tab Lịch sử.
@@ -1687,14 +1694,10 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                     <span className="mission-done-card__icon" aria-hidden="true">✓</span>
                     <div className="mission-done-card__body">
                       <strong>Đội đã hoàn thành nhiệm vụ trong chu kỳ này</strong>
-                      <p>Kiểm tra minh chứng trong Lịch sử nhiệm vụ. Nếu nhu cầu đã được đáp ứng, kết thúc xử lý SOS; nếu chưa, giao thêm đội.</p>
+                      <p>Kiểm tra minh chứng rồi kết thúc, hoặc giao thêm đội.</p>
                     </div>
                     <div className="mission-done-card__actions">
-                      <button type="button" className="button primary" onClick={() => {
-                        const target = document.getElementById('resolve-request');
-                        target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                        target?.querySelector<HTMLInputElement>('input[type="radio"]:checked, input[type="radio"]')?.focus({ preventScroll: true });
-                      }}>Kết thúc xử lý SOS <span aria-hidden="true">↓</span></button>
+                      <button type="button" className="button primary" onClick={() => setCloseoutOpen(true)}>Kết thúc xử lý SOS</button>
                       <button type="button" className="button secondary" aria-expanded={showAdditionalDispatch} onClick={() => setShowAdditionalDispatch((value) => !value)}>
                         {showAdditionalDispatch ? 'Ẩn danh sách đội' : 'Vẫn cần giao thêm đội'}
                       </button>
@@ -1702,8 +1705,8 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                   </div>}
                   {showTeamCandidates && <>
                   <div className="dispatch-section-heading"><div><h3>Đội có thể giao nhiệm vụ</h3>
-                  {Boolean(candidates?.items.length) && <p className="muted">Đội gợi ý cân bằng khoảng cách và khối lượng việc. Chọn đội khác cần ghi lý do.</p>}</div>
-                  <button type="button" className="button secondary small" disabled={candidateLoading} onClick={() => setDetailRevision(value => value + 1)}>{candidateLoading ? 'Đang tải đội…' : 'Tải lại đội phù hợp'}</button></div>
+                  {Boolean(candidates?.items.length) && <p className="muted">Gợi ý cân bằng khoảng cách và khối lượng việc. Chọn đội khác cần ghi lý do.</p>}</div>
+                  <button type="button" className="icon-button" title="Tải lại đội phù hợp" aria-label="Tải lại đội phù hợp" disabled={candidateLoading} onClick={() => setDetailRevision(value => value + 1)}><span aria-hidden="true">↻</span></button></div>
                   {candidateError && (
                     <p role="alert" className="notice error">
                       Tải đội phù hợp: {candidateError}
@@ -1712,12 +1715,21 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                   {!candidates && !candidateError && <p role="status">Đang tải đội phù hợp…</p>}
                   {candidates?.items.length === 0 && (
                     <div role="status" className="dispatch-empty">
-                      <strong>Chưa có đội phù hợp để giao nhiệm vụ</strong>
-                      <p>{canReportTeamPosition && candidates.unknown_position.some((candidate) => candidate.team.reporting_mode === 'COORDINATOR')
-                        ? 'Có đội chưa có GPS: báo vị trí của đội ở mục bên dưới rồi bấm “Tải lại đội phù hợp”.'
-                        : subCoordinator
-                          ? 'Liên hệ trưởng đội hoặc điều phối viên chính để xác nhận đội sẵn sàng và cập nhật vị trí. Sau đó bấm “Tải lại đội phù hợp”.'
-                          : 'Đội cần sẵn sàng, có vị trí mới và phù hợp yêu cầu. Kiểm tra trong mục Đội cứu hộ rồi tải lại danh sách.'}</p>
+                      <span className="dispatch-empty__icon" aria-hidden="true">!</span>
+                      <div className="dispatch-empty__body">
+                        <strong>Chưa có đội phù hợp</strong>
+                        {canReportTeamPosition && candidates.unknown_position.some((candidate) => candidate.team.reporting_mode === 'COORDINATOR')
+                          ? <p>Có đội ngoài hệ thống chưa có vị trí: bấm “Báo vị trí” ở bảng bên dưới.</p>
+                          : <ul>
+                            <li>Đội đang nghỉ hoặc chờ xác nhận sẵn sàng</li>
+                            <li>Đội đang làm nhiệm vụ khác</li>
+                            <li>Vị trí đội ở quá xa, hoặc đội thiếu kỹ năng cho loại sự cố này</li>
+                          </ul>}
+                        <div className="dispatch-empty__actions">
+                          {!subCoordinator && <TeamReadinessQueue refreshRevision={revision} onChanged={() => setDetailRevision(value => value + 1)} />}
+                          {subCoordinator && <span className="muted">Liên hệ điều phối viên chính để xác nhận đội sẵn sàng.</span>}
+                        </div>
+                      </div>
                     </div>
                   )}
                   {[...(candidates?.items ?? [])].sort((a, b) => Number(b.suggested) - Number(a.suggested)).map((candidate, _index, all) => (
@@ -1774,24 +1786,17 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                     </div>
                     </OptionalFold>
                   ))}
-                  {canReportTeamPosition && Boolean(candidates?.unknown_position.some((candidate) => candidate.team.reporting_mode === 'COORDINATOR')) &&
-                    <details className="sos-fold">
-                      <summary>Báo vị trí cho đội chưa có GPS ({candidates?.unknown_position.filter((candidate) => candidate.team.reporting_mode === 'COORDINATOR').length})</summary>
-                      {candidates?.unknown_position.filter((candidate) => candidate.team.reporting_mode === 'COORDINATOR').map((candidate) =>
-                        <CoordinatorTeamPositionForm key={candidate.team.id} teamId={candidate.team.id} teamName={candidate.team.name}
-                          onSuccess={() => setDetailRevision((value) => value + 1)} />)}
-                    </details>}
+                  {canReportTeamPosition && <ExternalTeamsPanel onChanged={() => setDetailRevision((value) => value + 1)} />}
                   </>}
                 </section>
               )}
               {['TRIAGED', 'DISPATCHED', 'IN_PROGRESS'].includes(detail.status) && (
-                <div id="resolve-request" className="sos-closeout">
-                  <div className="sos-closeout__head">
-                    <div>
-                      <h3>Kết thúc xử lý SOS</h3>
-                      <p className="muted">Chọn căn cứ, ghi nội dung đã đối chiếu rồi xác nhận. Người báo sẽ thấy SOS đã được xử lý.</p>
-                    </div>
-                  </div>
+                <div id="resolve-request" className="sos-dispatch-footer">
+                  <button type="button" className={`button${completedInCurrentCycle ? ' primary' : ' secondary'}`} onClick={() => setCloseoutOpen(true)}>Kết thúc xử lý SOS</button>
+                  <CancelRequestPopup key={`cancel-${detail.id}-${detail.version}`}
+                    requestId={detail.id} version={detail.version} onCompleted={done} onStale={refreshAfterConflict} />
+                  <DetailSurface modal open={closeoutOpen} label="Kết thúc xử lý SOS" heading="Kết thúc xử lý SOS" className="sos-closeout-dialog" onClose={() => setCloseoutOpen(false)}>
+                  <div className="sos-closeout">
                   <AsyncRequestForm
                   key={`resolve-${detail.id}-${detail.version}`}
                   requestId={detail.id}
@@ -1802,15 +1807,15 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                     href: `#active-mission-${mission.id}`,
                   }))}
                   hideTitle
-                  suggestedBasis={completedInCurrentCycle ? 'RESCUE_COMPLETED' : undefined}
-                  onCompleted={done}
-                  onStale={refreshAfterConflict}
+                  suggestedBasis={detail.mission_history?.items.some((mission) => mission.status === 'COMPLETED') ? 'RESCUE_COMPLETED' : undefined}
+                  disabledBases={detail.mission_history?.items.some((mission) => mission.status === 'COMPLETED')
+                    ? { SUPPLY_ONLY: 'Không dùng khi đã có đội hoàn thành nhiệm vụ.', NO_ACTION_REQUIRED: 'Không dùng khi đã có đội hoàn thành nhiệm vụ.' }
+                    : { RESCUE_COMPLETED: 'Cần có nhiệm vụ đội đã hoàn thành.' }}
+                  onCompleted={() => { setCloseoutOpen(false); done(); }}
+                  onStale={() => { setCloseoutOpen(false); refreshAfterConflict(); }}
                 />
-                  <div className="sos-closeout__cancel">
-                    <span className="muted">SOS báo nhầm hoặc không còn cần xử lý?</span>
-                    <CancelRequestPopup key={`cancel-${detail.id}-${detail.version}`}
-                      requestId={detail.id} version={detail.version} onCompleted={done} onStale={refreshAfterConflict} />
                   </div>
+                  </DetailSurface>
                 </div>
               )}
               {['RESOLVED', 'CLOSED'].includes(detail.status) && <div className="sos-terminal-actions">
@@ -1933,7 +1938,29 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
             />
             </div>
             </div>
-          </>
+          </div>
+          <aside className="sos-detail-split__map" hidden={mapHidden}>
+              {/* Sticky map column beside the record (like the citizen SOS form), the same for main and sub coordinators. */}
+              <section className="sos-location-map" aria-labelledby="sos-location-map-title">
+                <div className="sos-location-map__head">
+                  <h3 id="sos-location-map-title">Vị trí SOS và thời tiết</h3>
+                <button type="button" className="sos-map-hide" onClick={toggleMap} title="Ẩn bản đồ (phím M)" aria-label="Ẩn bản đồ (phím M)">Ẩn <kbd>M</kbd></button>
+                  {detail.subject.location && <span className="muted">
+                    {detail.subject.location.coordinates[1].toFixed(5)}, {detail.subject.location.coordinates[0].toFixed(5)}
+                  </span>}
+                </div>
+                {detail.subject.location
+                  ? <HeatmapPanel compact showLayers={false} weatherLayers selected={{
+                    id: detail.id,
+                    trackingCode: detail.tracking_code,
+                    status: detail.status,
+                    longitude: detail.subject.location.coordinates[0],
+                    latitude: detail.subject.location.coordinates[1],
+                  }} />
+                  : <p className="notice">Hồ sơ chưa có tọa độ nên không thể hiển thị trên bản đồ. Liên hệ người báo để xác nhận vị trí.</p>}
+              </section>
+          </aside>
+          </div>
         )}
       </section></section>}
     </div>

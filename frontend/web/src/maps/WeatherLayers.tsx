@@ -193,8 +193,8 @@ function labelIcon(temp: number) {
   });
 }
 
-export function WeatherLayers({ map }: { map: L.Map | null }) {
-  const [active, setActive] = useState<Record<LayerKey, boolean>>({ rain: true, cloud: false, wind: false, temp: false, storm: false });
+export function WeatherLayers({ map, rainOnStart = true }: { map: L.Map | null; rainOnStart?: boolean }) {
+  const [active, setActive] = useState<Record<LayerKey, boolean>>({ rain: rainOnStart, cloud: false, wind: false, temp: false, storm: false });
   const [status, setStatus] = useState<Record<LayerKey, Status>>({ rain: 'idle', cloud: 'idle', wind: 'idle', temp: 'idle', storm: 'idle' });
   const [storms, setStorms] = useState<Storm[]>([]);
   const [grid, setGrid] = useState<Grid | null>(null);

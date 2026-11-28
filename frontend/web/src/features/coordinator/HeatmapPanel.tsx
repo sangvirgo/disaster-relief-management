@@ -126,6 +126,7 @@ function HeatmapCanvas({
   radarUrl,
   hideCellPins = false,
   onMap,
+  focusZoom = 14,
 }: {
   cells: HeatmapCell[];
   selected: SelectedSos | null;
@@ -138,6 +139,8 @@ function HeatmapCanvas({
   hideCellPins?: boolean;
   /** Receives the Leaflet map once created (and null on teardown) so overlays such as WeatherLayers can attach. */
   onMap?: (map: L.Map | null) => void;
+  /** Zoom used when centring on the selected SOS. */
+  focusZoom?: number;
 }) {
   const elementRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -422,7 +425,7 @@ function HeatmapCanvas({
       .addTo(markerLayer);
     marker.getElement()?.setAttribute('role', 'img');
     marker.getElement()?.setAttribute('aria-label', `Vị trí SOS ${selected.trackingCode} đang chọn`);
-    map.setView(position, Math.max(map.getZoom(), 14), { animate: false });
+    map.setView(position, Math.max(map.getZoom(), focusZoom), { animate: false });
     map.invalidateSize();
   }, [selected?.id, selected?.latitude, selected?.longitude]);
 
@@ -569,8 +572,9 @@ export function HeatmapPanel({
         <div className={weatherLayers ? 'heatmap-map-shell heatmap-map-shell--weather' : 'heatmap-map-shell'}>
           <HeatmapCanvas hideCellPins={compact && Boolean(selected)} cells={visibleCells} selected={selected} onResolutionChange={onResolutionChange} onZoomChange={onZoomChange} heatOpacity={heatOpacity}
             weather={showWeather ? weatherData?.locations ?? [] : []}
-            radarUrl={showRadar ? radarTemplate : null} onMap={weatherLayers ? setLeafletMap : undefined} />
-          {weatherLayers && <WeatherLayers map={leafletMap} />}
+            radarUrl={showRadar ? radarTemplate : null} onMap={weatherLayers ? setLeafletMap : undefined} focusZoom={weatherLayers ? 11 : 14} />
+          {/* Radar tiles stop at zoom 7, so at street level they blur into a wash: start with it off and let the user turn it on. */}
+          {weatherLayers && <WeatherLayers map={leafletMap} rainOnStart={false} />}
           {weatherLayers && weatherData && (() => {
             const alerted = weatherData.locations.filter((place) => place.alerts.length).length;
             return <p className={`heatmap-weather-badge${alerted ? ' heatmap-weather-badge--alert' : ''}`} role="status"

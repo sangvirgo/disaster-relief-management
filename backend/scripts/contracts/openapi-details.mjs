@@ -495,7 +495,7 @@ const responseDetails = {
     response: response(object({ items: item({ code: text, display_name: text }, ['code', 'display_name']) }, ['items'])),
   },
   responseTeamsList: {
-    query: ['availability', 'status'].map((name) => ({ name, in: 'query', required: false, schema: text })),
+    query: ['availability', 'status', 'reporting_mode'].map((name) => ({ name, in: 'query', required: false, schema: text })),
     response: response(teamPageSchema),
   },
   responseTeamsCreate: {
