@@ -11,6 +11,14 @@ export class CampaignPageQueryDto {
   declare limit?: number;
 }
 
+export class CampaignHistoryQueryDto extends CampaignPageQueryDto {
+  @IsOptional() @IsIn(['full', 'milestones'])
+  declare view?: 'full' | 'milestones';
+
+  @IsOptional() @IsIn(['sos', 'mission', 'coordination'])
+  declare kind?: 'sos' | 'mission' | 'coordination';
+}
+
 export class CommonQueueQueryDto extends CampaignPageQueryDto {
   @IsOptional() @IsIn(['UNMATCHED', 'CONFLICT'])
   declare match_state?: 'UNMATCHED' | 'CONFLICT';

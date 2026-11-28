@@ -309,6 +309,10 @@ const responseDetails = {
   },
   responseCampaignsHistory: {
     summary: 'Return a cursor-paginated campaign relief timeline.',
+    query: [
+      { name: 'view', in: 'query', schema: { type: 'string', enum: ['full', 'milestones'], default: 'full' }, description: 'Milestones selects rescue decisions and canonical mission transitions before pagination; full retains every audit event.' },
+      { name: 'kind', in: 'query', schema: { type: 'string', enum: ['sos', 'mission', 'coordination'] }, description: 'Filter event category before pagination. Cursors are bound to the selected view and kind.' },
+    ],
     response: response(page(campaignHistoryItemSchema.properties), 'Unified append-only coordination, request and mission history.'),
   },
   responseCampaignsHistorySummary: {

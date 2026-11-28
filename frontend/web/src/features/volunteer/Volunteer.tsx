@@ -217,8 +217,8 @@ export function Notices({ onOpenMission, onOpenRequest }: {
                   {!item.read_at && <span className="notice-unread-badge">Chưa đọc</span>}
                 </div>
                 <div className="notice-record-references">
-                  {typeof item.payload.request_id === 'string' && <span>Hồ sơ SOS · <code>{item.payload.request_id.slice(0, 8)}</code></span>}
-                  {typeof item.payload.mission_id === 'string' && <span>Nhiệm vụ · <code>{item.payload.mission_id.slice(0, 8)}</code></span>}
+                  {typeof item.payload.request_id === 'string' && <span>Hồ sơ SOS{typeof item.payload.tracking_code === 'string' && <> · <code>{item.payload.tracking_code}</code></>}</span>}
+                  {typeof item.payload.mission_id === 'string' && <span>Nhiệm vụ · <code>NV-{item.payload.mission_id.replaceAll('-', '').slice(-6).toUpperCase()}</code></span>}
                 </div>
                 <div className="notice-record-meta">
                   <time dateTime={item.created_at}>{timeLabel(item.created_at)}</time>
@@ -887,7 +887,6 @@ export function Volunteer({ page, currentUserId, sharingTeamId = '', sharingMess
                   <div>
                     <div className="team-profile-meta">
                       <span className="volunteer-team-kind">{label(selectedTeam.kind)}</span>
-                      {selectedTeamCanBeManaged && <span className="chip team-leader-badge">Bạn đang quản lý đội này</span>}
                     </div>
                     <div className="volunteer-team-title-row">
                       <h3>{selectedTeam.name}</h3>
@@ -895,7 +894,9 @@ export function Volunteer({ page, currentUserId, sharingTeamId = '', sharingMess
                           <span className="team-availability-dot" aria-hidden="true" />
                           {!teamActivityLoaded ? 'Đang kiểm tra' : busyTeamIds.has(selectedTeam.id) ? 'Đang có nhiệm vụ' : label(selectedTeam.availability)}
                       </span>
-                      {selectedTeamCanBeManaged && selectedTeam.status === 'ACTIVE' && selectedTeam.availability === 'AVAILABLE' && (
+                      {selectedTeamCanBeManaged && <div className="team-header-actions">
+                        <span className="chip team-leader-badge">Bạn đang quản lý đội này</span>
+                      {selectedTeam.status === 'ACTIVE' && selectedTeam.availability === 'AVAILABLE' && (
                         <button
                           type="button"
                           className="button danger team-header-pause"
@@ -905,6 +906,7 @@ export function Volunteer({ page, currentUserId, sharingTeamId = '', sharingMess
                           Chuyển sang Tạm ngưng
                         </button>
                       )}
+                      </div>}
                     </div>
                   </div>
                 </div>
@@ -973,38 +975,37 @@ export function Volunteer({ page, currentUserId, sharingTeamId = '', sharingMess
                   {teamDetailTab === 'location' && (
                     <div className="volunteer-team-panel-content volunteer-team-location">
                       <div className="volunteer-team-section-heading">
-                        <div><h4>Vị trí đội cứu hộ</h4><p>Điều phối viên dùng vị trí mới để so sánh đội phù hợp.</p></div>
+                        <div><h4>Vị trí đội cứu hộ</h4><p>Cập nhật vị trí để điều phối viên tìm đội phù hợp.</p></div>
+                        <span className="volunteer-team-location-status">{selectedTeam.position ? `Cập nhật ${positionAge(selectedTeam.position.age_s)} trước · ${label(selectedTeam.position.source)}` : 'Chưa có vị trí'}</span>
                       </div>
-                      <p className="volunteer-team-location-status">{selectedTeam.position ? `Cập nhật ${positionAge(selectedTeam.position.age_s)} trước · ${label(selectedTeam.position.source)}` : 'Đội chưa gửi vị trí.'}</p>
                       {selectedTeamCanBeManaged && selectedTeam.reporting_mode === 'APP' && selectedTeam.status === 'ACTIVE' ? <>
-                        <p>Chia sẻ GPS chỉ hoạt động khi bạn bật và tab trình duyệt đang mở.</p>
                         {onToggleSharing && <div className="team-sharing-control">
+                          <div className="team-sharing-control__intro"><strong>{sharingTeamId === selectedTeam.id ? 'Đang chia sẻ GPS' : 'Chia sẻ GPS tự động'}</strong><small>Gửi mỗi 2 phút khi bật và giữ tab này mở. Có thể dừng bất kỳ lúc nào.</small></div>
                           <button type="button" className={`button ${sharingTeamId === selectedTeam.id ? 'secondary' : ''}`}
                             onClick={() => onToggleSharing(selectedTeam.id)}>
                             {sharingTeamId === selectedTeam.id ? 'Dừng chia sẻ vị trí' : 'Bắt đầu chia sẻ vị trí'}
                           </button>
-                          <small>Tự động gửi GPS mỗi 2 phút. Bạn có thể dừng bất kỳ lúc nào.</small>
                           {sharingTeamId === selectedTeam.id && sharingMessage && <p role="status" className="notice">{sharingMessage}</p>}
                         </div>}
                         <div className="volunteer-team-manual-location">
                           <div className="volunteer-team-section-heading">
-                            <div><h4>Cập nhật thủ công</h4><p>Dùng GPS thiết bị hoặc ghim vị trí trên bản đồ.</p></div>
+                            <div><h4>Đặt vị trí trên bản đồ</h4><p>Tìm địa chỉ, bấm ghim hoặc lấy GPS rồi lưu vị trí.</p></div>
                             <button type="button" className="button secondary" onClick={getTeamDeviceLocation} disabled={busy || evidencePending || missionLoading}>
                               Lấy vị trí GPS
                             </button>
                           </div>
                           <LocationPicker
                             value={teamPoint}
-                            initiallyOpen selectOnPick
+                            initiallyOpen hideToggle selectOnPick
                             onSelect={(point) => { setTeamPoint(point); setTeamAccuracy(null); }}
                           />
-                          {teamPoint && (
+                          {teamPoint && <div className="team-location-save">
                             <p role="status">
                               Tọa độ đã chọn: <strong>{teamPoint.latitude.toFixed(6)}, {teamPoint.longitude.toFixed(6)}</strong>
                               {teamAccuracy ? ` (độ chính xác ~${Math.round(teamAccuracy)}m)` : ''}
                             </p>
-                          )}
-                          {teamPoint && <button type="button" className="button" disabled={busy || evidencePending || missionLoading} onClick={() => updateTeamPosition(selectedTeam)}>Lưu vị trí mới</button>}
+                            <button type="button" className="button" disabled={busy || evidencePending || missionLoading} onClick={() => updateTeamPosition(selectedTeam)}>Lưu vị trí mới</button>
+                          </div>}
                         </div>
                       </> : <p className="muted">Vị trí chỉ có thể cập nhật bởi trưởng đội dùng ứng dụng.</p>}
                     </div>

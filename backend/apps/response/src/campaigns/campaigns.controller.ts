@@ -4,7 +4,7 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { IdempotencyKeyInterceptor } from '@c48/technical/idempotency/idempotency.interceptor';
-import { CampaignActionDto, CampaignAreaDto, CampaignCreateDto, CommonQueueQueryDto, CampaignPageQueryDto, CampaignPatchDto, CampaignReasonActionDto } from './campaigns.dto';
+import { CampaignHistoryQueryDto, CampaignActionDto, CampaignAreaDto, CampaignCreateDto, CommonQueueQueryDto, CampaignPageQueryDto, CampaignPatchDto, CampaignReasonActionDto } from './campaigns.dto';
 import { CampaignCommandRequest, CampaignsService } from './campaigns.service';
 import { CampaignCoordinationService } from './campaign-coordination.service';
 import { ResponseServiceTokenGuard } from './service-token.guard';
@@ -77,10 +77,10 @@ export class CampaignsController {
   }
 
   @Get('campaigns/:id/history')
-  async history(@Param('id', new ParseUUIDPipe({ version: 'all' })) id: string, @Query() query: CampaignPageQueryDto,
+  async history(@Param('id', new ParseUUIDPipe({ version: 'all' })) id: string, @Query() query: CampaignHistoryQueryDto,
     @Req() request: Request, @Res({ passthrough: true }) response: Response) {
     noStore(response);
-    return this.coordination.history(id, query.cursor, query.limit, request);
+    return this.coordination.history(id, query.cursor, query.limit, request, query);
   }
 
   @Get('campaigns')

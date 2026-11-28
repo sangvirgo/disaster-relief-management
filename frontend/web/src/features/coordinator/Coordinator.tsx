@@ -17,7 +17,7 @@ import { RequestTimeline } from './RequestTimeline';
 import { RequestEvidencePanel } from './RequestEvidencePanel';
 import { TeamReadinessQueue } from './TeamReadinessQueue';
 import { MissionSupplyPanel } from '../supply/MissionSupplyPanel';
-import { type Me } from '../../auth/session';
+import { isSubCoordinator, type Me } from '../../auth/session';
 import './coordinator-detail.css';
 
 type QueueItem = {
@@ -538,11 +538,13 @@ function claimBlockedBy(detail: Pick<Detail, 'handled_by' | 'handled_at'>, curre
 }
 
 export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnassigned = false,
-  campaignId, campaignMatchState, initialUnassignedOnly = false }: {
+  campaignId, campaignMatchState, initialUnassignedOnly = false, user, onRequestClosed }: {
   page: string; initialRequestId?: string; currentUserId: string; canSeeUnassigned?: boolean;
   campaignId?: string; campaignMatchState?: 'UNMATCHED' | 'CONFLICT'; initialUnassignedOnly?: boolean;
   user?: Me;
+  onRequestClosed?: () => void;
 }) {
+  const subCoordinator = isSubCoordinator(user ?? null);
   const restoredView = useRef<QueueView | null>(null);
   if (!restoredView.current) restoredView.current = readQueueView(currentUserId, page);
   const [queue, setQueue] = useState<Queue | null>(null);
@@ -553,6 +555,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
   const [detail, setDetail] = useState<Detail | null>(null);
   const [candidates, setCandidates] = useState<Candidates | null>(null);
   const [candidateError, setCandidateError] = useState('');
+  const [candidateLoading, setCandidateLoading] = useState(false);
   const [duplicates, setDuplicates] = useState<DuplicateCandidate[]>([]);
   const [duplicateError, setDuplicateError] = useState('');
   const [reviewLane, setReviewLane] = useState(restoredView.current.reviewLane);
@@ -763,6 +766,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
   useEffect(() => {
     if (!selected || !detail || detail.status !== 'TRIAGED') return;
     let live = true;
+    setCandidateLoading(true);
     setCandidateError('');
     api<Candidates>('response', `/requests/${selected}/team-candidates`)
       .then((value) => {
@@ -771,7 +775,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
       .catch((cause) => {
         if (live)
           setCandidateError(cause instanceof Error ? cause.message : 'Không thể tải đội phù hợp.');
-      });
+      }).finally(() => { if (live) setCandidateLoading(false); });
     return () => {
       live = false;
     };
@@ -974,6 +978,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
     setDetail(null);
     setDetailError('');
     setUpdateMessage('');
+    onRequestClosed?.();
     requestAnimationFrame(() => window.scrollTo({ top: listScrollRef.current }));
   }
   function changeTab(tab: SosTab) {
@@ -995,7 +1000,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
           <div className="queue-filter-toolbar">
             <button type="button" className="icon-button" title="Làm mới SOS" aria-label="Làm mới SOS" disabled={loading}
               onClick={() => setRevision((value) => value + 1)}><span aria-hidden="true">↻</span></button>
-            <TeamReadinessQueue refreshRevision={revision} onChanged={() => { setRevision(value => value + 1); setDetailRevision(value => value + 1); }} />
+            {!subCoordinator && <TeamReadinessQueue refreshRevision={revision} onChanged={() => { setRevision(value => value + 1); setDetailRevision(value => value + 1); }} />}
           </div>
         </div>
         <form className="filter-bar queue-filter-bar" onSubmit={submitQueueSearch} role="search" aria-label="Tìm và lọc SOS">
@@ -1141,8 +1146,8 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 )}
             </header>
             {/* One compact strip instead of three stacked boxes: campaign, who handles it, and the next step. */}
-            <div className="sos-strip">
-              <section className="sos-strip__cell" aria-label="Chiến dịch của SOS">
+            <div className={`sos-strip${subCoordinator ? ' sos-strip--sub' : ''}`}>
+              {!subCoordinator && <section className="sos-strip__cell" aria-label="Chiến dịch của SOS">
                 <small>Chiến dịch</small>
                 <strong>{detail.campaign_id ? campaignOptions.find(campaign => campaign.value === detail.campaign_id)?.label ?? 'Chiến dịch đã gắn' : 'Chưa có chiến dịch'}</strong>
                 {detail.campaign_id && canSeeUnassigned && !['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) &&
@@ -1157,14 +1162,14 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                       warning: 'Xác nhận gỡ yêu cầu này khỏi chiến dịch?',
                     })}
                   </fieldset>}
-              </section>
+              </section>}
               {!['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) && <section className="sos-strip__cell" aria-label="Nhận xử lý hồ sơ">
                 <small>Người xử lý</small>
                 <strong role="status">{detail.handled_by && claimActive(detail)
                   ? detail.handled_by === currentUserId ? 'Bạn đang xử lý' : detail.handled_by_name || 'Điều phối viên khác'
                   : 'Chưa có người nhận'}</strong>
                 {detail.handled_by === currentUserId && claimActive(detail)
-                  ? <button type="button" className="text-action" disabled={claimBusy} onClick={() => void runClaim('release')}>Nhả xử lý</button>
+                  ? <button type="button" className="text-action" disabled={claimBusy} onClick={() => void runClaim('release')}>Trả về hàng đợi</button>
                   : <button type="button" className="button primary small" disabled={claimBusy || claimBlockedBy(detail, currentUserId)} onClick={() => void runClaim('claim')}>Nhận xử lý</button>}
               </section>}
               {!['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) && <nav className="sos-strip__cell sos-strip__next" aria-label="Bước xử lý SOS">
@@ -1647,7 +1652,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
               </div>
               <div className="sos-tab-group" hidden={activeTab !== 'dispatch'}>
               {detail.status === 'TRIAGED' && (
-                <section>
+                <section className="dispatch-candidates">
                   {latestCompletedMissionId && !completionCheck && <p role="status">Đang đối chiếu nhiệm vụ đã hoàn thành với chu kỳ xử lý hiện tại…</p>}
                   {completionCheck?.error && <p className="notice warning" role="alert">Chưa đối chiếu được nhiệm vụ đã hoàn thành. Hãy bấm “Làm mới SOS” trước khi giao thêm đội.</p>}
                   {completedInCurrentCycle && <div className="notice">
@@ -1659,8 +1664,9 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                     </button></div>
                   </div>}
                   {showTeamCandidates && <>
-                  <h3>Đội có thể giao nhiệm vụ</h3>
-                  <p className="muted">Đội đầu tiên là gợi ý cân bằng khoảng cách và khối lượng việc; chỉ chọn đội khác khi có lý do.</p>
+                  <div className="dispatch-section-heading"><div><h3>Đội có thể giao nhiệm vụ</h3>
+                  {Boolean(candidates?.items.length) && <p className="muted">Đội gợi ý cân bằng khoảng cách và khối lượng việc. Chọn đội khác cần ghi lý do.</p>}</div>
+                  <button type="button" className="button secondary small" disabled={candidateLoading} onClick={() => setDetailRevision(value => value + 1)}>{candidateLoading ? 'Đang tải đội…' : 'Tải lại đội phù hợp'}</button></div>
                   {candidateError && (
                     <p role="alert" className="notice error">
                       Tải đội phù hợp: {candidateError}
@@ -1668,9 +1674,12 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                   )}
                   {!candidates && !candidateError && <p role="status">Đang tải đội phù hợp…</p>}
                   {candidates?.items.length === 0 && (
-                    <p role="status" className="notice warning">
-                      Chưa có đội đủ điều kiện để giao nhiệm vụ. Hãy cập nhật tình trạng và vị trí đội trong mục Đội cứu hộ, rồi tải lại SOS.
-                    </p>
+                    <div role="status" className="dispatch-empty">
+                      <strong>Chưa có đội phù hợp để giao nhiệm vụ</strong>
+                      <p>{subCoordinator
+                        ? 'Liên hệ trưởng đội hoặc điều phối viên chính để xác nhận đội sẵn sàng và cập nhật vị trí. Sau đó bấm “Tải lại đội phù hợp”.'
+                        : 'Đội cần sẵn sàng, có vị trí mới và phù hợp yêu cầu. Kiểm tra trong mục Đội cứu hộ rồi tải lại danh sách.'}</p>
+                    </div>
                   )}
                   {[...(candidates?.items ?? [])].sort((a, b) => Number(b.suggested) - Number(a.suggested)).map((candidate, _index, all) => (
                     <OptionalFold key={candidate.team.id} fold={!candidate.suggested && all.some((item) => item.suggested)}
@@ -1726,7 +1735,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                     </div>
                     </OptionalFold>
                   ))}
-                  {Boolean(candidates?.unknown_position.some((candidate) => candidate.team.reporting_mode === 'COORDINATOR')) &&
+                  {!subCoordinator && Boolean(candidates?.unknown_position.some((candidate) => candidate.team.reporting_mode === 'COORDINATOR')) &&
                     <details className="sos-fold">
                       <summary>Cập nhật vị trí đội do điều phối viên báo</summary>
                       {candidates?.unknown_position.filter((candidate) => candidate.team.reporting_mode === 'COORDINATOR').map((candidate) =>
@@ -1737,6 +1746,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 </section>
               )}
               {['TRIAGED', 'DISPATCHED', 'IN_PROGRESS'].includes(detail.status) && (
+                <OptionalFold fold={subCoordinator && !completedInCurrentCycle} summary="Kết thúc hoặc hủy SOS">
                 <div id="resolve-request" className="sos-closeout">
                   <div className="sos-closeout__head">
                     <h3>Kết thúc xử lý yêu cầu</h3>
@@ -1756,6 +1766,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                   onCompleted={done}
                   onStale={refreshAfterConflict}
                 /></div>
+                </OptionalFold>
               )}
               {['RESOLVED', 'CLOSED'].includes(detail.status) && <div className="sos-terminal-actions">
               {detail.status === 'RESOLVED' &&

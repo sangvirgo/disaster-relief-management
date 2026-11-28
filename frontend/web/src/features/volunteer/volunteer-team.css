@@ -273,9 +273,13 @@
 }
 
 .volunteer-team-location .team-sharing-control {
-  justify-items: start;
-  gap: var(--space-2);
-  padding: var(--space-4);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  padding: 12px 14px;
+  border: 1px solid #bdd5fb;
   border-radius: var(--radius-md);
   background: var(--color-primary-bg);
 }
@@ -288,6 +292,21 @@
 
 .volunteer-team-location .team-sharing-control p {
   margin: 0;
+  flex-basis: 100%;
+}
+
+.team-sharing-control__intro { display: grid; gap: 4px; flex: 1 1 240px; }
+.volunteer-team-location .team-sharing-control > .button { flex: 0 0 auto; }
+.volunteer-team-location > .volunteer-team-section-heading { align-items: center; flex-wrap: wrap; gap: 10px; }
+.volunteer-team-location-status { padding: 6px 10px; border-radius: 8px; background: #f1f5f9; color: #475569; font-size: 13px; }
+.volunteer-team-location .volunteer-team-manual-location { padding: 14px; border: 1px solid var(--color-surface-border); border-radius: 12px; }
+.volunteer-team-manual-location .volunteer-team-section-heading { align-items: center; flex-wrap: wrap; gap: 10px; }
+.volunteer-team-location .location-map { height: clamp(320px, 44vh, 480px); min-height: 320px; }
+.team-location-save { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 10px 12px; border-radius: 10px; background: #eff6ff; }
+.team-location-save p { margin: 0; color: #334155; font-size: 13px; overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .team-header-actions { margin-left: 0; width: 100%; }
+  .team-sharing-control__intro { flex-basis: 100%; }
 }
 
 .volunteer-team-location-status {

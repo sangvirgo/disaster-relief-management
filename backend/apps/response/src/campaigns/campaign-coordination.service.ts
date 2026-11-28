@@ -376,26 +376,36 @@ export class CampaignCoordinationService {
     return { items, common_queue: { unmatched: totals.UNMATCHED ?? 0, conflict: totals.CONFLICT ?? 0 } };
   }
 
-  async history(campaignId: string, cursorValue: string | undefined, limitValue: number | undefined, request: Request): Promise<Record<string, unknown>> {
+  async history(campaignId: string, cursorValue: string | undefined, limitValue: number | undefined, request: Request, options: { view?: 'full' | 'milestones'; kind?: 'sos' | 'mission' | 'coordination' } = {}): Promise<Record<string, unknown>> {
     const session = await this.sessions.require(request);
     await this.assertCampaignHistoryAccess(campaignId, session);
     const limit = limitValue ?? 50;
-    const filters = { campaign_id: campaignId, user_id: session.userId };
+    const milestones = options.view === 'milestones';
+    const filters = { campaign_id: campaignId, user_id: session.userId,
+      ...(milestones ? { view: 'milestones' } : {}), ...(options.kind ? { kind: options.kind } : {}) };
+    const milestoneTypes = [
+      'REQUEST_VERIFIED', 'REQUEST_TRIAGED', 'PRIORITY_CHANGED', 'PRIORITY_REDUCED',
+      'REQUEST_RESOLVED', 'REQUEST_CANCELLED', 'REQUEST_REJECTED', 'REQUEST_DUPLICATED', 'REQUEST_REOPENED',
+      'REPORTER_SUPPLEMENT', 'SUPPLEMENT_REVIEW', 'AUTHORITY_REFERRED', 'CLAIM_TAKEN_OVER',
+      'COORDINATION_CAMPAIGN_CLOSED',
+      'MISSION_OFFERED', 'MISSION_ACCEPTED', 'MISSION_DECLINED', 'MISSION_EN_ROUTE', 'MISSION_ON_SCENE',
+      'MISSION_COMPLETED', 'MISSION_FAILED', 'MISSION_CANCELLED',
+    ];
     const cursor = cursorValue ? decodeKeysetCursor(cursorValue, filters) : undefined;
     const rowsFound = rows(await this.dataSource.query(
       `WITH timeline AS (
          SELECT md5(ce.id::text||':STARTED')::uuid AS id,ce.started_at AS occurred_at,'COORDINATION_STARTED'::text AS event_type,
-                ce.user_id AS actor_user_id,NULL::uuid AS request_id,NULL::uuid AS mission_id,jsonb_build_object('engagement_id',ce.id) AS payload
+                ce.user_id AS actor_user_id,NULL::uuid AS request_id,NULL::uuid AS mission_id,jsonb_build_object('engagement_id',ce.id) AS payload,'coordination'::text AS source
            FROM campaign_engagement ce WHERE ce.campaign_id=$1
          UNION ALL
          SELECT md5(ce.id::text||':'||COALESCE(ce.ended_reason,'EXPIRED'))::uuid,
                 COALESCE(ce.ended_at,ce.last_active_at+interval '${ENGAGEMENT_TTL_MINUTES} minutes'),
                 CASE WHEN ce.ended_reason='LEFT' THEN 'COORDINATION_LEFT' WHEN ce.ended_reason IS NULL OR ce.ended_reason='EXPIRED' THEN 'COORDINATION_EXPIRED'
                   WHEN ce.ended_reason='SWITCHED' THEN 'COORDINATION_SWITCHED' ELSE 'COORDINATION_CAMPAIGN_CLOSED' END,
-                ce.user_id,NULL::uuid,NULL::uuid,jsonb_build_object('engagement_id',ce.id,'ended_reason',ce.ended_reason)
+                ce.user_id,NULL::uuid,NULL::uuid,jsonb_build_object('engagement_id',ce.id,'ended_reason',ce.ended_reason),'coordination'::text
            FROM campaign_engagement ce WHERE ce.campaign_id=$1 AND (ce.ended_at IS NOT NULL OR ce.last_active_at <= now()-interval '${ENGAGEMENT_TTL_MINUTES} minutes')
          UNION ALL
-         SELECT e.id,e.occurred_at,e.event_type,e.actor_user_id,r.id,NULL::uuid,e.payload
+         SELECT e.id,e.occurred_at,e.event_type,e.actor_user_id,r.id,NULL::uuid,e.payload,'request'::text
            FROM request_event e JOIN assistance_request r ON r.id=e.request_id
           WHERE COALESCE(NULLIF(e.payload->>'campaign_id','')::uuid,NULLIF(e.payload->>'previous_campaign_id','')::uuid,r.campaign_id)=$1
              OR (e.payload ? 'campaign_candidate_ids' AND EXISTS (
@@ -408,7 +418,7 @@ export class CampaignCoordinationService {
                 ))
          UNION ALL
          SELECT me.id,me.occurred_at,'MISSION_'||me.to_status,me.actor_user_id,m.request_id,m.id,
-                jsonb_build_object('from_status',me.from_status,'to_status',me.to_status,'reason',me.reason,'outcome_note',me.outcome_note)
+                jsonb_build_object('from_status',me.from_status,'to_status',me.to_status,'reason',me.reason,'outcome_note',me.outcome_note),'mission'::text
            FROM mission_event me JOIN mission m ON m.id=me.mission_id JOIN assistance_request r ON r.id=m.request_id
           WHERE r.campaign_id=$1
        )
@@ -416,8 +426,11 @@ export class CampaignCoordinationService {
               to_char(occurred_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_occurred_at
          FROM timeline
         WHERE ($2::timestamptz IS NULL OR (occurred_at,id)<($2::timestamptz,$3::uuid))
+        AND ($5::text[] IS NULL OR (event_type=ANY($5::text[]) AND NOT (source='request' AND event_type LIKE 'MISSION_%')))
+          AND ($6::text IS NULL OR CASE WHEN event_type LIKE 'MISSION_%' THEN 'mission'
+            WHEN event_type LIKE 'COORDINATION_%' THEN 'coordination' ELSE 'sos' END=$6)
         ORDER BY occurred_at DESC,id DESC LIMIT $4`,
-      [campaignId, cursor?.sort[0] ?? null, cursor?.id ?? null, limit + 1],
+      [campaignId, cursor?.sort[0] ?? null, cursor?.id ?? null, limit + 1, milestones ? milestoneTypes : null, options.kind ?? null],
     ) as SqlRows<HistoryRow>);
     const more = rowsFound.length > limit;
     const page = rowsFound.slice(0, limit);

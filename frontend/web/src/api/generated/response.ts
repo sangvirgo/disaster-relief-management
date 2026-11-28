@@ -8861,6 +8861,10 @@ export interface operations {
     responseCampaignsHistory: {
         parameters: {
             query?: {
+                /** @description Milestones selects rescue decisions and canonical mission transitions before pagination; full retains every audit event. */
+                view?: "full" | "milestones";
+                /** @description Filter event category before pagination. Cursors are bound to the selected view and kind. */
+                kind?: "sos" | "mission" | "coordination";
                 cursor?: string;
                 limit?: number;
             };

@@ -24,6 +24,43 @@ function fixture(grants: ReporterSession['grants'], managerHandler?: (sql: strin
   return { service: new CampaignCoordinationService(dataSource, sessions, idempotency), managerQuery, dataSourceQuery, idempotency };
 }
 
+describe('CampaignCoordinationService history filters', () => {
+  function historyFixture() {
+    const result = fixture([{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }], sql => {
+      if (sql.includes('SELECT 1 FROM campaign WHERE')) return [{}];
+      if (!sql.includes('WITH timeline AS')) return [];
+      return [campaignA, campaignB].map(id => ({ id, occurred_at: '2026-11-28T01:00:00.000Z',
+        cursor_occurred_at: '2026-11-28T01:00:00.000000Z', event_type: 'MISSION_COMPLETED',
+        actor_user_id: null, request_id: null, mission_id: id, payload: {} }));
+    });
+    (result.service as unknown as { sessions: { lookupUsers: () => Promise<unknown[]> } }).sessions.lookupUsers = async () => [];
+    return result;
+  }
+
+  it('filters meaningful canonical transitions and category before keyset pagination', async () => {
+    const { service, dataSourceQuery } = historyFixture();
+    await service.history(campaignA, undefined, 1, request, { view: 'milestones', kind: 'mission' });
+    const [sql, values] = dataSourceQuery.mock.calls.find(([sql]) => sql.includes('WITH timeline AS'))!;
+    expect(sql.indexOf('event_type=ANY($5')).toBeLessThan(sql.indexOf('LIMIT $4'));
+    expect(sql).toContain("NOT (source='request' AND event_type LIKE 'MISSION_%')");
+    expect(values?.[4]).toEqual(expect.arrayContaining(['REQUEST_VERIFIED', 'PRIORITY_REDUCED', 'MISSION_ON_SCENE', 'MISSION_COMPLETED']));
+    expect(values?.[4]).not.toEqual(expect.arrayContaining(['REQUEST_SUBMITTED']));
+    expect(values?.[5]).toBe('mission');
+  });
+
+  it('retains the complete legacy view and binds filtered cursors to view and category', async () => {
+    const { service, dataSourceQuery } = historyFixture();
+    const full = await service.history(campaignA, undefined, 1, request);
+    const query = dataSourceQuery.mock.calls.find(([sql]) => sql.includes('WITH timeline AS'))!;
+    expect(query[1]?.slice(4)).toEqual([null, null]);
+    await expect(service.history(campaignA, String(full.cursor), 1, request, { view: 'full' })).resolves.toBeDefined();
+    const filtered = await service.history(campaignA, undefined, 1, request, { view: 'milestones', kind: 'mission' });
+    await expect(service.history(campaignA, String(filtered.cursor), 1, request, { view: 'milestones', kind: 'sos' }))
+      .rejects.toMatchObject({ code: 'CURSOR_INVALID' });
+    await expect(service.history(campaignA, String(filtered.cursor), 1, request)).rejects.toMatchObject({ code: 'CURSOR_INVALID' });
+  });
+});
+
 describe('CampaignCoordinationService triage', () => {
   it('pages the unassigned SOS queue newest first with a matching descending cursor', async () => {
     const time = new Date('2026-11-28T03:00:00.123Z');

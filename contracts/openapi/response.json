@@ -15549,6 +15549,34 @@
             }
           },
           {
+            "name": "view",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "full",
+                "milestones"
+              ],
+              "default": "full"
+            },
+            "description": "Milestones selects rescue decisions and canonical mission transitions before pagination; full retains every audit event.",
+            "required": false
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "sos",
+                "mission",
+                "coordination"
+              ]
+            },
+            "description": "Filter event category before pagination. Cursors are bound to the selected view and kind.",
+            "required": false
+          },
+          {
             "name": "cursor",
             "in": "query",
             "required": false,

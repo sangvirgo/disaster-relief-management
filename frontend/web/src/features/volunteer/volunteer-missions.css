@@ -284,7 +284,8 @@
 .team-profile-header > div { width: 100%; min-width: 0; }
 .team-profile-meta { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .team-profile-meta .volunteer-team-kind { margin: 0; }
-.volunteer-team-title-row .team-header-pause { margin: 0 0 0 auto; width: auto; }
+.team-header-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-left: auto; }
+.volunteer-team-title-row .team-header-pause { margin: 0; width: auto; }
 .volunteer-team-title-row .team-header-status.is-ready { color: #087443; background: #eafaf0; border-color: #a6dfbd; }
 
 .volunteer-mission-context h3,

@@ -1636,8 +1636,15 @@
 .history-filter button { border: 1px solid #cbd5e1; background: #fff; border-radius: 999px; padding: 4px 14px; cursor: pointer; }
 .history-filter button.active { background: #2563eb; border-color: #2563eb; color: #fff; }
 .history-day h3 { margin: 16px 0 8px; font-size: 0.9rem; text-transform: capitalize; color: #475569; }
-.history-day ol { list-style: none; margin: 0; padding: 0 0 0 18px; border-left: 2px solid #e2e8f0; display: grid; gap: 10px; }
-.history-event { display: flex; gap: 10px; position: relative; }
+.history-day ol { list-style: none; margin: 0; padding: 0 0 0 18px; border-left: 2px solid #e2e8f0; display: grid; gap: 0; }
+.history-event { display: flex; align-items: flex-start; gap: 10px; position: relative; padding: 8px 0; }
+.history-event + .history-event { border-top: 1px solid #e9eef5; }
+.history-event__body { display: flex; align-items: baseline; flex-wrap: wrap; gap: 3px 12px; flex: 1; min-width: 0; }
+.history-event__body .history-event__meta { margin-left: auto; }
+.history-event__body .history-event__note { flex-basis: 100%; overflow-wrap: anywhere; }
+.history-event__note--expandable summary { width: fit-content; color: #1d4ed8; font-weight: 600; cursor: pointer; }
+.history-event__note--expandable[open] summary { margin-bottom: 4px; }
+@media (max-width: 700px) { .history-event__body .history-event__meta { margin-left: 0; flex-basis: 100%; } }
 .history-event__icon { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 50%; margin-left: -34px; background: #fff; border: 2px solid #cbd5e1; font-size: 14px; }
 .history-event--sos .history-event__icon { border-color: #f97316; }
 .history-event--mission .history-event__icon { border-color: #10b981; }

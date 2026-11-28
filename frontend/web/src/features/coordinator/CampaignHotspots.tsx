@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { CampaignAreaMap, type AreaMapCampaign } from '../../maps/CampaignAreaMap';
 import { Badge } from '../../components/ui/Badge';
 import { Pager } from '../../components/ui/Pager';
-import { LIST_PAGE_SIZE } from '../../api/useCursorNav';
+import { LIST_PAGE_SIZE, useCursorNav } from '../../api/useCursorNav';
 
 export type HotspotTriage = {
   id: string; name: string;
@@ -55,13 +55,16 @@ function waitLabel(minutes: number): string {
  * Hotspot view for choosing a campaign: a map tinted by backlog plus the ranked list of ACTIVE campaigns. One click takes
  * a campaign and opens its SOS queue. Ranking is advisory; the coordinator decides which campaign to work.
  */
-export function CampaignHotspots({ triage, overview, engagedIds, loading, onEngage, onOpen, onRefresh }: {
+export function CampaignHotspots({ triage, overview, engagedIds, loading, onEngage, onOpen, onRefresh, showRefresh = true }: {
   triage: HotspotTriage[]; overview: HotspotOverview[]; engagedIds: string[]; loading: boolean;
   onEngage: (campaignId: string) => void; onOpen: (campaignId: string) => void; onRefresh: () => void;
+  showRefresh?: boolean;
 }) {
   const [filter, setFilter] = useState<Filter>('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [page, setPage] = useState(0);
+  const [cursor, setCursor, prevPage] = useCursorNav<string>('');
+  const page = Number(cursor || 0);
+  const [query, setQuery] = useState('');
   const limitReached = engagedIds.length >= MAX_ENGAGEMENTS;
 
   const hotspots = useMemo<Hotspot[]>(() => {
@@ -82,13 +85,14 @@ export function CampaignHotspots({ triage, overview, engagedIds, loading, onEnga
     return base.map((item) => ({ ...item, heat: max ? item.score / max : 0 }));
   }, [triage, overview]);
 
-  const visible = hotspots.filter((item) => filter === 'all'
+  const matching = hotspots.filter(item => item.name.toLocaleLowerCase('vi-VN').includes(query.trim().toLocaleLowerCase('vi-VN')));
+  const visible = matching.filter((item) => filter === 'all'
     || (filter === 'unattended' && item.coordinators === 0 && item.open > 0)
     || (filter === 'p1' && item.p1 > 0));
   const pageCount = Math.max(1, Math.ceil(visible.length / LIST_PAGE_SIZE));
   const currentPage = Math.min(page, pageCount - 1);
   const pageItems = visible.slice(currentPage * LIST_PAGE_SIZE, (currentPage + 1) * LIST_PAGE_SIZE);
-  const suggestion = hotspots.find((item) => !engagedIds.includes(item.id) && (item.p1 + item.p2 + item.overdue > 0 || item.open > 0));
+  const suggestion = visible.find((item) => !engagedIds.includes(item.id) && (item.p1 + item.p2 + item.overdue > 0 || item.open > 0));
   const mapCampaigns: AreaMapCampaign[] = visible.filter((item) => item.center && item.radius_m).map((item) => ({
     id: item.id, name: item.name, status: 'ACTIVE', center: item.center!, radius_m: item.radius_m!, heat: item.heat,
     summary: `${item.open} SOS mở${item.p1 ? ` · ${item.p1} P1` : ''}`, label: item.rank,
@@ -97,13 +101,17 @@ export function CampaignHotspots({ triage, overview, engagedIds, loading, onEnga
     unattended: sum.unattended + (item.coordinators === 0 && item.open > 0 ? 1 : 0) }), { open: 0, p1: 0, overdue: 0, unattended: 0 });
 
   function changeFilter(next: Filter) {
-    setFilter(next); setPage(0); setSelectedId(null);
+    setFilter(next); setCursor(''); setSelectedId(null);
   }
-  function select(id: string) {
+  const selected = visible.find(item => item.id === selectedId);
+  function select(id: string, fromList = false) {
     setSelectedId((current) => (current === id ? null : id));
     const index = visible.findIndex((item) => item.id === id);
-    if (index >= 0) setPage(Math.floor(index / LIST_PAGE_SIZE));
-    requestAnimationFrame(() => document.getElementById(`hotspot-${id}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+    if (index >= 0) setCursor(Math.floor(index / LIST_PAGE_SIZE) ? String(Math.floor(index / LIST_PAGE_SIZE)) : '');
+    if (fromList || window.matchMedia('(max-width: 1100px)').matches) requestAnimationFrame(() => {
+      const target = window.matchMedia('(max-width: 1100px)').matches ? 'hotspot-map-details' : 'hotspot-map-view';
+      document.getElementById(target)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    });
   }
 
   function action(item: Hotspot, primary = false) {
@@ -115,15 +123,15 @@ export function CampaignHotspots({ triage, overview, engagedIds, loading, onEnga
       onClick={() => onEngage(item.id)}>Nhận điều phối và xử lý</button>;
   }
 
-  return <section className="hotspots" aria-labelledby="hotspots-title">
-    <header className="hotspots__header">
+  return <section className="hotspots" aria-label="Chọn chiến dịch cần hỗ trợ">
+    {showRefresh && <header className="hotspots__header">
       <div>
         <span className="eyebrow">Chọn chiến dịch cần xử lý</span>
-        <h2 id="hotspots-title">Bản đồ điểm nóng</h2>
-        <p className="muted">Vùng càng đỏ càng nhiều SOS gấp đang chờ. Thứ tự chỉ để tham khảo, bạn tự chọn chiến dịch để xử lý.</p>
+        <h2 id="hotspots-title">Chiến dịch cần hỗ trợ</h2>
+        <p className="muted">So sánh SOS đang chờ rồi chọn chiến dịch để bắt đầu. Thứ tự là gợi ý, bạn quyết định.</p>
       </div>
-      <button type="button" className="button secondary refresh-action" disabled={loading} onClick={onRefresh}>Làm mới</button>
-    </header>
+      {showRefresh && <button type="button" className="button secondary refresh-action" disabled={loading} onClick={onRefresh}>Làm mới</button>}
+    </header>}
 
     <dl className="hotspots__totals" aria-label="Tổng quan các chiến dịch đang hoạt động">
       <div><dt>Chiến dịch hoạt động</dt><dd>{hotspots.length}</dd></div>
@@ -136,62 +144,54 @@ export function CampaignHotspots({ triage, overview, engagedIds, loading, onEnga
     {suggestion && <div className="hotspots__suggestion" role="status">
       <div>
         <strong>Gợi ý: {suggestion.name}</strong>
-        <span>{suggestion.reasons.join(' · ') || `${suggestion.open} SOS đang mở`}</span>
+        <span>{suggestion.reasons[0] || `${suggestion.open} SOS đang mở`}</span>
       </div>
       {action(suggestion, true)}
     </div>}
     {limitReached && <p className="notice" role="status">Bạn đang điều phối tối đa 3 chiến dịch. Dừng một chiến dịch để nhận thêm.</p>}
 
-    <div className="hotspots__filters" role="group" aria-label="Lọc chiến dịch">
+    <div className="filter-bar hotspots__filters" role="group" aria-label="Lọc chiến dịch">
+      <label className="filter-search"><input type="search" aria-label="Tìm chiến dịch" placeholder="Tìm theo tên chiến dịch" value={query} onChange={event => { setQuery(event.target.value); setCursor(''); setSelectedId(null); }} /></label>
       {FILTERS.map(([id, title]) => <button key={id} type="button" className="hotspots__chip" aria-pressed={filter === id} onClick={() => changeFilter(id)}>
         {title}
       </button>)}
+      <span className="filter-bar__summary">{visible.length} chiến dịch</span>
     </div>
 
-    <div className="hotspots__layout">
-      <div className="hotspots__list">
-        {pageItems.length === 0 && !loading && <p className="empty">Không có chiến dịch phù hợp bộ lọc.</p>}
-        <ol className="hotspots__items">
-          {pageItems.map((item) => {
-            const engaged = engagedIds.includes(item.id);
-            const tone = item.heat >= 0.66 ? 'hot' : item.heat >= 0.33 ? 'warm' : 'calm';
-            return <li key={item.id} id={`hotspot-${item.id}`} className={`hotspot-card hotspot-card--${tone}${selectedId === item.id ? ' is-selected' : ''}`}>
-              <button type="button" className="hotspot-card__head" aria-pressed={selectedId === item.id} onClick={() => select(item.id)}
-                aria-label={`Xem ${item.name} trên bản đồ`}>
-                <span className="hotspot-card__rank" aria-hidden="true">{item.rank}</span>
-                <span className="hotspot-card__name">{item.name}</span>
-                {engaged && <Badge tone="info" kind="meta">Bạn đang điều phối</Badge>}
-              </button>
-              <div className="hotspot-card__metrics">
-                <span><strong>{item.open}</strong> SOS mở</span>
-                {item.p1 > 0 && <Badge tone="danger" kind="priority" priority="P1">{item.p1} P1 chưa xử lý</Badge>}
-                {item.p2 > 0 && <Badge tone="warning" kind="priority" priority="P2">{item.p2} P2 chưa xử lý</Badge>}
-                {item.overdue > 0 && <Badge tone="warning" kind="meta">{item.overdue} quá hạn</Badge>}
-              </div>
-              <p className="hotspot-card__meta">
-                {item.coordinators === 0 ? <strong className="hotspot-card__alert">Chưa có điều phối viên</strong> : `${item.coordinators} điều phối viên đang tham gia`}
-                {item.open > 0 && ` · ${waitLabel(item.waitMinutes)}`}
-              </p>
-              <div className="hotspot-card__actions">
-                {item.center && <button type="button" className="button secondary small" onClick={() => select(item.id)}>{selectedId === item.id ? 'Bỏ chọn' : 'Xem vùng'}</button>}
-                {action(item)}
-              </div>
-            </li>;
-          })}
-        </ol>
-        <Pager page={currentPage} hasNext={currentPage < pageCount - 1} loading={loading} count={pageItems.length} noun="chiến dịch"
-          onPrev={() => setPage((value) => Math.max(0, value - 1))} onNext={() => setPage((value) => Math.min(pageCount - 1, value + 1))} />
-      </div>
+    <div id="hotspot-map-view" className={`hotspots__map-frame${selected ? ' hotspots__map-frame--selected' : ''}`}>
       <div className="hotspots__map">
         {mapCampaigns.length > 0
           ? <CampaignAreaMap requests={[]} campaigns={mapCampaigns} height="clamp(380px, 68dvh, 720px)" selectedCampaignId={selectedId} showLegend={false}
-            onCampaignSelect={select} ariaLabel="Bản đồ điểm nóng các chiến dịch đang hoạt động"
+            onCampaignSelect={id => select(id)} ariaLabel="Bản đồ điểm nóng các chiến dịch đang hoạt động"
             note={<><span><i className="hotspots__swatch hotspots__swatch--hot" aria-hidden="true" /> Nhiều SOS gấp</span>
               <span><i className="hotspots__swatch hotspots__swatch--warm" aria-hidden="true" /> Cần chú ý</span>
               <span><i className="hotspots__swatch hotspots__swatch--calm" aria-hidden="true" /> Ổn định</span></>} />
           : <p className="empty">{loading ? 'Đang tải bản đồ…' : 'Chưa có chiến dịch đang hoạt động có vùng trên bản đồ.'}</p>}
       </div>
-
+      {selected && <aside id="hotspot-map-details" className="hotspots__selection" aria-label="Thông tin chiến dịch đang chọn" aria-live="polite">
+        <div className="hotspots__selection-head"><span className="eyebrow">Chiến dịch #{selected.rank}</span><button type="button" className="button secondary small" aria-label="Đóng thông tin chiến dịch" onClick={() => setSelectedId(null)}>Đóng</button></div>
+        <h3>{selected.name}</h3>
+        {engagedIds.includes(selected.id) && <Badge tone="info" kind="meta">Bạn đang điều phối</Badge>}
+        <dl className="hotspots__selection-metrics"><div><dt>SOS mở</dt><dd>{selected.open}</dd></div><div><dt>P1 chưa xử lý</dt><dd>{selected.p1}</dd></div><div><dt>Quá hạn</dt><dd>{selected.overdue}</dd></div><div><dt>Điều phối viên</dt><dd>{selected.coordinators}</dd></div></dl>
+        {selected.open > 0 && <p>{waitLabel(selected.waitMinutes)}</p>}
+        {selected.reasons.length > 0 && <p className="muted">{selected.reasons.join(' · ')}</p>}
+        {action(selected, true)}
+      </aside>}
+    </div>
+    <div className="hotspots__compact-list">
+      <h3>Danh sách chiến dịch</h3>
+      <p className="muted">Chọn tên để xem vùng và thông tin trên bản đồ, hoặc mở hàng đợi ngay.</p>
+      {pageItems.length === 0 && !loading && <p className="empty">Không có chiến dịch phù hợp bộ lọc.</p>}
+      {pageItems.length > 0 && <div className="hotspots__table-wrap" role="region" aria-label="Danh sách chiến dịch cần hỗ trợ" tabIndex={0}>
+        <table className="hotspots__table"><thead><tr><th scope="col">Chiến dịch</th><th scope="col">SOS mở</th><th scope="col">P1</th><th scope="col">Quá hạn</th><th scope="col">Điều phối viên</th><th scope="col">Thao tác</th></tr></thead><tbody>
+          {pageItems.map(item => <tr key={item.id} className={selectedId === item.id ? 'is-selected' : ''}>
+            <td><button type="button" className="hotspots__table-name" aria-label={`Xem ${item.name} trên bản đồ`} aria-pressed={selectedId === item.id} onClick={() => select(item.id, true)}><span className="hotspot-card__rank">{item.rank}</span><strong>{item.name}</strong></button>{engagedIds.includes(item.id) && <small className="hotspots__engaged-label">Bạn đang điều phối</small>}</td>
+            <td>{item.open}</td><td className={item.p1 ? 'hotspot-card__alert' : ''}>{item.p1}</td><td>{item.overdue}</td><td>{item.coordinators || <span className={item.open ? 'hotspot-card__alert' : ''}>Chưa có</span>}</td><td>{action(item)}</td>
+          </tr>)}
+        </tbody></table>
+      </div>}
+      <Pager page={currentPage} hasNext={currentPage < pageCount - 1} loading={loading} count={pageItems.length} noun="chiến dịch"
+        onPrev={prevPage} onNext={() => setCursor(String(Math.min(pageCount - 1, currentPage + 1)))} />
     </div>
   </section>;
 }

@@ -1,4 +1,10 @@
 /* Coordinator SOS detail: one calm column. Header -> summary -> decision -> secondary folds. Tokens only. */
+.dispatch-section-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.dispatch-section-heading h3 { margin: 0; }
+.dispatch-section-heading p { margin: 4px 0 0; }
+.dispatch-empty { display: grid; gap: 6px; padding: 16px; border: 1px solid #cbd9ed; border-radius: 10px; background: #f8fafc; }
+.dispatch-empty strong { color: #334155; }
+.dispatch-empty p { margin: 0; color: #526379; line-height: 1.6; }
 .coordinator-layout { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); }
 .coordinator-detail-surface .queue-detail-card { display: grid; gap: var(--space-4); padding: 0; }
 .coordinator-detail-surface .queue-detail-card > * { margin: 0; }

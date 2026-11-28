@@ -1,3 +1,4 @@
+import { CampaignScopeNotice } from './CampaignScopeNotice';
 import { Dropdown } from '../../components/ui/Dropdown';
 import { useEffect, useState } from 'react';
 import { api, newCommandKey } from '../../api/client';
@@ -123,6 +124,7 @@ function PrimaryCampaignCoordination({ user, initialRequestId = '' }: { user: Me
   const tabs = [['routing', isScopedCoordinator ? 'Bản đồ chiến dịch' : 'Bản đồ SOS'], ['sos', 'Xử lý SOS'], ['campaigns', 'Chiến dịch'], ['workspace', 'Theo dõi chiến dịch'], ['history', 'Lịch sử']];
   const activeTab = (id: string) => tab === id || (id === 'workspace' && tab === 'choose') || (id === 'history' && tab === 'my-history');
   return <section className="campaign-coordination">
+    {isScopedCoordinator && <CampaignScopeNotice />}
     <div className="tabs" role="tablist" aria-label="Điều phối chiến dịch">
       {tabs.map(([id, title]) => <button key={id} type="button" role="tab" aria-selected={activeTab(id)} className={activeTab(id) ? 'active' : ''}
         onClick={() => setTab(id as typeof campaignTabs[number])}>{title}</button>)}
