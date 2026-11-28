@@ -11,7 +11,7 @@ type ResponseOverview = {
     received_last_24h: number; resolved_total: number; verification_overdue: number;
     declared_danger_waiting: number; awaiting_team_assignment: number };
   missions: { active_by_status: Counts; overdue_offers: number };
-  teams: { total: number; available: number; unavailable: number; awaiting_readiness: number;
+  teams: { total: number; available: number; unavailable: number;
     on_mission: number; position_missing_or_stale: number };
   thresholds: { verification_overdue_minutes: number; offer_overdue_minutes: number; team_position_fresh_minutes: number };
   generated_at: string;
@@ -164,9 +164,9 @@ function ResponseOverviewPanels({ view, compact = false }: { view: 'overview' | 
       <Bars title="Loại sự cố" counts={data.requests.open_by_category} />
       <Bars title="Nhiệm vụ đang hoạt động" counts={data.missions.active_by_status} />
       <Bars title="Đội cứu hộ" counts={{ AVAILABLE: data.teams.available, ON_MISSION: data.teams.on_mission,
-        AWAITING_READINESS: data.teams.awaiting_readiness, UNAVAILABLE: data.teams.unavailable }}
-        order={['AVAILABLE', 'ON_MISSION', 'AWAITING_READINESS', 'UNAVAILABLE']}
-        labelFor={(code) => ({ AVAILABLE: 'Sẵn sàng', ON_MISSION: 'Đang làm nhiệm vụ', AWAITING_READINESS: 'Chờ xác nhận sẵn sàng', UNAVAILABLE: 'Không sẵn sàng' }[code] || code)} />
+        UNAVAILABLE: data.teams.unavailable }}
+        order={['AVAILABLE', 'ON_MISSION', 'UNAVAILABLE']}
+        labelFor={(code) => ({ AVAILABLE: 'Sẵn sàng', ON_MISSION: 'Đang làm nhiệm vụ', UNAVAILABLE: 'Không sẵn sàng' }[code] || code)} />
     </div>}
     {data && <a className="dash-link" href="?workspace=coordinator&page=campaigns&campaign_tab=routing&map_layer=density">Xem bản đồ nhiệt SOS ›</a>}
   </Panel>{!compact && <WeekSummaryPanel />}</>;

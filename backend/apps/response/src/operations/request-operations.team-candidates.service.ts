@@ -42,7 +42,7 @@ export class RequestOperationsTeamCandidatesService {
           WHERE r.id=$1
        ), eligible AS (
          SELECT t.id,t.name,t.team_kind,t.reporting_mode,t.external_contact_note,t.availability,t.status,
-                t.readiness_required,t.version,t.created_at,
+                t.version,t.created_at,
                 COALESCE((SELECT array_agg(ts.skill_code ORDER BY ts.skill_code) FROM team_skill ts WHERE ts.team_id=t.id),ARRAY[]::text[]) AS skills,
                 floor(extract(epoch FROM (q.query_time-p.captured_at)))::int AS position_age_s,
                 p.accuracy_m AS position_accuracy_m,p.source AS position_source,
@@ -78,7 +78,7 @@ export class RequestOperationsTeamCandidatesService {
                FROM mission m
                WHERE m.team_id=t.id
            ) recent ON true
-          WHERE t.status='ACTIVE' AND t.availability='AVAILABLE' AND NOT t.readiness_required
+          WHERE t.status='ACTIVE' AND t.availability='AVAILABLE'
             AND ((t.reporting_mode='APP' AND EXISTS (
                     SELECT 1 FROM team_member tm WHERE tm.team_id=t.id AND tm.member_role='LEADER' AND tm.left_at IS NULL))
               OR (t.reporting_mode='COORDINATOR' AND NULLIF(btrim(t.external_contact_note),'') IS NOT NULL))
@@ -89,7 +89,7 @@ export class RequestOperationsTeamCandidatesService {
                                AND NOT EXISTS (SELECT 1 FROM team_skill ts
                                                 WHERE ts.team_id=t.id AND ts.skill_code=required.skill_code))
        )
-       SELECT id,name,team_kind,reporting_mode,external_contact_note,availability,status,readiness_required,version,created_at,
+       SELECT id,name,team_kind,reporting_mode,external_contact_note,availability,status,version,created_at,
               skills,position_age_s,position_accuracy_m,position_source,longitude,latitude,distance_m,recent_missions_24h,recent_missions_7d,recent_history
          FROM eligible
         WHERE position_team_id IS NULL

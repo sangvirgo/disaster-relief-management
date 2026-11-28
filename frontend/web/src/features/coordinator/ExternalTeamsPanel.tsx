@@ -3,10 +3,9 @@ import { useCursorPages } from '../../api/useCursorPages';
 import { LIST_PAGE_SIZE } from '../../api/useCursorNav';
 import { ListNav } from '../../components/ui/Pager';
 import { CoordinatorTeamPositionForm } from './CoordinatorTeamPositionForm';
-import { TeamReadyForm } from './TeamReadinessQueue';
 
 type ExternalTeam = {
-  id: string; name: string; version: number; availability: 'AVAILABLE' | 'UNAVAILABLE'; readiness_required: boolean;
+  id: string; name: string; version: number; availability: 'AVAILABLE' | 'UNAVAILABLE';
   external_contact_note?: string | null; position: { age_s: number } | null;
 };
 
@@ -21,12 +20,12 @@ function ageText(seconds: number): string {
 
 /**
  * Teams without accounts (police, army, local groups) report through a coordinator. Every such team is listed here with
- * its contact and state, and the coordinator can always report its position or record that it is ready again —
- * the actions no longer depend on the team appearing in the candidate list.
+ * its contact, availability and position age, and the coordinator can always report its position — the action no
+ * longer depends on the team appearing in the candidate list.
  */
 export function ExternalTeamsPanel({ onChanged }: { onChanged: () => void }) {
   const list = useCursorPages<ExternalTeam>('response', '/teams?status=ACTIVE&reporting_mode=COORDINATOR', LIST_PAGE_SIZE);
-  const [open, setOpen] = useState<{ id: string; action: 'position' | 'ready' } | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const done = (text: string) => { setOpen(null); setMessage(text); list.reload(); onChanged(); };
 
@@ -46,31 +45,23 @@ export function ExternalTeamsPanel({ onChanged }: { onChanged: () => void }) {
       <table className="external-teams__table">
         <thead><tr><th scope="col">Đội</th><th scope="col">Trạng thái</th><th scope="col">Vị trí</th><th scope="col">Thao tác</th></tr></thead>
         <tbody>{list.items.map((team) => {
-          const locked = team.readiness_required;
-          const resting = !locked && team.availability === 'UNAVAILABLE';
+          const resting = team.availability === 'UNAVAILABLE';
           const fresh = team.position !== null && team.position.age_s <= FRESH_S;
-          const expanded = open?.id === team.id ? open.action : null;
+          const expanded = open === team.id;
           return [
             <tr key={team.id}>
               <th scope="row"><span className="external-teams__name">{team.name}</span>
                 {team.external_contact_note && <small>{team.external_contact_note}</small>}</th>
-              <td>{locked ? <span className="ext-pill ext-pill--warn">Chờ báo sẵn sàng</span>
-                : resting ? <span className="ext-pill">Đang nghỉ</span>
-                  : <span className="ext-pill ext-pill--ok">Sẵn sàng</span>}</td>
+              <td>{resting ? <span className="ext-pill">Tạm ngưng</span> : <span className="ext-pill ext-pill--ok">Sẵn sàng</span>}</td>
               <td>{team.position === null ? <span className="ext-pill ext-pill--warn">Chưa có</span>
                 : <span className={fresh ? 'external-teams__age' : 'external-teams__age external-teams__age--old'}>{ageText(team.position.age_s)}{fresh ? '' : ' · cũ'}</span>}</td>
               <td className="external-teams__actions">
-                <button type="button" className={`button small${!fresh && !locked && !resting ? '' : ' secondary'}`} aria-expanded={expanded === 'position'}
-                  onClick={() => setOpen(expanded === 'position' ? null : { id: team.id, action: 'position' })}>Báo vị trí</button>
-                {locked && <button type="button" className="button small" aria-expanded={expanded === 'ready'}
-                  onClick={() => setOpen(expanded === 'ready' ? null : { id: team.id, action: 'ready' })}>Sẵn sàng</button>}
+                <button type="button" className={`button small${!fresh && !resting ? '' : ' secondary'}`} aria-expanded={expanded}
+                  onClick={() => setOpen(expanded ? null : team.id)}>Báo vị trí</button>
               </td>
             </tr>,
             expanded && <tr key={`${team.id}-form`} className="external-teams__form-row"><td colSpan={4}>
-              {expanded === 'position'
-                ? <CoordinatorTeamPositionForm teamId={team.id} teamName={team.name} onSuccess={() => done(`Đã cập nhật vị trí ${team.name}.`)} />
-                : <TeamReadyForm team={team} onCancel={() => setOpen(null)} onStale={() => { setOpen(null); list.reload(); }}
-                  onDone={() => done(`Đã ghi nhận ${team.name} sẵn sàng.`)} />}
+              <CoordinatorTeamPositionForm teamId={team.id} teamName={team.name} onSuccess={() => done(`Đã cập nhật vị trí ${team.name}.`)} />
             </td></tr>,
           ];
         })}</tbody>

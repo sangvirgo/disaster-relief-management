@@ -21,7 +21,6 @@ const initialTeam: TeamRow = {
   reporting_mode: 'APP',
   availability: 'AVAILABLE',
   status: 'ACTIVE',
-  readiness_required: false,
   version: 4,
   created_at: new Date('2026-01-01T00:00:00.000Z'),
   skills: [],

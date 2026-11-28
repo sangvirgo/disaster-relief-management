@@ -49,7 +49,6 @@ interface TeamRow {
   reporting_mode: 'APP' | 'COORDINATOR';
   availability: 'AVAILABLE' | 'UNAVAILABLE';
   status: 'ACTIVE' | 'INACTIVE';
-  readiness_required: boolean;
   external_contact_note: string | null;
 }
 
@@ -150,13 +149,13 @@ export class MissionsCommandsService {
     }
 
     const teamRows = await manager.query(
-      `SELECT id,reporting_mode,availability,status,readiness_required,external_contact_note
+      `SELECT id,reporting_mode,availability,status,external_contact_note
          FROM rescue_team WHERE id=$1 FOR SHARE`, [dto.team_id],
     ) as TeamRow[];
     const team = teamRows[0];
     if (!team) throw new AppError('NOT_FOUND', { status: 404 });
     if (team.status !== 'ACTIVE') throw this.teamNotEligible('INACTIVE');
-    if (team.availability !== 'AVAILABLE' || team.readiness_required) throw this.teamNotEligible('UNAVAILABLE');
+    if (team.availability !== 'AVAILABLE') throw this.teamNotEligible('UNAVAILABLE');
     if (team.reporting_mode === 'COORDINATOR' && !team.external_contact_note?.trim()) throw new AppError('TEAM_NOT_ELIGIBLE', { status: 409 });
 
     const missingSkills = await manager.query(
@@ -261,7 +260,7 @@ export class MissionsCommandsService {
     const request = await this.lockRequest(manager, requestId, session, permission, change.command === 'accept');
     if (protectedRequestStatuses.includes(request.status)) throw new AppError('STATE_TRANSITION_INVALID', { status: 409 });
     const teams = await manager.query(
-      `SELECT id,reporting_mode,availability,status,readiness_required,external_contact_note
+      `SELECT id,reporting_mode,availability,status,external_contact_note
          FROM rescue_team WHERE id=$1 FOR SHARE`, [teamId],
     ) as TeamRow[];
     const team = teams[0];
@@ -309,12 +308,6 @@ export class MissionsCommandsService {
       reason, outcomeNote, change.occurredAt ?? null, change.reportedBy ?? null,
     );
 
-    if (change.target === 'CANCELLED' && ['ACCEPTED', 'EN_ROUTE', 'ON_SCENE'].includes(mission.status)) {
-      await manager.query(
-        `UPDATE rescue_team SET availability='UNAVAILABLE',readiness_required=true,version=version+1
-          WHERE id=$1 AND (availability IS DISTINCT FROM 'UNAVAILABLE' OR readiness_required IS DISTINCT FROM true)`, [teamId],
-      );
-    }
     await this.recomputeRequest(manager, request, session.userId, missionId);
     return { status: 200, value: this.commandView(updated!), resource: { type: 'mission', id: missionId } };
   }

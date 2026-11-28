@@ -38,24 +38,24 @@ INSERT INTO incident_category_skill (category_code, skill_code) VALUES
 ON CONFLICT DO NOTHING;
 
 INSERT INTO rescue_team (id, name, team_kind, reporting_mode, external_contact_note,
-                         readiness_required, affiliation_verified_at, affiliation_verified_by, availability) VALUES
+                         affiliation_verified_at, affiliation_verified_by, availability) VALUES
   ('00000000-0000-4000-8000-0000000000a9',
-   'Đội xuồng cứu hộ Bắc', 'VOLUNTEER', 'APP', NULL, false, now() - interval '2 days',
+   'Đội xuồng cứu hộ Bắc', 'VOLUNTEER', 'APP', NULL, now() - interval '2 days',
    '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
   ('00000000-0000-4000-8000-0000000000aa',
-   'Đội sơ cứu lưu động Nam', 'VOLUNTEER', 'APP', NULL, false, now() - interval '2 days',
+   'Đội sơ cứu lưu động Nam', 'VOLUNTEER', 'APP', NULL, now() - interval '2 days',
    '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
   ('00000000-0000-4000-8000-0000000000ab',
-   'Đội hỗ trợ cơ động Trung', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên, đội hình giả lập.', false,
+   'Đội hỗ trợ cơ động Trung', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên, đội hình giả lập.',
    now() - interval '2 days', '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
   ('00000000-0000-4000-8000-0000000000ac',
-   'Đội y tế cộng đồng Bắc', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên, đội hình giả lập.', false,
+   'Đội y tế cộng đồng Bắc', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên, đội hình giả lập.',
    now() - interval '1 day', '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
   ('00000000-0000-4000-8000-0000000000ad',
-   'Đội xuồng cứu hộ Nam', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên, đội xuồng giả lập.', false,
+   'Đội xuồng cứu hộ Nam', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên, đội xuồng giả lập.',
    now() - interval '1 day', '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
   ('00000000-0000-4000-8000-0000000000ae',
-   'Đội cứu hộ cơ động Bắc', 'VOLUNTEER', 'APP', NULL, false,
+   'Đội cứu hộ cơ động Bắc', 'VOLUNTEER', 'APP', NULL,
    now() - interval '1 day', '00000000-0000-4000-8000-000000000118', 'AVAILABLE')
 ON CONFLICT DO NOTHING;
 
@@ -116,13 +116,13 @@ ON CONFLICT (team_id) DO UPDATE SET
 -- Three additional APP-led northern teams for the terrain-rescue demo.
 -- Positions are initial synthetic fixtures; leaders must refresh them after 30 minutes.
 INSERT INTO rescue_team (id, name, team_kind, reporting_mode,
-                         readiness_required, affiliation_verified_at, affiliation_verified_by, availability) VALUES
+                         affiliation_verified_at, affiliation_verified_by, availability) VALUES
   ('00000000-0000-4000-8000-0000000000af',
-   'Đội cứu hộ địa hình Bắc 1', 'VOLUNTEER', 'APP', false, now(), '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
+   'Đội cứu hộ địa hình Bắc 1', 'VOLUNTEER', 'APP', now(), '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
   ('00000000-0000-4000-8000-0000000000b0',
-   'Đội cứu hộ địa hình Bắc 2', 'VOLUNTEER', 'APP', false, now(), '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
+   'Đội cứu hộ địa hình Bắc 2', 'VOLUNTEER', 'APP', now(), '00000000-0000-4000-8000-000000000118', 'AVAILABLE'),
   ('00000000-0000-4000-8000-0000000000b1',
-   'Đội cứu hộ đa năng Bắc', 'VOLUNTEER', 'APP', false, now(), '00000000-0000-4000-8000-000000000118', 'AVAILABLE')
+   'Đội cứu hộ đa năng Bắc', 'VOLUNTEER', 'APP', now(), '00000000-0000-4000-8000-000000000118', 'AVAILABLE')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO team_member (team_id, user_id, member_role)

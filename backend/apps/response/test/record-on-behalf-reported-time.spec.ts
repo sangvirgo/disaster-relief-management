@@ -38,8 +38,7 @@ describe('record-on-behalf reported time', () => {
 
 describe('team contact note visibility', () => {
   const row = {
-    id: 't1', name: 'Đội dân quân', team_kind: 'MILITARY', reporting_mode: 'COORDINATOR', availability: 'AVAILABLE', status: 'ACTIVE',
-    readiness_required: false, version: 1, created_at: new Date(), skills: [], position_age_s: null, position_accuracy_m: null,
+    id: 't1', name: 'Đội dân quân', team_kind: 'MILITARY', reporting_mode: 'COORDINATOR', availability: 'AVAILABLE', status: 'ACTIVE', version: 1, created_at: new Date(), skills: [], position_age_s: null, position_accuracy_m: null,
     position_source: null, longitude: null, latitude: null, external_contact_note: 'Bộ đàm kênh 5, anh Hùng',
   } as unknown as TeamRow;
 

@@ -5936,7 +5936,7 @@
       "post": {
         "operationId": "cancelMission",
         "summary": "Cancel a mission",
-        "description": "Requires MISSION_ASSIGN in the request scope. Canceling ACCEPTED, EN_ROUTE, or ON_SCENE marks the team UNAVAILABLE and requires fresh readiness; canceling OFFERED does not.",
+        "description": "Requires MISSION_ASSIGN in the request scope. Canceling a mission frees the team; it does not lock it.",
         "tags": [
           "Missions"
         ],
@@ -10458,9 +10458,6 @@
                               "UNAVAILABLE"
                             ]
                           },
-                          "readiness_required": {
-                            "type": "boolean"
-                          },
                           "status": {
                             "type": "string",
                             "enum": [
@@ -10554,7 +10551,6 @@
                           "kind",
                           "reporting_mode",
                           "availability",
-                          "readiness_required",
                           "status",
                           "skills",
                           "position",
@@ -10740,9 +10736,6 @@
                         "UNAVAILABLE"
                       ]
                     },
-                    "readiness_required": {
-                      "type": "boolean"
-                    },
                     "status": {
                       "type": "string",
                       "enum": [
@@ -10836,7 +10829,6 @@
                     "kind",
                     "reporting_mode",
                     "availability",
-                    "readiness_required",
                     "status",
                     "skills",
                     "position",
@@ -11013,9 +11005,6 @@
                         "UNAVAILABLE"
                       ]
                     },
-                    "readiness_required": {
-                      "type": "boolean"
-                    },
                     "status": {
                       "type": "string",
                       "enum": [
@@ -11109,7 +11098,6 @@
                     "kind",
                     "reporting_mode",
                     "availability",
-                    "readiness_required",
                     "status",
                     "skills",
                     "position",
@@ -11231,9 +11219,6 @@
                         "UNAVAILABLE"
                       ]
                     },
-                    "readiness_required": {
-                      "type": "boolean"
-                    },
                     "status": {
                       "type": "string",
                       "enum": [
@@ -11327,7 +11312,6 @@
                     "kind",
                     "reporting_mode",
                     "availability",
-                    "readiness_required",
                     "status",
                     "skills",
                     "position",
@@ -13736,273 +13720,6 @@
             "WebAccessCookie": []
           }
         ]
-      }
-    },
-    "/teams/{id}/ready": {
-      "post": {
-        "operationId": "responseTeamsReady",
-        "summary": "Explicitly confirm field readiness after active mission cancellation.",
-        "description": "An active APP leader uses SELF; a scoped TEAM_MANAGE_ANY caller records RADIO/PHONE/IN_PERSON/OTHER with reported_by. Requires the current team version, no active mission, and a confirmation time after the last active cancellation and not in the future. Atomically clears readiness_required, sets AVAILABLE, and records audit evidence. Generic PATCH does not clear the latch.",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Documented response shape.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "name": {
-                      "type": "string"
-                    },
-                    "kind": {
-                      "type": "string",
-                      "enum": [
-                        "VOLUNTEER",
-                        "MILITARY",
-                        "GOVERNMENT",
-                        "OTHER"
-                      ]
-                    },
-                    "reporting_mode": {
-                      "type": "string",
-                      "enum": [
-                        "APP",
-                        "COORDINATOR"
-                      ]
-                    },
-                    "availability": {
-                      "type": "string",
-                      "enum": [
-                        "AVAILABLE",
-                        "UNAVAILABLE"
-                      ]
-                    },
-                    "readiness_required": {
-                      "type": "boolean"
-                    },
-                    "status": {
-                      "type": "string",
-                      "enum": [
-                        "ACTIVE",
-                        "INACTIVE"
-                      ]
-                    },
-                    "skills": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "external_contact_note": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Contact point of a coordinator-reported team; returned only to coordinators."
-                    },
-                    "position": {
-                      "anyOf": [
-                        {
-                          "type": "null"
-                        },
-                        {
-                          "type": "object",
-                          "properties": {
-                            "age_s": {
-                              "type": "integer"
-                            },
-                            "accuracy_m": {
-                              "anyOf": [
-                                {
-                                  "type": "number"
-                                },
-                                {
-                                  "type": "null"
-                                }
-                              ]
-                            },
-                            "source": {
-                              "type": "string",
-                              "enum": [
-                                "GPS",
-                                "MANUAL_PIN",
-                                "COORDINATOR_REPORTED"
-                              ]
-                            },
-                            "location": {
-                              "type": "object",
-                              "properties": {
-                                "type": {
-                                  "type": "string",
-                                  "const": "Point"
-                                },
-                                "coordinates": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "number"
-                                  },
-                                  "minItems": 2,
-                                  "maxItems": 2
-                                }
-                              },
-                              "required": [
-                                "type",
-                                "coordinates"
-                              ]
-                            }
-                          },
-                          "required": [
-                            "age_s",
-                            "accuracy_m",
-                            "source"
-                          ]
-                        }
-                      ]
-                    },
-                    "version": {
-                      "type": "integer"
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "name",
-                    "kind",
-                    "reporting_mode",
-                    "availability",
-                    "readiness_required",
-                    "status",
-                    "skills",
-                    "position",
-                    "version"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "UNAUTHENTICATED": {
-                    "summary": "UNAUTHENTICATED",
-                    "value": {
-                      "code": "UNAUTHENTICATED",
-                      "message": "Bạn cần đăng nhập để thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  },
-                  "SESSION_EXPIRED": {
-                    "summary": "SESSION_EXPIRED",
-                    "value": {
-                      "code": "SESSION_EXPIRED",
-                      "message": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Documented error response; clients branch on the stable code.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                },
-                "examples": {
-                  "FORBIDDEN": {
-                    "summary": "FORBIDDEN",
-                    "value": {
-                      "code": "FORBIDDEN",
-                      "message": "Bạn không có quyền thực hiện thao tác này.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  },
-                  "CSRF_INVALID": {
-                    "summary": "CSRF_INVALID",
-                    "value": {
-                      "code": "CSRF_INVALID",
-                      "message": "Yêu cầu không hợp lệ hoặc đã hết hạn. Vui lòng tải lại trang.",
-                      "correlation_id": "00000000-0000-4000-8000-000000000000"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "x-c48-contract-source": "docs/backend/03-response-api.md",
-        "x-c48-controller-source": "backend/apps/response/src/teams/teams.controller.ts#TeamsController.ready",
-        "security": [
-          {
-            "NativeBearer": []
-          },
-          {
-            "WebAccessCookie": [],
-            "CsrfToken": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "expected_version": {
-                    "type": "integer"
-                  },
-                  "confirmation_basis": {
-                    "type": "string",
-                    "enum": [
-                      "SELF",
-                      "RADIO",
-                      "PHONE",
-                      "IN_PERSON",
-                      "OTHER"
-                    ]
-                  },
-                  "reported_by": {
-                    "type": "string",
-                    "maxLength": 200
-                  },
-                  "occurred_at": {
-                    "type": "string",
-                    "format": "date-time"
-                  }
-                },
-                "required": [
-                  "expected_version",
-                  "confirmation_basis",
-                  "occurred_at"
-                ]
-              }
-            }
-          }
-        }
       }
     },
     "/dashboard/overview": {

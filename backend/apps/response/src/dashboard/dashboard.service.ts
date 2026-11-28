@@ -88,13 +88,12 @@ export class DashboardService {
         [...mq.values, offerOverdue]),
       this.dataSource.query(`
         WITH teams AS (
-          SELECT t.id, t.availability, t.readiness_required
+          SELECT t.id, t.availability
             FROM rescue_team t WHERE t.status = 'ACTIVE'
         ), scoped AS (SELECT * FROM teams t WHERE ${tq.where})
         SELECT COUNT(*)::int AS total,
                COUNT(*) FILTER (WHERE availability = 'AVAILABLE')::int AS available,
                COUNT(*) FILTER (WHERE availability <> 'AVAILABLE')::int AS unavailable,
-               COUNT(*) FILTER (WHERE readiness_required AND availability <> 'AVAILABLE')::int AS awaiting_readiness,
                COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM mission m WHERE m.team_id = scoped.id AND m.status IN ${ACTIVE_MISSION}))::int AS on_mission,
                COUNT(*) FILTER (WHERE NOT EXISTS (SELECT 1 FROM team_position p WHERE p.team_id = scoped.id
                                                      AND p.captured_at >= now() - (${freshParam}::int * interval '1 minute')))::int AS position_missing_or_stale
@@ -127,7 +126,7 @@ export class DashboardService {
       missions: { active_by_status: toMap(msRow.active_by_status), overdue_offers: n(msRow.overdue_offers) },
       teams: {
         total: n(tmRow.total), available: n(tmRow.available), unavailable: n(tmRow.unavailable),
-        awaiting_readiness: n(tmRow.awaiting_readiness), on_mission: n(tmRow.on_mission),
+        on_mission: n(tmRow.on_mission),
         position_missing_or_stale: n(tmRow.position_missing_or_stale),
       },
       thresholds: {

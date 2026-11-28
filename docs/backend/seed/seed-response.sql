@@ -47,17 +47,17 @@ ON CONFLICT DO NOTHING;
 
 -- ---------- teams ----------
 INSERT INTO rescue_team (id, name, team_kind, reporting_mode, external_contact_note,
-                         readiness_required, affiliation_verified_at, affiliation_verified_by, availability, created_at) VALUES
-  (pg_temp.u('a1'), 'Đội xuồng cứu hộ 1',            'VOLUNTEER',  'APP',         NULL, false, now() - interval '5 days', pg_temp.u('102'), 'AVAILABLE',   now() - interval '6 days'),
-  (pg_temp.u('a2'), 'Đội y tế lưu động',             'VOLUNTEER',  'APP',         NULL, false, now() - interval '5 days', pg_temp.u('102'), 'AVAILABLE',   now() - interval '6 days'),
-  (pg_temp.u('a3'), 'Đại đội cơ động',        'MILITARY',   'COORDINATOR', 'Liên lạc qua bộ đàm, hô hiệu ALPHA (giả lập); tần số do điều phối viên giữ.', false, now() - interval '4 days', pg_temp.u('102'), 'AVAILABLE', now() - interval '5 days'),
-  (pg_temp.u('a4'), 'Đội cứu hỏa - cứu nạn',  'GOVERNMENT', 'COORDINATOR', 'Liên hệ trực ban qua số nội bộ 0900000900 (giả lập).', false, now() - interval '4 days', pg_temp.u('102'), 'AVAILABLE', now() - interval '5 days'),
-  -- readiness latch example: not yet verified and flagged UNAVAILABLE until a leader and affiliation are confirmed
-  (pg_temp.u('a5'), 'Đội tình nguyện dự bị',         'VOLUNTEER',  'APP',         NULL, true,  NULL, NULL, 'UNAVAILABLE', now() - interval '1 day'),
+                         affiliation_verified_at, affiliation_verified_by, availability, created_at) VALUES
+  (pg_temp.u('a1'), 'Đội xuồng cứu hộ 1',            'VOLUNTEER',  'APP',         NULL, now() - interval '5 days', pg_temp.u('102'), 'AVAILABLE',   now() - interval '6 days'),
+  (pg_temp.u('a2'), 'Đội y tế lưu động',             'VOLUNTEER',  'APP',         NULL, now() - interval '5 days', pg_temp.u('102'), 'AVAILABLE',   now() - interval '6 days'),
+  (pg_temp.u('a3'), 'Đại đội cơ động',        'MILITARY',   'COORDINATOR', 'Liên lạc qua bộ đàm, hô hiệu ALPHA (giả lập); tần số do điều phối viên giữ.', now() - interval '4 days', pg_temp.u('102'), 'AVAILABLE', now() - interval '5 days'),
+  (pg_temp.u('a4'), 'Đội cứu hỏa - cứu nạn',  'GOVERNMENT', 'COORDINATOR', 'Liên hệ trực ban qua số nội bộ 0900000900 (giả lập).', now() - interval '4 days', pg_temp.u('102'), 'AVAILABLE', now() - interval '5 days'),
+  -- resting team example: not yet verified and UNAVAILABLE until a leader and affiliation are confirmed
+  (pg_temp.u('a5'), 'Đội tình nguyện dự bị',         'VOLUNTEER',  'APP',         NULL, NULL, NULL, 'UNAVAILABLE', now() - interval '1 day'),
   -- Candidate workload example: team B has two recent missions at 3 km; C is free at 4 km; D is free at 10 km.
-  (pg_temp.u('a6'), 'Đội cơ động B', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên; đội hình giả lập B.', false, now() - interval '5 days', pg_temp.u('102'), 'AVAILABLE', now() - interval '6 days'),
-  (pg_temp.u('a7'), 'Đội cơ động C', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên; đội hình giả lập C.', false, now() - interval '3 days', pg_temp.u('102'), 'AVAILABLE', now() - interval '4 days'),
-  (pg_temp.u('a8'), 'Đội cơ động D', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên; đội hình giả lập D.', false, now() - interval '5 days', pg_temp.u('102'), 'AVAILABLE', now() - interval '6 days')
+  (pg_temp.u('a6'), 'Đội cơ động B', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên; đội hình giả lập B.', now() - interval '5 days', pg_temp.u('102'), 'AVAILABLE', now() - interval '6 days'),
+  (pg_temp.u('a7'), 'Đội cơ động C', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên; đội hình giả lập C.', now() - interval '3 days', pg_temp.u('102'), 'AVAILABLE', now() - interval '4 days'),
+  (pg_temp.u('a8'), 'Đội cơ động D', 'GOVERNMENT', 'COORDINATOR', 'Liên lạc qua điều phối viên; đội hình giả lập D.', now() - interval '5 days', pg_temp.u('102'), 'AVAILABLE', now() - interval '6 days')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO team_member (team_id, user_id, member_role) VALUES
@@ -406,14 +406,14 @@ SELECT pg_temp.must('R12 resolved without seal or Logistics admission, completed
 SELECT pg_temp.must('capacity-one: every team has at most one active mission and exactly 2 are active',
   (SELECT coalesce(max(c), 0) FROM (SELECT count(*) c FROM mission WHERE status IN ('OFFERED','ACCEPTED','EN_ROUTE','ON_SCENE') GROUP BY team_id) x) = 1
   AND (SELECT count(*) FROM mission WHERE status IN ('OFFERED','ACCEPTED','EN_ROUTE','ON_SCENE')) = 2);
-SELECT pg_temp.must('teams: 8 base teams (expansion adds more), mixed kinds/modes, stale position, no position, readiness latch',
+SELECT pg_temp.must('teams: 8 base teams (expansion adds more), mixed kinds/modes, stale position, no position, resting team',
   (SELECT count(*) FROM rescue_team) >= 8
   AND (SELECT count(*) FROM rescue_team WHERE reporting_mode = 'COORDINATOR' AND external_contact_note IS NOT NULL
          AND id IN (pg_temp.u('a3'), pg_temp.u('a4'), pg_temp.u('a6'), pg_temp.u('a7'), pg_temp.u('a8'))) = 5
   AND (SELECT count(*) FROM team_position WHERE captured_at < now() - interval '30 minutes') = 1
   AND NOT EXISTS (SELECT 1 FROM team_position WHERE team_id = pg_temp.u('a4'))
   AND NOT EXISTS (SELECT 1 FROM team_member WHERE team_id IN (pg_temp.u('a3'), pg_temp.u('a4')))
-  AND EXISTS (SELECT 1 FROM rescue_team WHERE id = pg_temp.u('a5') AND readiness_required AND availability = 'UNAVAILABLE'));
+  AND EXISTS (SELECT 1 FROM rescue_team WHERE id = pg_temp.u('a5') AND availability = 'UNAVAILABLE'));
 SELECT pg_temp.must('P3 comparison: B is 3 km with 2 recent missions, C is 4 km with none, D is 10 km',
   (SELECT ST_Distance(p.location, s.location) BETWEEN 2900 AND 3100
      FROM team_position p JOIN request_subject s ON s.request_id = pg_temp.u('fd') WHERE p.team_id = pg_temp.u('a6'))

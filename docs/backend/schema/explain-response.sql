@@ -118,7 +118,7 @@ SELECT sn.request_id, t.id, 1,
 FROM snap sn JOIN tm t ON t.n = 1 + (sn.i % 3000);
 
 -- Make the eligibility predicates selective but ensure the measured query has a real candidate.
-UPDATE rescue_team SET reporting_mode='COORDINATOR',external_contact_note='T8 EXPLAIN synthetic contact',availability='AVAILABLE',status='ACTIVE',readiness_required=false;
+UPDATE rescue_team SET reporting_mode='COORDINATOR',external_contact_note='T8 EXPLAIN synthetic contact',availability='AVAILABLE',status='ACTIVE';
 SELECT t.id AS candidate_team_id
   FROM rescue_team t JOIN team_position p ON p.team_id=t.id
  WHERE NOT EXISTS (SELECT 1 FROM mission m WHERE m.team_id=t.id AND m.status IN ('OFFERED','ACCEPTED','EN_ROUTE','ON_SCENE'))
@@ -219,7 +219,7 @@ WITH target AS (
    WHERE r.id=@rid@
 ), eligible AS (
   SELECT t.id,t.name,t.team_kind,t.reporting_mode,t.availability,t.status,
-         t.readiness_required,t.version,t.created_at,
+         t.version,t.created_at,
          COALESCE((SELECT array_agg(ts.skill_code ORDER BY ts.skill_code) FROM team_skill ts WHERE ts.team_id=t.id),ARRAY[]::text[]) AS skills,
          floor(extract(epoch FROM (q.query_time-p.captured_at)))::int AS position_age_s,
          p.accuracy_m AS position_accuracy_m,p.source AS position_source,
@@ -239,7 +239,7 @@ WITH target AS (
                        WHERE me.mission_id=m.id
                          AND me.recorded_at BETWEEN q.query_time-interval '24 hours' AND q.query_time))
     ) recent ON true
-   WHERE t.status='ACTIVE' AND t.availability='AVAILABLE' AND NOT t.readiness_required
+   WHERE t.status='ACTIVE' AND t.availability='AVAILABLE'
      AND ((t.reporting_mode='APP' AND EXISTS (
              SELECT 1 FROM team_member tm WHERE tm.team_id=t.id AND tm.member_role='LEADER' AND tm.left_at IS NULL))
        OR (t.reporting_mode='COORDINATOR' AND NULLIF(btrim(t.external_contact_note),'') IS NOT NULL))
@@ -250,7 +250,7 @@ WITH target AS (
                         AND NOT EXISTS (SELECT 1 FROM team_skill ts
                                          WHERE ts.team_id=t.id AND ts.skill_code=required.skill_code))
 )
-SELECT id,name,team_kind,reporting_mode,availability,status,readiness_required,version,created_at,
+SELECT id,name,team_kind,reporting_mode,availability,status,version,created_at,
        skills,position_age_s,position_accuracy_m,position_source,longitude,latitude,distance_m,recent_missions_24h
   FROM eligible
  WHERE position_team_id IS NULL

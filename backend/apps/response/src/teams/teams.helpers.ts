@@ -7,7 +7,6 @@ export interface TeamRow extends Record<string, unknown> {
   reporting_mode: 'APP' | 'COORDINATOR';
   availability: 'AVAILABLE' | 'UNAVAILABLE';
   status: 'ACTIVE' | 'INACTIVE';
-  readiness_required: boolean;
   version: number;
   created_at: Date | string;
   cursor_id?: string;
@@ -36,7 +35,6 @@ export function teamView(row: TeamRow, includeCoordinates = false, includeContac
     kind: row.team_kind,
     reporting_mode: row.reporting_mode,
     availability: row.availability,
-    readiness_required: row.readiness_required,
     status: row.status,
     skills: row.skills ?? [],
     ...(includeContact && row.reporting_mode === 'COORDINATOR' ? { external_contact_note: row.external_contact_note ?? null } : {}),

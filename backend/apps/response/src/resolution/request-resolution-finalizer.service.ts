@@ -246,14 +246,6 @@ export class RequestResolutionFinalizer {
         WHERE request_id=$1 AND work_cycle=$2 AND status=ANY($3::mission_status[])
         ORDER BY id FOR UPDATE`, [intent.request_id, intent.work_cycle, activeMissionStatuses],
     ) as MissionToCancel[];
-    const engagedTeams = [...new Set(missions.filter(({ status }) => teamEngagedStatuses.has(status)).map(({ team_id }) => team_id))].sort();
-    if (engagedTeams.length) {
-      await manager.query(
-        `UPDATE rescue_team SET availability='UNAVAILABLE',readiness_required=true,version=version+1
-          WHERE id=ANY($1::uuid[])
-            AND (availability IS DISTINCT FROM 'UNAVAILABLE' OR readiness_required IS DISTINCT FROM true)`, [engagedTeams],
-      );
-    }
     for (const mission of missions) {
       const [updated] = await manager.query(
         `UPDATE mission SET status='CANCELLED',version=version+1

@@ -71,7 +71,7 @@ describe('MissionsCommandsService UPDATE RETURNING handling', () => {
       }];
       if (sql.includes('FROM rescue_team WHERE id=$1 FOR SHARE')) return [{
         id: teamId, reporting_mode: 'COORDINATOR',
-        availability: 'AVAILABLE', status: 'ACTIVE', readiness_required: false, external_contact_note: 'Liên hệ điều phối',
+        availability: 'AVAILABLE', status: 'ACTIVE', external_contact_note: 'Liên hệ điều phối',
       }];
       if (sql.includes('FROM incident_category_skill')) return [];
       if (sql.includes('FROM mission WHERE team_id=$1')) return [];

@@ -10,7 +10,7 @@ import { TeamPageQueryDto } from './teams.dto';
 import { teamView, TeamRow } from './teams.helpers';
 
 const teamSelect = `SELECT t.id,t.name,t.team_kind,t.reporting_mode,t.external_contact_note,
-                           t.availability,t.status,t.readiness_required,t.version,t.created_at,
+                           t.availability,t.status,t.version,t.created_at,
                            COALESCE(s.skills,ARRAY[]::text[]) AS skills,
                            CASE WHEN p.team_id IS NULL THEN NULL ELSE greatest(0,floor(extract(epoch FROM clock_timestamp()-p.captured_at)))::int END AS position_age_s,
                            p.accuracy_m AS position_accuracy_m,p.source AS position_source,

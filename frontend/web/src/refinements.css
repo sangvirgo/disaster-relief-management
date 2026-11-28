@@ -1494,23 +1494,6 @@
 @media (prefers-reduced-motion: reduce) { .operations-detail-transition { animation: none; } }
 .sos-action-entry { padding: 16px 0; border-top: 1px solid var(--color-surface-border); }
 .report-heatmap > .card { border: 0; padding: 0; box-shadow: none; background: transparent; }
-.team-readiness-list {
-  min-inline-size: 0;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-
-.team-readiness-list > .candidate,
-.team-readiness-form,
-.team-readiness-form form,
-.team-readiness-form label,
-.team-readiness-form input,
-.team-readiness-form select {
-  min-width: 0;
-  max-width: 100%;
-}
-
 .password-change-dialog { max-width: 560px; }
 .password-change-dialog > .auth-card {
   max-width: none;

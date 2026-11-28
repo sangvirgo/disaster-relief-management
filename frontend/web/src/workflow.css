@@ -861,8 +861,6 @@
 .sos-suggestion__ai { display: grid; gap: 8px; padding-top: 10px; border-top: 1px solid var(--border, #e2e8f0); }
 .sos-suggestion__ai .command-form, .sos-suggestion__ai .button { width: auto; }
 .coordinator-layout .queue-filter-toolbar { justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
-.team-readiness-results { flex-basis: 100%; min-width: 0; }
-.team-readiness-results > p { margin: 0; }
 
 .weather-layer-control { margin: 8px 0 12px; display: grid; gap: 4px; }
 .weather-popup p { margin: 4px 0 0; }

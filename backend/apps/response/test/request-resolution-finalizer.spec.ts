@@ -297,7 +297,7 @@ describe('RequestResolutionFinalizer', () => {
     expect(childLockIndex).toBeLessThan(canonicalLockIndex);
     expect(canonicalLockIndex).toBeLessThan(teamLockIndex);
     expect(teamLockIndex).toBeLessThan(missionLockIndex);
-    expect(manager.query.mock.calls.some(([sql]) => String(sql).includes("readiness_required=true,version=version+1"))).toBe(true);
+    expect(manager.query.mock.calls.some(([sql]) => String(sql).includes("UPDATE rescue_team"))).toBe(false);
     expect(manager.query.mock.calls.some(([sql]) => String(sql).includes("'DUPLICATE_ORPHANED'"))).toBe(true);
   });
 });

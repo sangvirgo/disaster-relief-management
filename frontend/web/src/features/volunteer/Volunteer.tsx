@@ -17,7 +17,6 @@ import { useUnsavedWork } from '../../app/useUnsavedWork';
 import { readMissionDraft, writeMissionDraft, clearMissionDraft } from './missionDraft';
 import { missionViews, noticeViews } from '../../app/routeViews';
 import { TeamMembers } from './TeamMembers';
-import { TeamReadinessForm } from './TeamReadinessForm';
 import { MissionSupplyPanel } from '../supply/MissionSupplyPanel';
 import './volunteer-missions.css';
 import './volunteer-team.css';
@@ -31,7 +30,6 @@ type Team = {
   kind: string;
   reporting_mode: string;
   availability: string;
-  readiness_required?: boolean;
   status: string;
   skills: string[];
   position: null | {
@@ -612,7 +610,7 @@ export function Volunteer({ page, currentUserId, sharingTeamId = '', sharingMess
       refreshAll();
     } catch (cause) {
       setTeamMessage(cause instanceof ApiError && cause.code === 'TEAM_NOT_ELIGIBLE' && nextAvailability === 'AVAILABLE'
-        ? 'Đội chưa thể chuyển sang sẵn sàng. Hãy kiểm tra nhiệm vụ đang hoạt động hoặc yêu cầu xác nhận lại sau khi nhiệm vụ bị hủy. Nếu không còn nhiệm vụ mà vẫn bị chặn, cần người phụ trách hệ thống kiểm tra trạng thái đội; tải lại trang không tự gỡ được khóa này.'
+        ? 'Đội chưa thể chuyển sang sẵn sàng vì còn nhiệm vụ đang hoạt động. Hãy xử lý nhiệm vụ đó trước.'
         : cause instanceof Error ? cause.message : 'Không thể cập nhật trạng thái đội.');
       refreshAll();
     } finally {
@@ -958,16 +956,12 @@ export function Volunteer({ page, currentUserId, sharingTeamId = '', sharingMess
                   )}
                   {teamDetailTab === 'overview' && (
                     <div className="volunteer-team-panel-content">
-                      {selectedTeam.readiness_required && <p className="notice warning" role="status">Đội cần xác nhận sẵn sàng trở lại sau khi nhiệm vụ đang hoạt động bị hủy.</p>}
                       {selectedTeamCanBeManaged && selectedTeam.status === 'ACTIVE' && selectedTeam.availability !== 'AVAILABLE' && (
                         teamActivityError ? <p className="notice error" role="alert">{teamActivityError}</p>
-                          : !teamActivityLoaded ? <p role="status">Đang kiểm tra nhiệm vụ của đội trước khi xác nhận sẵn sàng…</p>
-                            : busyTeamIds.has(selectedTeam.id) ? <p className="notice warning">Đội còn nhiệm vụ đang hoạt động hoặc chờ nhận. Hãy xử lý nhiệm vụ đó trước khi xác nhận sẵn sàng.</p>
-                              : !teamLoading && <TeamReadinessForm key={`${selectedTeam.id}-${selectedTeam.version}`}
-                                teamId={selectedTeam.id} teamName={selectedTeam.name} version={selectedTeam.version}
-                                recorded={selectedTeam.reporting_mode === 'COORDINATOR'}
-                                onSuccess={() => { setTeamMessage('Đã xác nhận đội sẵn sàng.'); refreshAll(); }}
-                                onStale={refreshAll} />
+                          : !teamActivityLoaded ? <p role="status">Đang kiểm tra nhiệm vụ của đội…</p>
+                            : busyTeamIds.has(selectedTeam.id) ? <p className="notice warning">Đội còn nhiệm vụ đang hoạt động hoặc chờ nhận. Hãy xử lý nhiệm vụ đó trước.</p>
+                              : <button type="button" className="button primary" disabled={busy || teamLoading}
+                                onClick={() => toggleTeamAvailability(selectedTeam)}>Chuyển sang Sẵn sàng</button>
                       )}
                       {!selectedTeamCanBeManaged && <p className="muted">Chỉ trưởng đội mới có thể thay đổi trạng thái sẵn sàng.</p>}
                     </div>

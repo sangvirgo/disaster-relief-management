@@ -38,7 +38,7 @@ SELECT expect_err('COORDINATOR team without contact note (NULL)', $$INSERT INTO 
 SELECT expect_err('COORDINATOR team with blank contact note', $$INSERT INTO rescue_team (organization_id,name,team_kind,reporting_mode,external_contact_note) VALUES (gen_random_uuid(),'Đội C','GOVERNMENT','COORDINATOR','   ')$$, '23514', 'coordinator_needs_contact');
 INSERT INTO rescue_team (id,organization_id,name,team_kind,reporting_mode,external_contact_note) VALUES
  ('00000000-0000-0000-0000-0000000000a2',gen_random_uuid(),'Đội QS','MILITARY','COORDINATOR','Chỉ huy: 0900111222');   -- accepted with zero members
-SELECT assert_that('COORDINATOR team accepted with zero members, readiness_required defaults false', (SELECT count(*) FROM team_member WHERE team_id='00000000-0000-0000-0000-0000000000a2')=0 AND (SELECT readiness_required FROM rescue_team WHERE id='00000000-0000-0000-0000-0000000000a2')=false);
+SELECT assert_that('COORDINATOR team accepted with zero members', (SELECT count(*) FROM team_member WHERE team_id='00000000-0000-0000-0000-0000000000a2')=0);
 
 -- request intake: optional phone/headcount
 INSERT INTO assistance_request (id,tracking_code,incident_category_code,report_mode,reporter_contact_phone,organization_id)

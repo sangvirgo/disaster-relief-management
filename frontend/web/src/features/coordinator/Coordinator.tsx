@@ -16,9 +16,8 @@ import { ExternalTeamsPanel } from './ExternalTeamsPanel';
 import { operationIdFromTimeline, ResolutionOperationPanel } from './ResolutionOperationPanel';
 import { RequestTimeline } from './RequestTimeline';
 import { RequestEvidencePanel } from './RequestEvidencePanel';
-import { TeamReadinessQueue } from './TeamReadinessQueue';
 import { MissionSupplyPanel } from '../supply/MissionSupplyPanel';
-import { isSubCoordinator, type Me } from '../../auth/session';
+import type { Me } from '../../auth/session';
 import './coordinator-detail.css';
 
 type QueueItem = {
@@ -549,7 +548,6 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
   user?: Me;
   onRequestClosed?: () => void;
 }) {
-  const subCoordinator = isSubCoordinator(user ?? null);
   // Reporting a team position for a team without GPS needs a system-wide coordinator grant (TEAM_POSITION_SET_ANY).
   const canReportTeamPosition = Boolean(user?.grants.some((grant) => grant.scope_type === 'SYSTEM'
     && grant.role_code === 'COORDINATOR'));
@@ -1029,9 +1027,6 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
           <div>
             <h2>{title[page] || title.queue}</h2>
             {queue && <p className="muted">Cập nhật lúc {timeLabel(queue.generated_at)}</p>}
-          </div>
-          <div className="queue-filter-toolbar">
-            {!subCoordinator && <TeamReadinessQueue refreshRevision={revision} onChanged={() => { setRevision(value => value + 1); setDetailRevision(value => value + 1); }} />}
           </div>
         </div>
         <form className="filter-bar queue-filter-bar" onSubmit={submitQueueSearch} role="search" aria-label="Tìm và lọc SOS">
@@ -1721,14 +1716,10 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                         {canReportTeamPosition && candidates.unknown_position.some((candidate) => candidate.team.reporting_mode === 'COORDINATOR')
                           ? <p>Có đội ngoài hệ thống chưa có vị trí: bấm “Báo vị trí” ở bảng bên dưới.</p>
                           : <ul>
-                            <li>Đội đang nghỉ hoặc chờ xác nhận sẵn sàng</li>
+                            <li>Đội đang tạm ngưng hoạt động</li>
                             <li>Đội đang làm nhiệm vụ khác</li>
                             <li>Vị trí đội ở quá xa, hoặc đội thiếu kỹ năng cho loại sự cố này</li>
                           </ul>}
-                        <div className="dispatch-empty__actions">
-                          {!subCoordinator && <TeamReadinessQueue refreshRevision={revision} onChanged={() => setDetailRevision(value => value + 1)} />}
-                          {subCoordinator && <span className="muted">Liên hệ điều phối viên chính để xác nhận đội sẵn sàng.</span>}
-                        </div>
                       </div>
                     </div>
                   )}

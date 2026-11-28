@@ -11,14 +11,14 @@ function assertVietnamese(result, status, code) {
 async function addCandidateTeam(responseDb, coordinatorId, {
   id = randomUUID(), name, position, skills = ['T8_A', 'T8_C'],
   reportingMode = 'COORDINATOR', availability = 'AVAILABLE', status = 'ACTIVE',
-  readinessRequired = false, externalContactNote = 'Liên hệ kiểm thử T8',
+  externalContactNote = 'Liên hệ kiểm thử T8',
 }) {
   await responseDb.query(
     `INSERT INTO rescue_team
-       (id,name,team_kind,reporting_mode,external_contact_note,availability,status,readiness_required)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+       (id,name,team_kind,reporting_mode,external_contact_note,availability,status)
+     VALUES ($1,$2,$3,$4,$5,$6,$7)`,
     [id, `Đội ${name} ${id.slice(0, 8)}`,
-      reportingMode === 'APP' ? 'VOLUNTEER' : 'OTHER', reportingMode, externalContactNote, availability, status, readinessRequired],
+      reportingMode === 'APP' ? 'VOLUNTEER' : 'OTHER', reportingMode, externalContactNote, availability, status],
   );
   await responseDb.query('INSERT INTO team_skill (team_id,skill_code) SELECT $1,unnest($2::text[])', [id, skills]);
   if (position) {
@@ -84,10 +84,6 @@ export async function runTeamCandidatesSmoke({ responseDb, responseUrl, reporter
     name: 'không sẵn sàng', availability: 'UNAVAILABLE',
     position: { longitude: 104.5, latitude: 14.5, captured_at: new Date() },
   });
-  const readinessRequiredTeam = await addTeam({
-    name: 'cần kiểm tra sẵn sàng', readinessRequired: true,
-    position: { longitude: 104.5, latitude: 14.5, captured_at: new Date() },
-  });
   const inactiveTeam = await addTeam({
     name: 'đội ngừng hoạt động', status: 'INACTIVE',
     position: { longitude: 104.5, latitude: 14.5, captured_at: new Date() },
@@ -149,7 +145,7 @@ export async function runTeamCandidatesSmoke({ responseDb, responseUrl, reporter
   assert.equal(candidates.value.items.some((item) => item.team.id === farTeam), false, 'fresh teams outside radius are omitted');
   assert.equal(candidates.value.items.some((item) => item.team.id === missingSkillTeam), false, 'missing required skills are excluded');
   const eligibilityExcludedTeams = [
-    unavailableTeam, readinessRequiredTeam, inactiveTeam, appTeamWithoutLeader,
+    unavailableTeam, inactiveTeam, appTeamWithoutLeader,
   ];
   for (const teamId of eligibilityExcludedTeams) {
     assert.equal(candidates.value.items.some((item) => item.team.id === teamId), false, `${teamId} must not be a candidate`);

@@ -309,17 +309,15 @@ export async function runMissionSmoke({
   const stillAssigned = await responseDb.query('SELECT team_id,status FROM mission WHERE id=$1', [raceMission.id]);
   assert.deepEqual(stillAssigned.rows, [{ team_id: appTeam.value.id, status: 'OFFERED' }], 'overdue notice must not auto-reassign');
 
-  const beforeOfferedCancel = await responseDb.query('SELECT availability,readiness_required FROM rescue_team WHERE id=$1', [appTeam.value.id]);
+  const beforeOfferedCancel = await responseDb.query('SELECT availability FROM rescue_team WHERE id=$1', [appTeam.value.id]);
   assert.equal(beforeOfferedCancel.rows[0].availability, 'AVAILABLE');
-  assert.equal(beforeOfferedCancel.rows[0].readiness_required, false);
   const offeredCancel = await call(responseUrl, `missions/${raceMission.id}/cancel`, {
     method: 'POST', body: { expected_version: 1, reason: 'Thu hồi lời mời trong kiểm thử.' },
     headers: { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': key() },
   });
   assert.equal(offeredCancel.status, 200, JSON.stringify(offeredCancel.value));
-  const afterOfferedCancel = await responseDb.query('SELECT availability,readiness_required FROM rescue_team WHERE id=$1', [appTeam.value.id]);
-  assert.equal(afterOfferedCancel.rows[0].availability, 'AVAILABLE', 'canceling OFFERED must keep team readiness');
-  assert.equal(afterOfferedCancel.rows[0].readiness_required, false);
+  const afterOfferedCancel = await responseDb.query('SELECT availability FROM rescue_team WHERE id=$1', [appTeam.value.id]);
+  assert.equal(afterOfferedCancel.rows[0].availability, 'AVAILABLE', 'canceling OFFERED keeps the team available');
 
   const campaign = await call(responseUrl, 'campaigns', {
     method: 'POST', body: { name: `T9 lock campaign ${key()}` },
@@ -663,10 +661,9 @@ export async function runMissionSmoke({
   );
   assert.deepEqual(unavailableFirstMissions.rows, [], 'an unavailable team must not receive an offered mission');
   const unavailableTeamState = await responseDb.query(
-    'SELECT availability,readiness_required,version FROM rescue_team WHERE id=$1', [appTeam.value.id],
+    'SELECT availability,version FROM rescue_team WHERE id=$1', [appTeam.value.id],
   );
   assert.equal(unavailableTeamState.rows[0].availability, 'UNAVAILABLE');
-  assert.equal(unavailableTeamState.rows[0].readiness_required, false);
   const restoredTeam = await call(responseUrl, `teams/${appTeam.value.id}`, {
     method: 'PATCH', body: { expected_version: Number(unavailableTeamState.rows[0].version), availability: 'AVAILABLE' },
     headers: { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': key() },
@@ -689,12 +686,11 @@ export async function runMissionSmoke({
     headers: { Authorization: `Bearer ${coordinator.token}`, 'Idempotency-Key': key() },
   });
   assert.equal(activeCancel.status, 200, JSON.stringify(activeCancel.value));
-  const afterActiveCancel = await responseDb.query('SELECT availability,readiness_required FROM rescue_team WHERE id=$1', [appTeam.value.id]);
-  assert.equal(afterActiveCancel.rows[0].availability, 'UNAVAILABLE');
-  assert.equal(afterActiveCancel.rows[0].readiness_required, true);
+  const afterActiveCancel = await responseDb.query('SELECT availability FROM rescue_team WHERE id=$1', [appTeam.value.id]);
+  assert.equal(afterActiveCancel.rows[0].availability, 'AVAILABLE', 'canceling an accepted mission frees the team (no readiness latch)');
 
   await responseDb.query(
-    "UPDATE rescue_team SET availability='AVAILABLE',readiness_required=false,version=version+1 WHERE id=$1",
+    "UPDATE rescue_team SET availability='AVAILABLE',version=version+1 WHERE id=$1",
     [coordinatorTeam.value.id],
   );
   await responseDb.query(

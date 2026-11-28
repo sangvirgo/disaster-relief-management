@@ -478,7 +478,6 @@
 .async-request-form .resolve-reason__label > label { display: inline; }
 /* Dispatch footer cancel link: beat the older pink-box rule. */
 .sos-dispatch-footer .secondary-command .secondary-action-button { min-width: 0; border: 0; background: transparent; box-shadow: none; text-decoration: underline; }
-.record-detail-dialog.team-readiness-dialog { width: min(560px, calc(100vw - 32px)); }
 .queue-filter-toolbar .button.small { min-height: 36px; }
 
 /* Dispatch tab polish (2026-11-28). */
@@ -496,20 +495,6 @@
 .dispatch-empty__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
 .dispatch-empty__actions .button { margin: 0; }
 
-/* Team readiness dialog: one row per team, inline two-field confirmation. */
-.team-ready { display: grid; gap: 12px; }
-.team-ready__hint { margin: 0; font-size: 13.5px; }
-.team-ready__empty { margin: 0; padding: 14px; border-radius: 10px; background: var(--color-surface-subtle); color: var(--color-text-secondary); text-align: center; }
-.team-ready__list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
-.team-ready__row { display: grid; gap: 10px; padding: 12px 14px; border: 1px solid var(--color-surface-border); border-radius: 12px; background: var(--color-surface-card); }
-.team-ready__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.team-ready__head .button { margin: 0; min-height: 34px; }
-.team-ready__form { display: grid; gap: 8px; }
-.team-ready__basis { display: flex; flex-wrap: wrap; gap: 6px; }
-.team-ready__basis .filter-chip.active { border-color: var(--color-primary); background: var(--color-primary-bg); color: var(--color-primary-dark); }
-.team-ready__form input { width: 100%; min-height: 40px; }
-.team-ready__actions { display: flex; justify-content: flex-end; gap: 8px; }
-.team-ready__actions .button { margin: 0; }
 
 /* Map show/hide (button or M key). */
 .sos-detail-split { position: relative; }

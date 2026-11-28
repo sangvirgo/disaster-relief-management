@@ -213,7 +213,6 @@ CREATE TABLE rescue_team (
   team_kind                text NOT NULL CHECK (team_kind IN ('VOLUNTEER','MILITARY','GOVERNMENT','OTHER')),
   reporting_mode           text NOT NULL DEFAULT 'APP' CHECK (reporting_mode IN ('APP','COORDINATOR')),
   external_contact_note    text CHECK (external_contact_note IS NULL OR btrim(external_contact_note) <> ''),   -- PII (commander phone); never in list rows
-  readiness_required       boolean NOT NULL DEFAULT false,         -- latch: generic PATCH cannot bypass readiness
   affiliation_verified_at  timestamptz,
   affiliation_verified_by  uuid,
   availability             text NOT NULL DEFAULT 'AVAILABLE' CHECK (availability IN ('AVAILABLE','UNAVAILABLE')),
