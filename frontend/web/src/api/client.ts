@@ -1,4 +1,5 @@
-import { logisticsCommandErrorCopy } from '../i18n/commandErrors';
+import { logisticsCommandErrorCopy } from '../i18n/commandErrors.ts';
+import { resolutionErrorCopy } from '../i18n/resolutionErrors.ts';
 
 export type Service = 'identity' | 'response' | 'logistics';
 export type ApiErrorCode = string;
@@ -19,6 +20,7 @@ type ErrorEnvelope = {
   message?: string;
   field_errors?: Record<string, string[]>;
   correlation_id?: string;
+  details?: unknown;
 };
 const serviceNames: Record<Service, string> = {
   identity: 'Tài khoản',
@@ -73,7 +75,7 @@ function serverError(
 ): ApiError {
   const code = payload.code || (status === 403 ? 'FORBIDDEN' : 'REQUEST_FAILED');
   const reason =
-    messages[code] || (typeof payload.message === 'string' && payload.message.trim()) || fallback;
+    resolutionErrorCopy(code, payload.details) || messages[code] || (typeof payload.message === 'string' && payload.message.trim()) || fallback;
   return new ApiError(
     code,
     status,
@@ -267,25 +269,29 @@ export async function upload<T>(
   const body = new FormData();
   body.append('file', file);
   let response: Response;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 120_000);
   try {
     response = await fetch(`/api/v1/${service}${path}`, {
       method: 'POST',
       credentials,
       cache: 'no-store',
       body,
+      signal: controller.signal,
       headers: {
         ...options.headers,
         'Idempotency-Key': options.idempotencyKey,
         ...(credentials !== 'omit' ? { 'X-CSRF-Token': csrfToken! } : {}),
       },
     });
+    if (response.ok) return await response.json() as T;
   } catch {
     throw new ApiError(
-      'NETWORK_UNAVAILABLE',
+      controller.signal.aborted ? 'UPLOAD_TIMEOUT' : 'NETWORK_UNAVAILABLE',
       0,
       `${serviceNames[service]}: Không thể tải tệp lên. Chưa có xác nhận từ máy chủ.`
     );
-  }
+  } finally { clearTimeout(timeout); }
   if (response.status === 401 && retryAuth && credentials !== 'omit') {
     try {
       await refresh();

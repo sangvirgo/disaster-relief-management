@@ -2026,6 +2026,14 @@ export interface components {
                 /** Format: date-time */
                 created_at: string;
             }[];
+            current_description?: string | null;
+            /** @description Narrative at first human verification, not necessarily original intake. */
+            first_verified_description?: string | null;
+            /** @description Current-work-cycle mission counts; does not imply SOS resolution or relief-goods delivery. */
+            rescue_progress?: {
+                active: number;
+                completed: number;
+            };
         };
         ReporterEventPage: {
             items: components["schemas"]["ReporterEvent"][];
@@ -2040,6 +2048,11 @@ export interface components {
                 status: string;
                 /** Format: date-time */
                 received_at: string;
+                /** @description Current-work-cycle mission counts; does not imply SOS resolution or relief-goods delivery. */
+                rescue_progress?: {
+                    active: number;
+                    completed: number;
+                };
             }[];
             more: boolean;
             cursor?: string;
@@ -2648,6 +2661,20 @@ export interface components {
             beneficiary_contact_phone?: string | null;
             /** @description Leader-only. */
             alternate_contact?: Record<string, never> | null;
+            /** @description Latest human-approved facts in the mission work cycle. Assignment fields remain the historical snapshot. No contact data. */
+            current_situation?: {
+                description: string | null;
+                people_affected: number | null;
+                declared_danger: boolean;
+                location: {
+                    [key: string]: unknown;
+                } | null;
+                /** Format: date-time */
+                approved_at: string;
+                changed_since_assignment: boolean;
+                children_count: number | null;
+                elderly_count: number | null;
+            };
         };
         MissionDetail: components["schemas"]["MissionView"] & {
             timeline: {

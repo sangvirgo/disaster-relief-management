@@ -25,6 +25,9 @@ interface MissionRow extends Record<string, unknown> {
   cursor_created_at: string;
   campaign_id: string | null;
   approved_facts: unknown;
+  current_approved_facts?: unknown;
+  situation_approved_at?: Date | string | null;
+  situation_changed?: boolean;
   member_role?: 'LEADER' | 'MEMBER';
 }
 
@@ -50,6 +53,20 @@ function missionView(row: MissionRow, includeContacts: boolean, canManageMission
     view.reporter_contact_phone = facts.reporter_contact_phone ?? null;
     view.beneficiary_contact_phone = facts.beneficiary_contact_phone ?? null;
     view.alternate_contact = facts.alternate_contact ?? null;
+  }
+  if (row.current_approved_facts && row.situation_approved_at) {
+    const current = asObject(row.current_approved_facts);
+    // Explicit allowlist: never spread a verification payload (it also contains private contacts).
+    view.current_situation = {
+      description: current.description ?? null,
+      people_affected: current.people_affected == null ? null : Number(current.people_affected),
+      children_count: current.children_count == null ? null : Number(current.children_count),
+      elderly_count: current.elderly_count == null ? null : Number(current.elderly_count),
+      declared_danger: current.reporter_declared_danger === true,
+      location: current.location ?? null,
+      approved_at: toIso(row.situation_approved_at),
+      changed_since_assignment: row.situation_changed === true,
+    };
   }
   return view;
 }
@@ -106,10 +123,15 @@ export class MissionsQueriesService {
       `SELECT m.id,m.request_id,m.team_id,t.name AS team_name,t.status AS team_status,t.reporting_mode AS team_reporting_mode,m.work_cycle,m.status,m.mission_kind,m.version,m.created_at,
               to_char(m.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at,
               r.campaign_id,e.payload->'approved_facts' AS approved_facts,
+              current_event.payload->'approved_facts' AS current_approved_facts,
+              current_event.occurred_at AS situation_approved_at,
+              current_event.id<>m.verification_revision AS situation_changed,
               tm.member_role
          FROM mission m JOIN rescue_team t ON t.id=m.team_id
          JOIN assistance_request r ON r.id=m.request_id
          JOIN request_event e ON e.id=m.verification_revision AND e.request_id=m.request_id
+         LEFT JOIN request_event current_event ON current_event.id=r.verification_revision
+           AND current_event.request_id=m.request_id AND r.work_cycle=m.work_cycle
          JOIN team_member tm ON tm.team_id=m.team_id AND tm.user_id=$1 AND tm.left_at IS NULL
         WHERE m.team_id=ANY($2::uuid[])
           AND ($3::timestamptz IS NULL OR (m.created_at,m.id)>($3::timestamptz,$4::uuid))
@@ -205,10 +227,15 @@ export class MissionsQueriesService {
     const rows = await queryable.query(
       `SELECT m.id,m.request_id,m.team_id,t.name AS team_name,t.status AS team_status,t.reporting_mode AS team_reporting_mode,m.work_cycle,m.status,m.mission_kind,m.version,m.created_at,
               to_char(m.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at,
-              r.campaign_id,e.payload->'approved_facts' AS approved_facts
+              r.campaign_id,e.payload->'approved_facts' AS approved_facts,
+              current_event.payload->'approved_facts' AS current_approved_facts,
+              current_event.occurred_at AS situation_approved_at,
+              current_event.id<>m.verification_revision AS situation_changed
          FROM mission m JOIN rescue_team t ON t.id=m.team_id
          JOIN assistance_request r ON r.id=m.request_id
          JOIN request_event e ON e.id=m.verification_revision AND e.request_id=m.request_id
+         LEFT JOIN request_event current_event ON current_event.id=r.verification_revision
+           AND current_event.request_id=m.request_id AND r.work_cycle=m.work_cycle
         WHERE m.id=$1`, [missionId],
     ) as MissionRow[];
     return rows[0];

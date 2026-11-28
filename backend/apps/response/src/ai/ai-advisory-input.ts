@@ -6,10 +6,11 @@ export interface StoredAssessmentFacts extends AiAssessmentFacts {
   version: number;
   workCycle: number;
 }
+export const ADVISORY_PROMPT_VERSION = 'v20';
 
 export function aiAssessmentHash(facts: AiAssessmentFacts, requestVersion: number, workCycle: number): string {
   return aiInputHash(JSON.stringify({
-    schema_version: 'v6', request_version: Number(requestVersion), work_cycle: Number(workCycle),
+    schema_version: 'v6', prompt_version: ADVISORY_PROMPT_VERSION, request_version: Number(requestVersion), work_cycle: Number(workCycle),
     input_mode: 'SANITIZED_NARRATIVE',
     input: buildAiAssessmentInput(facts),
   }));
@@ -40,8 +41,8 @@ export async function enqueueAiAdvisory(manager: Pick<EntityManager, 'query'>, r
   const risk = scoreRequestRisk(facts);
   await manager.query(
     `INSERT INTO ai_advisory (request_id,request_version,input_hash,model,prompt_version,schema_version,risk_score,reason_codes)
-     VALUES ($1,$2,$3,$4,'v19','v5',$5,$6) ON CONFLICT (request_id,input_hash) DO NOTHING`,
+     VALUES ($1,$2,$3,$4,$7,'v5',$5,$6) ON CONFLICT (request_id,input_hash) DO NOTHING`,
     [requestId, Number(facts.version), aiAssessmentHash(facts, facts.version, facts.workCycle),
-      process.env.GEMINI_MODEL ?? 'gemini-3.5-flash-lite', risk.score, risk.reasonCodes],
+      process.env.GEMINI_MODEL ?? 'gemini-3.5-flash-lite', risk.score, risk.reasonCodes, ADVISORY_PROMPT_VERSION],
   );
 }

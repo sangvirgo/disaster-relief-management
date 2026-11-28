@@ -4,12 +4,14 @@ import { useCursorNav, LIST_PAGE_SIZE } from '../../api/useCursorNav';
 import { ListNav } from '../../components/ui/Pager';
 import type { Me } from '../../auth/session';
 import { label, requestStatusLabel, timeLabel } from '../../i18n/labels';
+import { rescueProgressMessage, type RescueProgress } from './rescueProgress';
 
 type OwnedRequest = {
   id: string;
   tracking_code: string;
   status: string;
   received_at: string;
+  rescue_progress?: RescueProgress;
 };
 type OwnedPage = { items: OwnedRequest[]; more: boolean; cursor?: string };
 
@@ -131,7 +133,7 @@ export function CitizenRequests({
               <small>Tiếp nhận {timeLabel(item.received_at)}</small>
             </div>
             <span className={`chip request-status request-status--${requestStatusTone(item.status)}`}>
-              {requestStatusLabel(item.status)}
+              {rescueProgressMessage(item.status, item.rescue_progress) || requestStatusLabel(item.status)}
             </span>
             <span className="account-request-arrow" aria-hidden="true">›</span>
           </button>

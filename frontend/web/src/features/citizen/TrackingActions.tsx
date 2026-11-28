@@ -70,7 +70,8 @@ export function TrackingActions({
   const descriptionError = description.length > 2000 ? 'Mô tả mới không được vượt quá 2.000 ký tự.' : '';
   const peopleError = people && (!Number.isInteger(Number(people)) || Number(people) < 1 || Number(people) > 10000)
     ? 'Số người cần hỗ trợ phải là số nguyên từ 1 đến 10.000.' : '';
-  const hasSupplementChanges = Boolean(description.trim() || people || danger || supplementPoint);
+  const descriptionChanged = Boolean(description.trim() && description.trim() !== tracking.current_description?.trim());
+  const hasSupplementChanges = Boolean(descriptionChanged || people || danger || supplementPoint);
   const hasSubmission = hasSupplementChanges || Boolean(file);
   const supplementInvalid = Boolean(descriptionError || peopleError);
   async function supplement(event: FormEvent) {
@@ -89,7 +90,7 @@ export function TrackingActions({
           idempotencyKey: supplementKey.current,
           body: {
             expected_version: tracking.version,
-            ...(description.trim() ? { description: description.trim() } : {}),
+            ...(descriptionChanged ? { description: description.trim() } : {}),
             ...(people ? { people_affected: Number(people) } : {}),
             ...(danger ? { reporter_declared_danger: true } : {}),
             ...(supplementPoint ? { location: {
@@ -220,6 +221,8 @@ export function TrackingActions({
       {tracking.can_supplement ? (
         <form className="form-stack" onSubmit={supplement} noValidate>
           <p>Thông tin bổ sung sau xác minh sẽ được điều phối viên rà soát trước khi áp dụng.</p>
+          {tracking.current_description && !description.trim() && <button className="button secondary" type="button" disabled={busy}
+            onClick={() => setDescription(tracking.current_description || '')}>Sửa từ mô tả đang ghi nhận</button>}
           <label>
             Mô tả tình hình cập nhật
             <textarea

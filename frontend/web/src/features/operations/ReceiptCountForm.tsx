@@ -2,21 +2,14 @@ import { Dropdown } from '../../components/ui/Dropdown';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, newCommandKey, upload } from '../../api/client';
 import { fetchAll } from '../../api/fetchAll';
+import { loadStaffDrive } from '../../api/staffDrive';
+import { useUnsavedWork } from '../../app/useUnsavedWork';
+import { clearCountDraft, readCountDraft, writeCountDraft, type CountLine as Line } from './countDraft';
 import { evidenceFileError } from '../../i18n/evidence';
 import './receipt-count.css';
 
 type Item = { id: string; name: string; unit: { display_name: string; scale: number } };
-type Drive = { items: { item_id: string; item_name: string; unit_name: string; scale: number }[] };
-type Line = {
-  outside?: boolean;
-  item_id: string;
-  counted_quantity: string;
-  accepted_quantity: string;
-  held_quantity: string;
-  rejected_quantity: string;
-  condition_note: string;
-  expiry_date: string;
-};
+type Drive = { id: string; items: { item_id: string; item_name: string; unit_name: string; scale: number }[] };
 const empty = (): Line => ({
   item_id: '',
   counted_quantity: '',
@@ -31,6 +24,7 @@ const normalizeQuantity = (value?: string) => value?.replace(/(\.\d*?)0+$/, '$1'
 type Existing = { lines?: (Partial<Line> & { item_name?: string; unit_name?: string; unit_scale?: number | string })[] } | null;
 
 export function ReceiptCountForm({
+  userId,
   receiptId,
   deliveryId,
   create,
@@ -42,6 +36,7 @@ export function ReceiptCountForm({
   confirm,
   onSuccess,
 }: {
+  userId: string;
   receiptId: string;
   deliveryId: string;
   /** When there is no receipt yet, it is created from this delivery and warehouse right before the first count is sent. */
@@ -57,14 +52,16 @@ export function ReceiptCountForm({
   confirm?: { countRevision: number; declarationRevision: number };
   onSuccess: (result?: { confirmation?: { matched: boolean; posted?: boolean; mismatched_items: string[] } }) => void;
 }) {
+  const draftScope = { userId, deliveryId, version, mode: confirm ? 'confirm' : heldRelease ? 'release' : 'count', countRevision: confirm?.countRevision, declarationRevision: confirm?.declarationRevision };
+  const [restored, setRestored] = useState(() => readCountDraft(draftScope));
   const [driveItems, setDriveItems] = useState<Item[]>([]);
   const [catalogItems, setCatalogItems] = useState<Item[]>([]);
-  const [allowUnexpected, setAllowUnexpected] = useState(false);
+  const [allowUnexpected, setAllowUnexpected] = useState(restored?.allowUnexpected || false);
   const [driveLoading, setDriveLoading] = useState(true);
   const [driveRevision, setDriveRevision] = useState(0);
-  const initializedItems = useRef(false);
+  const initializedItems = useRef(Boolean(restored));
   const [lines, setLines] = useState<Line[]>(
-    existing?.lines?.length
+    restored?.lines || (existing?.lines?.length
       ? existing.lines.map((line) => ({
           item_id: line.item_id || '',
           counted_quantity: normalizeQuantity(line.counted_quantity) || '',
@@ -74,20 +71,33 @@ export function ReceiptCountForm({
           condition_note: line.condition_note || '',
           expiry_date: line.expiry_date || '',
         }))
-      : [empty()]
+      : [empty()])
   );
-  const [note, setNote] = useState('');
-  const [advanced, setAdvanced] = useState(Boolean(existing?.lines?.some(line => Number(line.held_quantity) > 0 || Number(line.rejected_quantity) > 0 || line.condition_note || line.expiry_date)));
+  const [note, setNote] = useState(restored?.note || '');
+  const [dirty, setDirty] = useState(Boolean(restored));
+  const [draftSaved, setDraftSaved] = useState(Boolean(restored));
+  const [advanced, setAdvanced] = useState(restored?.advanced || Boolean(existing?.lines?.some(line => Number(line.held_quantity) > 0 || Number(line.rejected_quantity) > 0 || line.condition_note || line.expiry_date)));
   const [error, setError] = useState('');
   const [itemsError, setItemsError] = useState('');
   const [busy, setBusy] = useState(false);
   const [evidence, setEvidence] = useState<File | null>(null);
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  useUnsavedWork((dirty && !draftSaved) || Boolean(evidence) || busy, busy
+    ? 'Kết quả đang được gửi, chưa xác nhận hoàn tất. Bạn vẫn muốn rời đi?'
+    : evidence ? 'Tệp minh chứng chưa được gửi. Nếu rời đi, bạn cần chọn lại tệp. Bạn vẫn muốn rời đi?'
+    : 'Không lưu được bản nháp trên trình duyệt. Rời biểu mẫu sẽ mất số liệu chưa gửi. Bạn vẫn muốn rời đi?');
+  const [touched, setTouched] = useState<Record<string, boolean>>(restored?.touched || {});
   const [attempted, setAttempted] = useState(false);
   const key = useRef<string | null>(null);
   const createKey = useRef<string | null>(null);
   const evidenceKey = useRef<string | null>(null);
   const createdReceipt = useRef<{ id: string; version: number } | null>(null);
+  useEffect(() => {
+    if (!dirty) return;
+    const save = () => setDraftSaved(writeCountDraft(draftScope, { lines, note, advanced, allowUnexpected, touched, evidenceName: evidence?.name || restored?.evidenceName || '' }));
+    save();
+    const timer = window.setInterval(save, 60_000);
+    return () => window.clearInterval(timer);
+  }, [dirty, lines, note, advanced, allowUnexpected, touched, evidence, userId, deliveryId, version, confirm?.countRevision, confirm?.declarationRevision]);
   const existingItems: Item[] = [...(initialItems || []), ...(existing?.lines || []).filter(line => line.item_id).map(line => ({
     id: line.item_id!, name: line.item_name || line.item_id!,
     unit: { display_name: line.unit_name || '', scale: Number(line.unit_scale ?? 0) },
@@ -141,8 +151,9 @@ export function ReceiptCountForm({
   useEffect(() => {
     let live = true;
     setDriveLoading(true);
+    setItemsError('');
     Promise.all([
-      api<Drive>('logistics', `/donation-drives/${encodeURIComponent(driveId)}`),
+      loadStaffDrive<Drive>(driveId),
       create && !confirm ? api<{ declaration?: { lines?: { item_id: string }[] } }>('logistics', `/public/donations/${encodeURIComponent(deliveryId)}`, { credentials: 'omit' }) : Promise.resolve(null),
     ]).then(([drive, declaration]) => { if (!live) return;
         if (!initializedItems.current && !existing?.lines?.length && !heldRelease) {
@@ -167,6 +178,7 @@ export function ReceiptCountForm({
     return () => { live = false; };
   }, [allowUnexpected]);
   function edit(index: number, field: keyof Line, value: string) {
+    setDirty(true);
     setLines((current) =>
       current.map((line, position) => {
         if (position !== index) return line;
@@ -222,12 +234,31 @@ export function ReceiptCountForm({
         },
       });
       key.current = null;
+      clearCountDraft(draftScope);
+      setDirty(false);
       onSuccess(result);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Chưa xác nhận được kết quả kiểm đếm.');
     } finally {
       setBusy(false);
     }
+  }
+  function discardDraft() {
+    if (!window.confirm('Bỏ bản nháp kiểm đếm này và nhập lại?')) return;
+    clearCountDraft(draftScope);
+    setRestored(null);
+    setDirty(false);
+    setDraftSaved(false);
+    setNote(''); setTouched({}); setEvidence(null); setAllowUnexpected(false);
+    setAdvanced(heldRelease);
+    setLines(existing?.lines?.length ? existing.lines.map(line => ({
+      item_id: line.item_id || '', counted_quantity: normalizeQuantity(line.counted_quantity) || '',
+      accepted_quantity: normalizeQuantity(line.accepted_quantity) || '', held_quantity: normalizeQuantity(line.held_quantity) || '0',
+      rejected_quantity: normalizeQuantity(line.rejected_quantity) || '0', condition_note: line.condition_note || '', expiry_date: line.expiry_date || '',
+    })) : [empty()]);
+    initializedItems.current = false;
+    setDriveRevision(value => value + 1);
+    key.current = null;
   }
   const columns = (advanced || heldRelease ? [
     ['counted_quantity', 'Đã đếm'],
@@ -242,6 +273,8 @@ export function ReceiptCountForm({
     : `minmax(180px, 2fr) repeat(${columns.length}, minmax(96px, 1fr)) 36px`;
   return (
     <form className="count-form" onSubmit={submit} noValidate>
+      {restored && <div className="notice" role="status"><p>Đã khôi phục số liệu bạn đang nhập. Đây là bản nháp chưa gửi.{restored.evidenceName ? ' Tệp minh chứng cần chọn lại nếu muốn đính kèm.' : ''}</p><button type="button" className="button secondary" disabled={busy} onClick={discardDraft}>Bỏ bản nháp</button></div>}
+      {!restored && dirty && draftSaved && <small className="muted" role="status">Đã lưu bản nháp trong phiên trình duyệt này, giữ 30 phút sau khi rời biểu mẫu. Kết quả chưa được gửi.</small>}
       <header className="count-form__intro">
         <h3>{heldRelease ? 'Kiểm tra lại hàng tạm giữ' : confirm ? 'Xác nhận kiểm đếm độc lập' : 'Nhập kết quả kiểm đếm'}</h3>
         <p>{confirm
@@ -252,6 +285,7 @@ export function ReceiptCountForm({
       {itemsError && <p className="notice error" role="alert">{itemsError}</p>}
       {!driveLoading && !driveItems.length && <button className="button secondary" type="button" onClick={() => { setItemsError(''); setDriveRevision(current => current + 1); }}>Tải lại vật phẩm của đợt</button>}
 
+      <fieldset className="count-form__fields" disabled={busy || driveLoading} aria-label="Kết quả kiểm đếm">
       {!heldRelease && <div className="count-form__options" role="group" aria-label="Tùy chọn kiểm đếm">
         <label className="count-form__toggle">
           <input type="checkbox" checked={advanced} onChange={() => setAdvanced((value) => !value)} />
@@ -259,6 +293,7 @@ export function ReceiptCountForm({
         </label>
         <label className="count-form__toggle">
           <input type="checkbox" checked={allowUnexpected} disabled={allowUnexpected} onChange={() => {
+            setDirty(true);
             setAllowUnexpected(true);
             setAdvanced(true);
             setLines(current => [...current, { ...empty(), outside: true }]);
@@ -313,7 +348,7 @@ export function ReceiptCountForm({
               </span>)}
               <span role="cell">
                 {!heldRelease && lines.length > 1 && <button className="count-form__remove" type="button" aria-label={`Bỏ dòng ${index + 1}`} title="Bỏ dòng"
-                  onClick={() => { setLines(lines.filter((_, position) => position !== index)); key.current = null; }}>×</button>}
+                  onClick={() => { setDirty(true); setLines(lines.filter((_, position) => position !== index)); key.current = null; }}>×</button>}
               </span>
             </div>
             {(advanced || heldRelease) && <div className="count-form__extra">
@@ -335,6 +370,7 @@ export function ReceiptCountForm({
         })}
       </div>
       {canAddLine && <button className="button secondary count-form__add" type="button" onClick={() => {
+        setDirty(true);
         const nextItem = allowUnexpected ? undefined : driveItems.find(item => !lines.some(line => line.item_id === item.id));
         setLines([...lines, { ...empty(), item_id: nextItem?.id || '', outside: allowUnexpected }]);
         key.current = null;
@@ -347,7 +383,7 @@ export function ReceiptCountForm({
           rows={2}
           aria-invalid={Boolean(showFieldError('note', note) && fieldErrors.note)}
           value={note}
-          onChange={(event) => { setNote(event.target.value); setTouched((current) => ({ ...current, note: true })); key.current = null; }}
+          onChange={(event) => { setDirty(true); setNote(event.target.value); setTouched((current) => ({ ...current, note: true })); key.current = null; }}
           onBlur={() => setTouched((current) => ({ ...current, note: true }))}
         />
         {showFieldError('note', note) && fieldErrors.note && <small className="field-error" role="alert">{fieldErrors.note}</small>}
@@ -355,7 +391,7 @@ export function ReceiptCountForm({
       {!heldRelease && <div className="count-form__evidence">
         <span>Ảnh hoặc video minh chứng <small>(không bắt buộc)</small></span>
         <label className="count-form__file">
-          <input type="file" accept="image/jpeg,image/png,video/mp4" onChange={event => { setEvidence(event.target.files?.[0] || null); key.current = null; evidenceKey.current = null; }} />
+          <input type="file" accept="image/jpeg,image/png,video/mp4" onChange={event => { setDirty(true); setEvidence(event.target.files?.[0] || null); key.current = null; evidenceKey.current = null; }} />
           <span className="button secondary">Chọn tệp</span>
           <span className="count-form__file-name">{evidence ? evidence.name : 'Chưa chọn tệp (JPG, PNG hoặc MP4)'}</span>
         </label>
@@ -365,6 +401,7 @@ export function ReceiptCountForm({
       <button className="button count-form__submit" disabled={busy || driveLoading || !driveItems.length || hasInvalidFields || Boolean(evidence && evidenceFileError(evidence))}>
         {busy ? 'Đang gửi…' : confirm ? 'Gửi xác nhận kiểm đếm' : 'Gửi kết quả đếm'}
       </button>
+      </fieldset>
     </form>
   );
 }

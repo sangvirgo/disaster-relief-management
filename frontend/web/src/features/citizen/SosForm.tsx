@@ -184,7 +184,7 @@ export function SosForm({
         errors[field] = 'Số điện thoại cần có 8–15 chữ số; có thể thêm dấu + ở đầu.';
     }
     const lon = Number(longitude), lat = Number(latitude);
-    if (!longitude || !latitude) errors.location = 'Vị trí cần hỗ trợ là bắt buộc.';
+    if (!longitude || !latitude) errors.location = 'Chọn vị trí trên bản đồ rồi bấm “Xác nhận vị trí”.';
     else if (!Number.isFinite(lon) || !Number.isFinite(lat) || Math.abs(lon) > 180 || Math.abs(lat) > 90)
       errors.location = 'Vị trí cần hỗ trợ không hợp lệ.';
     if (people && (!Number.isInteger(Number(people)) || Number(people) < 1 || Number(people) > 10000))
@@ -712,7 +712,7 @@ export function SosForm({
           )}
         </div>
       </div>
-      <div className="sos-submit-bar">
+      <div className={`sos-submit-bar${busy || (Object.keys(clientErrors).length === 0 && !fieldError) ? ' is-ready' : ''}`}>
       <Button type="submit" variant="emergency" size="lg" disabled={busy || Object.keys(clientErrors).length > 0 || Boolean(fieldError)} loading={busy}>
         {busy ? 'Đang gửi…' : 'Gửi yêu cầu SOS'}
       </Button>

@@ -40,6 +40,7 @@ type Team = {
   };
 };
 type TeamDetailTab = 'overview' | 'members' | 'location';
+const teamDetailViews = ['overview', 'members', 'location'] as const;
 const teamDetailTabs: { id: TeamDetailTab; label: string }[] = [
   { id: 'overview', label: 'Tổng quan' },
   { id: 'members', label: 'Thành viên' },
@@ -243,7 +244,7 @@ export function Notices({ onOpenMission, onOpenRequest }: {
   );
 }
 
-export function Volunteer({ page, sharingTeamId = '', sharingMessage = '', onToggleSharing }: {
+export function Volunteer({ page, currentUserId, sharingTeamId = '', sharingMessage = '', onToggleSharing }: {
   page: string; currentUserId: string; sharingTeamId?: string; sharingMessage?: string;
   onToggleSharing?: (teamId: string) => void;
 }) {
@@ -317,7 +318,7 @@ export function Volunteer({ page, sharingTeamId = '', sharingMessage = '', onTog
   const [teamPoint, setTeamPoint] = useState<Point | null>(null);
   const [teamAccuracy, setTeamAccuracy] = useState<number | null>(null);
   const [teamMessage, setTeamMessage] = useState('');
-  const [teamDetailTab, setTeamDetailTab] = useState<TeamDetailTab>('overview');
+  const [teamDetailTab, setTeamDetailTab] = useUrlView('team_tab', teamDetailViews, 'overview');
 
   useEffect(() => {
     if (!isTeam || !selectedTeam?.id) return;
@@ -676,7 +677,11 @@ export function Volunteer({ page, sharingTeamId = '', sharingMessage = '', onTog
   }
   const activeMission = !missionId ? null : missionDetail?.id === missionId ? missionDetail : selectedMission?.id === missionId ? selectedMission : null;
   const canManageMission = activeMission?.can_manage_mission === true;
-  const directionsUrl = activeMission && googleMapsDirectionsUrl(activeMission.location);
+  const currentSituation = activeMission?.current_situation;
+  // Mission destination remains the approved assignment; a later SOS location needs coordinator review.
+  const situationLocation = activeMission?.location;
+  const situationLocationChanged = Boolean(currentSituation && JSON.stringify(currentSituation.location?.coordinates) !== JSON.stringify(activeMission?.location?.coordinates));
+  const directionsUrl = activeMission && googleMapsDirectionsUrl(situationLocation);
   const selectedTeamCanBeManaged = Boolean(selectedTeam &&
     (canManageTeam || manageableTeamIds.has(selectedTeam.id)));
   const hasSingleTeam = isTeam && items.length === 1 && !next;
@@ -806,7 +811,7 @@ export function Volunteer({ page, sharingTeamId = '', sharingMessage = '', onTog
                       <button type="button" className="mission-table-open" aria-pressed={selectedMission?.id === mission.id} onClick={(event) => { event.stopPropagation(); selectMission(mission); }}>
                         <strong>{label(mission.category)}</strong>
                       </button>
-                      {mission.declared_danger && <span className="mission-table-danger">Cần hỗ trợ khẩn cấp</span>}
+                      {(mission.current_situation ? mission.current_situation.declared_danger : mission.declared_danger) && <span className="mission-table-danger">Cần hỗ trợ khẩn cấp</span>}
                     </td>
                     <td><span className="mission-table-team">{mission.team.name}</span></td>
                     <td><span className={`chip mission-status mission-status-${mission.status.toLowerCase()}`}>{label(mission.status)}</span></td>
@@ -1010,81 +1015,33 @@ export function Volunteer({ page, sharingTeamId = '', sharingMessage = '', onTog
                 >
                 {missionDetailTab === 'overview' && <div className="volunteer-mission-tab-content">
                 <div className="volunteer-mission-facts">
-                  <div><small>Số người cần hỗ trợ</small><strong>{activeMission.people_affected ?? 'Chưa rõ'}</strong></div>
+                  <div><small>Số người cần hỗ trợ</small><strong>{currentSituation ? currentSituation.people_affected ?? 'Chưa rõ' : activeMission.people_affected ?? 'Chưa rõ'}</strong></div>
+                  {currentSituation?.children_count != null && <div><small>Trẻ em</small><strong>{currentSituation.children_count}</strong></div>}
+                  {currentSituation?.elderly_count != null && <div><small>Người cao tuổi</small><strong>{currentSituation.elderly_count}</strong></div>}
 
                   <div><small>Đội thực hiện</small><strong>{activeMission.team.name}</strong></div>
                 </div>
 
                 <div className="volunteer-mission-context">
-                  <h3>Mô tả tình huống</h3>
-                  <p>{activeMission.description || 'Chưa có mô tả tình huống được cung cấp.'}</p>
+                  <h3>{currentSituation ? 'Tình huống đã được duyệt' : 'Tình huống khi giao nhiệm vụ'}</h3>
+                  {currentSituation && <p className="muted">Duyệt lúc {new Date(currentSituation.approved_at).toLocaleString('vi-VN')}{currentSituation.changed_since_assignment ? ' · Có cập nhật sau khi giao nhiệm vụ' : ''}</p>}
+                  <p>{(currentSituation ? currentSituation.description : activeMission.description) || 'Chưa có mô tả tình huống được cung cấp.'}</p>
+                  {currentSituation?.changed_since_assignment && <details>
+                    <summary>Xem tình huống lúc giao nhiệm vụ</summary>
+                    <p>Số người: {activeMission.people_affected ?? 'Chưa rõ'}</p>
+                    <p>{activeMission.description || 'Chưa có mô tả.'}</p>
+                  </details>}
+                  {!currentSituation && <small>Đây là thông tin tại thời điểm giao việc. Liên hệ điều phối viên để kiểm tra cập nhật mới.</small>}
+                  {situationLocationChanged && <p className="notice warning">SOS có vị trí cập nhật. Liên hệ điều phối viên xác nhận điểm đến; chỉ đường bên dưới dùng vị trí lúc giao nhiệm vụ.</p>}
                 </div>
 
-                {activeMission.declared_danger && (
+                {(currentSituation ? currentSituation.declared_danger : activeMission.declared_danger) && (
                   <p className="notice warning volunteer-mission-danger">
                     Người báo cho biết có nguy hiểm tính mạng cần hỗ trợ khẩn cấp.
                   </p>
                 )}
 
-                {/* Thông tin liên hệ chỉ hiển thị với Đội trưởng */}
-                {(activeMission.reporter_contact_phone ||
-                  activeMission.beneficiary_contact_phone) && (
-                  <div className="volunteer-mission-contacts">
-                    <div><h3>Liên hệ hiện trường</h3><p>Thông tin dành cho đội trưởng.</p></div>
-                    <div className="volunteer-mission-contact-list">
-                    {activeMission.reporter_contact_phone && (
-                      <p>
-                        Người báo:{' '}
-                        <a href={`tel:${activeMission.reporter_contact_phone}`}>
-                          {activeMission.reporter_contact_phone}
-                        </a>
-                      </p>
-                    )}
-                    {activeMission.beneficiary_contact_phone && (
-                      <p>
-                        Người cần hỗ trợ:{' '}
-                        <a href={`tel:${activeMission.beneficiary_contact_phone}`}>
-                          {activeMission.beneficiary_contact_phone}
-                        </a>
-                      </p>
-                    )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Chỉ đường Google Maps */}
-                {directionsUrl ? (
-                  <div className="mission-location volunteer-mission-location">
-                    <h3>Vị trí hiện trường</h3>
-                    <div className="mission-route-summary">
-                      <div><small>Điểm xuất phát</small><strong>Chọn trên Google Maps</strong></div>
-                      <span aria-hidden="true">→</span>
-                      <div><small>Điểm đến</small><strong>Tọa độ hiện trường</strong></div>
-                    </div>
-                    <p className="mission-route-coordinates">
-                      Vĩ độ {(activeMission.location as { coordinates: [number, number] }).coordinates[1]}
-                      {' · '}Kinh độ {(activeMission.location as { coordinates: [number, number] }).coordinates[0]}
-                    </p>
-                    <a
-                      className="button mission-directions"
-                      href={directionsUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Mở chỉ đường trên Google Maps ↗
-                    </a>
-                    <p className="mission-route-note">Google Maps mở trong tab mới. Kiểm tra lối tiếp cận an toàn trước khi di chuyển.</p>
-                  </div>
-                ) : (
-                  <p className="notice">
-                    Chưa nhận được tọa độ hiện trường từ hệ thống. Hãy bấm Làm mới để thử lại; nếu vẫn thiếu, báo điều phối viên bổ sung vị trí trước khi di chuyển.
-                  </p>
-                )}
                 </div>}
-
-                {missionDetailTab === 'overview' && activeMission.status !== 'OFFERED' && (
-                  <MissionSupplyPanel missionId={activeMission.id} missionStatus={activeMission.status} />
-                )}
 
                 <div hidden={missionDetailTab !== 'overview'} className="volunteer-mission-tab-content volunteer-mission-progress">
                 {['OFFERED', 'ACCEPTED', 'EN_ROUTE', 'ON_SCENE'].includes(activeMission.status) ? (
@@ -1273,10 +1230,71 @@ export function Volunteer({ page, sharingTeamId = '', sharingMessage = '', onTog
                 )}
 
                 {canManageMission && ['ACCEPTED', 'EN_ROUTE', 'ON_SCENE'].includes(activeMission.status) &&
-                  <MissionEvidenceUpload key={activeMission.id} missionId={activeMission.id} disabled={busy}
+                  <MissionEvidenceUpload key={`${currentUserId}:${activeMission.id}`} userId={currentUserId} missionId={activeMission.id} disabled={busy}
                     onBusyChange={setEvidencePending} onSaved={() => setRevision(value => value + 1)} />}
 
                 </div>
+
+                {missionDetailTab === 'overview' && <div className="volunteer-mission-tab-content">
+                {/* Thông tin liên hệ chỉ hiển thị với Đội trưởng */}
+                {(activeMission.reporter_contact_phone ||
+                  activeMission.beneficiary_contact_phone) && (
+                  <div className="volunteer-mission-contacts">
+                    <div><h3>Liên hệ hiện trường</h3><p>Thông tin dành cho đội trưởng.</p></div>
+                    <div className="volunteer-mission-contact-list">
+                    {activeMission.reporter_contact_phone && (
+                      <p>
+                        Người báo:{' '}
+                        <a href={`tel:${activeMission.reporter_contact_phone}`}>
+                          {activeMission.reporter_contact_phone}
+                        </a>
+                      </p>
+                    )}
+                    {activeMission.beneficiary_contact_phone && (
+                      <p>
+                        Người cần hỗ trợ:{' '}
+                        <a href={`tel:${activeMission.beneficiary_contact_phone}`}>
+                          {activeMission.beneficiary_contact_phone}
+                        </a>
+                      </p>
+                    )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Chỉ đường Google Maps */}
+                {directionsUrl ? (
+                  <div className="mission-location volunteer-mission-location">
+                    <h3>Vị trí hiện trường</h3>
+                    <div className="mission-route-summary">
+                      <div><small>Điểm xuất phát</small><strong>Chọn trên Google Maps</strong></div>
+                      <span aria-hidden="true">→</span>
+                      <div><small>Điểm đến</small><strong>Tọa độ hiện trường</strong></div>
+                    </div>
+                    <p className="mission-route-coordinates">
+                      Vĩ độ {(situationLocation as { coordinates: [number, number] }).coordinates[1]}
+                      {' · '}Kinh độ {(situationLocation as { coordinates: [number, number] }).coordinates[0]}
+                    </p>
+                    <a
+                      className="button mission-directions"
+                      href={directionsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Mở chỉ đường trên Google Maps ↗
+                    </a>
+                    <p className="mission-route-note">Google Maps mở trong tab mới. Kiểm tra lối tiếp cận an toàn trước khi di chuyển.</p>
+                  </div>
+                ) : (
+                  <p className="notice">
+                    Chưa nhận được tọa độ hiện trường từ hệ thống. Hãy bấm Làm mới để thử lại; nếu vẫn thiếu, báo điều phối viên bổ sung vị trí trước khi di chuyển.
+                  </p>
+                )}
+                </div>}
+
+                {missionDetailTab === 'overview' && activeMission.status !== 'OFFERED' && (
+                  <MissionSupplyPanel missionId={activeMission.id} missionStatus={activeMission.status} />
+                )}
 
                 {missionDetailTab === 'history' && <div className="volunteer-mission-tab-content volunteer-mission-history">
                 {/* Hiển thị danh sách minh chứng đã có */}

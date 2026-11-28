@@ -177,7 +177,7 @@
   justify-content: space-between;
   gap: var(--space-4);
   min-width: 0;
-  padding: var(--space-4);
+  padding: 12px 16px;
   border: 1px solid #d9e5f3;
   border-radius: 16px;
   background: linear-gradient(135deg, #f6faff, #fff 75%);
@@ -185,11 +185,14 @@
 
 .volunteer-mission-summary__identity {
   display: grid;
-  gap: var(--space-1);
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 4px 16px;
   min-width: 0;
 }
 
 .volunteer-mission-summary__identity small {
+  grid-column: 1 / -1;
   color: var(--color-text-secondary);
   font-size: 12px;
   line-height: 18px;
@@ -234,19 +237,16 @@
 }
 
 .volunteer-mission-facts {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
 }
 
 .volunteer-mission-facts > div {
   display: grid;
   gap: var(--space-1);
   min-width: 0;
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid #e1e8f0;
-  border-radius: 12px;
-  background: #f8fafc;
+  padding: 4px 0;
 }
 
 .volunteer-mission-facts small {
@@ -317,10 +317,6 @@
 
 .volunteer-mission-progress > .notice {
   margin: 0;
-}
-
-.volunteer-mission-progress {
-  order: -1;
 }
 
 .volunteer-mission-progress .action-grid {
@@ -408,10 +404,6 @@
     line-height: 25px;
   }
 
-  .volunteer-mission-facts {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .volunteer-mission-contacts {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -421,8 +413,6 @@
   }
 }
 
-.volunteer-mission-facts { display: flex; flex-wrap: wrap; gap: 8px 24px; }
-.volunteer-mission-facts > div { padding: 4px 0; background: transparent; border: 0; }
 .volunteer-mission-progress .action-grid { display: flex; flex-wrap: wrap; gap: 10px; }
 .volunteer-mission-progress .action-grid > .button { width: auto; flex: 0 1 auto; }
 

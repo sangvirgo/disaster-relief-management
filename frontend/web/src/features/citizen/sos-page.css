@@ -176,7 +176,7 @@
   min-width: 0;
 }
 .sos-submit-bar {
-  position: sticky;
+  position: static;
   bottom: 0;
   z-index: var(--z-sticky);
   display: flex;
@@ -190,6 +190,7 @@
   box-shadow: none;
   pointer-events: none;
 }
+.sos-submit-bar.is-ready { position: sticky; }
 .sos-submit-bar .ui-button {
   flex: none;
   min-width: 320px;

@@ -924,6 +924,12 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
     detail?.timeline.items.filter((event) => event.event_type === 'SUPPLEMENT_REVIEW')
       .map((event) => event.payload?.reviewed_event_id).filter((id): id is string => typeof id === 'string') ?? []
   );
+  const previousApprovedSituation = detail?.timeline.items.flatMap(event => {
+    const facts = event.payload?.approved_facts;
+    const description = facts && typeof facts === 'object' ? (facts as Record<string, unknown>).description : undefined;
+    return typeof description === 'string' && description.trim() && description !== detail.description
+      ? [{ description, approvedAt: event.occurred_at }] : [];
+  })[0];
   const pendingSupplements = detail?.timeline.items.filter((event) =>
     event.event_type === 'REPORTER_SUPPLEMENT' && event.payload?.pending_review === true && !reviewedSupplementIds.has(event.id)
   ) ?? [];
@@ -1242,6 +1248,11 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 <h3 id="request-profile-heading">Thông tin hồ sơ SOS</h3>
               </div>
               <p className="sos-profile__description">{reliefDescription(detail.description).narrative || 'Chưa có mô tả tình huống.'}</p>
+              {previousApprovedSituation && <details className="tracking-situation" open>
+                <summary>Tình huống đã duyệt trước đó · {timeLabel(previousApprovedSituation.approvedAt)}</summary>
+                <p>{reliefDescription(previousApprovedSituation.description).narrative}</p>
+                <small>Thông tin lịch sử để đối chiếu với mô tả hiện tại. Kiểm tra các chi tiết còn hiệu lực trước khi quyết định.</small>
+              </details>}
               <RequestEvidencePanel key={detail.id} items={detail.evidence?.items ?? []} />
               <dl className="sos-profile__facts">
                 <div><dt>Sự cố</dt><dd>{label(detail.category)}</dd></div>

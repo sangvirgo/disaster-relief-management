@@ -138,6 +138,7 @@ export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, er
         radius: campaign.radiusM, color, weight: 2, dashArray: '8 6', fillColor: color, fillOpacity: 0.04, interactive: false,
       }).addTo(group);
       L.marker([campaign.lat + campaign.radiusM / 111_320, campaign.lng], {
+        title: `Vùng chiến dịch: ${campaign.name}`,
         zIndexOffset: 300,
         icon: L.divIcon({ className: 'campaign-flag-pin', html: `<span style="background:${color}" aria-hidden="true">⚑</span>`, iconSize: [22, 22], iconAnchor: [11, 11] }),
       }).bindTooltip(`Chiến dịch cứu trợ: ${escapeHtml(campaign.name)} (${campaign.status === 'ACTIVE' ? 'đang hoạt động' : campaign.status === 'PAUSED' ? 'tạm dừng' : 'đã đóng'}) · bán kính ${kmLabel(campaign.radiusM)}`).addTo(group);

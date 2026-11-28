@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import type { DataSource } from 'typeorm';
 import { AiAdvisoryService } from '../src/ai/ai-advisory.service';
 import { aiInputHash } from '../src/ai/ai-risk';
-import { aiAssessmentHash, enqueueAiAdvisory } from '../src/ai/ai-advisory-input';
+import { aiAssessmentHash, enqueueAiAdvisory, isAiAdvisoryFresh } from '../src/ai/ai-advisory-input';
 import { Registry } from 'prom-client';
 import { registerGeminiMetrics } from '@c48/technical';
 const job = { id: '00000000-0000-4000-8000-000000000001', request_id: 'request', description: 'Cần nước uống', input_hash: aiInputHash('Cần nước uống'), model: 'test', attempts: 1, claim_token: '00000000-0000-4000-8000-000000000099' };
@@ -20,6 +20,13 @@ const capturedTrappedGeminiResponse = JSON.parse(readFileSync(
   new URL('../../../../docs/backend/seed/fixtures/gemini-af2-f6-response-2026-10-27.json', import.meta.url), 'utf8',
 )).extracted_json as Record<string, unknown>;
 describe('AI advisory worker lifecycle', () => {
+  it('does not present an advisory from the old prompt as fresh', () => {
+    const facts = { incidentCategoryCode: 'FLOOD', description: 'Có 4 người cần hỗ trợ.' };
+    expect(isAiAdvisoryFresh({ request_version: 1, input_hash: aiAssessmentHash(facts, 1, 1) }, facts, 1)).toBe(true);
+    expect(isAiAdvisoryFresh({ request_version: 1, input_hash: aiInputHash(JSON.stringify({ schema_version: 'v6', request_version: 1, work_cycle: 1,
+      input_mode: 'SANITIZED_NARRATIVE', input: { incident_category_code: 'FLOOD', description: facts.description, people_affected: null, children_count: null,
+        elderly_count: null, reporter_declared_danger: false, needs_rescue: false, needs_relief_supplies: false } })) }, facts, 1)).toBe(false);
+  });
   beforeEach(() => { jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined); });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -69,15 +76,15 @@ describe('AI advisory worker lifecycle', () => {
       expect(fetch).toHaveBeenCalledTimes(fixtures.indexOf(fixture) + 1);
       const requestBody = JSON.parse(String(fetch.mock.calls.at(-1)?.[1]?.body)) as Record<string, unknown>;
       expect((requestBody.generationConfig as Record<string, unknown>).maxOutputTokens).toBe(2048);
-      expect(JSON.stringify(requestBody.contents)).toContain('dự báo 24 giờ tới');
-      expect(JSON.stringify(requestBody.contents)).toContain('không viết thành mưa hoặc gió đã xảy ra trong 24 giờ qua');
-      expect(JSON.stringify(requestBody.contents)).toContain('Weather_impact gồm đúng 2 câu ngắn');
-      expect(JSON.stringify(requestBody.contents)).toContain('Gắn triệu chứng và nhu cầu với đúng nhóm');
-      expect(JSON.stringify(requestBody.contents)).toContain('không tự đổi thành');
-      expect(JSON.stringify(requestBody.contents)).toContain('không hướng dẫn điều phối viên làm gì');
-      expect(JSON.stringify(requestBody.contents)).toContain('không ghép các trường dữ liệu bằng dấu phẩy');
-      expect(JSON.stringify(requestBody.contents)).toContain('không viết họ mắc kẹt tại tầng trệt');
-      expect(JSON.stringify(requestBody.contents)).toContain('thuộc P1 (70–100)');
+      expect(JSON.stringify(requestBody.systemInstruction)).toContain('dự báo 24 giờ tới');
+      expect(JSON.stringify(requestBody.systemInstruction)).toContain('không viết thành mưa hoặc gió đã xảy ra trong 24 giờ qua');
+      expect(JSON.stringify(requestBody.systemInstruction)).toContain('Weather_impact gồm đúng 2 câu ngắn');
+      expect(JSON.stringify(requestBody.systemInstruction)).toContain('Gắn triệu chứng và nhu cầu với đúng nhóm');
+      expect(JSON.stringify(requestBody.systemInstruction)).toContain('không tự đổi thành');
+      expect(JSON.stringify(requestBody.systemInstruction)).toContain('không hướng dẫn điều phối viên làm gì');
+      expect(JSON.stringify(requestBody.systemInstruction)).toContain('không ghép các trường dữ liệu bằng dấu phẩy');
+      expect(JSON.stringify(requestBody.systemInstruction)).toContain('không viết họ mắc kẹt tại tầng trệt');
+      expect(JSON.stringify(requestBody.systemInstruction)).toContain('thuộc P1 (70–100)');
       const completed = query.mock.calls.find(([sql]) => String(sql).includes("status='COMPLETED'"));
       expect(completed).toBeDefined();
       expect(String(completed?.[0])).toContain('claim_token=$3');
@@ -347,7 +354,7 @@ describe('AI advisory worker lifecycle', () => {
     expect(claimed?.claim_token).toMatch(/^[0-9a-f-]{36}$/u);
     const claim = query.mock.calls.find(([sql]) => String(sql).includes('attempts=attempts+1'));
     expect(claim?.[0]).toContain('claim_token=$2');
-    expect(claim?.[1]).toEqual([job.id, claimed?.claim_token, 45]);
+    expect(claim?.[1]).toEqual([job.id, claimed?.claim_token, 45, 'v20']);
   });
 });
 

@@ -22,9 +22,12 @@ const tileAttribution =
   (import.meta.env.VITE_OSM_TILE_ATTRIBUTION as string | undefined)?.trim() ||
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
+const PIN_PICK_ZOOM = 13;
+const pinMarkup = '<span class="location-pin-head"><span></span></span><span class="location-pin-shadow"></span>';
+
 const pinIcon = L.divIcon({
   className: 'location-pin-icon',
-  html: '<span class="location-pin-marker"><span class="location-center-pin-head"><span></span></span><span class="location-center-pin-shadow"></span></span>',
+  html: `<span class="location-pin-marker">${pinMarkup}</span>`,
   iconSize: [36, 38],
   iconAnchor: [18, 38],
 });
@@ -117,7 +120,8 @@ export function LocationPicker({
   const leafletMapRef = useRef<L.Map | null>(null);
   const chosenSearchRef = useRef<{ point: Point; label: string } | null>(null);
   const confirmedPointRef = useRef<Point | null>(value);
-  const suppressMoveRef = useRef(false);
+  const draftPointRef = useRef<Point | null>(null);
+  const googlePinRef = useRef<google.maps.OverlayView | null>(null);
 
   // Google Maps refs
   const googleContainerRef = useRef<HTMLDivElement>(null);
@@ -134,7 +138,6 @@ export function LocationPicker({
   const applyAutoSelection = useCallback((point: Point, address?: string) => {
     confirmedPointRef.current = point;
     setDraftPoint(point);
-    setPinDropKey((current) => current + 1);
     if (address) {
       setSearchQuery(address);
       setSelectedAddress(`Đã chọn: ${address}`);
@@ -156,9 +159,8 @@ export function LocationPicker({
   const searchOnTypingRef = useRef(false);
   const [selectedAddress, setSelectedAddress] = useState('');
   const [draftPoint, setDraftPoint] = useState<Point | null>(null);
+  draftPointRef.current = draftPoint;
   const pinMarkerRef = useRef<L.Marker | null>(null);
-  const [moving, setMoving] = useState(false);
-  const [pinDropKey, setPinDropKey] = useState(0);
   const [tileError, setTileError] = useState(false);
   const [weatherMap, setWeatherMap] = useState<L.Map | null>(null);
   const [error, setError] = useState('');
@@ -240,6 +242,23 @@ export function LocationPicker({
     }, wait);
   }
 
+  function pickPoint(point: Point) {
+    chosenSearchRef.current = null;
+    if (selectionModeRef.current.selectOnPick) {
+      applyAutoSelection(point);
+      lookupAddress(point, true);
+    } else {
+      setDraftPoint(point);
+      if (confirmedPointRef.current && !samePoint(point, confirmedPointRef.current)) {
+        confirmedPointRef.current = null;
+        selectRef.current(null);
+      }
+      lookupAddress(point);
+    }
+  }
+
+  useEffect(() => { googlePinRef.current?.draw(); }, [draftPoint, open, mapEngine]);
+
   useEffect(() => () => {
     addressAbortRef.current?.abort();
     addressAbortRef.current = null;
@@ -253,7 +272,7 @@ export function LocationPicker({
     const initialCenter: [number, number] = value
       ? [value.latitude, value.longitude]
       : [16.1, 107.7];
-    const initialZoom = value ? 17 : 6;
+    const initialZoom = value ? PIN_PICK_ZOOM : 6;
 
     const map = L.map(leafletContainerRef.current, {
       center: initialCenter,
@@ -285,22 +304,11 @@ export function LocationPicker({
       lookupAddress(value, true);
     }
 
-    // Clicking the map places the pin there; panning or zooming never changes the chosen point.
+    // A click chooses a point. Native map dragging does not emit this selection action.
     map.on('click', (event: L.LeafletMouseEvent) => {
       const point = { latitude: event.latlng.lat, longitude: event.latlng.lng };
-      chosenSearchRef.current = null;
-      if (selectionModeRef.current.selectOnPick) {
-        applyAutoSelection(point);
-        lookupAddress(point, true);
-        return;
-      }
-      setDraftPoint(point);
-      setSelectedAddress('Đang cập nhật vị trí ghim…');
-      if (confirmedPointRef.current && !samePoint(point, confirmedPointRef.current)) {
-        confirmedPointRef.current = null;
-        selectRef.current(null);
-      }
-      lookupAddress(point);
+      map.setView(event.latlng, Math.max(map.getZoom(), PIN_PICK_ZOOM), { animate: false });
+      pickPoint(point);
     });
 
     // Ép Leaflet render lại kích thước sau khi container xuất hiện
@@ -358,14 +366,10 @@ export function LocationPicker({
     if (!value || (confirmedPointRef.current && samePoint(confirmedPointRef.current, value))) return;
     const { latitude, longitude } = value;
     if (mapEngine === 'osm' && leafletMapRef.current) {
-      suppressMoveRef.current = true;
-      leafletMapRef.current.setView([latitude, longitude], Math.max(leafletMapRef.current.getZoom(), 17), { animate: false });
-      suppressMoveRef.current = false;
+      leafletMapRef.current.setView([latitude, longitude], Math.max(leafletMapRef.current.getZoom(), PIN_PICK_ZOOM), { animate: false });
     } else if (mapEngine === 'google' && googleMapRef.current) {
-      suppressMoveRef.current = true;
       googleMapRef.current.setCenter({ lat: latitude, lng: longitude });
-      googleMapRef.current.setZoom(Math.max(googleMapRef.current.getZoom() ?? 6, 16));
-      suppressMoveRef.current = false;
+      googleMapRef.current.setZoom(Math.max(googleMapRef.current.getZoom() ?? 6, PIN_PICK_ZOOM));
     }
     setDraftPoint(value);
     confirmedPointRef.current = value;
@@ -378,15 +382,13 @@ export function LocationPicker({
 
     let active = true;
     let clickListener: google.maps.MapsEventListener | undefined;
-    let moveListener: google.maps.MapsEventListener | undefined;
-    let moveStartListener: google.maps.MapsEventListener | undefined;
-    let moveEndListener: google.maps.MapsEventListener | undefined;
+    let pinOverlay: google.maps.OverlayView | undefined;
     let autocomplete: google.maps.places.PlaceAutocompleteElement | undefined;
 
     async function initGoogle() {
       try {
         setOptions({ key: activeGoogleKey, v: 'weekly', language: 'vi', region: 'VN' });
-        const [{ Map }, { PlaceAutocompleteElement }] = await Promise.all([
+        const [{ Map, OverlayView }, { PlaceAutocompleteElement }] = await Promise.all([
           importLibrary('maps'),
           importLibrary('places'),
         ]);
@@ -397,7 +399,7 @@ export function LocationPicker({
           : { lat: 16.1, lng: 107.7 };
         const map = new Map(googleContainerRef.current, {
           center,
-          zoom: value ? 16 : 6,
+          zoom: value ? PIN_PICK_ZOOM : 6,
           clickableIcons: false,
           streetViewControl: false,
           mapTypeControl: false,
@@ -408,38 +410,33 @@ export function LocationPicker({
           lookupAddress(value, true);
         }
 
-        let userMovedMap = false;
-        moveStartListener = map.addListener('dragstart', () => { userMovedMap = true; chosenSearchRef.current = null; setMoving(true); });
-        moveListener = map.addListener('center_changed', () => {
-          if (suppressMoveRef.current || !userMovedMap) return;
-          const center = map.getCenter();
-          if (!center) return;
-          const point = { latitude: center.lat(), longitude: center.lng() };
-          setDraftPoint(point);
-          setSelectedAddress('Đang cập nhật vị trí ghim…');
-          if (!selectionModeRef.current.selectOnPick && confirmedPointRef.current && !samePoint(point, confirmedPointRef.current)) {
-            confirmedPointRef.current = null;
-            selectRef.current(null);
-          }
-        });
-        moveEndListener = map.addListener('idle', () => {
-          setMoving(false);
-          if (suppressMoveRef.current || !userMovedMap) return;
-          userMovedMap = false;
-          const center = map.getCenter();
-          if (center) {
-            const point = { latitude: center.lat(), longitude: center.lng() };
-            if (selectionModeRef.current.selectOnPick) {
-              applyAutoSelection(point);
-              lookupAddress(point, true);
-            } else lookupAddress(point);
-          }
-        });
+        // A geographic pin is projected into the map pane; it never follows the viewport center.
+        pinOverlay = new OverlayView();
+        let pin: HTMLDivElement | null = null;
+        const overlay = pinOverlay;
+        overlay.onAdd = () => {
+          pin = document.createElement('div');
+          pin.className = 'location-google-pin';
+          pin.hidden = true;
+          pin.setAttribute('aria-hidden', 'true');
+          pin.innerHTML = pinMarkup;
+          overlay.getPanes()?.markerLayer.appendChild(pin);
+        };
+        overlay.draw = () => {
+          if (!pin) return;
+          const point = draftPointRef.current;
+          const pixel = point ? overlay.getProjection().fromLatLngToDivPixel({ lat: point.latitude, lng: point.longitude }) : null;
+          pin.hidden = !pixel;
+          if (pixel) { pin.style.left = pixel.x + 'px'; pin.style.top = pixel.y + 'px'; }
+        };
+        overlay.onRemove = () => { pin?.remove(); pin = null; };
+        googlePinRef.current = overlay;
+        overlay.setMap(map);
         clickListener = map.addListener('click', (event: google.maps.MapMouseEvent) => {
           if (!event.latLng) return;
-          userMovedMap = true;
-          chosenSearchRef.current = null;
-          map.panTo(event.latLng);
+          map.setCenter(event.latLng);
+          map.setZoom(Math.max(map.getZoom() ?? 6, PIN_PICK_ZOOM));
+          pickPoint({ latitude: event.latLng.lat(), longitude: event.latLng.lng() });
         });
 
         if (googleSearchRef.current) {
@@ -455,10 +452,8 @@ export function LocationPicker({
               ).placePrediction.toPlace();
               await place.fetchFields({ fields: ['formattedAddress', 'location', 'viewport'] });
               if (!active || !place.location) return;
-              suppressMoveRef.current = true;
               map.setCenter(place.location);
-              map.setZoom(17);
-              suppressMoveRef.current = false;
+              map.setZoom(PIN_PICK_ZOOM);
               const lat = place.location.lat();
               const lng = place.location.lng();
               const point = { latitude: lat, longitude: lng };
@@ -502,9 +497,8 @@ export function LocationPicker({
     return () => {
       active = false;
       clickListener?.remove();
-      moveListener?.remove();
-      moveStartListener?.remove();
-      moveEndListener?.remove();
+      pinOverlay?.setMap(null);
+      googlePinRef.current = null;
       autocomplete?.remove();
       googleMapRef.current = null;
     };
@@ -657,9 +651,7 @@ export function LocationPicker({
     if (!point) return;
     const { latitude: lat, longitude: lon } = point;
     if (leafletMapRef.current) {
-      suppressMoveRef.current = true;
-      leafletMapRef.current.setView([lat, lon], 17, { animate: false });
-      suppressMoveRef.current = false;
+      leafletMapRef.current.setView([lat, lon], PIN_PICK_ZOOM, { animate: false });
     }
     const label = resolvedLabel || [item.name, item.address].filter(Boolean).join(' · ');
     chosenSearchRef.current = { point, label };
@@ -675,21 +667,13 @@ export function LocationPicker({
     }
   }
 
-  async function confirmCenter() {
+  function confirmSelection() {
     searchOnTypingRef.current = false;
-    let centerPoint: Point | null = null;
-    if (mapEngine === 'osm') {
-      centerPoint = draftPoint;
-    } else {
-      const center = googleMapRef.current?.getCenter();
-      if (center) centerPoint = { latitude: center.lat(), longitude: center.lng() };
-    }
-    if (!centerPoint) return;
-    const point = chosenSearchRef.current?.point ?? centerPoint;
+    const point = chosenSearchRef.current?.point ?? draftPoint;
+    if (!point) return;
     if (validatePoint?.(point)) return;
     confirmedPointRef.current = point;
     setDraftPoint(point);
-    setPinDropKey((current) => current + 1);
     const original = chosenSearchRef.current;
     selectRef.current(point, original && samePoint(original.point, point) ? original.label : undefined);
     if (selectionModeRef.current.closeOnSelect) setOpen(false);
@@ -856,20 +840,10 @@ export function LocationPicker({
                 style={{ width: '100%', height: '100%' }}
               />
             )}
-            {mapEngine === 'google' && <div
-              key={pinDropKey}
-              className={`location-center-pin${moving ? ' is-moving' : ''}${pinDropKey ? ' is-confirmed' : ''}`}
-              aria-hidden="true"
-            >
-              <span className="location-center-pin-head">
-                <span />
-              </span>
-              <span className="location-center-pin-shadow" />
-            </div>}
             {!selectOnPick && <button
               type="button"
               className="location-confirm-button"
-              onClick={() => void confirmCenter()}
+              onClick={() => void confirmSelection()}
               disabled={!draftPoint || Boolean(draftPoint && validatePoint?.(draftPoint))}
             >
               Xác nhận vị trí

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { api, newCommandKey } from '../../api/client';
 import { fetchAll } from '../../api/fetchAll';
+import { loadStaffDrive } from '../../api/staffDrive';
 import { CommandForm, type CommandSpec } from '../../components/CommandForm';
 import { DetailSurface } from '../../components/DetailSurface';
 import { WarehouseCoverageMap, type Coverage, type HoverTarget, type MapCampaign, type WarehouseDraft } from '../../maps/WarehouseCoverageMap';
@@ -67,7 +68,7 @@ export function WarehouseMapManager({ canManage, canManageDrives, warehouseOptio
     const driveId = url.searchParams.get('edit_drive');
     if (!canManageDrives || !driveId || !/^[0-9a-f-]{36}$/i.test(driveId)) return;
     let live = true;
-    void api<Drive>('logistics', `/donation-drives/${encodeURIComponent(driveId)}`).then(drive => {
+    void loadStaffDrive<Drive>(driveId).then(drive => {
       if (!live) return;
       if (drive.status !== 'DRAFT') { setActionError('Đợt này không còn là bản nháp. Hãy chọn trên bản đồ để xem trạng thái mới.'); return; }
       setSelectedId(drive.intake_warehouse_id);
@@ -269,8 +270,8 @@ export function WarehouseMapManager({ canManage, canManageDrives, warehouseOptio
       : !editingWarehouseId && (canManage || canManageDrives) && <details ref={addMenuRef} className="warehouse-map-add-menu">
         <summary>＋ Thêm</summary>
         <div className="warehouse-map-add-menu__items">
-          {canManage && <button type="button" onClick={() => { addMenuRef.current?.removeAttribute('open'); setCreatingWarehouse(true); setSearchedPoint(null); setPlacing(false); setSelectedId(null); setHovered(null); setPlaceMessage(''); }}>Kho</button>}
-          {canManageDrives && <button type="button" onClick={() => { addMenuRef.current?.removeAttribute('open'); setPlacing(true); setPlaceMessage(''); }}>Đợt quyên góp</button>}
+          {canManage && <button type="button" aria-label="Thêm kho" onClick={() => { addMenuRef.current?.removeAttribute('open'); setCreatingWarehouse(true); setSearchedPoint(null); setPlacing(false); setSelectedId(null); setHovered(null); setPlaceMessage(''); }}>Kho</button>}
+          {canManageDrives && <button type="button" aria-label="Thêm đợt quyên góp" onClick={() => { addMenuRef.current?.removeAttribute('open'); setPlacing(true); setPlaceMessage(''); }}>Đợt quyên góp</button>}
         </div>
       </details>}
     <button type="button" className={`warehouse-map-layer-button${showCampaigns ? ' is-active' : ''}`} aria-label={showCampaigns ? 'Ẩn vùng chiến dịch' : 'Hiện vùng chiến dịch'} title={showCampaigns ? 'Ẩn vùng chiến dịch' : 'Hiện vùng chiến dịch'} aria-pressed={showCampaigns} onClick={() => setShowCampaigns(value => !value)}>

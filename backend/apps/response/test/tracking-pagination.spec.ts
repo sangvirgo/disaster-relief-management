@@ -25,6 +25,16 @@ function makeService(rows: unknown[]) {
 }
 
 describe('reporter keyset pagination', () => {
+  it('returns current-cycle mission progress separately from request status without staff data', async () => {
+    const { service, dataSource } = makeService([{ id: requestId, tracking_code: '01HJKMNPQR', status: 'TRIAGED',
+      received_at: publicTime, cursor_received_at: exactTime, rescue_progress: { active: 0, completed: 1 },
+      reporter_contact_phone: 'private', description: 'private', mission_id: 'private' }]);
+    const page = await service.mine({}, {} as never);
+    expect(page.items[0]?.rescue_progress).toEqual({ active: 0, completed: 1 });
+    expect(page.items[0]?.status).toBe('TRIAGED');
+    expect(JSON.stringify(page)).not.toContain('private');
+    expect(dataSource.query.mock.calls[0]?.[0]).toContain('m.work_cycle=assistance_request.work_cycle');
+  });
   it('preserves PostgreSQL microseconds in the personal request cursor', async () => {
     const { service, dataSource } = makeService([
       { id: requestId, tracking_code: '01HJKMNPQR', status: 'SUBMITTED', received_at: new Date(publicTime), cursor_received_at: exactTime },

@@ -425,6 +425,10 @@
 .tracking-back:hover { text-decoration: underline; }
 .tracking-progress-card .timeline { margin-top: 24px; }
 .tracking-progress-card > .request-status { margin-bottom: 10px; }
+.tracking-situation { display: grid; gap: 10px; margin-top: 16px; padding: 16px; border: 1px solid var(--color-surface-border); border-radius: 12px; }
+.tracking-situation h3, .tracking-situation p { margin: 0; }
+.tracking-situation p { line-height: 1.6; overflow-wrap: anywhere; white-space: pre-line; }
+.tracking-situation summary { cursor: pointer; color: var(--color-primary); }
 .tracking-recovery { margin-top: 24px; border-top: 1px solid var(--color-surface-border); padding-top: 18px; }
 .tracking-recovery summary { color: var(--color-primary-dark); cursor: pointer; font-weight: 700; }
 .tracking-recovery form { margin-top: 16px; }
@@ -1784,8 +1788,11 @@
 @media (max-width: 700px) { .warehouse-manager__map .warehouse-coverage__map { min-height: 540px; } .warehouse-map-hover { bottom: 48px; max-height: 58vh; } }
 .command-checkbox { display: flex !important; flex-direction: row; align-items: center; gap: 10px; }
 .command-checkbox input[type='checkbox'] { width: 20px; height: 20px; flex: none; margin: 0; }
-.receipt-filter-actions { display: flex; align-items: flex-end; margin: 0; }
-.clear-receipt-filters { width: auto; min-height: 36px; padding: 6px 12px; font-size: 13px; }
+.receipt-filter-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin: 16px 0; }
+.receipt-filter-row > .filter { display: grid; gap: 8px; flex: 1 1 200px; min-width: 0; margin: 0; }
+.receipt-filter-actions { display: flex; align-items: center; margin: 0; padding: 0; }
+.receipt-filter-actions .clear-receipt-filters { width: auto; min-height: var(--control-h-lg); margin: 0; padding: 0 16px; white-space: nowrap; }
+.receipt-filter-hint { flex-basis: 100%; margin: 0; color: var(--color-text-secondary); font-size: 13px; }
 .receipt-detail-summary { padding: 12px 16px; border: 1px solid var(--color-surface-border); border-radius: 12px; background: var(--color-surface-subtle); }
 .receipt-detail-summary h3 { margin: 0 0 8px; }
 .receipt-detail-summary p { margin: 5px 0; }
@@ -1834,8 +1841,6 @@
 .receipt-status-filters button { padding: 8px 14px; border: 1px solid var(--color-border); border-radius: 20px; background: white; cursor: pointer; font: inherit; }
 .receipt-status-filters button.active { background: var(--color-primary-bg); color: var(--color-primary); border-color: currentColor; }
 .coordinator-detail-surface .command-form > .button, .volunteer-mission-progress .button { width: fit-content; min-height: 40px; height: auto; padding: 9px 16px; justify-self: start; }
-.volunteer-mission-facts { display: flex; flex-wrap: wrap; gap: 8px 24px; }
-.volunteer-mission-facts > div { background: transparent; border: 0; padding: 4px 0; }
 .volunteer-team-panel-content > .button { width: fit-content; }
 
 .campaign-tools__panel .location-picker { margin: 0; }

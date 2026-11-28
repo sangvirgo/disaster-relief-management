@@ -18348,6 +18348,37 @@
               },
               "additionalProperties": false
             }
+          },
+          "current_description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "first_verified_description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Narrative at first human verification, not necessarily original intake."
+          },
+          "rescue_progress": {
+            "type": "object",
+            "properties": {
+              "active": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "completed": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "active",
+              "completed"
+            ],
+            "description": "Current-work-cycle mission counts; does not imply SOS resolution or relief-goods delivery."
           }
         },
         "additionalProperties": false
@@ -18405,6 +18436,24 @@
                 "received_at": {
                   "type": "string",
                   "format": "date-time"
+                },
+                "rescue_progress": {
+                  "type": "object",
+                  "properties": {
+                    "active": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "completed": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "active",
+                    "completed"
+                  ],
+                  "description": "Current-work-cycle mission counts; does not imply SOS resolution or relief-goods delivery."
                 }
               },
               "additionalProperties": false
@@ -21130,6 +21179,63 @@
               "null"
             ],
             "description": "Leader-only."
+          },
+          "current_situation": {
+            "type": "object",
+            "description": "Latest human-approved facts in the mission work cycle. Assignment fields remain the historical snapshot. No contact data.",
+            "properties": {
+              "description": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "people_affected": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "declared_danger": {
+                "type": "boolean"
+              },
+              "location": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "additionalProperties": true
+              },
+              "approved_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "changed_since_assignment": {
+                "type": "boolean"
+              },
+              "children_count": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "elderly_count": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "description",
+              "people_affected",
+              "declared_danger",
+              "location",
+              "approved_at",
+              "changed_since_assignment",
+              "children_count",
+              "elderly_count"
+            ]
           }
         },
         "additionalProperties": false

@@ -111,6 +111,10 @@ export class TrackingService {
     const cursor = query.cursor ? decodeKeysetCursor(query.cursor, filters) : undefined;
     const rows = await this.dataSource.query(
       `SELECT id, tracking_code, status, received_at,
+              (SELECT json_build_object(
+                'active',count(*) FILTER (WHERE m.status IN ('OFFERED','ACCEPTED','EN_ROUTE','ON_SCENE')),
+                'completed',count(*) FILTER (WHERE m.status='COMPLETED'))
+               FROM mission m WHERE m.request_id=assistance_request.id AND m.work_cycle=assistance_request.work_cycle) AS rescue_progress,
               to_char(received_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_received_at
          FROM assistance_request
         WHERE reporter_user_id = $1
@@ -119,10 +123,10 @@ export class TrackingService {
         ORDER BY received_at DESC, id DESC LIMIT $6`,
       [session.userId, searchTerms.trackingCodePattern, searchTerms.reporterPhone,
         cursor?.sort[0] ?? null, cursor?.id ?? null, (query.limit ?? 50) + 1],
-    ) as Array<{ id: string; tracking_code: string; status: string; received_at: Date | string; cursor_received_at: string }>;
+    ) as Array<{ id: string; tracking_code: string; status: string; received_at: Date | string; cursor_received_at: string; rescue_progress?: { active: number; completed: number } }>;
     const more = rows.length > (query.limit ?? 50);
     const page = rows.slice(0, query.limit ?? 50);
-    const items = page.map((row) => ({ id: row.id, tracking_code: row.tracking_code, status: row.status, received_at: toIso(row.received_at) }));
+    const items = page.map((row) => ({ id: row.id, tracking_code: row.tracking_code, status: row.status, received_at: toIso(row.received_at), ...(row.rescue_progress ? { rescue_progress: row.rescue_progress } : {}) }));
     const next = more && page.length ? page[page.length - 1]! : undefined;
     return { items, more, ...(next ? { cursor: encodeKeysetCursor([next.cursor_received_at], next.id, filters) } : {}) };
   }
@@ -402,14 +406,21 @@ export class TrackingService {
   private async trackingView(row: ReporterRequestRow): Promise<Record<string, unknown>> {
     const timeline = await this.readEvents(this.dataSource, row.id, undefined, 50);
     const extra = await this.dataSource.query(
-      `SELECT decision.reason AS rejection_reason, canonical.tracking_code AS duplicate_of_code
+      `SELECT decision.reason AS rejection_reason, canonical.tracking_code AS duplicate_of_code,
+              (SELECT e.payload->'approved_facts'->>'description' FROM request_event e
+               WHERE e.request_id=r.id AND e.event_type='REQUEST_VERIFIED'
+               ORDER BY e.occurred_at,e.id LIMIT 1) AS first_verified_description,
+              (SELECT json_build_object(
+                'active',count(*) FILTER (WHERE m.status IN ('OFFERED','ACCEPTED','EN_ROUTE','ON_SCENE')),
+                'completed',count(*) FILTER (WHERE m.status='COMPLETED'))
+               FROM mission m WHERE m.request_id=r.id AND m.work_cycle=r.work_cycle) AS rescue_progress
          FROM assistance_request r
          LEFT JOIN LATERAL (
            SELECT reason FROM verification_decision WHERE request_id=r.id ORDER BY decided_at DESC,id DESC LIMIT 1
          ) decision ON true
          LEFT JOIN assistance_request canonical ON canonical.id=r.canonical_request_id
         WHERE r.id=$1`, [row.id],
-    ) as Array<{ rejection_reason: string | null; duplicate_of_code: string | null }>;
+    ) as Array<{ rejection_reason: string | null; duplicate_of_code: string | null; first_verified_description?: string | null; rescue_progress?: { active: number; completed: number } }>;
     // Only the reporter's own files: staff and mission uploads (another uploader) never appear here.
     const evidence = await this.dataSource.query(
       `SELECT id,state,size_bytes,detected_mime,checksum,created_at FROM evidence_metadata
@@ -422,6 +433,9 @@ export class TrackingService {
       tracking_code: row.tracking_code,
       status: row.status,
       version: Number(row.version),
+      current_description: row.description,
+      first_verified_description: extra[0]?.first_verified_description ?? null,
+      ...(extra[0]?.rescue_progress ? { rescue_progress: extra[0].rescue_progress } : {}),
       priority_visible: false,
       received_at: toIso(row.received_at),
       timeline: timeline.items,

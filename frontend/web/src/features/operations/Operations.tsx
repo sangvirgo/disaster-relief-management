@@ -17,6 +17,8 @@ import { DetailSurface } from '../../components/DetailSurface';
 import { Tabs } from '../../components/ui/Tabs';
 import { StatusBadge } from '../../components/StatusBadge';
 import { useUrlView } from '../../app/useUrlView';
+import { useUrlRecord } from '../../app/useUrlRecord';
+import { canNavigateAway } from '../../app/navigationGuard';
 import { assetViews, reportViews, reviewViews } from '../../app/routeViews';
 
 type Row = Record<string, unknown> & {
@@ -38,6 +40,14 @@ type List = {
 };
 type ReferenceOptions = Record<string, { value: string; label: string }[]>;
 const referenceCache = new Map<string, { expiresAt: number; options: ReferenceOptions }>();
+const receiptStatuses = ['', 'DECLARED', 'COUNTING', 'PENDING_REVIEW', 'APPROVED', 'POSTED', 'REJECTED'] as const;
+const reviewQueueStatuses = ['', 'DECLARED', 'COUNTING', 'PENDING_REVIEW'] as const;
+const reviewWorkOptions = [
+  { value: 'DECLARED', label: 'Cần đếm', hint: 'Phiếu đã khai báo, chưa gửi kết quả kiểm đếm.' },
+  { value: 'COUNTING', label: 'Cần đếm lại', hint: 'Phiếu đang kiểm đếm hoặc đã được yêu cầu đếm lại.' },
+  { value: 'PENDING_REVIEW', label: 'Cần xác nhận', hint: 'Đã có kết quả đếm, cần người khác xác nhận độc lập.' },
+  { value: '', label: 'Tất cả', hint: 'Tất cả trạng thái trong phạm vi bạn được phép xem.' },
+] as const;
 const routes: Record<string, string> = {
   overview: '/reports/stock-summary',
   drives: '/donation-drives',
@@ -95,10 +105,9 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   const [reviewTab, setReviewTab] = useUrlView('view', reviewViews, 'receipts');
   const [report, setReport] = useUrlView('view', reportViews, 'stock-summary');
   const [warehouse, setWarehouse] = useState(() => readReportFilters(user.id).warehouse || '');
-  const [receiptCampaign, setReceiptCampaign] = useState('');
-  const [receiptWarehouse, setReceiptWarehouse] = useState('');
-  const [receiptStatus, setReceiptStatus] = useState('');
-  useEffect(() => { setReceiptStatus(page === 'review' ? 'PENDING_REVIEW' : ''); setCursor(''); }, [page]);
+  const [receiptCampaign, setReceiptCampaign] = useUrlRecord('receipt_campaign');
+  const [receiptWarehouse, setReceiptWarehouse] = useUrlRecord('receipt_warehouse');
+  const [receiptStatus, setReceiptStatus] = useUrlView<string>('receipt_status', page === 'review' ? reviewQueueStatuses : receiptStatuses, page === 'review' ? 'PENDING_REVIEW' : '');
   const [seenFilters, setSeenFilters] = useState<{ campaigns: Record<string, string>; warehouses: Record<string, string> }>({ campaigns: {}, warehouses: {} });
   const initialReportFilters = useRef({ warehouse: false });
   const [items, setItems] = useState<Row[]>([]);
@@ -121,9 +130,11 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   useEffect(() => setDriveItemPage(0), [selected?.id]);
   const [error, setError] = useState('');
   const [workflowNotice, setWorkflowNotice] = useState('');
+  const [workflowNextQueue, setWorkflowNextQueue] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [revision, setRevision] = useState(0);
   const [references, setReferences] = useState<ReferenceOptions>({});
+  useEffect(() => { setCursor(''); setSelected(null); setDetail(null); }, [receiptStatus, receiptCampaign, receiptWarehouse]);
   useEffect(() => {
     if (page !== 'intake' && page !== 'review') return;
     setSeenFilters((current) => {
@@ -313,6 +324,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   }
   function counted(result?: { confirmation?: { matched: boolean; posted?: boolean } }) {
     const confirmation = result?.confirmation;
+    setWorkflowNextQueue(confirmation ? confirmation.matched ? null : 'COUNTING' : 'PENDING_REVIEW');
     setWorkflowNotice(confirmation
       ? confirmation.matched ? confirmation.posted ? 'Hai lượt kiểm đếm khớp nhau. Biên nhận đã ghi sổ kho.' : 'Hai lượt kiểm đếm khớp nhau. Kiểm tra trạng thái biên nhận để theo dõi ghi sổ.'
         : 'Hai lượt kiểm đếm chưa khớp. Hàng chưa được ghi sổ; mở mục “Cần đếm lại” để xử lý.'
@@ -338,6 +350,14 @@ export function Operations({ page, user }: { page: string; user: Me }) {
   const canCount = (page === 'intake' && rights.has('OPERATIONS_MANAGER')) ||
     (page === 'review' && reviewTab === 'receipts' && rights.has('REVIEWER'));
   const canCreatePage = page === 'drives' && (rights.has('COORDINATOR') || rights.has('OPERATIONS_MANAGER'));
+  function clearReceiptFilters() {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('receipt_campaign');
+    url.searchParams.delete('receipt_warehouse');
+    url.searchParams.set('receipt_status', '');
+    window.history.pushState(null, '', url);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  }
   const createTitle = page === 'drives' ? 'Tạo đợt quyên góp' : 'Thêm kho';
   useEffect(() => { setShowCreate(false); }, [page, asset]);
   return (
@@ -349,7 +369,10 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             <button type="button" className="button secondary refresh-action" disabled={loading} onClick={() => { setCursor(''); setRevision((value) => value + 1); }}>Làm mới</button>
             {canCreatePage && <button type="button" className="button primary list-create-button" onClick={() => {
               if (page === 'drives') {
-                window.location.assign('?workspace=operations&page=assets&view=warehouses&create=drive');
+                const url = new URL(window.location.href);
+                url.search = new URLSearchParams({ workspace: 'operations', page: 'assets', view: 'warehouses', create: 'drive' }).toString();
+                window.history.pushState(null, '', url);
+                window.dispatchEvent(new PopStateEvent('popstate'));
                 return;
               }
               setSelected(null); setDetail(null); setShowCreate(true);
@@ -385,14 +408,13 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           </div>
         )}
         {(page === 'intake' || (page === 'review' && reviewTab === 'receipts')) && (
-          <div className="filter-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', margin: '12px 0' }}>
+          <div className="receipt-filter-row">
             {page === 'review' && (
-              <div className="receipt-status-filters" style={{ gridColumn: '1 / -1', margin: 0 }} role="group" aria-label="Việc cần làm">
-                {([['DECLARED', 'Cần đếm'], ['COUNTING', 'Cần đếm lại'], ['PENDING_REVIEW', 'Cần xác nhận'], ['', 'Tất cả']] as const).map(([value, title]) => (
-                  <button key={value} type="button" aria-pressed={receiptStatus === value} className={receiptStatus === value ? 'active' : ''}
-                    onClick={() => { setReceiptStatus(value); setCursor(''); setSelected(null); setDetail(null); }}>{title}</button>
-                ))}
-              </div>
+              <label className="filter">Việc cần làm
+                <Dropdown aria-label="Việc cần làm" value={receiptStatus} onChange={event => { setReceiptStatus(event.target.value); setCursor(''); setSelected(null); setDetail(null); }}>
+                  {reviewWorkOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </Dropdown>
+              </label>
             )}
             {([
               ['Chiến dịch', receiptCampaign, setReceiptCampaign, 'Tất cả chiến dịch',
@@ -412,9 +434,10 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 </Dropdown>
               </label>
             ))}
-            {(receiptCampaign || receiptWarehouse || (page !== 'review' && receiptStatus)) && (
-              <div className="receipt-filter-actions"><button type="button" className="button secondary clear-receipt-filters" onClick={() => { setReceiptCampaign(''); setReceiptWarehouse(''); if (page !== 'review') setReceiptStatus(''); setCursor(''); setSelected(null); }}>Xóa bộ lọc</button></div>
+            {(receiptCampaign || receiptWarehouse || receiptStatus) && (
+              <div className="receipt-filter-actions"><button type="button" className="button secondary clear-receipt-filters" onClick={clearReceiptFilters}>Xóa bộ lọc</button></div>
             )}
+            {page === 'review' && <p className="receipt-filter-hint" role="status">{reviewWorkOptions.find(option => option.value === receiptStatus)?.hint || 'Lọc theo trạng thái phiếu trong phạm vi bạn được phép xem.'}</p>}
           </div>
         )}
         {page === 'reports' && (
@@ -470,6 +493,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
         </label>}
         {!ready && <p>Chọn kho hoặc chiến dịch để tải báo cáo theo phạm vi được cấp quyền.</p>}
         {workflowNotice && <p className="notice" role="status">{workflowNotice}</p>}
+        {page === 'review' && workflowNextQueue && receiptStatus !== workflowNextQueue && <button type="button" className="button secondary" onClick={() => { setReceiptStatus(workflowNextQueue); setCursor(''); setSelected(null); setDetail(null); }}>{workflowNextQueue === 'COUNTING' ? 'Xem phiếu cần đếm lại' : 'Xem phiếu cần xác nhận'}</button>}
         {loading && <p role="status">Đang tải dữ liệu…</p>}
         {error && (
           <p className="notice error" role="alert">
@@ -558,7 +582,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
         )}
         {page !== 'assets' && <ListNav page={pageIndex} hasNext={Boolean(next)} loading={loading} onPrev={prevPage} onNext={() => next && setCursor(next)} count={items.length} />}
       </section>
-      {(selected || showCreate) && <DetailSurface key={selected?.id || 'create'} className={`operations-detail-transition operations-management-dialog ${page === 'drives' && selected ? 'drive-detail-dialog' : ''}`} heading={selected ? recordTitle(page, selected) : createTitle} modal open={Boolean(selected) || showCreate} onClose={() => { setSelected(null); setDetail(null); setShowCreate(false); }} label={selected ? `Chi tiết ${recordTitle(page, selected)}` : createTitle}>
+      {(selected || showCreate) && <DetailSurface canClose={canNavigateAway} key={selected?.id || 'create'} className={`operations-detail-transition operations-management-dialog ${page === 'drives' && selected ? 'drive-detail-dialog' : ''}`} heading={selected ? recordTitle(page, selected) : createTitle} modal open={Boolean(selected) || showCreate} onClose={() => { setSelected(null); setDetail(null); setShowCreate(false); }} label={selected ? `Chi tiết ${recordTitle(page, selected)}` : createTitle}>
         {selected && !detail && <p role="status">Đang tải chi tiết…</p>}
         {selected && inlineActions && <p style={{ margin: '0 0 12px' }}>
           {string(selected.drive_title) || 'Đợt quyên góp'}{selected.donor_name ? ` · ${string(selected.donor_name)}` : ''}{selected.warehouse_name ? ` · ${string(selected.warehouse_name)}` : ''} · <StatusBadge status={string(selected.status)} />
@@ -872,6 +896,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 ) : null)}
               {canCount && selected?.id && !selected.receipt_id && selected.status === 'DECLARED' && (
                 <ReceiptCountForm
+                  userId={user.id}
                   key={`first-${selected.id}`}
                   receiptId=""
                   deliveryId={selected.id}
@@ -887,13 +912,13 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 selected?.id &&
                 selected.version != null &&
                 rights.has('OPERATIONS_MANAGER') && (
-                  <RecoveryIssue
+                  <details className="receipt-recovery"><summary>Hỗ trợ người quyên góp mất quyền truy cập</summary><RecoveryIssue
                     key={`recovery-${selected.id}-${selected.version}`}
                     service="logistics"
                     path={`/donation-deliveries/${selected.id}/recovery`}
                     version={selected.version}
                     kind="donation"
-                  />
+                  /></details>
                 )}
               {canCount &&
                 receiptId &&
@@ -902,6 +927,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 !['REJECTED', 'CANCELLED'].includes(status) &&
                 (status !== 'POSTED' || (Array.isArray(count?.lines) && (count.lines as Row[]).some(line => Number(line.held_quantity) > 0))) && (
                   <ReceiptCountForm
+                    userId={user.id}
                     key={receiptId + version}
                     receiptId={receiptId}
                     deliveryId={string(selected.id)}
@@ -929,6 +955,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
               {page === 'review' && reviewTab === 'receipts' && receiptId && count && version != null &&
                 status === 'PENDING_REVIEW' && rights.has('REVIEWER') && !detail.review && !countedBefore && (
                   <ReceiptCountForm
+                    userId={user.id}
                     key={`confirm-${receiptId}-${version}`}
                     receiptId={receiptId}
                     deliveryId={string(selected.id)}
@@ -991,13 +1018,13 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 )}
               {page === 'review' && receiptId && status === 'POSTED' && count && Number(count.revision) > 1 &&
                 (detail.review as Row | null)?.decision === 'APPROVE' && rights.has('REVIEWER') &&
-                command({
+                <details><summary>Nhập bổ sung hàng tạm giữ đã được duyệt</summary>{command({
                   title: 'Nhập kho phần hàng được duyệt bổ sung', service: 'logistics',
                   path: `/donation-receipts/${receiptId}/release-held`, version,
                   fields: [{ name: 'reason', label: 'Lý do nhập bổ sung', type: 'textarea', required: true, maxLength: 1000 }],
                   build: values => ({ count_revision: count.revision, declaration_revision: count.declaration_revision, reason: values.reason }),
                   warning: 'Chỉ xác nhận khi lần kiểm đếm hiện tại đã chuyển hàng tạm giữ sang tiếp nhận và được duyệt độc lập. Phần đã ghi sổ không được cộng lại.',
-                })}
+                })}</details>}
               {page === 'review' &&
                 reviewTab === 'disputes' &&
                 id &&

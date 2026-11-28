@@ -146,14 +146,14 @@ test('switching the basis sends the new basis and its fields, not the old group 
   assert.deepEqual(body, { quantity_basis: 'PER_N_PEOPLE', people_per_unit: 2 });
 });
 
-test('role gating: only managers act; coordinators see warnings but no actions', () => {
+test('role gating: supply warning inbox and management actions belong to operations managers', () => {
   const manager = new Set(['OPERATIONS_MANAGER']);
   const coordinator = new Set(['COORDINATOR']);
   const reviewer = new Set(['REVIEWER']);
   assert.equal(canManageSupplyGaps(manager), true);
   assert.equal(canManageSupplyGaps(coordinator), false);
   assert.equal(canManageSupplyGaps(reviewer), false);
-  assert.equal(canViewSupplyGapWarnings(coordinator), true);
+  assert.equal(canViewSupplyGapWarnings(coordinator), false);
   assert.equal(canViewSupplyGapWarnings(manager), true);
   assert.equal(canViewSupplyGapWarnings(reviewer), false);
   assert.equal(canManageCampaignWarehouses(manager), true);

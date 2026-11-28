@@ -28,10 +28,13 @@ import {
   type Workspace,
 } from './app/catalog';
 import { useUrlView } from './app/useUrlView';
+import { canNavigateAway } from './app/navigationGuard';
 import { assetViews, donationViews, intakeSteps, missionViews, noticeViews, reportViews, reviewViews, supplySections } from './app/routeViews';
 import { label, requestStatusLabel, timeLabel } from './i18n/labels';
 import { CitizenAccount, CitizenRequests, requestStatusTone } from './features/citizen/CitizenAccount';
 import { clearAllSosDrafts } from './features/citizen/sosDraft';
+import { clearAllCountDrafts } from './features/operations/countDraft';
+import { clearPendingEvidence, purgeExpiredEvidence } from './features/volunteer/missionEvidenceStorage';
 import type { components as ResponseComponents } from './api/generated/response';
 import './style.css';
 import { StatusBadge } from './components/StatusBadge';
@@ -58,6 +61,7 @@ declare global {
 import './sos.css';
 import './workflow.css';
 import './refinements.css';
+import { rescueProgressMessage } from './features/citizen/rescueProgress';
 import './styles/tokens.css';
 import './components/ui/Badge.css';
 import './components/ui/PageHeader.css';
@@ -1104,11 +1108,16 @@ function Tracking({
           <span className={`chip request-status request-status--${requestStatusTone(data.status)}`}>
             {requestStatusLabel(data.status)}
           </span>
-          {data.timeline.some((entry) => entry.event_type === 'MISSION_COMPLETED' || entry.public_text_code === 'MISSION_COMPLETED') &&
-            !['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(data.status) && (
-              <p className="notice" role="status">Đội cứu hộ đã hoàn thành nhiệm vụ. Yêu cầu SOS vẫn đang được xử lý; xem lịch sử bên dưới để theo dõi các bước tiếp theo.</p>
-            )}
+          {rescueProgressMessage(data.status, data.rescue_progress) && <p className="notice" role="status">{rescueProgressMessage(data.status, data.rescue_progress)}. Xem lịch sử để theo dõi các bước tiếp theo.</p>}
           <p>Tiếp nhận lúc: {timeLabel(data.received_at)}</p>
+          {data.current_description && <div className="tracking-situation">
+            <h3>Tình huống đang ghi nhận</h3>
+            <p>{data.current_description}</p>
+            {data.first_verified_description && data.first_verified_description !== data.current_description && <details>
+              <summary>Xem mô tả khi xác minh lần đầu</summary>
+              <p>{data.first_verified_description}</p>
+            </details>}
+          </div>}
           {data.status === 'DUPLICATE' && data.duplicate_of_code && (
             <p className="notice">Yêu cầu này trùng với hồ sơ {data.duplicate_of_code}. Nếu hồ sơ gốc thuộc tài khoản của bạn, hãy quay lại danh sách để xem tiến độ hồ sơ đó.</p>
           )}
@@ -1604,6 +1613,11 @@ function normalizeSubview(url: URL, workspace: Workspace, page: string, user: Me
   if (!(workspace === 'operations' && page === 'intake' && (intakeSteps as readonly string[]).includes(opsStep)
     && (opsStep !== 'review' || roles(user).has('REVIEWER')))) url.searchParams.delete('step');
   const sosId = url.searchParams.get('sos_id');
+  if (!(workspace === 'operations' && page === 'intake' && ['', 'DECLARED', 'COUNTING', 'PENDING_REVIEW', 'APPROVED', 'POSTED', 'REJECTED'].includes(url.searchParams.get('receipt_status') || ''))) url.searchParams.delete('receipt_status');
+  for (const key of ['receipt_campaign', 'receipt_warehouse']) {
+    if (!(workspace === 'operations' && page === 'intake' && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(url.searchParams.get(key) || ''))) url.searchParams.delete(key);
+  }
+  if (!(workspace === 'volunteer' && page === 'team' && ['overview', 'members', 'location'].includes(url.searchParams.get('team_tab') || ''))) url.searchParams.delete('team_tab');
   const missionId = url.searchParams.get('mission_id');
   if (!(workspace === 'volunteer' && page === 'missions' && missionId && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(missionId))) {
     url.searchParams.delete('mission_id');
@@ -1640,6 +1654,10 @@ function writeRoute(workspace: Workspace, page: string, user: Me | null, mode: '
     url.searchParams.delete('mission_id');
     url.searchParams.delete('mission_tab');
     url.searchParams.delete('warehouse_id');
+    url.searchParams.delete('team_tab');
+    url.searchParams.delete('receipt_status');
+    url.searchParams.delete('receipt_campaign');
+    url.searchParams.delete('receipt_warehouse');
     url.searchParams.delete('warehouse_name');
   } else {
     normalizeSubview(url, workspace, page, user);
@@ -1649,6 +1667,13 @@ function writeRoute(workspace: Workspace, page: string, user: Me | null, mode: '
 }
 
 function App() {
+  useEffect(() => {
+    const purge = () => { void purgeExpiredEvidence().catch(() => {}); };
+    purge();
+    const timer = window.setInterval(purge, 60_000);
+    window.addEventListener('focus', purge);
+    return () => { window.clearInterval(timer); window.removeEventListener('focus', purge); };
+  }, []);
   const [user, setUser] = useState<Me | null>(null);
   const [sessionState, setSessionState] = useState<'loading' | 'guest' | 'ready' | 'error'>(
     'loading'
@@ -1718,6 +1743,8 @@ function App() {
   }
 
   function resetSession(openLogin = false) {
+    void clearPendingEvidence();
+    clearAllCountDrafts();
     clearAllSosDrafts();
     try {
       for (let index = window.sessionStorage.length - 1; index >= 0; index -= 1) {
@@ -1922,6 +1949,7 @@ function App() {
   }, [sessionState, selected.title]);
 
   function changeWorkspace(next: Workspace) {
+    if (next !== workspace && !canNavigateAway()) return;
     pendingRouteRef.current = null;
     if (next !== workspace) { setPrevWorkspace(workspace); try { sessionStorage.setItem('c48:prev-workspace', workspace); } catch {} }
     setWsMenuOpen(false);
@@ -1934,6 +1962,7 @@ function App() {
   }
 
   function changePage(id: string) {
+    if (id !== pageId && !canNavigateAway()) return;
     pendingRouteRef.current = null;
     if (id === 'track') {
       setSelectedTrackingCode('');
@@ -1965,6 +1994,7 @@ function App() {
   }
 
   async function signOut() {
+    if (!canNavigateAway()) return;
     setLogoutError('');
     try {
       await logout();

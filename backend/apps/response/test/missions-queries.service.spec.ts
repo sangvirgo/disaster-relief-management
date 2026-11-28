@@ -36,6 +36,17 @@ const coordinatorGrant = {
 };
 
 describe('MissionsQueriesService can_manage_mission', () => {
+  it('keeps assignment history and separately allowlists latest approved facts without leaking contacts', async () => {
+    const row = { ...missionRow(missionId, memberTeamId), approved_facts: { people_affected: 12, description: 'Tình huống cũ' },
+      current_approved_facts: { people_affected: 14, description: 'Đi vào phía sau nhà', reporter_contact_phone: 'private', reporter_name: 'private', reporter_declared_danger: true },
+      situation_approved_at: '2026-11-28T03:00:00Z', situation_changed: true };
+    const detail = await build({ memberRole: 'MEMBER', rows: [row] }).detail(missionId, request);
+    expect(detail.people_affected).toBe(12);
+    expect(detail.current_situation).toEqual({ people_affected: 14, children_count: null, elderly_count: null, description: 'Đi vào phía sau nhà', declared_danger: true,
+      location: null, approved_at: '2026-11-28T03:00:00.000Z', changed_since_assignment: true });
+    expect(JSON.stringify(detail)).not.toContain('private');
+    await expect(build({ memberRole: null, rows: [row] }).detail(missionId, request)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
   it('marks missions of led teams true and of member-only teams false, with contacts only for led teams', async () => {
     const service = build({
       teams: [{ team_id: ledTeamId, member_role: 'LEADER' }, { team_id: memberTeamId, member_role: 'MEMBER' }],
