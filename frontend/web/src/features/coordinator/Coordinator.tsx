@@ -1131,9 +1131,9 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                   : <span className="sos-head__nopriority">Chưa chọn ưu tiên</span>}
               </div>
               <div className="sos-head__buttons">
-              {!['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) && <button type="button" className="button primary sos-head__next"
+              {!['SUBMITTED', 'VERIFYING', 'RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) && <button type="button" className="button primary sos-head__next"
                 onClick={() => { const target = ['SUBMITTED', 'VERIFYING', 'VERIFIED'].includes(detail.status) ? 'overview' : 'dispatch'; changeTab(target); window.requestAnimationFrame(() => document.getElementById('sos-detail-content')?.scrollIntoView({ behavior: 'smooth', block: 'start' })); }}>
-                {['SUBMITTED', 'VERIFYING'].includes(detail.status) ? 'Xác minh thông tin' : detail.status === 'VERIFIED' ? 'Chọn mức ưu tiên' : completedInCurrentCycle && !detail.active_missions?.items.length ? 'Xác nhận kết quả SOS' : 'Giao đội và theo dõi'} <span aria-hidden="true">→</span>
+                {detail.status === 'VERIFIED' ? 'Chọn mức ưu tiên' : completedInCurrentCycle && !detail.active_missions?.items.length ? 'Xác nhận kết quả SOS' : 'Giao đội và theo dõi'} <span aria-hidden="true">→</span>
               </button>}
               <fieldset className="sos-head__actions" disabled={claimBlockedBy(detail, currentUserId)}>
               {!['RESOLVING', 'RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) &&
