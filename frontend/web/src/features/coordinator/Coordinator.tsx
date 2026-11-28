@@ -894,6 +894,10 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
     );
   }
   function aiResubmitAction(status: string | undefined) {
+    const action = aiResubmitControl(status);
+    return action && <div className="sos-ai-resubmit-row">{action}</div>;
+  }
+  function aiResubmitControl(status: string | undefined) {
     if (!detail) return null;
     if (status === 'COMPLETED' || status === 'QUEUED' || status === 'PROCESSING') return null;
     if (!reliefDescription(detail.description).narrative.trim() && !detail.description?.trim()) {
@@ -918,11 +922,11 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
       });
     }
     const reason = status === 'QUEUED' || status === 'PROCESSING'
-      ? 'Yêu cầu AI đã ở trong hàng đợi; gửi thêm lúc này không tạo lượt đánh giá mới.'
-      : 'Đã có kết quả AI. Hệ thống hiện chỉ cho gửi lại khi đánh giá lỗi hoặc thông tin SOS thay đổi.';
-    return <div className="sos-ai-resubmit">
-      <button type="button" className="button secondary" disabled aria-describedby="sos-ai-resubmit-reason">{title}</button>
-      <small id="sos-ai-resubmit-reason">{reason}</small>
+      ? 'AI đang đánh giá; kết quả tự cập nhật.'
+      : 'AI đã đánh giá thông tin hiện tại. Gửi lại được khi thông tin SOS thay đổi hoặc lượt đánh giá bị lỗi.';
+    return <div className="sos-ai-resubmit sos-ai-resubmit--idle">
+      <button type="button" className="button secondary small" disabled title={reason} aria-describedby={`sos-ai-resubmit-reason-${detail.id}`}>{title}</button>
+      <small id={`sos-ai-resubmit-reason-${detail.id}`}>{reason}</small>
     </div>;
   }
   const aiFacts = detail?.ai_advisory?.extracted_json?.facts;
@@ -1155,7 +1159,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
               {/* One meta line replaces the boxed strip: category, time, campaign and who handles the SOS. */}
               <p className="sos-head__sub sos-head__meta">
                 <span>{label(detail.category)} · tiếp nhận {timeLabel(detail.received_at)}</span>
-                {!campaignId && <span>Chiến dịch: <strong>{detail.campaign_id ? campaignOptions.find(campaign => campaign.value === detail.campaign_id)?.label ?? 'Chiến dịch đã gắn' : 'Chưa có chiến dịch'}</strong>
+                <span>Chiến dịch: <strong>{detail.campaign_id ? campaignOptions.find(campaign => campaign.value === detail.campaign_id)?.label ?? 'Chiến dịch đã gắn' : 'Chưa có chiến dịch'}</strong>
                   {detail.campaign_id && canSeeUnassigned && !['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) &&
                     <fieldset className="sos-strip__action" disabled={claimBlockedBy(detail, currentUserId)}>
                       {secondaryCommand({
@@ -1167,7 +1171,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                         fields: [],
                         warning: 'Xác nhận gỡ yêu cầu này khỏi chiến dịch?',
                       })}
-                    </fieldset>}</span>}
+                    </fieldset>}</span>
                 {!['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) && <span aria-label="Người xử lý hồ sơ" role="status">Người xử lý: <strong>{detail.handled_by && claimActive(detail)
                   ? detail.handled_by === currentUserId ? 'Bạn' : detail.handled_by_name || 'Điều phối viên khác'
                   : 'Chưa có'}</strong>
@@ -1184,6 +1188,24 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 )}
             </header>
             {claimError && <p role="alert" className="notice warning">{claimError}</p>}
+            {/* The location map with weather layers is always open, above the tabs, for every coordinator (main or sub). */}
+            <section className="sos-location-map" aria-labelledby="sos-location-map-title">
+              <div className="sos-location-map__head">
+                <h3 id="sos-location-map-title">Vị trí SOS và thời tiết</h3>
+                {detail.subject.location && <span className="muted">
+                  {detail.subject.location.coordinates[1].toFixed(5)}, {detail.subject.location.coordinates[0].toFixed(5)}
+                </span>}
+              </div>
+              {detail.subject.location
+                ? <HeatmapPanel compact showLayers={false} weatherLayers selected={{
+                  id: detail.id,
+                  trackingCode: detail.tracking_code,
+                  status: detail.status,
+                  longitude: detail.subject.location.coordinates[0],
+                  latitude: detail.subject.location.coordinates[1],
+                }} />
+                : <p className="notice">Hồ sơ chưa có tọa độ nên không thể hiển thị trên bản đồ. Liên hệ người báo để xác nhận vị trí.</p>}
+            </section>
             <div className="sos-detail-tabs" role="tablist" aria-label="Thông tin hồ sơ SOS" onKeyDown={(event) => {
               const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
               const current = tabs.indexOf(document.activeElement as HTMLButtonElement);
@@ -1243,6 +1265,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
               {detail.subject.household_reference_note && <p className="sos-profile__note"><strong>Ghi chú nhận diện nơi ở:</strong> {detail.subject.household_reference_note}</p>}
             </section>
             {detail.status === 'SUBMITTED' && <div className="sos-start-verification">
+              <p><strong>Bước tiếp theo:</strong> bắt đầu xác minh để nhận xử lý SOS này, sau đó liên hệ người báo và đối chiếu thông tin.</p>
               {command({
                 title: 'Bắt đầu xác minh',
                 hideTitle: true,
@@ -1283,28 +1306,27 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                     {ft.blockers.slice(0, 1).map((code) => <li key={code}>{fastTrackBlockerLabels[code] ?? 'Cần điều phối viên kiểm tra thêm'}</li>)}
                   </ul>
                 )}
-                {(rule?.score != null || aiDone) && <dl className="sos-decision__scores">
-                  <div>
-                    <dt title="Điểm từ dấu hiệu trong hồ sơ SOS; không phải độ tin cậy của AI">Điểm quy tắc</dt>
-                    <dd>{rule?.score != null ? <><b>{rule.score}</b>/100</> : '—'}</dd>
+                {rule?.score != null && <p className="sos-decision__meta">
+                  <span title="Điểm từ dấu hiệu trong hồ sơ SOS; không phải độ tin cậy của AI">Điểm quy tắc <b>{rule.score}</b>/100</span>
+                </p>}
+                <div className="sos-decision__ai" data-state={aiDone ? 'done' : aiStatus === 'QUEUED' || aiStatus === 'PROCESSING' ? 'pending' : 'none'}>
+                  <div className="sos-decision__ai-head">
+                    <span className="sos-decision__ai-title"><span aria-hidden="true">✦</span> Đánh giá của AI</span>
+                    {aiDone && ai?.suggested_priority && <PriorityBadge priority={ai.suggested_priority} />}
+                    {aiDone && detail.ai_advisory?.extracted_json?.ai_source === 'FALLBACK' && <span className="sos-decision__ai-tag">Mô hình dự phòng</span>}
+                    <span className="sos-decision__ai-status">{aiDone ? 'Đã đánh giá' : (advisoryStatusLabels[aiStatus ?? ''] ?? 'Chưa có đánh giá')}</span>
                   </div>
-
-                  <div className="sos-decision__aistatus">
-                    <dt>Trạng thái AI</dt>
-                    <dd>{aiDone ? 'Đã đánh giá' : (advisoryStatusLabels[aiStatus ?? ''] ?? 'Chưa có đánh giá')}</dd>
-                  </div>
-                </dl>}
-                {aiDone && detail.ai_advisory?.extracted_json?.summary && (
-                  <p className="sos-decision__summary">
-                    <strong>
-                      {ai?.suggested_priority ? `AI gợi ý ${ai.suggested_priority}` : 'AI chưa xác định mức ưu tiên'}
-                      {detail.ai_advisory.extracted_json.ai_source === 'FALLBACK' ? ' (mô hình dự phòng)' : ''}:
-                    </strong>{' '}
-                    {detail.ai_advisory.extracted_json.summary}
-                    {weatherImpactText(detail.ai_advisory.extracted_json.weather_impact) && <> Thời tiết: {weatherImpactText(detail.ai_advisory.extracted_json.weather_impact)}</>}
-                  </p>
-                )}
-                <div className={`sos-decision__actions${ft.eligible ? '' : ' sos-decision__actions--single'}`} key={`${aiStatus ?? 'NONE'}:${detail.ai_advisory?.id ?? ''}`}>
+                  {aiDone && detail.ai_advisory?.extracted_json?.summary
+                    ? <p className="sos-decision__ai-summary">{detail.ai_advisory.extracted_json.summary}</p>
+                    : (aiStatus === 'QUEUED' || aiStatus === 'PROCESSING')
+                      ? <p className="sos-decision__ai-summary muted">AI đang đánh giá, kết quả tự cập nhật sau ít phút.</p>
+                      : !aiDone && <p className="sos-decision__ai-summary muted">Chưa có đánh giá AI dùng được. Hãy xác minh thủ công.</p>}
+                  {aiDone && weatherImpactText(detail.ai_advisory?.extracted_json?.weather_impact) && <p className="sos-decision__ai-weather">
+                    <span aria-hidden="true">🌧</span><span><strong>Thời tiết:</strong> {weatherImpactText(detail.ai_advisory?.extracted_json?.weather_impact)}</span>
+                  </p>}
+                  {aiResubmitAction(aiStatus)}
+                </div>
+                <div className="sos-decision__actions" key={`${aiStatus ?? 'NONE'}:${detail.ai_advisory?.id ?? ''}`}>
                   {ft.eligible && <>
                     {command({
                       title: `Xác nhận ${ft.suggested_priority} và chọn đội`,
@@ -1332,7 +1354,6 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                       build: (values) => ({ confirmed: true, priority: values.priority, note: values.note }),
                     })}
                   </>}
-                  {(aiStatus === 'QUEUED' || aiStatus === 'PROCESSING') && <p className="sos-decision__hint">AI đang đánh giá, kết quả tự cập nhật sau ít phút.</p>}
                   {!ft.eligible && aiDone && <p className="sos-decision__hint">Hãy đối chiếu thông tin, bắt đầu xác minh rồi chọn mức ưu tiên theo đánh giá của bạn.</p>}
                 </div>
                 <div className="sos-decision__ai-tools">{aiResubmitAction(aiStatus)}</div>
@@ -1387,6 +1408,8 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                     {aiCountMismatches.map(key => <p key={key}>{advisoryFactLabels[key]} — hồ sơ: {detail.subject[key] ?? 'Chưa rõ'}; AI: {String(aiFacts?.[key])}.</p>)}
                   </div>}
                   <p className="sos-ai-card__note">Tóm tắt do AI tạo có thể thiếu hoặc sai chi tiết. Đối chiếu thông tin người báo trước khi quyết định ưu tiên và giao đội.</p>
+                  {!['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) &&
+                    aiResubmitAction(status)}
                 </section>
               );
             })()}
@@ -1660,11 +1683,22 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 <section className="dispatch-candidates">
                   {latestCompletedMissionId && !completionCheck && <p role="status">Đang đối chiếu nhiệm vụ đã hoàn thành với chu kỳ xử lý hiện tại…</p>}
                   {completionCheck?.error && <p className="notice warning" role="alert">Chưa đối chiếu được nhiệm vụ đã hoàn thành. Hãy bấm “Làm mới SOS” trước khi giao thêm đội.</p>}
-                  {completedInCurrentCycle && <div className="dispatch-completed-bar" role="status">
-                    <strong><span aria-hidden="true">✓ </span>Đội đã hoàn thành</strong>
-                    <button type="button" className="button secondary" onClick={() => setShowAdditionalDispatch((value) => !value)}>
-                      {showAdditionalDispatch ? 'Ẩn lựa chọn đội' : 'Giao thêm đội'}
-                    </button>
+                  {completedInCurrentCycle && <div className="mission-done-card" role="status">
+                    <span className="mission-done-card__icon" aria-hidden="true">✓</span>
+                    <div className="mission-done-card__body">
+                      <strong>Đội đã hoàn thành nhiệm vụ trong chu kỳ này</strong>
+                      <p>Kiểm tra minh chứng trong Lịch sử nhiệm vụ. Nếu nhu cầu đã được đáp ứng, kết thúc xử lý SOS; nếu chưa, giao thêm đội.</p>
+                    </div>
+                    <div className="mission-done-card__actions">
+                      <button type="button" className="button primary" onClick={() => {
+                        const target = document.getElementById('resolve-request');
+                        target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        target?.querySelector<HTMLInputElement>('input[type="radio"]:checked, input[type="radio"]')?.focus({ preventScroll: true });
+                      }}>Kết thúc xử lý SOS <span aria-hidden="true">↓</span></button>
+                      <button type="button" className="button secondary" aria-expanded={showAdditionalDispatch} onClick={() => setShowAdditionalDispatch((value) => !value)}>
+                        {showAdditionalDispatch ? 'Ẩn danh sách đội' : 'Vẫn cần giao thêm đội'}
+                      </button>
+                    </div>
                   </div>}
                   {showTeamCandidates && <>
                   <div className="dispatch-section-heading"><div><h3>Đội có thể giao nhiệm vụ</h3>
@@ -1751,12 +1785,12 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 </section>
               )}
               {['TRIAGED', 'DISPATCHED', 'IN_PROGRESS'].includes(detail.status) && (
-                <OptionalFold fold={subCoordinator && !completedInCurrentCycle} summary="Kết thúc hoặc hủy SOS">
                 <div id="resolve-request" className="sos-closeout">
                   <div className="sos-closeout__head">
-                    <h3>Kết thúc xử lý yêu cầu</h3>
-                    <CancelRequestPopup key={`cancel-${detail.id}-${detail.version}`}
-                      requestId={detail.id} version={detail.version} onCompleted={done} onStale={refreshAfterConflict} />
+                    <div>
+                      <h3>Kết thúc xử lý SOS</h3>
+                      <p className="muted">Chọn căn cứ, ghi nội dung đã đối chiếu rồi xác nhận. Người báo sẽ thấy SOS đã được xử lý.</p>
+                    </div>
                   </div>
                   <AsyncRequestForm
                   key={`resolve-${detail.id}-${detail.version}`}
@@ -1768,10 +1802,16 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                     href: `#active-mission-${mission.id}`,
                   }))}
                   hideTitle
+                  suggestedBasis={completedInCurrentCycle ? 'RESCUE_COMPLETED' : undefined}
                   onCompleted={done}
                   onStale={refreshAfterConflict}
-                /></div>
-                </OptionalFold>
+                />
+                  <div className="sos-closeout__cancel">
+                    <span className="muted">SOS báo nhầm hoặc không còn cần xử lý?</span>
+                    <CancelRequestPopup key={`cancel-${detail.id}-${detail.version}`}
+                      requestId={detail.id} version={detail.version} onCompleted={done} onStale={refreshAfterConflict} />
+                  </div>
+                </div>
               )}
               {['RESOLVED', 'CLOSED'].includes(detail.status) && <div className="sos-terminal-actions">
               {detail.status === 'RESOLVED' &&
@@ -1813,43 +1853,6 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 onStale={refreshAfterConflict}
               />
             </>}
-            </div>
-            <div className="sos-tab-group" hidden={activeTab !== 'overview'}>
-            {page === 'queue' && detail.status !== 'VERIFIED' && detail.subject.location && (
-              <details className="sos-fold queue-context-map">
-                <summary>Xem vị trí trên bản đồ</summary>
-                <HeatmapPanel
-                  showLayers={false}
-                  compact
-                  selected={{
-                    id: detail.id,
-                    trackingCode: detail.tracking_code,
-                    status: detail.status,
-                    longitude: detail.subject.location.coordinates[0],
-                    latitude: detail.subject.location.coordinates[1],
-                  }}
-                />
-              </details>
-            )}
-            {(page === 'triage' || (page === 'queue' && detail.status === 'VERIFIED')) && (
-              <div className="triage-context">
-                <div className="triage-context-map">
-                  <h3>Vị trí trên bản đồ nhiệt</h3>
-                  <HeatmapPanel
-                    showLayers={false}
-                    compact
-                    selected={detail.subject.location ? {
-                      id: detail.id,
-                      trackingCode: detail.tracking_code,
-                    status: detail.status,
-                      longitude: detail.subject.location.coordinates[0],
-                      latitude: detail.subject.location.coordinates[1],
-                    } : null}
-                  />
-                </div>
-              </div>
-            )}
-
             </div>
             <div className="sos-tab-group" hidden={activeTab !== 'dispatch'}>
             {completedInCurrentCycle && Boolean(detail.active_missions?.items.length) &&

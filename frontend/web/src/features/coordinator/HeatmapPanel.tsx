@@ -10,6 +10,7 @@ import { api } from '../../api/client';
 import type { components } from '../../api/generated/response';
 import { label, requestStatusLabel, timeLabel } from '../../i18n/labels';
 import { weatherChartSvg, type WeatherHourly } from '../../components/WeatherChart';
+import { WeatherLayers } from '../../maps/WeatherLayers';
 
 setWorkerUrl(workerUrl);
 
@@ -124,6 +125,7 @@ function HeatmapCanvas({
   weather,
   radarUrl,
   hideCellPins = false,
+  onMap,
 }: {
   cells: HeatmapCell[];
   selected: SelectedSos | null;
@@ -134,6 +136,8 @@ function HeatmapCanvas({
   radarUrl: string | null;
   /** Single-SOS views draw only the exact selected pin; aggregate cell centres look like a second, wrong location. */
   hideCellPins?: boolean;
+  /** Receives the Leaflet map once created (and null on teardown) so overlays such as WeatherLayers can attach. */
+  onMap?: (map: L.Map | null) => void;
 }) {
   const elementRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -156,6 +160,7 @@ function HeatmapCanvas({
       closeButton?.setAttribute('title', 'Đóng thông tin mật độ SOS');
     });
     mapRef.current = map;
+    onMap?.(map);
     let resizeBaseMap = () => {};
     if (tileUrl) {
       L.tileLayer(tileUrl, { attribution: tileAttribution, maxZoom: 19 })
@@ -184,6 +189,7 @@ function HeatmapCanvas({
     return () => {
       window.clearTimeout(sizeTimer);
       resizeObserver.disconnect();
+      onMap?.(null);
       map.remove();
       canvas.remove();
       mapRef.current = null;
@@ -435,17 +441,22 @@ export function HeatmapPanel({
   selected = null,
   compact = false,
   showLayers = true,
+  weatherLayers = false,
 }: {
   selected?: SelectedSos | null;
   compact?: boolean;
   showLayers?: boolean;
+  /** Draw the Windy-style weather chips (radar, cloud, wind, temperature, storm) over the map, as on the SOS form. */
+  weatherLayers?: boolean;
 }) {
+  const [leafletMap, setLeafletMap] = useState<L.Map | null>(null);
   const [layer, setLayer] = useState<'confirmed' | 'unverified'>('unverified');
   const [category, setCategory] = useState('');
   const [showWeather, setShowWeather] = useState(true);
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [weatherError, setWeatherError] = useState(false);
-  const [showRadar, setShowRadar] = useState(!compact);
+  // WeatherLayers brings its own rain radar chip, so the built-in radar stays off to avoid drawing it twice.
+  const [showRadar, setShowRadar] = useState(!compact && !weatherLayers);
   const [radarTemplate, setRadarTemplate] = useState<string | null>(null);
   const [radarError, setRadarError] = useState(false);
   useEffect(() => {
@@ -466,6 +477,14 @@ export function HeatmapPanel({
     const timer = window.setInterval(load, 10 * 60_000);
     return () => { live = false; window.clearInterval(timer); };
   }, []);
+  // The weather text block is hidden on the SOS map; the data licence (CC BY 4.0) stays in the map attribution.
+  const weatherAttribution = weatherLayers ? weatherData?.attribution : undefined;
+  useEffect(() => {
+    const control = leafletMap?.attributionControl;
+    if (!control || !weatherAttribution) return;
+    control.addAttribution(weatherAttribution);
+    return () => { control.removeAttribution(weatherAttribution); };
+  }, [leafletMap, weatherAttribution]);
   useEffect(() => {
     if (compact && selected?.status)
       setLayer(['SUBMITTED', 'VERIFYING'].includes(selected.status) ? 'unverified' : 'confirmed');
@@ -547,10 +566,21 @@ export function HeatmapPanel({
       <>
         {loading && compact && <p role="status">Đang cập nhật bản đồ nhiệt…</p>}
         {error && <p className="notice error" role="alert">{error}</p>}
-        <HeatmapCanvas hideCellPins={compact && Boolean(selected)} cells={visibleCells} selected={selected} onResolutionChange={onResolutionChange} onZoomChange={onZoomChange} heatOpacity={heatOpacity}
-          weather={showWeather ? weatherData?.locations ?? [] : []}
-          radarUrl={showRadar ? radarTemplate : null} />
-        {compact ? <div className="weather-layer-control">
+        <div className={weatherLayers ? 'heatmap-map-shell heatmap-map-shell--weather' : 'heatmap-map-shell'}>
+          <HeatmapCanvas hideCellPins={compact && Boolean(selected)} cells={visibleCells} selected={selected} onResolutionChange={onResolutionChange} onZoomChange={onZoomChange} heatOpacity={heatOpacity}
+            weather={showWeather ? weatherData?.locations ?? [] : []}
+            radarUrl={showRadar ? radarTemplate : null} onMap={weatherLayers ? setLeafletMap : undefined} />
+          {weatherLayers && <WeatherLayers map={leafletMap} />}
+          {weatherLayers && weatherData && (() => {
+            const alerted = weatherData.locations.filter((place) => place.alerts.length).length;
+            return <p className={`heatmap-weather-badge${alerted ? ' heatmap-weather-badge--alert' : ''}`} role="status"
+              title="Dự báo mô hình tham khảo, không thay thế cảnh báo chính thức.">
+              <span aria-hidden="true">{alerted ? '⚠' : '✓'}</span>
+              {alerted ? `${alerted} khu vực cảnh báo thời tiết 24 giờ tới` : 'Không có cảnh báo thời tiết 24 giờ tới'}
+            </p>;
+          })()}
+        </div>
+        {weatherLayers ? null : compact ? <div className="weather-layer-control">
           {weatherData && <small className="muted">
             {weatherData.locations.some((place) => place.alerts.length)
               ? `Có ${weatherData.locations.filter((place) => place.alerts.length).length} khu vực có cảnh báo thời tiết trong 24 giờ tới.`
@@ -562,8 +592,8 @@ export function HeatmapPanel({
             <summary>Lớp bản đồ</summary>
             <label><input type="checkbox" checked={showWeather} onChange={(event) => setShowWeather(event.target.checked)} />
               {' '}Cảnh báo thời tiết</label>
-            <label><input type="checkbox" checked={showRadar} onChange={(event) => setShowRadar(event.target.checked)} />
-              {' '}Radar mưa</label>
+            {!weatherLayers && <label><input type="checkbox" checked={showRadar} onChange={(event) => setShowRadar(event.target.checked)} />
+              {' '}Radar mưa</label>}
             {radarError && showRadar && <small className="muted" role="status">Chưa tải được radar mưa.</small>}
             {weatherData && <small className="muted">{weatherData.disclaimer} {weatherData.attribution}</small>}
           </details>

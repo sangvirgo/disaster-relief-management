@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { api, ApiError, newCommandKey } from '../../api/client';
 import { useUrlView } from '../../app/useUrlView';
 import type { Me } from '../../auth/session';
-import { CampaignScopeNotice } from './CampaignScopeNotice';
 import { Dropdown } from '../../components/ui/Dropdown';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { confirmAction } from '../../components/confirmAction';
@@ -170,7 +169,6 @@ export function SubCoordination({ user, initialRequestId = '' }: { user: Me; ini
 
   return <section className="campaign-coordination sub-coordination">
     <header className="sub-coordination__header"><p>Chọn chiến dịch → Xử lý SOS → Theo dõi kết quả</p><div className="sub-coordination__header-actions"><span className="chip">Đang điều phối {engagements.length}/3</span><button type="button" className="button secondary refresh-action" disabled={loading || historyLoading} onClick={() => setRefresh(value => value + 1)}>Làm mới</button></div></header>
-    <CampaignScopeNotice selfSelected />
 
     {engagements.length > 0 && tab === 'routing' && <div className="sub-coordination__continue" role="group" aria-label="Chiến dịch bạn đang điều phối">
       <span>Tiếp tục:</span>

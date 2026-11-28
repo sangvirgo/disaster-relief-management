@@ -563,17 +563,12 @@
 /* Bản đồ SOS tab: one compact switch between campaign areas and SOS density. */
 .map-layer-switch { margin: 0 0 12px; }
 
-.campaign-scope-notice { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; border: 1px solid #cbdcf7; border-radius: 12px; background: #fff; }
-.campaign-scope-notice__icon { display: grid; place-items: center; flex: 0 0 24px; height: 24px; border-radius: 50%; background: #eaf2ff; color: #245ac1; font-weight: 700; }
-.campaign-scope-notice strong { color: #183b70; font-size: 14px; }
-.campaign-scope-notice p { margin: 4px 0 0; font-size: 14px; line-height: 1.55; color: var(--color-text-primary); }
-.campaign-scope-notice .campaign-scope-notice__secondary { color: var(--color-text-secondary); font-size: 13px; }
 .sub-coordination__header { gap: 8px 16px; }
 .sub-coordination__header > p { font-weight: 500; color: #334b68; }
 .sub-coordination__continue { padding: 10px 12px; border-radius: 10px; background: #edf2f8; }
 .sub-coordination__continue .hotspots__chip { background: #fff; }
 @media (max-width: 600px) {
-  .campaign-scope-notice { padding: 12px; gap: 8px; }
+
   .sub-coordination__header-actions { width: 100%; justify-content: space-between; }
   .sub-coordination__continue .hotspots__chip { flex: 1 1 220px; }
 }

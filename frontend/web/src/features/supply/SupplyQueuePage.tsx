@@ -109,19 +109,23 @@ export function SupplyQueuePage() {
   return (
     <div className="operations-workspace supply-page">
       <section className="card supply-queue">
-        <div className="supply-queue__intro"><p>Soạn hàng theo yêu cầu. Khi đội đến, nhập mã 6 số để xác nhận bàn giao.</p><Button variant="secondary" disabled={loading} onClick={() => setRevision((value) => value + 1)}>Làm mới</Button></div>
         <div className="supply-queue__toolbar">
           <Tabs items={STATUS_TABS} value={status} onChange={changeStatus} ariaLabel="Trạng thái yêu cầu hàng" idBase="supply-queue" />
-          {warehouses.length > 1 && (
-            <label className="filter supply-queue__filter" htmlFor={filterId}>
-              <span>Kho</span>
-              <Dropdown id={filterId} value={warehouseId} onChange={(event) => { setRows([]); setNext(''); setLoading(true); setWarehouseId(event.target.value); setCursor(''); }}>
-                <option value="">Tất cả kho</option>
-                {warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
-              </Dropdown>
-            </label>
-          )}
+          <div className="supply-queue__tools">
+            {warehouses.length > 1 && (
+              <span className="filter-bar__select supply-queue__filter" data-static-label>
+                <Dropdown id={filterId} aria-label="Lọc theo kho" value={warehouseId} onChange={(event) => { setRows([]); setNext(''); setLoading(true); setWarehouseId(event.target.value); setCursor(''); }}>
+                  <option value="">Tất cả kho</option>
+                  {warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
+                </Dropdown>
+              </span>
+            )}
+            <span className="supply-queue__summary" role="status">{loading && rows.length === 0 ? 'Đang tải…' : <><strong>{rows.length}</strong> yêu cầu trên trang</>}</span>
+            <button type="button" className="icon-button" title="Làm mới danh sách" aria-label="Làm mới danh sách giao hàng" disabled={loading}
+              onClick={() => setRevision((value) => value + 1)}><span aria-hidden="true">↻</span></button>
+          </div>
         </div>
+        {status === 'READY' && <p className="supply-queue__hint"><span aria-hidden="true">ⓘ</span> Soạn sẵn hàng theo từng dòng. Khi đội đến, bấm <strong>Giao hàng</strong> và nhập mã 6 số đội trưởng đọc. Dòng viền đỏ là yêu cầu sắp hết hạn giữ hàng.</p>}
         {notice && <p className="notice success" role="status">{notice}</p>}
         {error && <p className="notice error" role="alert">{error}</p>}
         <div id="supply-queue-tabpanel" role="tabpanel" aria-labelledby={`supply-queue-tab-${status}`}>
@@ -133,10 +137,17 @@ export function SupplyQueuePage() {
                 : 'Thử chọn trạng thái hoặc kho khác.'}
             />
           ) : (
-            <ul className="supply-queue__list" aria-busy={loading}>
-              {rows.map((row) => <QueueCard key={row.id} row={row} disabled={loading || Boolean(error)} onHandOver={() => setDialog({ mode: 'handover', row })}
-                onCancel={() => setDialog({ mode: 'cancel', row })} />)}
-            </ul>
+            <div className="supply-table-scroll" role="region" aria-label="Bảng yêu cầu giao hàng" tabIndex={0}>
+              <table className="supply-table" aria-busy={loading}>
+                <thead><tr>
+                  <th scope="col">Đội</th><th scope="col">Kho</th><th scope="col">Hàng cần soạn</th>
+                  <th scope="col">{status === 'READY' ? 'Hạn giữ hàng' : status === 'HANDED_OVER' ? 'Giao lúc' : 'Cập nhật'}</th>
+                  <th scope="col">Trạng thái</th><th scope="col">Thao tác</th>
+                </tr></thead>
+                <tbody>{rows.map((row) => <QueueRow key={row.id} row={row} disabled={loading || Boolean(error)} onHandOver={() => setDialog({ mode: 'handover', row })}
+                  onCancel={() => setDialog({ mode: 'cancel', row })} />)}</tbody>
+              </table>
+            </div>
           )}
         </div>
         <ListNav page={pageIndex} hasNext={Boolean(next)} loading={loading} count={rows.length} noun="yêu cầu"
@@ -150,32 +161,33 @@ export function SupplyQueuePage() {
   );
 }
 
-function QueueCard({ row, disabled, onHandOver, onCancel }: { row: SupplyQueueRow; disabled: boolean; onHandOver: () => void; onCancel: () => void }) {
+function QueueRow({ row, disabled, onHandOver, onCancel }: { row: SupplyQueueRow; disabled: boolean; onHandOver: () => void; onCancel: () => void }) {
   const urgent = row.status === 'READY' && isUrgent(row.expires_at);
   return (
-    <li className={`supply-card${urgent ? ' supply-card--urgent' : ''}`}>
-      <div className="supply-card__head">
-        <div>
-          <h3>{row.team_name}</h3>
-          <p className="muted">{row.warehouse.name} · gửi lúc {timeLabel(row.created_at)}</p>
-        </div>
-        <div className="supply-card__state">
-          <Badge tone={supplyStatusTones[row.status]}>{supplyStatusLabels[row.status]}</Badge>
-          {row.status === 'READY' && <span className={urgent ? 'supply-deadline supply-deadline--urgent' : 'supply-deadline'}>{deadlineText(row.expires_at)}</span>}
-          {row.status === 'HANDED_OVER' && row.handed_over_at && <span className="supply-deadline">Giao lúc {timeLabel(row.handed_over_at)}</span>}
-        </div>
-      </div>
-      <ul className="supply-card__items" aria-label="Hàng cần soạn">
-        {row.lines.map((line) => <li key={line.item_id}><span>{line.item_name}</span><strong>{quantityText(line.quantity, line.unit_name, line.item_id)}</strong></li>)}
-        {row.lines.length === 0 && <li className="muted">Không còn hàng để giao.</li>}
-      </ul>
-      {row.status === 'READY' && (
-        <div className="supply-card__actions">
-          <Button variant="ghost" disabled={disabled} onClick={onCancel}>Không giao được</Button>
+    <tr className={urgent ? 'supply-table__row--urgent' : undefined}>
+      <th scope="row" data-label="Đội">
+        <span className="supply-table__team">{row.team_name}</span>
+        <small>Gửi lúc {timeLabel(row.created_at)}</small>
+      </th>
+      <td data-label="Kho">{row.warehouse.name}</td>
+      <td data-label="Hàng cần soạn">
+        {row.lines.length === 0 ? <span className="muted">Không còn hàng để giao</span> : <ul className="supply-table__items">
+          {row.lines.map((line) => <li key={line.item_id}><span>{line.item_name}</span><strong>{quantityText(line.quantity, line.unit_name, line.item_id)}</strong></li>)}
+        </ul>}
+      </td>
+      <td data-label="Thời hạn">
+        {row.status === 'READY' ? <span className={urgent ? 'supply-deadline supply-deadline--urgent' : 'supply-deadline'}>{deadlineText(row.expires_at)}</span>
+          : row.status === 'HANDED_OVER' && row.handed_over_at ? <time dateTime={row.handed_over_at}>{timeLabel(row.handed_over_at)}</time>
+            : <span className="muted">—</span>}
+      </td>
+      <td data-label="Trạng thái"><Badge tone={supplyStatusTones[row.status]}>{supplyStatusLabels[row.status]}</Badge></td>
+      <td data-label="Thao tác" className="supply-table__actions">
+        {row.status === 'READY' ? <>
           <Button disabled={disabled} onClick={onHandOver}>Giao hàng</Button>
-        </div>
-      )}
-    </li>
+          <Button variant="ghost" disabled={disabled} onClick={onCancel}>Không giao được</Button>
+        </> : <span className="muted">—</span>}
+      </td>
+    </tr>
   );
 }
 

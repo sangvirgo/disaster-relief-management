@@ -1,10 +1,18 @@
-import { Dropdown } from '../../components/ui/Dropdown';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, newCommandKey } from '../../api/client';
 import { label } from '../../i18n/labels';
 import { confirmAction } from '../../components/confirmAction';
 
 type Kind = 'cancel' | 'resolve';
+type ResolveBasis = 'RESCUE_COMPLETED' | 'SUPPLY_ONLY' | 'NO_ACTION_REQUIRED';
+const resolveBases: { value: ResolveBasis; title: string; hint: string; template: string }[] = [
+  { value: 'RESCUE_COMPLETED', title: 'Nhiệm vụ cứu hộ đã hoàn thành', hint: 'Đội đã báo hoàn thành và minh chứng phù hợp.',
+    template: 'Đội cứu hộ đã hoàn thành nhiệm vụ; đã đối chiếu báo cáo và minh chứng, người dân đã an toàn.' },
+  { value: 'SUPPLY_ONLY', title: 'Chỉ hỗ trợ vật tư và đã bàn giao', hint: 'SOS chỉ cần vật tư và đã nhận đủ.',
+    template: 'Yêu cầu chỉ cần hỗ trợ vật tư; vật tư đã được bàn giao cho người dân.' },
+  { value: 'NO_ACTION_REQUIRED', title: 'Không còn cần hành động', hint: 'Người báo xác nhận đã ổn hoặc nhu cầu không còn.',
+    template: 'Đã liên hệ xác nhận, nhu cầu hỗ trợ không còn; không cần điều thêm đội.' },
+];
 export function AsyncRequestForm({
   requestId,
   version,
@@ -13,6 +21,7 @@ export function AsyncRequestForm({
   onCompleted,
   onStale,
   blockers = [],
+  suggestedBasis,
 }: {
   requestId: string;
   version: number;
@@ -21,9 +30,11 @@ export function AsyncRequestForm({
   onCompleted: () => void;
   onStale?: () => void;
   blockers?: { text: string; href: string }[];
+  /** Pre-selected outcome basis (the coordinator still reviews it, writes the reason and confirms). */
+  suggestedBasis?: ResolveBasis;
 }) {
   const [reason, setReason] = useState('');
-  const [basis, setBasis] = useState('');
+  const [basis, setBasis] = useState<string>(kind === 'resolve' ? suggestedBasis ?? '' : '');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [operationId, setOperationId] = useState('');
@@ -128,11 +139,31 @@ export function AsyncRequestForm({
       {blockers.length > 0 && <div className="notice warning" role="status"><strong>Chưa thể kết thúc yêu cầu</strong><ul>{blockers.map(blocker => <li key={blocker.href}><a href={blocker.href}>{blocker.text}</a></li>)}</ul></div>}
       {!operationId && (
         <>
-          <label className="async-request-form__reason">
-            <span>Lý do <span className="required-mark" aria-hidden="true">*</span></span>
+          {kind === 'resolve' && (
+            <fieldset className="resolve-basis" aria-describedby={touched.basis && basisError ? 'async-request-basis-error' : undefined}>
+              <legend>1. Căn cứ kết thúc <span className="required-mark" aria-hidden="true">*</span></legend>
+              <div className="resolve-basis__options">
+                {resolveBases.map((option) => <label key={option.value} className={`resolve-basis__option${basis === option.value ? ' selected' : ''}`}>
+                  <input type="radio" name={`resolve-basis-${requestId}`} value={option.value} checked={basis === option.value}
+                    onChange={() => { setBasis(option.value); setTouched((current) => ({ ...current, basis: true })); key.current = null; }} />
+                  <span><strong>{option.title}</strong><small>{option.hint}</small></span>
+                </label>)}
+              </div>
+              {touched.basis && basisError && <small className="field-error" id="async-request-basis-error" role="alert">{basisError}</small>}
+            </fieldset>
+          )}
+          <div className="resolve-reason">
+            <div className="resolve-reason__label">
+              <label htmlFor={`async-request-reason-${requestId}`}>{kind === 'resolve' ? '2. Nội dung đã đối chiếu' : 'Lý do'} <span className="required-mark" aria-hidden="true">*</span></label>
+              {kind === 'resolve' && resolveBases.some((option) => option.value === basis) && <button type="button" className="text-action resolve-reason__template"
+                onClick={() => { setReason(resolveBases.find((option) => option.value === basis)!.template); setTouched((current) => ({ ...current, reason: true })); key.current = null; }}>
+                Điền câu gợi ý</button>}
+            </div>
             <textarea
-              rows={2}
+              id={`async-request-reason-${requestId}`}
               required
+              rows={3}
+              placeholder={kind === 'resolve' ? 'Ví dụ: Đội đã đưa 12 người đến nơi an toàn, đã kiểm tra ảnh minh chứng.' : undefined}
               maxLength={2001}
               aria-invalid={Boolean(touched.reason && reasonError)}
               aria-describedby={touched.reason && reasonError ? 'async-request-reason-error' : undefined}
@@ -145,32 +176,10 @@ export function AsyncRequestForm({
               onBlur={() => setTouched((current) => ({ ...current, reason: true }))}
             />
             {touched.reason && reasonError && <small className="field-error" id="async-request-reason-error" role="alert">{reasonError}</small>}
-          </label>
-          {kind === 'resolve' && (
-            <label className="async-request-form__basis">
-              <span>Căn cứ kết thúc <span className="required-mark" aria-hidden="true">*</span></span>
-              <Dropdown
-                required
-                aria-invalid={Boolean(touched.basis && basisError)}
-                aria-describedby={touched.basis && basisError ? 'async-request-basis-error' : undefined}
-                value={basis}
-                onChange={(event) => {
-                  setBasis(event.target.value);
-                  setTouched((current) => ({ ...current, basis: true }));
-                  key.current = null;
-                }}
-                onBlur={() => setTouched((current) => ({ ...current, basis: true }))}
-              >
-                <option value="">Chọn căn cứ</option>
-                <option value="RESCUE_COMPLETED">Nhiệm vụ cứu hộ đã hoàn thành</option>
-                <option value="SUPPLY_ONLY">Chỉ hỗ trợ vật tư và đã bàn giao</option>
-                <option value="NO_ACTION_REQUIRED">Không còn cần hành động</option>
-              </Dropdown>
-              {touched.basis && basisError && <small className="field-error" id="async-request-basis-error" role="alert">{basisError}</small>}
-            </label>
-          )}
+            <small className="muted resolve-reason__count">{reason.length}/2000</small>
+          </div>
           <button className="button async-request-form__submit" disabled={busy || invalid || blockers.length > 0}>
-            {busy ? 'Đang gửi lệnh…' : kind === 'cancel' ? 'Xác nhận hủy' : 'Gửi đề nghị kết thúc'}
+            {busy ? 'Đang gửi lệnh…' : kind === 'cancel' ? 'Xác nhận hủy' : 'Kết thúc xử lý SOS'}
           </button>
         </>
       )}

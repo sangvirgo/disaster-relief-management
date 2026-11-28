@@ -48,7 +48,19 @@ function draftCardStyle(point: { x: number; y: number; width: number; height: nu
   return { left, top, width, right: 'auto', bottom: 'auto' };
 }
 
-export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, error = false, selectedId, onSelectWarehouse, onEditWarehouse, onSelectDrive, onHover, onEmptyClick, toolbar, hoverCard, placing = false, onMapClick, banner, creatingWarehouse = false, editingWarehouse = false, draft, onDraftChange, searchPoint }: {
+/** Small hover card beside a pin: right of it when there is room, otherwise left; above it in the lower half. */
+function popCardStyle(point: { x: number; y: number; width: number; height: number }): React.CSSProperties {
+  const width = Math.min(280, point.width - 20);
+  const left = point.x + 22 + width <= point.width - 10 ? point.x + 22 : Math.max(10, point.x - 22 - width);
+  const below = point.y < point.height / 2;
+  return below
+    ? { left, top: Math.max(10, point.y - 24), width, maxHeight: Math.max(160, point.height - point.y + 14) }
+    : { left, bottom: Math.max(10, point.height - point.y - 24), width, maxHeight: Math.max(160, point.y + 14) };
+}
+
+export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, error = false, selectedId, onSelectWarehouse, onEditWarehouse, onSelectDrive, onHover, onEmptyClick, toolbar, hoverCard, placing = false, onMapClick, banner, creatingWarehouse = false, editingWarehouse = false, draft, onDraftChange, searchPoint, cardTarget, onHoverEnd }: {
+  /** The warehouse or drive whose hover card is shown; the card is drawn beside its pin. */
+  cardTarget?: HoverTarget | null; onHoverEnd?: () => void;
   searchPoint?: { latitude: number; longitude: number } | null;
   placing?: boolean; onMapClick?: (lat: number, lng: number) => void; banner?: React.ReactNode;
   rows: Coverage[]; campaigns?: MapCampaign[]; loading?: boolean; error?: boolean; selectedId?: string | null;
@@ -85,6 +97,19 @@ export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, er
   const [draftReady, setDraftReady] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(6);
   const selectionTimer = useRef<number | null>(null);
+  // The hover card shows only while the pointer is on a pin or on the card itself (short grace period between them).
+  const [hovering, setHovering] = useState(false);
+  const [viewTick, setViewTick] = useState(0);
+  const hideTimer = useRef<number | null>(null);
+  const hoverEndRef = useRef(onHoverEnd);
+  hoverEndRef.current = onHoverEnd;
+  const keepCard = () => { if (hideTimer.current !== null) window.clearTimeout(hideTimer.current); hideTimer.current = null; setHovering(true); };
+  const releaseCard = () => {
+    if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
+    hideTimer.current = window.setTimeout(() => { hideTimer.current = null; setHovering(false); hoverEndRef.current?.(); }, 280);
+  };
+  const keepCardRef = useRef(keepCard); keepCardRef.current = keepCard;
+  const releaseCardRef = useRef(releaseCard); releaseCardRef.current = releaseCard;
 
   const focusWarehouse = (map: L.Map, row: Coverage) => {
     map.invalidateSize();
@@ -120,12 +145,13 @@ export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, er
       setDraftPoint({ x: point.x, y: point.y, width: size.x, height: size.y });
     };
     map.on('zoom move resize', updateDraftPoint);
+    map.on('zoom move resize', () => setViewTick((value) => value + 1));
     map.on('zoomend', () => setZoomLevel(map.getZoom()));
     const timer = window.setTimeout(() => map.invalidateSize(), 250);
     // The detail column beside the map can change the map width; keep Leaflet's size in step with the container.
     const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => map.invalidateSize({ pan: false }));
     resize?.observe(containerRef.current);
-    return () => { resize?.disconnect(); window.clearTimeout(timer); if (selectionTimer.current !== null) window.clearTimeout(selectionTimer.current); map.remove(); mapRef.current = null; layerRef.current = null; draftLayerRef.current = null; };
+    return () => { resize?.disconnect(); window.clearTimeout(timer); if (hideTimer.current !== null) window.clearTimeout(hideTimer.current); if (selectionTimer.current !== null) window.clearTimeout(selectionTimer.current); map.remove(); mapRef.current = null; layerRef.current = null; draftLayerRef.current = null; };
   }, []);
 
   useEffect(() => {
@@ -168,9 +194,11 @@ export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, er
           html: warehouseIconHtml(selected),
           iconSize: [44, 44], iconAnchor,
         }),
-      }).bindTooltip(escapeHtml(row.name)).on('mouseover', () => hoverRef.current?.({ kind: 'warehouse', id: row.id, warehouseId: row.id }))
+      }).on('mouseover', () => { keepCardRef.current(); hoverRef.current?.({ kind: 'warehouse', id: row.id, warehouseId: row.id }); })
+        .on('mouseout', () => releaseCardRef.current())
         .on('click', (event: L.LeafletMouseEvent) => {
           L.DomEvent.stopPropagation(event.originalEvent);
+          keepCardRef.current();
           if (creatingRef.current || placingRef.current) { map.fire('click', { latlng: event.latlng }); return; }
           if (selectionTimer.current !== null) window.clearTimeout(selectionTimer.current);
           selectionTimer.current = window.setTimeout(() => {
@@ -203,9 +231,11 @@ export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, er
             html: `<span style="background:${pinColor}" aria-hidden="true">♥</span>`,
             iconSize: [PIN, PIN], iconAnchor: [PIN / 2 - dx, PIN / 2 - dy],
           }),
-        }).on('mouseover', () => hoverRef.current?.({ kind: 'drive', id: drive.id, warehouseId: row.id }))
+        }).on('mouseover', () => { keepCardRef.current(); hoverRef.current?.({ kind: 'drive', id: drive.id, warehouseId: row.id }); })
+          .on('mouseout', () => releaseCardRef.current())
           .on('click', (event: L.LeafletMouseEvent) => {
             L.DomEvent.stopPropagation(event.originalEvent);
+            keepCardRef.current();
             if (creatingRef.current || placingRef.current) map.fire('click', { latlng: event.latlng });
             else selectDriveRef.current?.(drive.id, row.id);
           }).addTo(group);
@@ -280,8 +310,20 @@ export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, er
   }, [selectedId, rows, editingWarehouse]);
 
   const drafting = creatingWarehouse || editingWarehouse;
-  const showDetails = !drafting && Boolean(hoverCard);
-  return <div className={`warehouse-coverage__frame${showDetails ? ' warehouse-coverage__frame--with-side' : ''}`}>
+  const cardRow = cardTarget ? rows.find((row) => row.id === cardTarget.warehouseId) : undefined;
+  const cardDrive = cardTarget?.kind === 'drive' ? cardRow?.drives.find((drive) => drive.id === cardTarget.id) : undefined;
+  const cardLatLng: L.LatLngTuple | null = cardDrive?.lat !== undefined && cardDrive.lng !== undefined
+    ? [cardDrive.lat, cardDrive.lng] : cardRow ? [cardRow.lat, cardRow.lng] : null;
+  const cardPoint = (() => {
+    void viewTick;
+    const map = mapRef.current;
+    if (!map || !cardLatLng) return null;
+    const point = map.latLngToContainerPoint(cardLatLng);
+    const size = map.getSize();
+    return { x: point.x, y: point.y, width: size.x, height: size.y };
+  })();
+  const showDetails = !drafting && Boolean(hoverCard) && hovering && Boolean(cardPoint);
+  return <div className="warehouse-coverage__frame">
   <div className="warehouse-coverage__map-shell">
     <div ref={containerRef} className="campaign-area-map warehouse-coverage__map" role="region" aria-label="Bản đồ các kho, bán kính phục vụ và đợt quyên góp" />
     {banner && <div className="warehouse-map-banner" role="status">{banner}</div>}
@@ -295,12 +337,11 @@ export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, er
       <span><i className="legend-dot legend-dot--paused">♥</i> Tạm dừng</span>
       <span><i className="legend-dot legend-dot--draft">♥</i> Bản nháp</span>
     </div>
+    {showDetails && cardPoint && <aside className="warehouse-map-pop" style={popCardStyle(cardPoint)} aria-label="Chi tiết kho hoặc điểm quyên góp"
+      onMouseEnter={keepCard} onMouseLeave={releaseCard} onFocus={keepCard}>{hoverCard}</aside>}
     {loading && <p className="warehouse-coverage__overlay" role="status">Đang tải vị trí các kho…</p>}
     {error && <p className="warehouse-coverage__overlay warehouse-coverage__overlay--error" role="alert">Chưa tải được dữ liệu kho. Hãy bấm Làm mới để thử lại.</p>}
     {!loading && !error && rows.length === 0 && <p className="warehouse-coverage__overlay">Chưa có kho nào có vị trí. Hãy thêm kho hoặc sửa kho để chọn vị trí.</p>}
   </div>
-  {showDetails && <aside className="warehouse-map-side" aria-label="Chi tiết kho hoặc điểm quyên góp đang chọn" aria-live="polite">
-    {hoverCard}
-  </aside>}
   </div>;
 }

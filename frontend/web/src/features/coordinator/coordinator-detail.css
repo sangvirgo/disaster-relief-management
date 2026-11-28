@@ -90,7 +90,7 @@
 .sos-decision__ai-tools .sos-ai-resubmit small { flex: 1 1 200px; }
 .dispatch-completed-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; padding: 10px 14px; background: var(--color-primary-bg); border: 1px solid var(--color-primary-border); border-radius: 10px; color: var(--color-primary-dark); }
 .dispatch-completed-bar .button { min-height: 36px; padding: 6px 12px; }
-.dispatch-candidates:has(> .dispatch-completed-bar:only-child) { padding: 0; border: 0; background: transparent; box-shadow: none; }
+.dispatch-candidates:has(> :is(.dispatch-completed-bar, .mission-done-card):only-child) { padding: 0; border: 0; background: transparent; box-shadow: none; }
 .sos-decision__actions .secondary-command .sos-action-entry .button { background: var(--color-surface-card); color: var(--color-text-primary); border: 1px solid var(--color-surface-divider); }
 .sos-ai-resubmit { display: grid; flex: 1 1 180px; gap: var(--space-1); min-width: 0; }
 .sos-ai-resubmit .button { width: fit-content; white-space: normal; }
@@ -275,10 +275,9 @@
 .sos-closeout__head .secondary-action-button:hover { background: var(--color-emergency-dark); color: var(--color-text-inverse); }
 .sos-closeout > .command-form { border-top: 0; padding-top: 0; }
 .sos-closeout { gap: 12px; padding-top: 16px; }
-.sos-closeout > .async-request-form--resolve { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(240px, 1fr); align-items: start; gap: 12px 16px; }
-.sos-closeout .async-request-form__reason { grid-row: span 2; }
-.sos-closeout .async-request-form__reason textarea { min-height: 112px; height: 112px; resize: vertical; }
-.sos-closeout .async-request-form__submit { justify-self: end; margin: 0; }
+.sos-closeout > .async-request-form--resolve { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 14px; }
+.sos-closeout .resolve-reason textarea { min-height: 96px; resize: vertical; }
+.sos-closeout .async-request-form__submit { justify-self: start; margin: 0; }
 .sos-closeout .async-request-form > :is(h3, .notice) { grid-column: 1 / -1; }
 .sos-closeout__head .secondary-action-button { min-width: 0; background: var(--color-emergency-bg); color: var(--color-emergency-dark); border-color: var(--color-emergency-border); }
 @media (max-width: 700px) {
@@ -341,3 +340,93 @@
 .text-action:hover { text-decoration: underline; }
 .text-action:disabled { opacity: .5; cursor: not-allowed; }
 .sos-head__actions .button { background: transparent; }
+
+/* Always-open SOS location map with weather chips (same layers as the citizen SOS form), above the detail tabs. */
+.sos-location-map { display: grid; gap: var(--space-2); margin: var(--space-3) 0 var(--space-2); padding: var(--space-3); border: 1px solid var(--color-surface-border); border-radius: var(--radius-md); background: #f8fbff; min-width: 0; }
+.sos-location-map__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.sos-location-map__head h3 { margin: 0; font-size: 1rem; }
+.sos-location-map__head .muted { font-size: 13px; font-variant-numeric: tabular-nums; }
+.sos-location-map .notice { margin: 0; }
+.sos-location-map .weather-layer-control { margin: 4px 0 0; }
+.heatmap-map-shell { position: relative; min-width: 0; }
+.sos-location-map .heatmap-panel-compact .heatmap-canvas { height: clamp(360px, 48vh, 520px); }
+@media (max-width: 720px) { .sos-location-map .heatmap-panel-compact .heatmap-canvas { height: 340px; } }
+
+/* Mission completed → next step card (dispatch tab). */
+.mission-done-card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px 16px; padding: 16px 18px; border: 1px solid #b7e4c7; border-radius: var(--radius-md); background: #f0fbf4; }
+.mission-done-card__icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: #1f9d55; color: #fff; font-weight: 800; }
+.mission-done-card__body strong { color: #14532d; }
+.mission-done-card__body p { margin: 4px 0 0; color: var(--color-text-secondary); font-size: 14px; }
+.mission-done-card__actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.mission-done-card__actions .button { margin: 0; min-height: 40px; white-space: nowrap; }
+@media (max-width: 760px) { .mission-done-card { grid-template-columns: auto minmax(0, 1fr); } .mission-done-card__actions { grid-column: 1 / -1; justify-content: flex-start; } }
+
+/* Close-out step: basis as choice cards, reason with template, quiet cancel link. */
+.sos-closeout__head p { margin: 4px 0 0; font-size: 14px; }
+.sos-closeout .resolve-basis { margin: 0; padding: 0; border: 0; min-width: 0; }
+.sos-closeout .resolve-basis legend, .resolve-reason__label { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; font-weight: 600; }
+.resolve-basis__options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.resolve-basis__option { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border: 1px solid var(--color-surface-border); border-radius: 12px; background: var(--color-surface-card); cursor: pointer; }
+.resolve-basis__option:hover, .resolve-basis__option.selected { border-color: var(--color-primary); background: var(--sidebar-active-bg); }
+.resolve-basis__option.selected { box-shadow: 0 0 0 2px rgba(37, 99, 235, .12); }
+.resolve-basis__option input { flex: none; width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--color-primary); }
+.resolve-basis__option span { display: grid; gap: 2px; }
+.resolve-basis__option small { color: var(--color-text-secondary); font-size: 13px; font-weight: 400; }
+.resolve-reason__template { margin-left: auto; font-size: 13px; font-weight: 600; }
+.resolve-reason__count { justify-self: end; font-size: 12px; }
+.sos-closeout__cancel { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding-top: var(--space-3); border-top: 1px dashed var(--color-surface-border); font-size: 14px; }
+.sos-closeout__cancel .secondary-command { margin: 0; }
+.sos-closeout__cancel .secondary-action-button { min-height: 0; padding: 4px 6px; border: 0; background: transparent; color: var(--color-emergency); font-weight: 600; text-decoration: underline; cursor: pointer; }
+@media (max-width: 760px) { .resolve-basis__options { grid-template-columns: minmax(0, 1fr); } }
+
+/* Weather alert summary drawn on the SOS map instead of a text block below it. */
+.heatmap-weather-badge { position: absolute; z-index: 500; left: 10px; bottom: 10px; display: inline-flex; align-items: center; gap: 6px; margin: 0; padding: 6px 12px; border-radius: 999px; background: #fffffff2; color: var(--color-text-primary); font-size: 12.5px; font-weight: 600; box-shadow: 0 2px 8px #0003; pointer-events: none; }
+.heatmap-weather-badge--alert { background: #fff4e5f5; color: #9a3412; }
+.heatmap-map-shell--weather .weather-legends { bottom: 48px; }
+.resolve-reason { display: grid; gap: 6px; }
+.resolve-reason__label { margin-bottom: 0; }
+.resolve-reason textarea { width: 100%; }
+/* Keep map overlays (weather chips, alert badge) inside the map so they never cover the sticky page header. */
+.heatmap-map-shell { isolation: isolate; z-index: 0; }
+
+/* SOS detail polish (2026-11-28): start-verification bar, AI resubmit row, compact map attribution. */
+.sos-start-verification { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; width: 100%; box-sizing: border-box; padding: 12px 16px; border: 1px solid var(--color-primary-border, #bfd3f5); border-radius: var(--radius-md); background: var(--color-primary-bg, #eef4ff); }
+.sos-start-verification p { flex: 1 1 260px; margin: 0; font-size: 14px; color: var(--color-text-secondary); }
+.sos-start-verification p strong { color: var(--color-text-primary); }
+.sos-decision__actions > .sos-ai-resubmit-row { grid-column: 1 / -1; }
+.sos-ai-resubmit-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; padding-top: 10px; border-top: 1px dashed var(--color-surface-border); }
+.sos-ai-resubmit-row > .command-form { margin: 0; padding: 0; border: 0; background: transparent; }
+.sos-ai-resubmit-row .button { min-height: 34px; padding: 6px 12px; font-size: 13px; font-weight: 600; }
+.sos-ai-resubmit-row > small { color: var(--color-text-secondary); font-size: 12.5px; }
+.sos-ai-resubmit--idle { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.sos-ai-resubmit--idle small { flex: 1 1 200px; color: var(--color-text-secondary); font-size: 12.5px; line-height: 1.4; }
+.sos-location-map .leaflet-control-attribution { max-width: 55%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 10px; opacity: .85; }
+.sos-location-map .leaflet-control-attribution:hover { max-width: 100%; white-space: normal; opacity: 1; }
+
+/* Decision card v2 (2026-11-28): compact meta, AI sub-panel, actions in one row, quiet resubmit link. */
+.sos-decision__meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; font-size: 13px; color: var(--color-text-secondary); }
+.sos-decision__meta > span { padding: 3px 10px; border: 1px solid var(--color-surface-border); border-radius: 999px; background: var(--color-surface-card); }
+.sos-decision__meta b { color: var(--color-text-primary); font-variant-numeric: tabular-nums; }
+.sos-decision__ai { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid #d9d2fb; border-radius: 12px; background: #fbfaff; }
+.sos-decision__ai[data-state='none'] { border-color: var(--color-surface-border); background: var(--color-surface-card); }
+.sos-decision__ai-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.sos-decision__ai-title { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: #4c1d95; font-size: 14px; }
+.sos-decision__ai-title > span { color: #7c3aed; }
+.sos-decision__ai-tag { padding: 2px 8px; border-radius: 999px; background: #fef3c7; color: #92400e; font-size: 12px; font-weight: 600; }
+.sos-decision__ai-status { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--color-text-secondary); }
+.sos-decision__ai-status::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; }
+.sos-decision__ai[data-state='done'] .sos-decision__ai-status::before { background: #16a34a; }
+.sos-decision__ai[data-state='pending'] .sos-decision__ai-status::before { background: #f59e0b; }
+.sos-decision__ai-summary { margin: 0; font-size: 14px; line-height: 1.6; color: var(--color-text-primary); }
+.sos-decision__ai-weather { display: flex; gap: 8px; margin: 0; padding: 8px 10px; border-radius: 8px; background: #eef6ff; font-size: 13px; line-height: 1.5; color: var(--color-text-secondary); }
+.sos-decision__ai-weather strong { color: var(--color-text-primary); }
+.sos-decision .sos-decision__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.sos-decision .sos-decision__actions > :is(.command-form, .secondary-command, .sos-action-entry) { width: auto; }
+.sos-decision .sos-decision__actions .button { min-height: 42px; }
+.sos-decision .sos-decision__actions:empty { display: none; }
+/* Resubmit as a quiet link-style row at the bottom of the AI panel. */
+.sos-decision__ai .sos-ai-resubmit-row, .sos-ai-card .sos-ai-resubmit-row { margin: 0; padding-top: 8px; border-top: 1px solid #ece8fb; }
+.sos-ai-resubmit-row .button.secondary { min-height: 30px; padding: 4px 10px; border-color: #d9d2fb; background: #fff; color: #5b21b6; font-size: 12.5px; }
+.sos-ai-resubmit-row .button.secondary:disabled { border-color: transparent; background: transparent; color: var(--color-text-muted); padding-left: 0; cursor: not-allowed; }
+.sos-ai-resubmit-row .button.secondary:disabled::before { content: '↻ '; }
+.sos-ai-resubmit--idle small { font-size: 12px; }

@@ -120,3 +120,31 @@
   .supply-form__lines li { grid-template-columns: minmax(0, 1fr) auto; }
   .supply-form__lines li > button { grid-column: 1 / -1; justify-self: end; }
 }
+
+/* Warehouse queue as a data table (one row per team request), 2026-11-28. */
+.supply-queue__toolbar { align-items: center; }
+.supply-queue__toolbar .tabs { margin: 0; }
+.supply-queue__tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-left: auto; }
+.supply-queue__filter { min-width: 200px; }
+.supply-queue__summary { color: var(--color-text-secondary); font-size: 13px; white-space: nowrap; }
+.supply-queue__summary strong { color: var(--color-text-primary); }
+.supply-queue__hint { display: flex; gap: 8px; margin: 0; padding: 10px 14px; border-radius: var(--radius-sm); background: var(--color-primary-bg); color: var(--color-text-secondary); font-size: 13.5px; line-height: 1.5; }
+.supply-queue__hint > span { color: var(--color-primary); font-weight: 700; }
+.supply-table-scroll { width: 100%; overflow-x: auto; border: 1px solid var(--color-surface-border); border-radius: var(--radius-md); }
+.supply-table { width: 100%; min-width: 760px; border-collapse: collapse; background: var(--color-surface-card); }
+.supply-table thead { background: var(--color-surface-subtle); }
+.supply-table th, .supply-table td { padding: 12px 14px; border-bottom: 1px solid var(--color-surface-border); text-align: left; vertical-align: top; }
+.supply-table thead th { color: var(--color-text-muted); font: 600 var(--text-caption) var(--font-family); white-space: nowrap; }
+.supply-table tbody tr:last-child > * { border-bottom: 0; }
+.supply-table tbody tr:hover { background: var(--color-surface-subtle); }
+.supply-table tbody th { font-weight: 400; }
+.supply-table__team { display: block; font-weight: 650; color: var(--color-text-primary); }
+.supply-table tbody th small { color: var(--color-text-secondary); font-size: 12.5px; }
+.supply-table__row--urgent > th:first-child { box-shadow: inset 4px 0 0 var(--color-emergency); }
+.supply-table__items { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; min-width: 200px; }
+.supply-table__items li { display: flex; justify-content: space-between; gap: 12px; }
+.supply-table__items strong { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.supply-table__actions { white-space: nowrap; }
+.supply-table__actions { display: table-cell; }
+.supply-table__actions .button { margin: 0 6px 0 0; min-height: 36px; }
+@media (max-width: 640px) { .supply-queue__tools { margin-left: 0; width: 100%; } .supply-queue__filter { flex: 1 1 auto; } }
