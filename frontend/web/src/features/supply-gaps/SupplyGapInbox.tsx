@@ -213,6 +213,7 @@ export function SupplyGapInbox({ user }: { user: Me }) {
         </div>
       </div>
       <p className="muted">Hệ thống chỉ đề xuất. Chỉ quản lý vận hành mới tạo đợt quyên góp từ đề xuất thiếu hàng (mức đỏ).</p>
+      <p className="muted">Nhu cầu SOS được cập nhật khoảng 5 phút/lần; đề xuất thiếu hàng khoảng 15 phút/lần. “Làm mới” tải kết quả đã có, không chạy lượt phân tích mới.</p>
       <div className="filter">
         <label htmlFor="supply-status-filter">Trạng thái đề xuất</label>
         <Dropdown id="supply-status-filter" value={status} onChange={(event) => changeStatus(event.target.value)}>

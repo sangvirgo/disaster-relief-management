@@ -123,7 +123,7 @@ export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, er
     map.on('zoomend', () => setZoomLevel(map.getZoom()));
     const timer = window.setTimeout(() => map.invalidateSize(), 250);
     // The detail column beside the map can change the map width; keep Leaflet's size in step with the container.
-    const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => map.invalidateSize());
+    const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => map.invalidateSize({ pan: false }));
     resize?.observe(containerRef.current);
     return () => { resize?.disconnect(); window.clearTimeout(timer); if (selectionTimer.current !== null) window.clearTimeout(selectionTimer.current); map.remove(); mapRef.current = null; layerRef.current = null; draftLayerRef.current = null; };
   }, []);

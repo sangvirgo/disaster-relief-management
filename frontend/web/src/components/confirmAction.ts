@@ -1,6 +1,7 @@
 import { acquireModalScrollLock } from './modalScrollLock';
 
-export function confirmAction(message: string): Promise<boolean> {
+export type ConfirmOptions = { title?: string; tone?: 'warning' };
+export function confirmAction(message: string, options: ConfirmOptions = {}): Promise<boolean> {
   return new Promise((resolve) => {
     const dialog = document.createElement('dialog');
     dialog.className = 'action-confirm-dialog';
@@ -15,7 +16,7 @@ export function confirmAction(message: string): Promise<boolean> {
     icon.alt = 'Reliva';
     const title = document.createElement('h2');
     title.id = 'action-confirm-title';
-    title.textContent = 'Xác nhận thao tác';
+    title.textContent = options.title || 'Xác nhận thao tác';
     const description = document.createElement('p');
     description.id = 'action-confirm-message';
     description.textContent = message;
@@ -30,7 +31,16 @@ export function confirmAction(message: string): Promise<boolean> {
     confirm.className = 'button';
     confirm.textContent = 'Xác nhận';
     actions.append(cancel, confirm);
-    content.append(icon, title, description, actions);
+    if (options.tone === 'warning') {
+      const warning = document.createElement('div');
+      warning.className = 'action-confirm-warning';
+      const mark = document.createElement('span');
+      mark.className = 'action-confirm-warning__mark';
+      mark.setAttribute('aria-hidden', 'true');
+      mark.textContent = '!';
+      warning.append(mark, description);
+      content.append(title, warning, actions);
+    } else content.append(icon, title, description, actions);
     dialog.append(content);
     document.body.append(dialog);
     const releaseScrollLock = acquireModalScrollLock();

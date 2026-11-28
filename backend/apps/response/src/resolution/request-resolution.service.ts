@@ -81,7 +81,7 @@ export class RequestResolutionService {
     ) as unknown[];
     const needs = existingKeys.length > 0 || preflight.logistics_admitted_at === null
       ? []
-      : normalizeNeeds(await this.logistics.fulfillment(requestId, Number(preflight.work_cycle), request));
+      : normalizeNeeds(await this.logistics.fulfillment(requestId, Number(preflight.work_cycle), request, preflight.campaign_id));
 
     const result = await this.idempotency.execute(this.dataSource, {
       scopeKey,

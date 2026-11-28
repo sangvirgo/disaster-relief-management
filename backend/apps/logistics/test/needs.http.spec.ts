@@ -41,7 +41,7 @@ describe('POST /needs HTTP', () => {
   };
   const queries = {
     list: jest.fn(async (_query: NeedsListQueryDto, _request: Request) => ({ items: [], more: false })),
-    fulfillment: jest.fn(async (_requestId: string, _query: FulfillmentQueryDto, _request: Request) => ({ needs: [], cycle_state: 'OPEN', generated_at: '2026-10-13T00:00:00.000Z' })),
+    fulfillment: jest.fn(async (_requestId: string, _query: FulfillmentQueryDto, _request: Request, _resolutionCampaignId?: string) => ({ needs: [], cycle_state: 'OPEN', generated_at: '2026-10-13T00:00:00.000Z' })),
     contributions: jest.fn(async (_needId: string, _query: NeedContributionsQueryDto, _request: Request) => ({ items: [], more: false })),
   };
 
@@ -142,12 +142,20 @@ describe('POST /needs HTTP', () => {
       .get(`/api/v1/logistics/internal/requests/${requestId}/fulfillment?work_cycle=2`)
       .set('Authorization', 'Bearer response-service-token')
       .set('X-Actor-Authorization', 'Bearer actor-access-token')
+      .set('X-Resolution-Campaign-Id', itemId)
       .expect(200)
       .expect('Cache-Control', 'no-store');
 
     const call = queries.fulfillment.mock.calls.at(-1);
     expect(call?.[0]).toBe(requestId);
     expect((call?.[2] as Request).headers.authorization).toBe('Bearer actor-access-token');
+    expect(call?.[3]).toBe(itemId);
+  });
+
+  it('ignores a forged resolution scope on the public fulfillment route', async () => {
+    await request(app.getHttpServer()).get(`/api/v1/logistics/requests/${requestId}/fulfillment?work_cycle=2`)
+      .set('Authorization', 'Bearer actor-access-token').set('X-Resolution-Campaign-Id', itemId).expect(200);
+    expect(queries.fulfillment.mock.calls.at(-1)?.[3]).toBeUndefined();
   });
 
   it('paginates need contributions through a scoped no-store route', async () => {

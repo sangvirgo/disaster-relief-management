@@ -6,7 +6,7 @@ import { evidenceFileError } from '../i18n/evidence';
 import { SelectedFiles } from './ui/SelectedFiles';
 import { LocationPicker, type LocationOverlay } from '../maps/LocationPicker';
 import { CampaignAreaMap } from '../maps/CampaignAreaMap';
-import { confirmAction } from './confirmAction';
+import { confirmAction, type ConfirmOptions } from './confirmAction';
 
 export type Field = {
   name: string;
@@ -53,6 +53,7 @@ export interface CommandSpec {
   fields?: Field[];
   version?: number;
   warning?: string;
+  confirmOptions?: ConfirmOptions;
   /** Hide the heading when the surrounding UI already names the action. */
   hideTitle?: boolean;
   /** Visual weight of the submit button; destructive or secondary actions should not look like the main step. */
@@ -234,7 +235,7 @@ export function CommandForm({
       return;
     }
     const warning = spec.warningFor?.(values) ?? spec.warning;
-    if (warning && !(await confirmAction(warning))) return;
+    if (warning && !(await confirmAction(warning, spec.confirmOptions))) return;
     setBusy(true);
     setMessage('');
     setFieldErrors({});

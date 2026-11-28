@@ -3,6 +3,20 @@ import { AppError } from '@c48/technical/errors/errors';
 import { LogisticsCycleClient } from '../src/integrations/logistics/logistics-cycle.client';
 
 describe('LogisticsCycleClient', () => {
+  it('forwards the canonical resolution campaign with the live actor, without changing fulfillment totals', async () => {
+    const service = new LogisticsCycleClient({ baseUrl: 'http://127.0.0.1:1', timeoutMs: 100 }, {
+      serviceToken: jest.fn(async () => 'service-token'),
+    } as never);
+    const get = jest.fn(async () => ({ status: 200, body: { needs: [{ status: 'FULFILLED', delivered: '19', committed_reserved: '0', issued_unsettled: '0' }] } }));
+    (service as unknown as { client: { get: jest.Mock } }).client.get = get;
+    await expect(service.fulfillment('40000000-0000-4000-8000-000000000001', 1, {
+      headers: { authorization: 'Bearer live.actor-token', 'x-resolution-campaign-id': 'untrusted-browser-header' },
+    } as never, '50000000-0000-4000-8000-000000000001')).resolves.toEqual([{ status: 'FULFILLED', delivered: '19', reserved: '0', unsettledIssued: '0' }]);
+    expect(get.mock.calls[0]?.[1]).toEqual({ headers: { authorization: 'Bearer service-token',
+      'x-actor-authorization': 'Bearer live.actor-token', 'x-resolution-campaign-id': '50000000-0000-4000-8000-000000000001' } });
+    service.onModuleDestroy();
+  });
+
   it('sends a sealed-cycle command with the Logistics service token and outcome basis', async () => {
     const sessions = { serviceToken: jest.fn(async () => 'logistics-service-token') };
     const service = new LogisticsCycleClient({ baseUrl: 'http://127.0.0.1:1', timeoutMs: 100 }, sessions as never);

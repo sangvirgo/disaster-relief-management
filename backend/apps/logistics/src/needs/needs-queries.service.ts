@@ -5,7 +5,7 @@ import type { DataSource } from 'typeorm';
 import { AppError } from '@c48/technical/errors/errors';
 import { decodeKeysetCursor, encodeKeysetCursor } from '@c48/technical/pagination/keyset';
 import type { KeysetCursor } from '@c48/technical/pagination/keyset';
-import { hasPermission, ROLE_PERMISSIONS } from '@c48/identity-contracts/permissions';
+import { hasPermission, isSubCoordinator, ROLE_PERMISSIONS } from '@c48/identity-contracts/permissions';
 import type { Grant, Permission } from '@c48/identity-contracts/permissions';
 import { LogisticsSessionService } from '../auth/logistics-session.service';
 import { decimalFromUnits, quantityUnits } from '../common/quantity';
@@ -244,10 +244,15 @@ export class NeedsQueriesService {
     };
   }
 
-  async fulfillment(requestId: string, query: FulfillmentQueryDto, request: Request): Promise<Record<string, unknown>> {
+  async fulfillment(requestId: string, query: FulfillmentQueryDto, request: Request, resolutionCampaignId?: string): Promise<Record<string, unknown>> {
     const session = await this.sessions.require(request);
     const values: unknown[] = [requestId];
-    const conditions = [`c.request_id=$1`, scopeSql(session.grants, values, 'c')];
+    // Engagements live in Response, not Identity/Logistics. A service-authenticated, exact-cycle
+    // resolution read carries Response's canonical campaign after its live REQUEST_RESOLVE check.
+    // This does not grant NEED_MANAGE or enable public per-SOS logistics reads for floating grants.
+    const resolutionScoped = Boolean(resolutionCampaignId && isSubCoordinator(session.grants) && query.work_cycle !== undefined);
+    if (resolutionScoped) values.push(resolutionCampaignId);
+    const conditions = [`c.request_id=$1`, resolutionScoped ? 'c.campaign_id=$2' : scopeSql(session.grants, values, 'c')];
     if (query.work_cycle !== undefined) {
       values.push(query.work_cycle);
       conditions.push(`c.work_cycle=$${values.length}`);

@@ -744,7 +744,6 @@ export function SosForm({
         </ul>
       </div>}
       <div className={`sos-submit-bar${busy || (Object.keys(clientErrors).length === 0 && !fieldError) ? ' is-ready' : ''}`}>
-      {!attempted && Object.keys(clientErrors).length > 0 && <small className="sos-submit-hint">Cần chọn loại sự cố, nhu cầu và vị trí trên bản đồ. Bấm gửi để xem mục còn thiếu.</small>}
       <Button type="submit" variant="emergency" size="lg" disabled={busy} loading={busy}>
         {busy ? 'Đang gửi…' : 'Gửi yêu cầu SOS'}
       </Button>

@@ -178,7 +178,7 @@ export class RequestOperationsQueriesService {
         `SELECT id,status,mission_kind,created_at,team_id FROM mission WHERE request_id=$1 AND status IN ('OFFERED','ACCEPTED','EN_ROUTE','ON_SCENE') ORDER BY created_at,id LIMIT 6`, [row.id],
       ) as Promise<Array<Record<string, unknown>>>,
       this.dataSource.query(
-        `SELECT m.id,m.status,m.mission_kind,m.created_at,m.team_id,t.name AS team_name,m.suggested_team_id,m.override_reason,
+        `SELECT m.id,m.status,m.version,m.mission_kind,m.created_at,m.team_id,t.name AS team_name,m.suggested_team_id,m.override_reason,
                 e.to_status AS last_status,e.occurred_at AS last_occurred_at,e.recorded_basis,e.reported_by
            FROM mission m JOIN rescue_team t ON t.id=m.team_id
            LEFT JOIN LATERAL (SELECT to_status,occurred_at,recorded_basis,reported_by FROM mission_event WHERE mission_id=m.id ORDER BY occurred_at DESC,id DESC LIMIT 1) e ON true

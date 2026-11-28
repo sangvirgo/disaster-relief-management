@@ -59,7 +59,14 @@ export class NeedsController {
     @Res({ passthrough: true }) response: Response,
   ) {
     noStore(response);
-    return this.queries.fulfillment(requestId, query, actorRequest(request));
+    const header = request.headers['x-resolution-campaign-id'];
+    const campaignId = Array.isArray(header) ? header[0] : header;
+    if (campaignId && !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/iu.test(campaignId)) {
+      throw new AppError('VALIDATION_FAILED', { status: 400 });
+    }
+    // Only the authenticated Response service may attest its already-authorized resolution scope.
+    // Public fulfillment reads never consume this header or receive this override.
+    return this.queries.fulfillment(requestId, query, actorRequest(request), campaignId);
   }
 
   @Get('needs/:id/contributions')

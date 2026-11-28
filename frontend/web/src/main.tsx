@@ -36,6 +36,7 @@ import { TrackingProgress } from './features/citizen/TrackingProgress';
 import { clearAllSosDrafts } from './features/citizen/sosDraft';
 import { clearAllCountDrafts } from './features/operations/countDraft';
 import { clearAllMissionDrafts } from './features/volunteer/missionDraft';
+import { clearAllSupplyDrafts } from './features/supply/supplySessionDraft';
 import { clearPendingEvidence, purgeExpiredEvidence } from './features/volunteer/missionEvidenceStorage';
 import type { components as ResponseComponents } from './api/generated/response';
 import './style.css';
@@ -1713,6 +1714,7 @@ function App() {
     void clearPendingEvidence();
     clearAllCountDrafts();
     clearAllMissionDrafts();
+    clearAllSupplyDrafts();
     clearAllSosDrafts();
     try {
       for (let index = window.sessionStorage.length - 1; index >= 0; index -= 1) {

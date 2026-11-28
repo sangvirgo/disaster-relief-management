@@ -123,14 +123,15 @@ export function AsyncRequestForm({
     }
   }
   return (
-    <form className="form-stack command-form" onSubmit={submit} noValidate>
+    <form className={`form-stack command-form async-request-form async-request-form--${kind}`} data-static-label onSubmit={submit} noValidate>
       {!hideTitle && <h3>{kind === 'cancel' ? 'Hủy yêu cầu' : 'Kết thúc xử lý yêu cầu'}</h3>}
       {blockers.length > 0 && <div className="notice warning" role="status"><strong>Chưa thể kết thúc yêu cầu</strong><ul>{blockers.map(blocker => <li key={blocker.href}><a href={blocker.href}>{blocker.text}</a></li>)}</ul></div>}
       {!operationId && (
         <>
-          <label>
+          <label className="async-request-form__reason">
             <span>Lý do <span className="required-mark" aria-hidden="true">*</span></span>
             <textarea
+              rows={2}
               required
               maxLength={2001}
               aria-invalid={Boolean(touched.reason && reasonError)}
@@ -146,7 +147,7 @@ export function AsyncRequestForm({
             {touched.reason && reasonError && <small className="field-error" id="async-request-reason-error" role="alert">{reasonError}</small>}
           </label>
           {kind === 'resolve' && (
-            <label>
+            <label className="async-request-form__basis">
               <span>Căn cứ kết thúc <span className="required-mark" aria-hidden="true">*</span></span>
               <Dropdown
                 required
@@ -168,7 +169,7 @@ export function AsyncRequestForm({
               {touched.basis && basisError && <small className="field-error" id="async-request-basis-error" role="alert">{basisError}</small>}
             </label>
           )}
-          <button className="button" disabled={busy || invalid || blockers.length > 0}>
+          <button className="button async-request-form__submit" disabled={busy || invalid || blockers.length > 0}>
             {busy ? 'Đang gửi lệnh…' : kind === 'cancel' ? 'Xác nhận hủy' : 'Gửi đề nghị kết thúc'}
           </button>
         </>

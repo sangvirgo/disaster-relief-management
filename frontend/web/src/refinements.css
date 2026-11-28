@@ -1359,6 +1359,8 @@
 .action-confirm-content p { margin: 0; line-height: 1.55; overflow-wrap: anywhere; }
 .action-confirm-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 26px; flex-wrap: wrap; }
 .action-confirm-actions .button { min-width: 104px; }
+.action-confirm-warning { display: flex; align-items: flex-start; gap: 12px; padding: 16px; margin-top: 16px; border: 1px solid var(--color-warning-border); border-radius: 12px; background: var(--color-warning-bg); color: var(--color-warning-dark); font-weight: 600; }
+.action-confirm-warning__mark { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border: 2px solid currentColor; border-radius: 50%; font-size: 20px; font-weight: 800; line-height: 1; }
 .team-position-refresh {
   padding: 16px;
   margin: 12px 0;
@@ -2060,11 +2062,16 @@
 .tracking-steps li.is-current { color: var(--color-text-primary, #0f172a); }
 .tracking-next { padding: 12px 16px; border: 1px solid #bfdbfe; border-left: 4px solid #2563eb; border-radius: 10px; background: #eff6ff; }
 .tracking-next p { margin: 4px 0 0; }
-.tracking-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 16px; align-items: start; }
+.tracking-columns { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
 .tracking-columns .tracking-situation { margin: 0; }
 .tracking-history h3 { margin: 0 0 8px; }
 .tracking-page .timeline { margin: 0; padding: 0; list-style: none; }
 .tracking-page .timeline-item.is-latest strong { color: #1d4ed8; }
+.tracking-page .tracking-history__list { border-left: 0; }
+.tracking-history__list .timeline-item { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; padding: 10px 12px; border-bottom: 1px solid var(--color-surface-border); }
+.tracking-history__list .timeline-item::before { display: none; }
+.tracking-history__list .timeline-item.is-latest { background: var(--color-primary-bg); border-radius: 8px; }
+.tracking-history__list .timeline-item small { margin: 0; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .tracking-hotline { margin: 0; padding: 10px 14px; border-radius: 10px; background: #fef2f2; color: #7f1d1d; font-size: 13.5px; }
 .tracking-hotline a { color: #b91c1c; font-weight: 800; }
 @media (max-width: 640px) {

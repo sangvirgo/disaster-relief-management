@@ -9,6 +9,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { CommandForm, type CommandSpec } from '../../components/CommandForm';
 import { label, requestStatusLabel, timeLabel } from '../../i18n/labels';
 import { AsyncRequestForm } from './AsyncRequestForm';
+import { hasCurrentFailureReview } from './missionFailureReview';
 import { HeatmapPanel } from './HeatmapPanel';
 import { ContactAttemptPanel } from './ContactAttemptPanel';
 import { CoordinatorTeamPositionForm } from './CoordinatorTeamPositionForm';
@@ -163,6 +164,7 @@ type Detail = QueueItem & {
   mission_history?: {
     items: {
       id: string;
+      version?: number;
       status: string;
       mission_kind: string;
       created_at: string;
@@ -347,6 +349,7 @@ function CoordinatorMissionControl({ missionId, teamId, revision, onSuccess, onS
   const [contactNote, setContactNote] = useState('');
   const [loadError, setLoadError] = useState('');
   const [teamError, setTeamError] = useState('');
+  const [teamRestricted, setTeamRestricted] = useState(false);
   const [loadRevision, setLoadRevision] = useState(0);
   useEffect(() => {
     let live = true;
@@ -360,6 +363,7 @@ function CoordinatorMissionControl({ missionId, teamId, revision, onSuccess, onS
       setLoadError(missionResult.status === 'rejected'
         ? missionResult.reason instanceof Error ? missionResult.reason.message : 'Không thể tải nhiệm vụ.' : '');
       setReportingMode(teamResult.status === 'fulfilled' ? teamResult.value.reporting_mode : '');
+      setTeamRestricted(teamResult.status === 'rejected' && teamResult.reason instanceof ApiError && teamResult.reason.status === 403);
       setContactNote(teamResult.status === 'fulfilled' ? teamResult.value.external_contact_note?.trim() ?? '' : '');
       setTeamError(teamResult.status === 'rejected'
         ? teamResult.reason instanceof Error ? teamResult.reason.message : 'Không thể tải đội cứu hộ.' : '');
@@ -372,11 +376,12 @@ function CoordinatorMissionControl({ missionId, teamId, revision, onSuccess, onS
   if (!['OFFERED', 'ACCEPTED', 'EN_ROUTE', 'ON_SCENE'].includes(mission.status)) return <p className="notice">Nhiệm vụ đã chuyển sang {label(mission.status)}. Bấm Làm mới SOS để tải lại hồ sơ.</p>;
   const cancel = <SosCommandPopup
     key={`${missionId}-${mission.version}-cancel`}
-    spec={{ title: 'Hủy giao nhiệm vụ', service: 'response', path: `/missions/${missionId}/cancel`,
+    spec={{ title: 'Hủy giao nhiệm vụ', tone: 'danger', service: 'response', path: `/missions/${missionId}/cancel`,
       version: mission.version, warning: 'Xác nhận hủy nhiệm vụ này? Đội sẽ không tiếp tục xử lý nhiệm vụ đã hủy.',
       fields: [{ name: 'reason', label: 'Lý do hủy nhiệm vụ', type: 'textarea', required: true, maxLength: 2000 }] }}
     onSuccess={onSuccess} onStale={onStale}
   />;
+  if (teamRestricted) return <><p className="notice" role="status"><strong>Đội đang thực hiện nhiệm vụ · {label(mission.status)}</strong><br />Tiến độ được theo dõi theo cập nhật của đội. Hồ sơ chi tiết của đội nằm ngoài phạm vi tài khoản này.</p>{cancel}</>;
   if (teamError) return <><p role="alert" className="notice warning">Không tải được chế độ báo cáo của đội: {teamError} Chưa thể ghi tiến độ thay đội.</p>{retry}{cancel}</>;
   if (!reportingMode) return <p role="status">Đang tải thông tin đội…</p>;
   if (reportingMode !== 'COORDINATOR') return cancel;
@@ -881,12 +886,13 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
   function secondaryCommand(spec: CommandSpec, tone?: 'danger', onSuccess = done) {
     return (
       <div className={`secondary-command${tone ? ` secondary-command--${tone}` : ''}`}>
-        {command(spec, onSuccess)}
+        {command({ ...spec, tone: tone === 'danger' ? 'danger' : spec.tone ?? 'secondary' }, onSuccess)}
       </div>
     );
   }
   function aiResubmitAction(status: string | undefined) {
     if (!detail) return null;
+    if (status === 'COMPLETED' || status === 'QUEUED' || status === 'PROCESSING') return null;
     if (!reliefDescription(detail.description).narrative.trim() && !detail.description?.trim()) {
       return <small className="muted">AI cần mô tả tình huống để đánh giá; hồ sơ này chưa có nên hãy xác minh trực tiếp.</small>;
     }
@@ -1127,20 +1133,17 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                   hideTitle: true,
                   service: 'response',
                   path: `/requests/${detail.id}/authority-referrals`,
-                  fields: [
-                    { name: 'referred_body', label: 'Cơ quan tiếp nhận', type: 'text', required: true, maxLength: 200 },
-                    { name: 'note', label: 'Cách thức và nội dung đã chuyển', type: 'textarea', required: true, maxLength: 1000 },
-                  ],
-                  build: (values) => ({
-                    referred_body: values.referred_body,
-                    note: values.note,
+                  build: () => ({
+                    referred_body: 'Cơ quan chức năng',
+                    note: 'Điều phối viên xác nhận đã chuyển thông tin yêu cầu cho cơ quan chức năng.',
                     expected_version: detail.version,
                   }),
-                  warning: 'Xác nhận đã chuyển yêu cầu cho cơ quan chức năng được ghi rõ? Hệ thống sẽ thử kết thúc và đóng SOS nếu đủ điều kiện.',
+                  confirmOptions: { title: 'Xác nhận chuyển giao', tone: 'warning' },
+                  warning: 'Cơ quan tiếp nhận cần chịu trách nhiệm xử lý toàn bộ, Reliva sẽ không tiếp tục theo dõi tín hiệu này',
                 }, undefined, referralDone)}
               </fieldset>
               <p className="sos-head__sub">{label(detail.category)} · tiếp nhận {timeLabel(detail.received_at)}</p>
-              {detail.mission_history?.items.some((mission) => mission.status === 'COMPLETED') &&
+              {activeTab !== 'dispatch' && completedInCurrentCycle && !detail.active_missions?.items.length &&
                 !['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) && (
                   <p className="notice" role="status">Đội đã hoàn thành nhiệm vụ cứu hộ. SOS chưa kết thúc{detail.needs_relief_supplies ? '; nhu cầu vật tư được theo dõi riêng.' : '.'}</p>
                 )}
@@ -1174,7 +1177,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
               </section>}
               {!['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) && <nav className="sos-strip__cell sos-strip__next" aria-label="Bước xử lý SOS">
                 <small>Bước tiếp theo</small>
-                <strong>{['SUBMITTED', 'VERIFYING'].includes(detail.status) ? 'Xác minh thông tin' : detail.status === 'VERIFIED' ? 'Chọn mức ưu tiên' : 'Giao đội và theo dõi'}</strong>
+                <strong>{['SUBMITTED', 'VERIFYING'].includes(detail.status) ? 'Xác minh thông tin' : detail.status === 'VERIFIED' ? 'Chọn mức ưu tiên' : completedInCurrentCycle && !detail.active_missions?.items.length ? 'Xác nhận kết quả SOS' : 'Giao đội và theo dõi'}</strong>
                 <button type="button" className="text-action" onClick={() => { const target = ['SUBMITTED', 'VERIFYING', 'VERIFIED'].includes(detail.status) ? 'overview' : 'dispatch'; changeTab(target); window.requestAnimationFrame(() => document.getElementById('sos-detail-content')?.scrollIntoView({ behavior: 'smooth', block: 'start' })); }}>Đi tới →</button>
               </nav>}
             </div>
@@ -1329,8 +1332,8 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                   </>}
                   {(aiStatus === 'QUEUED' || aiStatus === 'PROCESSING') && <p className="sos-decision__hint">AI đang đánh giá, kết quả tự cập nhật sau ít phút.</p>}
                   {!ft.eligible && aiDone && <p className="sos-decision__hint">Hãy đối chiếu thông tin, bắt đầu xác minh rồi chọn mức ưu tiên theo đánh giá của bạn.</p>}
-                  {aiResubmitAction(aiStatus)}
                 </div>
+                <div className="sos-decision__ai-tools">{aiResubmitAction(aiStatus)}</div>
                 {aiDone && aiNeedsMismatch && <p className="sos-alert sos-alert--warning" role="status">AI ghi nhận nhu cầu cứu hộ khác với hồ sơ. Hãy đối chiếu thông tin người báo trước khi quyết định.</p>}
                 {aiDone && aiCountMismatches.length > 0 && <div className="sos-alert sos-alert--warning" role="status">
                   <strong>Cần đối chiếu số người:</strong>
@@ -1619,7 +1622,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                   reason: 'Điều phối viên đã xem thông tin SOS đã xác minh và xác nhận mức ưu tiên được gợi ý.' }),
               })}
               {detail.status === 'VERIFIED' &&
-                command({
+                secondaryCommand({
                   title: 'Chọn mức ưu tiên khác',
                   service: 'response',
                   path: `/requests/${detail.id}/triage`,
@@ -1655,13 +1658,11 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 <section className="dispatch-candidates">
                   {latestCompletedMissionId && !completionCheck && <p role="status">Đang đối chiếu nhiệm vụ đã hoàn thành với chu kỳ xử lý hiện tại…</p>}
                   {completionCheck?.error && <p className="notice warning" role="alert">Chưa đối chiếu được nhiệm vụ đã hoàn thành. Hãy bấm “Làm mới SOS” trước khi giao thêm đội.</p>}
-                  {completedInCurrentCycle && <div className="notice">
-                    <strong>Đội đã hoàn thành nhiệm vụ trong chu kỳ này.</strong>
-                    <p>Kết quả đã được ghi nhận. Điều phối viên cần kiểm tra minh chứng và kết thúc xử lý SOS nếu nhu cầu đã được đáp ứng.</p>
-                    <a href="#resolve-request">Đi đến bước kết thúc xử lý ↓</a>
-                    <div><button type="button" className="button secondary" onClick={() => setShowAdditionalDispatch((value) => !value)}>
-                      {showAdditionalDispatch ? 'Ẩn lựa chọn giao thêm đội' : 'Vẫn cần giao thêm đội'}
-                    </button></div>
+                  {completedInCurrentCycle && <div className="dispatch-completed-bar" role="status">
+                    <strong><span aria-hidden="true">✓ </span>Đội đã hoàn thành</strong>
+                    <button type="button" className="button secondary" onClick={() => setShowAdditionalDispatch((value) => !value)}>
+                      {showAdditionalDispatch ? 'Ẩn lựa chọn đội' : 'Giao thêm đội'}
+                    </button>
                   </div>}
                   {showTeamCandidates && <>
                   <div className="dispatch-section-heading"><div><h3>Đội có thể giao nhiệm vụ</h3>
@@ -1864,7 +1865,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                       </p>
                       <CoordinatorMissionControl missionId={m.id} teamId={m.team_id}
                         revision={revision} onSuccess={done} onStale={refreshAfterConflict} />
-                      <MissionSupplyPanel missionId={m.id} missionStatus={m.status} onBehalf />
+                      <MissionSupplyPanel key={`${currentUserId}:${m.id}`} userId={currentUserId} missionId={m.id} missionStatus={m.status} onBehalf />
                     </div>
                   ))}
                 </div>
@@ -1891,9 +1892,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                       )}
                       {mission.status === 'FAILED' &&
                         ['TRIAGED', 'DISPATCHED', 'IN_PROGRESS'].includes(detail.status) &&
-                        !detail.timeline.items.some((event) =>
-                          event.event_type === 'MISSION_FAILURE_REVIEW' && event.payload?.mission_id === mission.id
-                        ) && command({
+                        !hasCurrentFailureReview(mission, detail.timeline.items) && command({
                           title: 'Rà soát nhiệm vụ thất bại',
                           service: 'response',
                           path: `/missions/${mission.id}/review-failure`,

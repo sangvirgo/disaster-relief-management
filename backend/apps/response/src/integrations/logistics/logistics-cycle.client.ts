@@ -71,15 +71,17 @@ export class LogisticsCycleClient implements OnModuleDestroy {
     return this.execute('unseal', requestId, workCycle, command);
   }
 
-  async fulfillment(requestId: string, workCycle: number, request: Request): Promise<FulfillmentNeedEvidence[]> {
-    if (!uuidPattern.test(requestId) || !Number.isSafeInteger(workCycle) || workCycle < 1) {
+  async fulfillment(requestId: string, workCycle: number, request: Request, campaignId?: string | null): Promise<FulfillmentNeedEvidence[]> {
+    if (!uuidPattern.test(requestId) || !Number.isSafeInteger(workCycle) || workCycle < 1 || (campaignId != null && !uuidPattern.test(campaignId))) {
       throw new AppError('VALIDATION_FAILED', { status: 400 });
     }
     const actorToken = this.actorAccessToken(request);
     const token = await this.sessions.serviceToken('logistics');
     const result = await this.client.get<unknown>(
       `/api/v1/logistics/internal/requests/${encodeURIComponent(requestId)}/fulfillment?work_cycle=${workCycle}`,
-      { headers: { authorization: `Bearer ${token}`, 'x-actor-authorization': `Bearer ${actorToken}` } },
+      // Canonical scope asserted by resolve() before this call, never taken from a browser header.
+      { headers: { authorization: `Bearer ${token}`, 'x-actor-authorization': `Bearer ${actorToken}`,
+        ...(campaignId ? { 'x-resolution-campaign-id': campaignId } : {}) } },
     );
     if (result.status === 404) return [];
     if (result.status !== 200 || !result.body || typeof result.body !== 'object' ||

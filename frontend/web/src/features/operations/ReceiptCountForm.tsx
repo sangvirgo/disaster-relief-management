@@ -160,9 +160,15 @@ export function ReceiptCountForm({
       loadStaffDrive<Drive>(driveId),
       create && !confirm ? api<{ declaration?: { lines?: { item_id: string }[] } }>('logistics', `/public/donations/${encodeURIComponent(deliveryId)}`, { credentials: 'omit' }) : Promise.resolve(null),
     ]).then(([drive, declaration]) => { if (!live) return;
+        setLines(current => current.map(line => line.item_id
+          ? { ...line, outside: !drive.items.some(item => item.item_id === line.item_id) } : line));
+        if ((existing?.lines || initialItems || []).some(line => {
+          const id = 'item_id' in line ? line.item_id : 'id' in line ? line.id : undefined;
+          return id && !drive.items.some(item => item.item_id === id);
+        })) setAllowUnexpected(true);
         if (!initializedItems.current && !existing?.lines?.length && !heldRelease) {
           const itemIds = initialItems?.length ? initialItems.map(item => ({ item_id: item.id })) : declaration?.declaration?.lines || drive.items;
-          setLines(itemIds.map(item => ({ ...empty(), item_id: item.item_id })));
+          setLines(itemIds.map(item => ({ ...empty(), item_id: item.item_id, outside: !drive.items.some(driveItem => driveItem.item_id === item.item_id) })));
           initializedItems.current = true;
         }
         setDriveItems(drive.items.map(item => ({

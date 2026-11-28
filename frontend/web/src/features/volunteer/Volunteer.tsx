@@ -38,7 +38,7 @@ type Team = {
     age_s: number;
     accuracy_m: number | null;
     source: string;
-    coordinates?: [number, number];
+    location?: { type: 'Point'; coordinates: [number, number] };
   };
 };
 type TeamDetailTab = 'overview' | 'members' | 'location';
@@ -995,7 +995,9 @@ export function Volunteer({ page, currentUserId, sharingTeamId = '', sharingMess
                             </button>
                           </div>
                           <LocationPicker
-                            value={teamPoint}
+                            value={teamPoint ?? (selectedTeam.position?.location ? {
+                              longitude: selectedTeam.position.location.coordinates[0], latitude: selectedTeam.position.location.coordinates[1],
+                            } : null)}
                             initiallyOpen hideToggle selectOnPick
                             onSelect={(point) => { setTeamPoint(point); setTeamAccuracy(null); }}
                           />
@@ -1305,6 +1307,10 @@ export function Volunteer({ page, currentUserId, sharingTeamId = '', sharingMess
                   </div>
                 )}
 
+                {activeMission.status !== 'OFFERED' && (
+                  <MissionSupplyPanel key={`${currentUserId}:${activeMission.id}`} userId={currentUserId} missionId={activeMission.id} missionStatus={activeMission.status} />
+                )}
+
                 {/* Chỉ đường Google Maps */}
                 {directionsUrl ? (
                   <div className="mission-location volunteer-mission-location">
@@ -1334,10 +1340,6 @@ export function Volunteer({ page, currentUserId, sharingTeamId = '', sharingMess
                   </p>
                 )}
                 </div>}
-
-                {missionDetailTab === 'overview' && activeMission.status !== 'OFFERED' && (
-                  <MissionSupplyPanel missionId={activeMission.id} missionStatus={activeMission.status} />
-                )}
 
                 {missionDetailTab === 'history' && <div className="volunteer-mission-tab-content volunteer-mission-history">
                 {/* Hiển thị danh sách minh chứng đã có */}

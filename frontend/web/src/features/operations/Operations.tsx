@@ -1,6 +1,6 @@
 import { ReconciliationTable, reconciliationMetrics, reconciliationResult } from './ReconciliationTable';
 import { Dropdown } from '../../components/ui/Dropdown';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { api } from '../../api/client';
 import { fetchAll } from '../../api/fetchAll';
 import { useCursorNav, LIST_PAGE_SIZE } from '../../api/useCursorNav';
@@ -121,6 +121,10 @@ function readReportFilters(userId: string): { warehouse?: string } {
       warehouse: typeof saved?.warehouse === 'string' ? saved.warehouse : '',
     };
   } catch { return {}; }
+}
+
+function CountDisclosure({ held, children }: { held: boolean; children: ReactNode }) {
+  return held ? <details className="receipt-count-disclosure"><summary>Xem xét hàng đang tạm giữ</summary>{children}</details> : <>{children}</>;
 }
 
 export function Operations({ page, user }: { page: string; user: Me }) {
@@ -526,7 +530,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
         )}
         {generatedAt && <p className="muted">Dữ liệu tạo lúc {timeLabel(generatedAt)}</p>}
         {!loading && ready && !error && !items.length && (
-          <div className="empty">Chưa có bản ghi trong phạm vi được cấp quyền.</div>
+          <div className="empty">{page === 'review' && receiptStatus === 'COUNTING' ? 'Không có phiếu cần đếm lại theo bộ lọc đang chọn.' : 'Không có kết quả theo bộ lọc đang chọn.'}</div>
         )}
         {page === 'stock' || (page === 'reports' && report === 'stock-summary') ? (
           <>
@@ -956,6 +960,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                 (page === 'intake' || status === 'COUNTING') &&
                 !['REJECTED', 'CANCELLED'].includes(status) &&
                 (status !== 'POSTED' || (Array.isArray(count?.lines) && (count.lines as Row[]).some(line => Number(line.held_quantity) > 0))) && (
+                  <CountDisclosure held={status === 'POSTED'}>
                   <ReceiptCountForm
                     userId={user.id}
                     key={receiptId + version}
@@ -978,6 +983,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                     }
                     onSuccess={counted}
                   />
+                  </CountDisclosure>
                 )}
               {page === 'intake' && receiptId && ['REJECTED', 'CANCELLED'].includes(status) && (
                 <p className="notice">Đóng góp đã {status === 'REJECTED' ? 'bị từ chối' : 'hủy'}, không thể gửi kiểm đếm mới hoặc ghi sổ.</p>

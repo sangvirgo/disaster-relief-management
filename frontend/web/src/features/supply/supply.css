@@ -106,9 +106,14 @@
   border-radius: var(--radius-sm);
 }
 .supply-form__lines li > div { display: grid; min-width: 0; }
-.supply-form__qty { display: grid; grid-template-columns: 96px auto; align-items: center; gap: var(--space-2); }
+.supply-form__qty { display: grid; gap: 4px; min-width: 160px; }
+.supply-form__qty-label { font-size: 13px; color: var(--color-text-secondary); }
+.supply-form__qty-control { display: flex; align-items: center; gap: 8px; }
+.supply-form__qty-control > span { min-width: 36px; color: var(--color-text-secondary); }
 .supply-form__qty .field-error { grid-column: 1 / -1; max-width: 220px; }
-.supply-form__qty input { width: 96px; text-align: right; }
+.supply-form__qty input { width: 112px; height: 44px; padding: 8px 12px; border: 1px solid var(--color-surface-border); border-radius: 8px; font: 600 18px/1.4 var(--font-family); color: var(--color-text-primary); background: var(--color-surface-card); text-align: right; }
+.supply-form__qty input:focus { outline: 3px solid var(--color-primary-bg); border-color: var(--color-primary); }
+.supply-form__qty input[aria-invalid='true'] { border-color: var(--color-emergency); }
 
 @media (max-width: 640px) {
   .supply-card__state { align-items: flex-start; }

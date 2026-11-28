@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { LIST_PAGE_SIZE, useCursorNav } from '../../api/useCursorNav';
+import { ListNav } from '../../components/ui/Pager';
 import { label, requestStatusLabel, timeLabel } from '../../i18n/labels';
 import { rescueProgressMessage, type RescueProgress } from './rescueProgress';
 import { requestStatusTone } from './CitizenAccount';
@@ -37,7 +39,14 @@ export function TrackingProgress({ data, onBack }: { data: Tracking; onBack?: ()
   const stopped = STOPPED.includes(data.status);
   const current = STEPS.findIndex((step) => step.statuses.includes(data.status));
   const progress = rescueProgressMessage(data.status, data.rescue_progress);
+  const nextStep = progress ? (data.rescue_progress!.active > 0
+    ? 'Làm theo hướng dẫn của đội khi gặp. Nếu tình huống thay đổi, hãy bổ sung thông tin.'
+    : 'Điều phối viên đang đối chiếu kết quả trước khi kết thúc SOS.') : NEXT_STEP[data.status];
   const events = [...data.timeline].sort((a, b) => Date.parse(b.occurred_at) - Date.parse(a.occurred_at));
+  const [cursor, setCursor, prev, page] = useCursorNav<string>('');
+  useEffect(() => { setCursor(''); }, [data.tracking_code, setCursor]);
+  const offset = Number(cursor || 0);
+  const visibleEvents = events.slice(offset, offset + LIST_PAGE_SIZE);
   async function copy() {
     try { await navigator.clipboard.writeText(data.tracking_code); setCopied(true); window.setTimeout(() => setCopied(false), 2000); }
     catch { setCopied(false); }
@@ -65,7 +74,7 @@ export function TrackingProgress({ data, onBack }: { data: Tracking; onBack?: ()
 
     {(progress || NEXT_STEP[data.status]) && <div className="tracking-next" role="status">
       <strong>{progress ?? 'Bước tiếp theo'}</strong>
-      {NEXT_STEP[data.status] && <p>{NEXT_STEP[data.status]}</p>}
+      {nextStep && <p>{nextStep}</p>}
     </div>}
     {data.status === 'DUPLICATE' && data.duplicate_of_code && <p className="notice">Yêu cầu này trùng với hồ sơ {data.duplicate_of_code}. Nếu hồ sơ gốc thuộc tài khoản của bạn, hãy quay lại danh sách để xem tiến độ hồ sơ đó.</p>}
     {data.status === 'REJECTED' && data.rejection_reason && <p className="notice">Lý do từ chối: {data.rejection_reason}</p>}
@@ -80,12 +89,14 @@ export function TrackingProgress({ data, onBack }: { data: Tracking; onBack?: ()
       </div>}
       <div className="tracking-history">
         <h3>Lịch sử xử lý</h3>
-        <ol className="timeline">
-          {events.map((entry, index) => <li className={`timeline-item${index === 0 ? ' is-latest' : ''}`} key={`${entry.occurred_at}-${index}`}>
+        <ol className="timeline tracking-history__list">
+          {visibleEvents.map((entry, index) => <li className={`timeline-item${offset + index === 0 ? ' is-latest' : ''}`} key={`${entry.occurred_at}-${index}`}>
             <strong>{label(entry.public_text_code || entry.event_type)}</strong>
             <small>{timeLabel(entry.occurred_at)}</small>
           </li>)}
         </ol>
+        <ListNav page={page} count={visibleEvents.length} hasNext={offset + LIST_PAGE_SIZE < events.length}
+          onPrev={prev} onNext={() => setCursor(String(offset + LIST_PAGE_SIZE))} noun="mốc xử lý" />
       </div>
     </div>
     <p className="tracking-hotline">Nguy hiểm đến tính mạng? Gọi ngay <a href="tel:114">114</a> (cứu hỏa, cứu nạn) hoặc <a href="tel:115">115</a> (cấp cứu).</p>

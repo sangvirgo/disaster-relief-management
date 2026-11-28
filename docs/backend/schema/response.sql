@@ -184,7 +184,7 @@ CREATE TABLE request_event (
 CREATE INDEX request_event_req_idx ON request_event (request_id, occurred_at, id);
 -- single-writer review facts: one review per material supplement event, one failure review per failed mission
 CREATE UNIQUE INDEX request_event_supplement_review_uq ON request_event ((payload->>'reviewed_event_id')) WHERE event_type = 'SUPPLEMENT_REVIEW';
-CREATE UNIQUE INDEX request_event_failure_review_uq ON request_event ((payload->>'mission_id')) WHERE event_type = 'MISSION_FAILURE_REVIEW';
+CREATE UNIQUE INDEX request_event_failure_review_uq ON request_event ((payload->>'mission_id'), (COALESCE(payload->>'mission_version','legacy'))) WHERE event_type = 'MISSION_FAILURE_REVIEW';
 -- authority referral is a request_event of type AUTHORITY_REFERRED (no separate table)
 ALTER TABLE assistance_request ADD CONSTRAINT request_verification_revision_fk
   FOREIGN KEY (verification_revision, id) REFERENCES request_event(id, request_id);

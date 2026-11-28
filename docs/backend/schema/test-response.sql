@@ -107,6 +107,8 @@ SELECT expect_err('duplicate SUPPLEMENT_REVIEW for same reviewed event', $$INSER
 INSERT INTO request_event (request_id,event_type,payload) VALUES ('00000000-0000-0000-0000-0000000000b1','SUPPLEMENT_REVIEW','{"reviewed_event_id":"00000000-0000-0000-0000-0000000000e9"}');
 INSERT INTO request_event (request_id,event_type,payload) VALUES ('00000000-0000-0000-0000-0000000000b1','MISSION_FAILURE_REVIEW','{"mission_id":"00000000-0000-0000-0000-0000000000f1"}');
 SELECT expect_err('duplicate MISSION_FAILURE_REVIEW for same mission', $$INSERT INTO request_event (request_id,event_type,payload) VALUES ('00000000-0000-0000-0000-0000000000b1','MISSION_FAILURE_REVIEW','{"mission_id":"00000000-0000-0000-0000-0000000000f1"}')$$, '23505', 'request_event_failure_review_uq');
+INSERT INTO request_event (request_id,event_type,payload) VALUES ('00000000-0000-0000-0000-0000000000b1','MISSION_FAILURE_REVIEW','{"mission_id":"00000000-0000-0000-0000-0000000000f1","mission_version":2}');
+SELECT expect_err('duplicate failure review for one mission revision', $$INSERT INTO request_event (request_id,event_type,payload) VALUES ('00000000-0000-0000-0000-0000000000b1','MISSION_FAILURE_REVIEW','{"mission_id":"00000000-0000-0000-0000-0000000000f1","mission_version":2}')$$, '23505', 'request_event_failure_review_uq');
 INSERT INTO request_event (request_id,event_type,payload) VALUES ('00000000-0000-0000-0000-0000000000b1','AUTHORITY_REFERRED','{"referred_body":"UBND"}'),('00000000-0000-0000-0000-0000000000b1','AUTHORITY_REFERRED','{"referred_body":"UBND"}');
 SELECT assert_that('AUTHORITY_REFERRED events are not unique-constrained, authority_referral table gone', to_regclass('authority_referral') IS NULL);
 

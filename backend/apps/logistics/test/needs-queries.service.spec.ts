@@ -9,6 +9,28 @@ const cycleId = '22222222-2222-4222-8222-222222222222';
 const needId = '33333333-3333-4333-8333-333333333333';
 
 describe('NeedsQueriesService', () => {
+  it('uses the Response-attested exact campaign and cycle for a floating coordinator resolution read', async () => {
+    const query = jest.fn().mockResolvedValueOnce([{ id: cycleId, state: 'OPEN' }]).mockResolvedValueOnce([]);
+    const service = new NeedsQueriesService({ query } as unknown as DataSource, {
+      require: jest.fn(async () => ({ userId: needId, grants: [{ role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: null }] })),
+    } as unknown as LogisticsSessionService);
+    await expect(service.fulfillment(requestId, { work_cycle: 2 }, {} as Request, cycleId)).resolves.toMatchObject({ needs: [] });
+    expect(query.mock.calls[0]?.[0]).toContain('c.request_id=$1 AND c.campaign_id=$2 AND c.work_cycle=$3');
+    expect(query.mock.calls[0]?.[1]).toEqual([requestId, cycleId, 2]);
+  });
+
+  it.each([undefined, 2])('does not grant floating coordinators public NEED_MANAGE access (cycle %s)', async (work_cycle) => {
+    const query = jest.fn();
+    const service = new NeedsQueriesService({ query } as unknown as DataSource, {
+      require: jest.fn(async () => ({ userId: needId, grants: [{ role_code: 'COORDINATOR', scope_type: 'CAMPAIGN', campaign_id: null }] })),
+    } as unknown as LogisticsSessionService);
+    await expect(service.fulfillment(requestId, { work_cycle }, {} as Request)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(query).not.toHaveBeenCalled();
+    if (work_cycle === undefined) {
+      await expect(service.fulfillment(requestId, {}, {} as Request, cycleId)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    }
+  });
+
   it('returns a scoped fulfillment board with derived totals and bounded contributions', async () => {
     const query = jest.fn()
       .mockResolvedValueOnce([{ id: cycleId, request_id: requestId, work_cycle: 2,  campaign_id: null, state: 'OPEN' }])

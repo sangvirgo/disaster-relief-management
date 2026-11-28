@@ -10,6 +10,9 @@ import { Skeleton } from '../../components/ui/Skeleton';
 import { timeLabel } from '../../i18n/labels';
 import { quantityInput } from '../../i18n/quantity';
 import { prepareSupplyLines, validSupplyQuantity } from './supplyDraft';
+import { readSupplyDraft, writeSupplyDraft, clearSupplyDraft } from './supplySessionDraft';
+import { LIST_PAGE_SIZE, useCursorNav } from '../../api/useCursorNav';
+import { ListNav } from '../../components/ui/Pager';
 import {
   deadlineText, isUrgent, quantityText, suggestionBasisLabels, supplyStatusLabels, supplyStatusTones,
   type MissionSupply, type SuggestionBasis, type SupplySuggestion, type SupplyTeamRequest,
@@ -38,9 +41,10 @@ const LIVE_MISSION = ['ACCEPTED', 'EN_ROUTE', 'ON_SCENE'];
  * coordinator for a team without the app — asks for goods in one step: the list is pre-filled from the AI/norm
  * suggestion and stays editable. The system picks the warehouse and returns a pickup code to read out at the warehouse.
  */
-export function MissionSupplyPanel({ missionId, missionStatus, onBehalf = false }: {
+export function MissionSupplyPanel({ missionId, missionStatus, userId, onBehalf = false }: {
   missionId: string;
   missionStatus: string;
+  userId: string;
   /** True on the coordinator screen: requests are made on behalf of the team. */
   onBehalf?: boolean;
 }) {
@@ -50,8 +54,9 @@ export function MissionSupplyPanel({ missionId, missionStatus, onBehalf = false 
   const [error, setError] = useState('');
   const [hidden, setHidden] = useState(false);
   const [revision, setRevision] = useState(0);
-  const [composing, setComposing] = useState(false);
+  const [composing, setComposing] = useState(() => LIVE_MISSION.includes(missionStatus) && readSupplyDraft(userId, missionId) !== null);
   const [showHistory, setShowHistory] = useState(false);
+  const [historyCursor, setHistoryCursor, previousHistory, historyPage] = useCursorNav<string>('');
 
   useEffect(() => {
     let live = true;
@@ -68,10 +73,15 @@ export function MissionSupplyPanel({ missionId, missionStatus, onBehalf = false 
     return () => { live = false; };
   }, [missionId, revision]);
 
-  if (hidden) return null;
   const open = data?.items.find((item) => item.status === 'READY') ?? null;
   const history = (data?.items ?? []).filter((item) => item !== open);
+  const historyOffset = Number(historyCursor || 0);
+  const visibleHistory = history.slice(historyOffset, historyOffset + LIST_PAGE_SIZE);
   const canRequest = Boolean(data?.can_request) && LIVE_MISSION.includes(missionStatus);
+  useEffect(() => {
+    if (open || !LIVE_MISSION.includes(missionStatus)) clearSupplyDraft(userId, missionId);
+  }, [open?.id, missionStatus, userId, missionId]);
+  if (hidden) return null;
 
   return (
     <section className="card supply-panel" aria-labelledby={headingId}>
@@ -92,8 +102,8 @@ export function MissionSupplyPanel({ missionId, missionStatus, onBehalf = false 
           {canRequest && <Button onClick={() => setComposing(true)}>Yêu cầu hàng cứu trợ</Button>}
         </div>
       )}
-      {data && !open && composing && (
-        <RequestForm missionId={missionId} onBehalf={onBehalf} onCancel={() => setComposing(false)}
+      {data && !open && composing && canRequest && (
+        <RequestForm key={`${userId}:${missionId}`} userId={userId} missionId={missionId} onBehalf={onBehalf} onCancel={() => { clearSupplyDraft(userId, missionId); setComposing(false); }}
           onCreated={() => { setComposing(false); setRevision((value) => value + 1); }} />
       )}
       {history.length > 0 && (
@@ -103,7 +113,7 @@ export function MissionSupplyPanel({ missionId, missionStatus, onBehalf = false 
           </button>
           {showHistory && (
             <ul>
-              {history.map((item) => (
+              {visibleHistory.map((item) => (
                 <li key={item.id}>
                   <Badge tone={supplyStatusTones[item.status]}>{supplyStatusLabels[item.status]}</Badge>
                   <span>{item.warehouse.name} · {timeLabel(item.handed_over_at || item.cancelled_at || item.created_at)}</span>
@@ -113,6 +123,8 @@ export function MissionSupplyPanel({ missionId, missionStatus, onBehalf = false 
               ))}
             </ul>
           )}
+          {showHistory && <ListNav page={historyPage} count={visibleHistory.length} hasNext={historyOffset + LIST_PAGE_SIZE < history.length}
+            onPrev={previousHistory} onNext={() => setHistoryCursor(String(historyOffset + LIST_PAGE_SIZE))} noun="yêu cầu" />}
         </div>
       )}
     </section>
@@ -188,8 +200,8 @@ function OpenRequest({ request, canCancel, onChanged }: { request: SupplyTeamReq
   );
 }
 
-function RequestForm({ missionId, onBehalf, onCancel, onCreated }: {
-  missionId: string; onBehalf: boolean; onCancel: () => void; onCreated: () => void;
+function RequestForm({ missionId, userId, onBehalf, onCancel, onCreated }: {
+  missionId: string; userId: string; onBehalf: boolean; onCancel: () => void; onCreated: () => void;
 }) {
   const addId = useId();
   const [lines, setLines] = useState<DraftLine[]>([]);
@@ -201,6 +213,8 @@ function RequestForm({ missionId, onBehalf, onCancel, onCreated }: {
   const [suggestionNotice, setSuggestionNotice] = useState('');
   const [catalogFailed, setCatalogFailed] = useState(false);
   const [lookupRevision, setLookupRevision] = useState(0);
+  const [restored, setRestored] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -221,15 +235,27 @@ function RequestForm({ missionId, onBehalf, onCancel, onCreated }: {
       }
       if (suggestion.status === 'rejected') setSuggestionNotice('Chưa tải được gợi ý vật phẩm. Bạn vẫn có thể chọn hàng từ danh mục nếu danh mục đã tải được.');
       if (items.status === 'fulfilled') {
-        setCatalog(items.value.filter((item) => item.id && item.status === 'ACTIVE').map((item) => ({
+        const catalogItems = items.value.filter((item) => item.id && item.status === 'ACTIVE').map((item) => ({
           id: item.id!, name: item.name || 'Mặt hàng', unit_name: itemUnitName(item.id, item.unit?.display_name), scale: Number(item.unit?.scale ?? 0),
-        })));
+        }));
+        setCatalog(catalogItems);
+        const draft = readSupplyDraft(userId, missionId);
+        if (draft && lookupRevision === 0) {
+          setLines(draft.map(line => {
+            const item = catalogItems.find(item => item.id === line.item_id);
+            return { ...line, item_name: item?.name ?? 'Vật phẩm không còn trong danh mục', unit_name: item?.unit_name ?? '' };
+          }));
+          setRestored(true);
+        }
       }
       else setCatalogFailed(true);
       if (suggestion.status === 'rejected' && items.status === 'rejected') setError('Không tải được gợi ý và danh mục hàng. Hãy thử lại.');
     }).finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
-  }, [missionId, lookupRevision]);
+  }, [missionId, userId, lookupRevision]);
+  useEffect(() => {
+    if (!loading && !catalogFailed) setSaved(writeSupplyDraft(userId, missionId, lines));
+  }, [lines, loading, catalogFailed, userId, missionId]);
 
   const scaleOf = (itemId: string) => catalog.find((item) => item.id === itemId)?.scale ?? -1;
   const quantityError = (line: DraftLine) => scaleOf(line.item_id) < 0 ? 'Chưa tải được đơn vị vật phẩm. Hãy thử tải lại danh mục.'
@@ -261,6 +287,7 @@ function RequestForm({ missionId, onBehalf, onCancel, onCreated }: {
         mission_id: missionId,
         lines: chosen.map((line) => ({ item_id: line.item_id, quantity: line.quantity })),
       });
+      clearSupplyDraft(userId, missionId);
       onCreated();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Không gửi được yêu cầu hàng.');
@@ -272,8 +299,9 @@ function RequestForm({ missionId, onBehalf, onCancel, onCreated }: {
   if (loading) return <Skeleton rows={3} label="Đang chuẩn bị danh sách gợi ý…" />;
   return (
     <form className="supply-form" onSubmit={submit}>
+      {saved && <p className="supply-open__hint" role="status">{restored ? 'Đã khôi phục bản nháp.' : 'Đã lưu bản nháp trong phiên này.'} Số lượng chưa được gửi tới kho.</p>}
       <p className="muted">
-        {lines.some((line) => line.basis)
+        {restored ? 'Kiểm tra lại số lượng trong bản nháp trước khi gửi.' : lines.some((line) => line.basis)
           ? 'Danh sách được gợi ý sẵn từ thông tin SOS. Hãy kiểm tra và sửa số lượng theo thực tế trước khi gửi.'
           : 'Chưa có gợi ý cho SOS này. Thêm các mặt hàng đội cần mang theo.'}
         {onBehalf && ' Bạn đang gửi yêu cầu thay cho đội.'}
@@ -286,10 +314,12 @@ function RequestForm({ missionId, onBehalf, onCancel, onCreated }: {
                 <strong>{line.item_name}</strong>
                 {line.basis && <small className="muted">{suggestionBasisLabels[line.basis]}</small>}
               </div>
-              <label className="supply-form__qty">
-                <span className="visually-hidden">Số lượng {line.item_name}</span>
-                <input inputMode="decimal" value={line.quantity} aria-invalid={Boolean(quantityError(line))} aria-describedby={quantityError(line) ? `${addId}-${line.item_id}-error` : undefined} onChange={(event) => update(index, event.target.value)} />
-                <span>{line.unit_name}</span>
+              <label className="supply-form__qty" data-static-label>
+                <span className="supply-form__qty-label">Số lượng</span>
+                <div className="supply-form__qty-control">
+                  <input aria-label={`Số lượng ${line.item_name}`} inputMode="decimal" value={line.quantity} aria-invalid={Boolean(quantityError(line))} aria-describedby={quantityError(line) ? `${addId}-${line.item_id}-error` : undefined} onChange={(event) => update(index, event.target.value)} />
+                  <span>{line.unit_name}</span>
+                </div>
                 {quantityError(line) && <small id={`${addId}-${line.item_id}-error`} className="field-error">{quantityError(line)}</small>}
               </label>
               <Button type="button" variant="ghost" size="sm" aria-label={`Bỏ ${line.item_name}`}
@@ -310,6 +340,7 @@ function RequestForm({ missionId, onBehalf, onCancel, onCreated }: {
         </label>
       )}
       {error && <p className="notice error" role="alert">{error}</p>}
+      <p className="supply-open__hint">Yêu cầu được gửi tới kho do hệ thống chọn. Nhân viên kho soạn hàng; đội trưởng dùng mã nhận hàng để xác nhận bàn giao tại kho.</p>
       <div className="supply-open__actions">
         <Button type="button" variant="secondary" onClick={onCancel}>Hủy</Button>
         <Button type="submit" loading={busy} disabled={!lines.length}>Gửi yêu cầu</Button>
