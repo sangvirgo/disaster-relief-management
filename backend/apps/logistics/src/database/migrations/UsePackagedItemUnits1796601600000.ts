@@ -3,8 +3,13 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 /** Counted packages: labels change, quantities and append-only movements do not. */
 export class UsePackagedItemUnits1796601600000 implements MigrationInterface {
   async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`INSERT INTO unit (code, display_name, scale) VALUES
-      ('CHAI', 'chai', 0), ('GOI', 'gói', 0) ON CONFLICT (code) DO NOTHING`);
+    // Leave a fresh database empty: the full seed provides these units. Catalog rows here would
+    // make the seed's existing-data guard choose additive mode and omit the base demo accounts.
+    await queryRunner.query(`INSERT INTO unit (code, display_name, scale)
+      SELECT package.code, package.display_name, package.scale
+      FROM (VALUES ('CHAI', 'chai', 0), ('GOI', 'gói', 0)) AS package(code, display_name, scale)
+      WHERE EXISTS (SELECT 1 FROM item)
+      ON CONFLICT (code) DO NOTHING`);
     await queryRunner.query(`DO $$ BEGIN
       IF EXISTS (SELECT 1 FROM unit WHERE code IN ('CHAI','GOI') AND scale <> 0) THEN
         RAISE EXCEPTION 'CATALOG_PACKAGE_UNIT_SCALE_CONFLICT';
