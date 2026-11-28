@@ -1735,7 +1735,7 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                           : candidate.in_band
                             ? 'Trong nhóm khoảng cách gần · '
                             : 'Ngoài nhóm khoảng cách gần · '}
-                        Cách {Math.round(candidate.distance_m || 0)} m · vị trí cập nhật{' '}
+                        Cách {(candidate.distance_m || 0) < 1000 ? `${Math.round(candidate.distance_m || 0)} m` : `${((candidate.distance_m || 0) / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} km`} · vị trí cập nhật{' '}
                         {Math.round((candidate.position_age_s || 0) / 60)} phút trước ·{' '}
                         {candidate.recent_missions_24h} nhiệm vụ/24 giờ ·{' '}
                         {candidate.recent_missions_7d} nhiệm vụ/7 ngày
@@ -1763,6 +1763,8 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                       )}
                       {command({
                         title: `Giao nhiệm vụ cho ${candidate.team.name}`,
+                        // The card already names the team; the inline (suggested) form shows only its button.
+                        hideTitle: candidate.suggested,
                         service: 'response',
                         path: `/requests/${detail.id}/missions`,
                         version: detail.version,

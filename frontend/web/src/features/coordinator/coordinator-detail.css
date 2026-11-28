@@ -259,9 +259,13 @@
   color: var(--color-primary-dark);
 }
 .coordinator-detail-surface .sos-actions .sos-action-row .secondary-command--danger .sos-action-entry > .button {
-  border: 1px solid var(--color-emergency);
+  border: 1px solid var(--color-emergency) !important;
   background: var(--color-emergency);
-  color: var(--color-text-inverse);
+  /* .command-danger (refinements.css) forces dark-red text with !important; keep white text on the red fill. */
+  color: var(--color-text-inverse) !important;
+}
+.coordinator-detail-surface .sos-actions .sos-action-row .secondary-command--danger .sos-action-entry > .button:hover:not(:disabled) {
+  background: var(--color-emergency-dark) !important;
 }
 .coordinator-detail-surface .sos-actions .sos-action-row > :is(.notice, section, details) { grid-column: 1 / -1; }
 @media (max-width: 600px) {
