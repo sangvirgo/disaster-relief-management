@@ -1654,7 +1654,9 @@
 .history-badge--live { background: #dcfce7; color: #166534; }
 
 /* Common-queue SOS rows: one compact card per SOS with its own decision controls */
-.common-queue-suggestions .suggestion-item { border: 1px solid #d9e5f3; border-radius: 12px; padding: 16px 18px; margin-top: 10px; background: #f8fbff; }
+.common-queue-suggestions .suggestion-item { border: 1px solid #b9cce4; border-left: 4px solid #2563eb; border-radius: 12px; padding: 18px; margin-top: 16px; background: #fff; box-shadow: 0 3px 12px #173e7a0d; }
+.common-queue-suggestions .suggestion-actions .suggestion-actions__create { background: #eaf2ff; border-color: #8fb4ef; color: #1e40af; }
+.common-queue-suggestions .suggestion-actions .suggestion-actions__expand { background: #fff6de; border-color: #e9bd55; color: #854d0e; }
 .common-queue-suggestions .chip--warn { background: #f3e8ff; color: #6b21a8; }
 .common-queue-suggestions .campaign-filters { margin: 0; }
 @media (max-width: 720px) {
@@ -1971,13 +1973,17 @@
 
 /* Conflict SOS: compare the campaigns a SOS falls into (2026-11-28). */
 .conflict-bulk { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin: 8px 0 12px; padding: 10px 14px; border: 1px solid #fecaca; border-left: 4px solid #dc2626; border-radius: 10px; background: #fef2f2; }
-.conflict-candidates { display: grid; gap: 6px; width: 100%; margin: 8px 0 0; padding: 0; list-style: none; }
-.conflict-candidates li { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; }
-.conflict-candidates li.is-suggested { border-color: #93c5fd; background: #eff6ff; }
+.conflict-candidates { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 12px; width: 100%; margin: 8px 0 0; padding: 0; list-style: none; }
+.conflict-candidates li { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; min-width: 0; padding: 14px; border: 2px solid #c6d3e3; border-radius: 10px; background: #f8fafc; }
+.conflict-candidates li > .button { margin-top: auto; }
+.conflict-candidates li.is-suggested { border-color: #3b82f6; background: #eaf2ff; box-shadow: 0 3px 10px #2563eb14; }
+.conflict-candidates li.is-suggested .conflict-candidates__info > strong { color: #173e7a; }
+.conflict-candidates li.is-suggested .chip { border-color: #1d4ed8; background: #1d4ed8; color: #fff; }
+.conflict-candidates li:not(.is-suggested) > .button { border-color: #8fb4ef; color: #1e40af; background: #fff; }
 .conflict-candidates__info { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; min-width: 0; }
 .conflict-candidates__info small { flex-basis: 100%; color: var(--color-text-secondary); }
 .conflict-candidates__warn { color: #b91c1c; }
-.common-queue-suggestions .suggestion-head > .conflict-candidates { order: 3; flex-basis: 100%; }
+.common-queue-suggestions .suggestion-head > .conflict-candidates { order: 3; grid-column: 1 / -1; }
 
 /* ---------- Shared filter controls (2026-11-28) ----------
    One look for every filter area: a wrapping bar holding a search box, compact selects, a segmented switch,

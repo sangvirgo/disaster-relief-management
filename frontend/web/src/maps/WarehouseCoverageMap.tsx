@@ -280,7 +280,8 @@ export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, er
   }, [selectedId, rows, editingWarehouse]);
 
   const drafting = creatingWarehouse || editingWarehouse;
-  return <div className={`warehouse-coverage__frame${drafting ? '' : ' warehouse-coverage__frame--with-side'}`}>
+  const showDetails = !drafting && Boolean(hoverCard);
+  return <div className={`warehouse-coverage__frame${showDetails ? ' warehouse-coverage__frame--with-side' : ''}`}>
   <div className="warehouse-coverage__map-shell">
     <div ref={containerRef} className="campaign-area-map warehouse-coverage__map" role="region" aria-label="Bản đồ các kho, bán kính phục vụ và đợt quyên góp" />
     {banner && <div className="warehouse-map-banner" role="status">{banner}</div>}
@@ -298,11 +299,8 @@ export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, er
     {error && <p className="warehouse-coverage__overlay warehouse-coverage__overlay--error" role="alert">Chưa tải được dữ liệu kho. Hãy bấm Làm mới để thử lại.</p>}
     {!loading && !error && rows.length === 0 && <p className="warehouse-coverage__overlay">Chưa có kho nào có vị trí. Hãy thêm kho hoặc sửa kho để chọn vị trí.</p>}
   </div>
-  {!drafting && <aside className="warehouse-map-side" aria-label="Chi tiết kho hoặc điểm quyên góp đang chọn" aria-live="polite">
-    {hoverCard || <div className="warehouse-map-side__empty">
-      <strong>Chi tiết kho và điểm quyên góp</strong>
-      <p>Bấm vào biểu tượng kho hoặc điểm quyên góp trên bản đồ để xem tồn kho, vật phẩm cần tiếp nhận và các thao tác.</p>
-    </div>}
+  {showDetails && <aside className="warehouse-map-side" aria-label="Chi tiết kho hoặc điểm quyên góp đang chọn" aria-live="polite">
+    {hoverCard}
   </aside>}
   </div>;
 }
