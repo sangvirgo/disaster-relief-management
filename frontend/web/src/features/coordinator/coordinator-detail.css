@@ -141,8 +141,16 @@
 .sos-table-signals :is(.chip, .queue-danger-chip) { display: inline-flex; align-items: center; max-width: 100%; min-height: 32px; padding: 5px 10px; line-height: 1.25; font-family: var(--font-family); white-space: normal; overflow-wrap: anywhere; }
 .sos-table-signals .queue-danger-chip { width: auto; flex: 0 1 auto; font-size: 12px; font-weight: 600; }
 .sos-table time { white-space: nowrap; font-variant-numeric: tabular-nums; }
-.sos-detail-page { width: 100%; max-width: 1200px; min-width: 0; margin-inline: auto; }
-.sos-back-to-list { margin-bottom: var(--space-4); }
+.sos-detail-page { width: 100%; min-width: 0; }
+.sos-back-to-list { margin-bottom: var(--space-3); font-size: 14px; }
+.sos-head__buttons { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.sos-head__buttons .sos-head__next { min-height: 38px; padding: 8px 16px; font-size: 14px; }
+.sos-head__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; }
+.sos-head__meta > span { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.sos-head__meta > span + span::before { content: '·'; margin: 0 10px; color: var(--color-text-muted); }
+.sos-head__meta strong { color: var(--color-text-primary); }
+.sos-head__meta .text-action { font-size: 13.5px; }
+.sos-head__meta em { font-style: normal; color: var(--color-text-muted); }
 .sos-detail-page .sos-head { padding-right: 0; }
 .sos-detail-page .queue-detail-card { min-width: 0; scroll-margin-top: 140px; }
 .sos-detail-tabs { position: sticky; top: 56px; z-index: var(--z-sticky); align-self: start; display: flex; gap: 6px; overflow-x: auto; border-bottom: 1px solid var(--color-surface-border); padding-bottom: 1px; background: var(--color-surface-card); box-shadow: var(--shadow-sm); scrollbar-width: thin; }
@@ -299,14 +307,7 @@
 .sos-next-step span { font-size: 13px; color: var(--color-text-secondary); }
 .suggestion-received { margin: 6px 0; font-size: 13px; color: var(--color-text-secondary); }
 
-/* SOS detail: one status strip (campaign · handler · next step) replaces three stacked boxes (2026-11-28). */
-.sos-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); margin: 12px 0 16px;
-  border: 1px solid var(--color-surface-border, #e2e8f0); border-radius: 12px; background: var(--color-surface-subtle, #f8fafc); overflow: hidden; }
-.sos-strip__cell { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; padding: 12px 16px; }
-.sos-strip__cell + .sos-strip__cell { border-left: 1px solid var(--color-surface-border, #e2e8f0); }
-.sos-strip__cell small { color: var(--color-text-secondary); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
-.sos-strip__cell strong { overflow-wrap: anywhere; font-size: 14.5px; }
-.sos-strip__next { background: #eff6ff; }
+/* SOS detail: the campaign detach action shown inline in the header meta line. */
 .sos-strip__action { margin: 0; padding: 0; border: 0; min-width: 0; }
 .sos-strip__action .secondary-command { margin: 0; padding: 0; border: 0; background: transparent; }
 .sos-strip__action .button { min-height: 0; height: auto; padding: 0; border: 0; background: none; color: var(--color-text-secondary); font-size: 13px; font-weight: 700; text-decoration: underline; }
@@ -314,4 +315,3 @@
 .text-action:hover { text-decoration: underline; }
 .text-action:disabled { opacity: .5; cursor: not-allowed; }
 .sos-head__actions .button { background: transparent; }
-@media (max-width: 720px) { .sos-strip__cell + .sos-strip__cell { border-left: 0; border-top: 1px solid var(--color-surface-border, #e2e8f0); } }

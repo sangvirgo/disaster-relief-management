@@ -6,6 +6,16 @@ import type { ReporterSession } from '../requests/reporter-session';
 import { RequestOperationsPersistenceService } from './request-operations.persistence.service';
 import { claimConflictMessage, claimIsActive, isSystemCoordinator } from './request-claims.helpers';
 
+/** Commands that take an unclaimed SOS for the actor; campaign routing and rejection do not. */
+export const AUTO_CLAIM_COMMANDS: ReadonlySet<string> = new Set([
+  'response.requests.start-verification',
+  'response.requests.verify',
+  'response.requests.concur',
+  'response.requests.triage',
+  'response.requests.fast-track',
+  'response.missions.offer',
+]);
+
 export interface ClaimRow {
   id: string;
   tracking_code: string;
@@ -62,7 +72,16 @@ export class RequestClaimGuard {
       await manager.query('UPDATE assistance_request SET handled_at=now() WHERE id=$1 AND handled_by=$2', [requestId, session.userId]);
       return;
     }
-    if (!row.handled_by || !claimIsActive(row.handled_at, row.db_now)) return;
+    if (!row.handled_by || !claimIsActive(row.handled_at, row.db_now)) {
+      // The first person who actually works an SOS becomes its handler, so primary and sub-coordinators see the same
+      // "Người xử lý" without having to press "Nhận xử lý" first. Routing an SOS between campaigns does not claim it.
+      if (AUTO_CLAIM_COMMANDS.has(command)) {
+        await manager.query('UPDATE assistance_request SET handled_by=$2,handled_at=now() WHERE id=$1', [requestId, session.userId]);
+        await this.persistence.insertEvent(manager, requestId, session.userId, 'CLAIMED', 'STAFF',
+          row.status, row.status, null, { previous_handled_by: row.handled_by, command, automatic: true });
+      }
+      return;
+    }
 
     if (!isSystemCoordinator(session.grants)) throw await this.conflictFor(row.handled_by);
     await this.takeover(manager, row, session, command);
