@@ -5,7 +5,7 @@ import { useUrlView } from '../../app/useUrlView';
 import { isSubCoordinator, type Me } from '../../auth/session';
 import { StatusBadge } from '../../components/StatusBadge';
 import { Pager } from '../../components/ui/Pager';
-import { Coordinator } from './Coordinator';
+import { Coordinator, CoordinatorMap } from './Coordinator';
 import { Campaigns } from './Campaigns';
 import { CommonQueueSuggestions } from './CommonQueueSuggestions';
 import { ScopedCampaignMap } from './ScopedCampaignMap';
@@ -31,6 +31,8 @@ type Summary = HistorySummaryData;
 type Overview = { items: OverviewCampaign[]; common_queue?: { unmatched: number; conflict: number } };
 const OVERVIEW_PAGE_SIZE = 10;
 const campaignTabs = ['campaigns', 'routing', 'sos', 'workspace', 'history', 'choose', 'my-history'] as const;
+/** The SOS map tab merges campaign routing (areas) and the former 'Tổng quan và bản đồ' density view. */
+export const mapLayers = ['areas', 'density'] as const;
 
 export function CampaignCoordination({ user, initialRequestId = '' }: { user: Me; initialRequestId?: string }) {
   // A sub-coordinator chooses campaigns itself and only works their SOS: it gets its own, narrower workspace.
@@ -41,6 +43,7 @@ export function CampaignCoordination({ user, initialRequestId = '' }: { user: Me
 function PrimaryCampaignCoordination({ user, initialRequestId = '' }: { user: Me; initialRequestId?: string }) {
   // Start with actionable intake. Map attribution and campaign administration remain one tab away.
   const [tab, setTab] = useUrlView('campaign_tab', campaignTabs, 'sos');
+  const [mapLayer, setMapLayer] = useUrlView('map_layer', mapLayers, 'areas');
   const [triage, setTriage] = useState<TriageCampaign[]>([]);
   const [overview, setOverview] = useState<OverviewCampaign[]>([]);
   const [commonQueue, setCommonQueue] = useState({ unmatched: 0, conflict: 0 });
@@ -140,7 +143,7 @@ function PrimaryCampaignCoordination({ user, initialRequestId = '' }: { user: Me
     ...user.grants.filter((grant) => grant.role_code === 'COORDINATOR' && grant.scope_type === 'CAMPAIGN' && grant.campaign_id).map((grant) => grant.campaign_id!),
     ...engagements.map((item) => item.campaign_id),
   ])];
-  const tabs = [['sos', 'Xử lý SOS'], ['routing', isScopedCoordinator ? 'Bản đồ chiến dịch' : 'Phân vùng SOS'], ['campaigns', 'Chiến dịch'], ['workspace', 'Theo dõi chiến dịch'], ['history', 'Lịch sử']];
+  const tabs = [['sos', 'Xử lý SOS'], ['routing', isScopedCoordinator ? 'Bản đồ chiến dịch' : 'Bản đồ SOS'], ['campaigns', 'Chiến dịch'], ['workspace', 'Theo dõi chiến dịch'], ['history', 'Lịch sử']];
   const activeTab = (id: string) => tab === id || (id === 'workspace' && tab === 'choose') || (id === 'history' && tab === 'my-history');
   return <section className="campaign-coordination">
     <div className="tabs" role="tablist" aria-label="Điều phối chiến dịch">
@@ -163,12 +166,12 @@ function PrimaryCampaignCoordination({ user, initialRequestId = '' }: { user: Me
             <span className="campaign-overview__metric-note">trên các chiến dịch</span>
           </article>
           {!isScopedCoordinator && <button type="button" className="campaign-overview__metric campaign-overview__metric--attention"
-            aria-label={`Mở tab Phân vùng SOS, ${unassignedRequestCount} SOS cần phân vùng`} onClick={() => setTab('routing')}>
+            aria-label={`Mở tab Bản đồ SOS, ${unassignedRequestCount} SOS cần phân vùng`} onClick={() => { setMapLayer('areas'); setTab('routing'); }}>
             <span className="campaign-overview__metric-label">SOS cần phân vùng</span>
             <strong>{loading && overviewCampaigns.length === 0 ? '—' : unassignedRequestCount}</strong>
             <span className="campaign-overview__metric-note">
               {loading && overviewCampaigns.length === 0 ? 'Đang tải dữ liệu…' : `${commonQueue.unmatched} ngoài vùng · ${commonQueue.conflict} trùng vùng`}
-              <span className="campaign-overview__metric-link">Mở tab Phân vùng SOS <span aria-hidden="true">→</span></span>
+              <span className="campaign-overview__metric-link">Mở tab Bản đồ SOS <span aria-hidden="true">→</span></span>
             </span>
           </button>}
         </div>
@@ -222,7 +225,18 @@ function PrimaryCampaignCoordination({ user, initialRequestId = '' }: { user: Me
       </div>
     </>}
     {tab === 'routing' && isScopedCoordinator && <ScopedCampaignMap campaigns={overviewCampaigns} campaignIds={scopedCampaignIds} />}
-    {tab === 'routing' && !isScopedCoordinator && <CommonQueueSuggestions onChanged={() => { setQueueRevision((value) => value + 1); setRefresh((value) => value + 1); }} />}
+    {tab === 'routing' && !isScopedCoordinator && <div className="map-layer-switch" role="group" aria-label="Chọn lớp bản đồ SOS">
+      <button type="button" aria-pressed={mapLayer === 'areas'} onClick={() => setMapLayer('areas')}>
+        <strong>Phân vùng chiến dịch</strong><small>Vùng chiến dịch và SOS chưa có chiến dịch ({unassignedRequestCount})</small>
+      </button>
+      <button type="button" aria-pressed={mapLayer === 'density'} onClick={() => setMapLayer('density')}>
+        <strong>Mật độ SOS</strong><small>Bản đồ nhiệt SOS đã và chưa xác minh, lọc theo loại sự cố</small>
+      </button>
+    </div>}
+    {tab === 'routing' && !isScopedCoordinator && mapLayer === 'density' && <div className="report-heatmap"><CoordinatorMap /></div>}
+    {tab === 'routing' && !isScopedCoordinator && mapLayer === 'areas' && <CommonQueueSuggestions onChanged={() => { setQueueRevision((value) => value + 1); setRefresh((value) => value + 1); }}
+      loads={overviewCampaigns.map((campaign) => ({ id: campaign.id, overdue: campaign.overdue_count, coordinators: campaign.active_coordinators.length,
+        open: Object.entries(campaign.request_counts ?? {}).filter(([status]) => !['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(status)).reduce((sum, [, count]) => sum + count, 0) }))} />}
     {tab === 'sos' && <Coordinator key={`sos-${queueRevision}-${initialRequestId}`} page="queue" currentUserId={user.id} user={user} canSeeUnassigned={!isScopedCoordinator} initialRequestId={initialRequestId} />}
     {tab === 'history' && <>
       <p><button className="button secondary" type="button" onClick={() => void showMyHistory()}>Xem lịch sử điều phối của tôi</button></p>

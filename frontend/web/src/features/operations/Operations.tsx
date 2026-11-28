@@ -88,6 +88,29 @@ function recordTitle(page: string, item: Row): string {
     'Bản ghi'
   );
 }
+/** Compact target-versus-received view of a drive's item list: the three least-covered items plus an overall bar. */
+function DriveNeedProgress({ items }: { items: Row[] }) {
+  if (!items.length) return <span className="muted">Chưa khai báo vật phẩm</span>;
+  const rows = items.map((item) => {
+    const target = Number(item.target_quantity ?? 0);
+    const received = Number(item.accepted_total ?? 0);
+    return { item, target, received, ratio: target > 0 ? Math.min(1, received / target) : 0 };
+  }).sort((a, b) => a.ratio - b.ratio);
+  const overall = rows.reduce((total, row) => total + row.ratio, 0) / rows.length;
+  return <div className="drive-need">
+    <div className="drive-need__overall" title={`Đạt trung bình ${Math.round(overall * 100)}% mục tiêu`}>
+      <span className="drive-need__track"><span className="drive-need__fill" style={{ width: `${Math.round(overall * 100)}%` }} /></span>
+      <strong>{Math.round(overall * 100)}%</strong>
+    </div>
+    <ul className="drive-need__items">
+      {rows.slice(0, 3).map(({ item, target, received }) => <li key={string(item.item_id)}>
+        <span>{string(item.item_name) || 'Vật phẩm'}</span>
+        <span className="muted">{quantity(received)}/{quantityWithUnit(item, target)}</span>
+      </li>)}
+      {rows.length > 3 && <li className="muted">+{rows.length - 3} vật phẩm khác</li>}
+    </ul>
+  </div>;
+}
 const fields = (entries: [string, string, boolean?][]) =>
   entries.map(([name, title, required]) => ({ name, label: title, required }));
 
@@ -558,18 +581,30 @@ export function Operations({ page, user }: { page: string; user: Me }) {
         ) : page === 'assets' ? null : (
           <div className="operations-table-scroll" role="region" aria-label={`Bảng ${headings[page] || 'bản ghi'}`} tabIndex={0}>
             <table className={`operations-record-table${page === 'drives' ? ' operations-record-table--drives' : ''}`}>
-              <thead><tr><th scope="col">{page === 'assets' ? 'Kho' : page === 'intake' ? 'Người đóng góp' : page === 'review' ? 'Mã phiếu' : page === 'drives' ? 'Đợt quyên góp' : 'Vật phẩm'}</th>{page !== 'assets' && page !== 'drives' && <th scope="col">{page === 'intake' || page === 'review' ? 'Đợt quyên góp' : 'Nhu cầu và kết quả'}</th>}<th scope="col">Tiếp nhận lúc</th><th scope="col">Trạng thái</th></tr></thead>
+              <thead><tr><th scope="col">{page === 'assets' ? 'Kho' : page === 'intake' ? 'Người đóng góp' : page === 'review' ? 'Mã phiếu' : page === 'drives' ? 'Đợt quyên góp' : 'Vật phẩm'}</th>{page !== 'assets' && page !== 'drives' && <th scope="col">{page === 'intake' || page === 'review' ? 'Đợt quyên góp' : 'Nhu cầu và kết quả'}</th>}
+                {page === 'drives' && <><th scope="col">Nhu cầu và tiến độ</th><th scope="col">Lượt đóng góp</th></>}
+                <th scope="col">{page === 'drives' ? 'Thời gian mở' : 'Tiếp nhận lúc'}</th><th scope="col">Trạng thái</th></tr></thead>
               <tbody>{items.map((item) => <tr key={operationRecordKey(item)}>
                 <th scope="row">{page === 'assets' && asset === 'warehouses' && item.id
                   ? <a className="table-row-link" href={`?workspace=operations&page=assets&view=warehouses&warehouse_id=${encodeURIComponent(item.id)}&warehouse_name=${encodeURIComponent(recordTitle(page, item))}`} aria-label={`Xem tồn kho ${recordTitle(page, item)}`}>{recordTitle(page, item)}</a>
-                  : <button type="button" className="table-row-link" onClick={() => { setDetailTab('overview'); setSelected(item); }}>{recordTitle(page, item)}</button>}</th>
+                  : <button type="button" className="table-row-link" onClick={() => { setDetailTab('overview'); setSelected(item); }}>{recordTitle(page, item)}</button>}
+                  {page === 'drives' && <small className="drive-row__meta">
+                    {string(item.warehouse_name) || 'Kho tiếp nhận chưa rõ'}
+                    {' · '}{item.campaign_id ? references.campaignNames?.find((option) => option.value === item.campaign_id)?.label || 'Có chiến dịch liên kết' : 'Không liên kết chiến dịch'}
+                  </small>}</th>
+                {page === 'drives' && <td><DriveNeedProgress items={Array.isArray(item.items) ? item.items as Row[] : []} /></td>}
+                {page === 'drives' && <td className="drive-row__donations">
+                  <strong>{Number(item.delivery_count ?? 0)}</strong> lượt
+                  <small>{Number(item.posted_delivery_count ?? 0)} đã nhập kho</small>
+                </td>}
                 {page !== 'assets' && page !== 'drives' && <td>{item.requested != null ? `Cần ${quantityWithUnit(item, item.requested)} · Đã giao ${quantityWithUnit(item, item.delivered)}`
                   : item.active_requested != null ? `Cần ${quantityWithUnit(item, item.active_requested)} · Đã giao ${quantityWithUnit(item, item.delivered)}`
                   : item.drive_title ? string(item.drive_title)
                   : item.warehouse_name ? string(item.warehouse_name)
                   : item.donor_name ? `Người đóng góp: ${string(item.donor_name)}`
                   : item.receipt_id ? 'Đã lập biên nhận' : '—'}</td>}
-                <td>{item.created_at ? timeLabel(item.created_at) : '—'}</td>
+                <td>{page === 'drives' ? <>{item.opens_at ? timeLabel(item.opens_at) : 'Chưa mở'}{item.closes_at && <small className="drive-row__meta">Đóng: {timeLabel(item.closes_at)}</small>}</>
+                  : item.created_at ? timeLabel(item.created_at) : '—'}</td>
                 <td>{item.status ? <StatusBadge status={item.status} /> : '—'}</td>
               </tr>)}</tbody>
             </table>

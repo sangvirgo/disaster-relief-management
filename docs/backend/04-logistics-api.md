@@ -31,7 +31,7 @@ Schema: [schema/logistics.sql](schema/logistics.sql). Conventions: [00](00-setup
 | `POST /donation-drives` (Idem) | `DONATION_DRIVE_MANAGE` | `{ title, description, intake_warehouse_id, location?, location_note?, campaign_id?, opens_at?, closes_at?, items:[{item_id, target_quantity, acceptance_note?}] }` → DRAFT; campaign validated through Response internal API **before** the transaction (`CAMPAIGN_NOT_ACTIVE`/`RESPONSE_UNAVAILABLE`); caches `campaign_status` |
 | `PATCH /donation-drives/{id}` · Ver | same | DRAFT only (items replaced as a set); `location` (Point inside the warehouse service area, else `DRIVE_LOCATION_OUTSIDE_AREA`) and `location_note` may change |
 | `POST /donation-drives/{id}/open` · `/pause` · `/resume` · `/close` (Idem · Ver) | same | pause/close need `reason`; open/resume re-check campaign (a PAUSED/CLOSED campaign ⇒ `CAMPAIGN_NOT_ACTIVE`); closing keeps receipts/disputes/returns operable |
-| `GET /donation-drives?status=` | `DONATION_DRIVE_MANAGE`/`DONATION_INTAKE`/`DONATION_REVIEW` in scope | staff list incl. DRAFT/CLOSED |
+| `GET /donation-drives?status=` | `DONATION_DRIVE_MANAGE`/`DONATION_INTAKE`/`DONATION_REVIEW` in scope | staff list incl. DRAFT/CLOSED; each row also carries `warehouse_name`, `delivery_count` and `posted_delivery_count` (2026-11-28) |
 | Scheduler | | every 5 min re-checks cached `campaign_status` of OPEN drives; campaign CLOSED ⇒ drive closed with reason `CAMPAIGN_CLOSED`; Response unreachable ⇒ keep cache, show `campaign_status_at` |
 
 ## 3. Donor declaration and private tracking (guest or signed-in)

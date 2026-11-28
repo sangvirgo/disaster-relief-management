@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { useCursorNav, LIST_PAGE_SIZE } from '../../api/useCursorNav';
 import { ListNav } from '../../components/ui/Pager';
-import type { Me } from '../../auth/session';
+import { isSubCoordinator, type Me } from '../../auth/session';
+import { fetchAll } from '../../api/fetchAll';
+import { allowedPages, allowedWorkspaces, workspaceLabels } from '../../app/catalog';
 import { label, requestStatusLabel, timeLabel } from '../../i18n/labels';
 import { rescueProgressMessage, type RescueProgress } from './rescueProgress';
 
@@ -149,6 +151,21 @@ export function CitizenRequests({
   );
 }
 
+const ROLE_INFO: Record<string, { summary: string; tone: string }> = {
+  CITIZEN: { summary: 'Gửi SOS, theo dõi tiến độ và đóng góp hàng cứu trợ.', tone: 'citizen' },
+  VOLUNTEER: { summary: 'Nhận nhiệm vụ, cập nhật tiến độ và quản lý đội cứu hộ.', tone: 'volunteer' },
+  COORDINATOR: { summary: 'Xác minh, ưu tiên SOS và giao đội cứu hộ trong chiến dịch.', tone: 'coordinator' },
+  OPERATIONS_MANAGER: { summary: 'Quản lý kho, đợt quyên góp và giao hàng cho đội.', tone: 'operations' },
+  REVIEWER: { summary: 'Duyệt độc lập biên nhận hàng quyên góp.', tone: 'operations' },
+  ADMIN: { summary: 'Quản lý người dùng, quyền truy cập và lịch sử thao tác.', tone: 'admin' },
+};
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return ((parts.at(-1)?.[0] ?? '') + (parts.length > 1 ? parts[0]![0] : '')).toUpperCase() || '?';
+}
+
+/** Profile page shared by every role: who you are, what each grant lets you do (with shortcuts), and account security. */
 export function CitizenAccount({
   user,
   onChangePassword,
@@ -156,23 +173,80 @@ export function CitizenAccount({
   user: Me;
   onChangePassword: () => void;
 }) {
-  const roleNames = [...new Set(user.grants.map((grant) => label(grant.role_code)))];
+  const [campaignNames, setCampaignNames] = useState<Record<string, string>>({});
+  const campaignIds = [...new Set(user.grants.map((grant) => grant.campaign_id).filter((id): id is string => Boolean(id)))];
+  useEffect(() => {
+    if (!campaignIds.length) return;
+    let live = true;
+    void fetchAll<{ id: string; name?: string }>('response', '/public/campaigns')
+      .then((items) => { if (live) setCampaignNames(Object.fromEntries(items.filter((item) => item.name).map((item) => [item.id, item.name!]))); })
+      .catch(() => undefined);
+    return () => { live = false; };
+    // Campaign names are a lookup for the grant list; reload only when the account changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user.id]);
+  const subCoordinator = isSubCoordinator(user);
+  const workspaces = allowedWorkspaces(user);
+  const grants = user.grants.length ? user.grants : [{ id: 'citizen', role_code: 'CITIZEN' as const, scope_type: 'SYSTEM', campaign_id: null }];
+  const scopeText = (grant: (typeof grants)[number]) => {
+    if (grant.role_code === 'COORDINATOR' && grant.scope_type === 'CAMPAIGN' && !grant.campaign_id) return 'Điều phối viên phụ · tự chọn chiến dịch';
+    if (grant.scope_type === 'CAMPAIGN') return `Chiến dịch: ${grant.campaign_id ? campaignNames[grant.campaign_id] ?? 'đang tải tên…' : 'chưa gắn'}`;
+    return 'Toàn hệ thống';
+  };
+  const roleTitle = (code: string) => code === 'COORDINATOR' && subCoordinator ? 'Điều phối viên phụ' : label(code);
   return (
     <div className="account-layout account-layout--profile-only">
-      <section className="card account-profile">
-        <span className="eyebrow">Hồ sơ của bạn</span>
-        <h2>{user.display_name}</h2>
-        <dl className="account-facts">
-          <div><dt>Tên đăng nhập</dt><dd>{user.username}</dd></div>
-          <div><dt>Vai trò được cấp</dt><dd>{roleNames.join(', ') || 'Người dân'}</dd></div>
-        </dl>
-        <div className="account-actions">
-          {!user.must_change_password && (
-            <button type="button" className="button secondary" onClick={onChangePassword}>Đổi mật khẩu</button>
-          )}
+      <section className="card account-profile account-hero">
+        <span className="account-hero__avatar" aria-hidden="true">{initials(user.display_name || user.username)}</span>
+        <div className="account-hero__body">
+          <span className="eyebrow">Hồ sơ của bạn</span>
+          <h2>{user.display_name}</h2>
+          <p className="muted">@{user.username}</p>
+          <ul className="account-hero__roles" aria-label="Vai trò được cấp">
+            {[...new Set(grants.map((grant) => grant.role_code))].map((code) => <li key={code} className={`account-role-chip account-role-chip--${ROLE_INFO[code]?.tone ?? 'citizen'}`}>{roleTitle(code)}</li>)}
+          </ul>
         </div>
-        <p className="account-hint">Các không gian làm việc xuất hiện theo vai trò được cấp cho tài khoản.</p>
       </section>
+
+      <div className="account-grid">
+        <section className="card account-section" aria-labelledby="account-grants-title">
+          <h3 id="account-grants-title">Quyền và phạm vi</h3>
+          <p className="muted">Mỗi quyền mở một không gian làm việc. Liên hệ quản trị viên nếu cần thay đổi.</p>
+          <ul className="account-grants">
+            {grants.map((grant) => <li key={grant.id} className={`account-grant account-grant--${ROLE_INFO[grant.role_code]?.tone ?? 'citizen'}`}>
+              <strong>{roleTitle(grant.role_code)}</strong>
+              <span className="account-grant__scope">{scopeText(grant)}</span>
+              <small>{ROLE_INFO[grant.role_code]?.summary}</small>
+            </li>)}
+          </ul>
+        </section>
+
+        <section className="card account-section" aria-labelledby="account-shortcuts-title">
+          <h3 id="account-shortcuts-title">Lối tắt công việc</h3>
+          <div className="account-shortcuts">
+            {workspaces.map((workspace) => <div key={workspace} className="account-shortcut">
+              <strong>{workspaceLabels[workspace]}</strong>
+              <div className="account-shortcut__links">
+                {allowedPages(workspace, user).slice(0, 4).map((page) => <a key={page.id} href={`?workspace=${workspace}&page=${page.id}`}>{page.title}</a>)}
+              </div>
+            </div>)}
+          </div>
+        </section>
+
+        <section className="card account-section" aria-labelledby="account-security-title">
+          <h3 id="account-security-title">Bảo mật tài khoản</h3>
+          <dl className="account-facts">
+            <div><dt>Tên đăng nhập</dt><dd>{user.username}</dd></div>
+            <div><dt>Mật khẩu</dt><dd>{user.must_change_password ? 'Cần đổi mật khẩu tạm' : 'Đã đặt'}</dd></div>
+          </dl>
+          <div className="account-actions">
+            {!user.must_change_password && (
+              <button type="button" className="button secondary" onClick={onChangePassword}>Đổi mật khẩu</button>
+            )}
+          </div>
+          <p className="account-hint">Không chia sẻ mật khẩu. Hãy đăng xuất khi dùng máy tính chung.</p>
+        </section>
+      </div>
     </div>
   );
 }

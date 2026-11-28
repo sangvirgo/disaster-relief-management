@@ -6,6 +6,7 @@ import { useCursorNav } from '../../api/useCursorNav';
 import { Pager } from '../../components/ui/Pager';
 import { CampaignAreaMap, type AreaAnimation } from '../../maps/CampaignAreaMap';
 import { timeLabel } from '../../i18n/labels';
+import { confirmAction } from '../../components/confirmAction';
 
 type LatLng = { latitude: number; longitude: number };
 type NearestCampaign = {
@@ -46,6 +47,8 @@ type Suggestions = {
   attach_targets: { id: string; name: string }[];
 };
 type MatchFilter = '' | 'UNMATCHED' | 'CONFLICT';
+/** Live load of a campaign, from the coordination overview; used to compare the areas a conflicting SOS falls into. */
+export type CampaignLoad = { id: string; open: number; overdue: number; coordinators: number };
 
 const PAGE_SIZE = 8;
 // Area used when a SOS is outside every campaign and there is no nearby campaign to extend.
@@ -70,7 +73,7 @@ const post = <T,>(path: string, body: unknown) =>
  * Control panel for the primary coordinator. Draw or adjust campaign areas on the map, and decide for each SOS that has no
  * campaign (outside every area, or inside several) whether to attach it to a campaign or start a new one.
  */
-export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void }) {
+export function CommonQueueSuggestions({ onChanged, loads = [] }: { onChanged: () => void; loads?: CampaignLoad[] }) {
   const [data, setData] = useState<Suggestions | null>(null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -85,6 +88,7 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
   const [cursor, setCursor, prevPage, pageIndex] = useCursorNav<string>('');
   const [choice, setChoice] = useState<Record<string, string>>({});
   const [mapFocus, setMapFocus] = useState<{ id: string; nonce: number } | null>(null);
+  const [conflictFocus, setConflictFocus] = useState<string[] | null>(null);
   const [areaAnimation, setAreaAnimation] = useState<(AreaAnimation & { attachedCount?: number }) | null>(null);
   // Map editor: draw a new campaign area, or adjust an existing one (kind 'adjust' carries the campaign id).
   const [editMode, setEditMode] = useState<{ kind: 'create' } | { kind: 'adjust'; id: string } | null>(null);
@@ -178,6 +182,36 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
   }
 
   const attachTargets = data?.attach_targets ?? [];
+  const loadById = useMemo(() => new Map(loads.map((load) => [load.id, load])), [loads]);
+  const targetName = (id: string) => attachTargets.find((target) => target.id === id)?.name ?? data?.campaigns.find((campaign) => campaign.id === id)?.name ?? 'Chiến dịch';
+  /** Distance from the SOS to each candidate centre, nearest first; the nearest is the (advisory) suggestion. */
+  const rankCandidates = (item: SuggestionRequest) => {
+    const point = { lat: item.location.latitude, lng: item.location.longitude };
+    return item.candidate_campaign_ids.map((id) => {
+      const center = data?.campaigns.find((campaign) => campaign.id === id)?.center;
+      return { id, distance: center ? haversineM(center, point) : Number.POSITIVE_INFINITY };
+    }).filter((candidate) => attachTargets.some((target) => target.id === candidate.id))
+      .sort((a, b) => a.distance - b.distance);
+  };
+  const conflictsOnPage = (data?.requests ?? []).filter((item) => item.campaign_match_state === 'CONFLICT' && rankCandidates(item).length > 0);
+  async function attachConflictsBySuggestion() {
+    const plan = conflictsOnPage.map((item) => ({ item, target: rankCandidates(item)[0]!.id }));
+    if (!plan.length) return;
+    const summary = plan.slice(0, 6).map(({ item, target }) => `${item.tracking_code} → ${targetName(target)}`).join('; ');
+    const ok = await confirmAction(`Gắn ${plan.length} SOS trùng vùng vào chiến dịch có tâm gần nhất? ${summary}${plan.length > 6 ? '; …' : ''}. Bạn vẫn có thể chuyển SOS sang chiến dịch khác sau đó.`);
+    if (!ok) return;
+    let done = 0;
+    const failed: string[] = [];
+    await run(async () => {
+      for (const { item, target } of plan) {
+        try {
+          await post(`/requests/${item.id}/attach-campaign`, { campaign_id: target, expected_version: item.version });
+          done += 1;
+        } catch { failed.push(item.tracking_code); }
+      }
+      if (failed.length) throw new Error(`Đã gắn ${done} SOS. Chưa gắn được: ${failed.join(', ')} (SOS có thể vừa được người khác xử lý). Hãy tải lại và thử từng SOS.`);
+    }, `Đã gắn ${plan.length} SOS trùng vùng vào chiến dịch gần nhất.`);
+  }
   const attach = (item: SuggestionRequest, campaignId: string) => run(
     () => post(`/requests/${item.id}/attach-campaign`, { campaign_id: campaignId, expected_version: item.version }).then(() => undefined),
     `Đã gắn ${item.tracking_code} vào chiến dịch.`,
@@ -357,7 +391,8 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
         animation={areaAnimation}
         onAnimationComplete={finishAreaAnimation}
         selectedCampaignId={selectedCampaignId}
-        onCampaignSelect={(id) => { cancelEdit(); setSelectedCampaignId(id); }}
+        highlightCampaignIds={selectedCampaignId ? null : conflictFocus}
+        onCampaignSelect={(id) => { cancelEdit(); setConflictFocus(null); setSelectedCampaignId(id); }}
         onCampaignEdit={(id) => { setSelectedCampaignId(id); startAdjust(id); }}
         editor={editMode ? {
           center: draftCenter, radiusM: draftRadius, hideCampaignId: adjusting?.id,
@@ -409,6 +444,10 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
             {data.supply_need_total} SOS cần hàng chưa thuộc chiến dịch. Hãy gắn các SOS này vào chiến dịch để hàng cứu trợ được tính vào kho.
           </p>
         )}
+        {conflictsOnPage.length > 1 && <div className="conflict-bulk" role="group" aria-label="Xử lý nhanh SOS trùng vùng">
+          <span><strong>{conflictsOnPage.length} SOS trùng vùng</strong> trên trang này. Gợi ý: gắn mỗi SOS vào chiến dịch có tâm gần nhất.</span>
+          <button type="button" className="button secondary" disabled={busy} onClick={() => void attachConflictsBySuggestion()}>Xem và gắn theo gợi ý</button>
+        </div>}
         {data && requests.length === 0 && <p className="empty">Không còn SOS nào cần quyết định chiến dịch.</p>}
         {requests.map((item) => {
           const nearest = item.nearest_campaign;
@@ -431,7 +470,8 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
               <div className="suggestion-head">
                 <div>
                   <button type="button" className="suggestion-code-link" title="Xem vị trí SOS trên bản đồ"
-                    onClick={() => { setSelectedCampaignId(null); cancelEdit(); setHighlight(item.id); setMapFocus({ id: item.id, nonce: Date.now() }); }}>
+                    onClick={() => { setSelectedCampaignId(null); cancelEdit(); setHighlight(item.id);
+                      setConflictFocus(item.campaign_match_state === 'CONFLICT' ? item.candidate_campaign_ids : null); setMapFocus({ id: item.id, nonce: Date.now() }); }}>
                     <span aria-hidden="true">📍</span>{item.tracking_code}
                   </button>{' '}
                   {item.priority && <span className="badge">{item.priority}</span>}{' '}
@@ -440,10 +480,27 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
                   <p className="suggestion-received"><time dateTime={item.received_at}>Tiếp nhận {timeLabel(item.received_at)}</time></p>
                   <p className="muted">
                     {item.campaign_match_state === 'CONFLICT'
-                      ? `Nằm trong ${candidates.size || 'nhiều'} vùng; hãy chọn chiến dịch phù hợp.`
+                      ? `Nằm trong ${candidates.size || 'nhiều'} vùng chiến dịch. So sánh bên dưới rồi chọn chiến dịch chịu trách nhiệm.`
                       : nearest ? <>Gần nhất: <strong>{nearest.name}</strong> · cách {km(nearest.distance_m)} km</> : 'Chưa có chiến dịch nào có vùng.'}
                   </p>
                 </div>
+                {item.campaign_match_state === 'CONFLICT' && rankCandidates(item).length > 0 && <ol className="conflict-candidates" aria-label={`Các chiến dịch chứa ${item.tracking_code}`}>
+                  {rankCandidates(item).map((candidate, index) => {
+                    const load = loadById.get(candidate.id);
+                    return <li key={candidate.id} className={index === 0 ? 'is-suggested' : ''}>
+                      <div className="conflict-candidates__info">
+                        <strong>{targetName(candidate.id)}</strong>
+                        {index === 0 && <span className="chip">Gợi ý · tâm gần nhất</span>}
+                        <small>
+                          {Number.isFinite(candidate.distance) ? `Cách tâm ${km(candidate.distance)} km` : 'Chưa rõ khoảng cách'}
+                          {load && <> · {load.open} SOS mở · {load.coordinators ? `${load.coordinators} điều phối viên` : <strong className="conflict-candidates__warn">chưa có điều phối viên</strong>}{load.overdue ? ` · ${load.overdue} quá hạn` : ''}</>}
+                        </small>
+                      </div>
+                      <button type="button" className={`button ${index === 0 ? 'primary' : 'secondary'} small`} disabled={busy}
+                        onClick={() => void attach(item, candidate.id)}>Gắn vào đây</button>
+                    </li>;
+                  })}
+                </ol>}
                 <div className="suggestion-actions">
                   <div className="suggestion-actions__attach">
                     <Dropdown aria-label={`Chiến dịch để gắn ${item.tracking_code}`} value={selectedTarget} disabled={busy}

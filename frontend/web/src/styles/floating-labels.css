@@ -128,3 +128,5 @@
     transition: none;
   }
 }
+
+.floating-field--required::before { content: attr(data-floating-label) " *"; }

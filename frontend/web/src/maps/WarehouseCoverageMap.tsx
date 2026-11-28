@@ -122,7 +122,10 @@ export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, er
     map.on('zoom move resize', updateDraftPoint);
     map.on('zoomend', () => setZoomLevel(map.getZoom()));
     const timer = window.setTimeout(() => map.invalidateSize(), 250);
-    return () => { window.clearTimeout(timer); if (selectionTimer.current !== null) window.clearTimeout(selectionTimer.current); map.remove(); mapRef.current = null; layerRef.current = null; draftLayerRef.current = null; };
+    // The detail column beside the map can change the map width; keep Leaflet's size in step with the container.
+    const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => map.invalidateSize());
+    resize?.observe(containerRef.current);
+    return () => { resize?.disconnect(); window.clearTimeout(timer); if (selectionTimer.current !== null) window.clearTimeout(selectionTimer.current); map.remove(); mapRef.current = null; layerRef.current = null; draftLayerRef.current = null; };
   }, []);
 
   useEffect(() => {
@@ -276,12 +279,14 @@ export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, er
     focusWarehouse(map, row);
   }, [selectedId, rows, editingWarehouse]);
 
-  return <div className="warehouse-coverage__map-shell">
+  const drafting = creatingWarehouse || editingWarehouse;
+  return <div className={`warehouse-coverage__frame${drafting ? '' : ' warehouse-coverage__frame--with-side'}`}>
+  <div className="warehouse-coverage__map-shell">
     <div ref={containerRef} className="campaign-area-map warehouse-coverage__map" role="region" aria-label="Bản đồ các kho, bán kính phục vụ và đợt quyên góp" />
     {banner && <div className="warehouse-map-banner" role="status">{banner}</div>}
     {(creatingWarehouse || editingWarehouse) && draft && zoomComplete && !draftReady && <div className="warehouse-map-banner" role="status">Kéo tâm kho hoặc nút bán kính, rồi thả để tiếp tục.</div>}
     {toolbar && <div className="warehouse-map-toolbar">{toolbar}</div>}
-    {hoverCard && ((!creatingWarehouse && !editingWarehouse) || (draft && draftReady)) && <div className={`warehouse-map-hover${creatingWarehouse || editingWarehouse ? ' warehouse-map-hover--draft' : ''}`} style={(creatingWarehouse || editingWarehouse) && draftPoint ? draftCardStyle(draftPoint) : undefined}>{hoverCard}</div>}
+    {hoverCard && drafting && draft && draftReady && <div className="warehouse-map-hover warehouse-map-hover--draft" style={draftPoint ? draftCardStyle(draftPoint) : undefined}>{hoverCard}</div>}
     <div className="warehouse-map-legend" aria-label="Chú giải bản đồ">
       <span><span className="legend-warehouse-icon" dangerouslySetInnerHTML={{ __html: warehouseIconHtml() }} /> Kho và bán kính phục vụ</span>
       <span><i className="legend-dot legend-dot--campaign">⚑</i> Vùng chiến dịch cứu trợ</span>
@@ -292,5 +297,12 @@ export function WarehouseCoverageMap({ rows, campaigns = [], loading = false, er
     {loading && <p className="warehouse-coverage__overlay" role="status">Đang tải vị trí các kho…</p>}
     {error && <p className="warehouse-coverage__overlay warehouse-coverage__overlay--error" role="alert">Chưa tải được dữ liệu kho. Hãy bấm Làm mới để thử lại.</p>}
     {!loading && !error && rows.length === 0 && <p className="warehouse-coverage__overlay">Chưa có kho nào có vị trí. Hãy thêm kho hoặc sửa kho để chọn vị trí.</p>}
+  </div>
+  {!drafting && <aside className="warehouse-map-side" aria-label="Chi tiết kho hoặc điểm quyên góp đang chọn" aria-live="polite">
+    {hoverCard || <div className="warehouse-map-side__empty">
+      <strong>Chi tiết kho và điểm quyên góp</strong>
+      <p>Bấm vào biểu tượng kho hoặc điểm quyên góp trên bản đồ để xem tồn kho, vật phẩm cần tiếp nhận và các thao tác.</p>
+    </div>}
+  </aside>}
   </div>;
 }

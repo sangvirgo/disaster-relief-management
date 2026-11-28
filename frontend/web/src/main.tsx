@@ -1589,6 +1589,8 @@ function permittedRoute(user: Me | null, requested: ReturnType<typeof routeFromU
   const legacyOperationsPages: Record<string, string> = { pickup: 'handover', needs: 'supply', proposals: 'supply', items: 'supply', drives: 'assets' };
   if (requested.workspace === 'operations' && legacyOperationsPages[requested.page]) return { workspace: 'operations' as const, page: legacyOperationsPages[requested.page]! };
   if (requested.workspace === 'operations' && requested.page === 'campaigns') return { workspace: 'operations' as const, page: 'assets' };
+  // 2026-11-28: the coordinator's 'Tổng quan và bản đồ' page now lives in the 'Bản đồ SOS' tab (density layer) and the dashboard report.
+  if (requested.workspace === 'coordinator' && requested.page === 'reports') return { workspace: 'coordinator' as const, page: 'campaigns' };
   if (requested.page === 'account' && user) return requested;
   if (allowedPages(requested.workspace, user).some((page) => page.id === requested.page)) return requested;
   return { workspace: requested.workspace, page: allowedPages(requested.workspace, user)[0]?.id || fallbackPage };
@@ -1601,6 +1603,7 @@ function normalizeSubview(url: URL, workspace: Workspace, page: string, user: Me
   if (!(workspace === 'coordinator' && page === 'campaigns'
     && ['campaigns', 'routing', 'sos', 'workspace', 'history', 'choose', 'my-history'].includes(url.searchParams.get('campaign_tab') || '')))
     url.searchParams.delete('campaign_tab');
+  if (!(workspace === 'coordinator' && page === 'campaigns' && ['areas', 'density'].includes(url.searchParams.get('map_layer') || ''))) url.searchParams.delete('map_layer');
   const allowedViews: readonly string[] = workspace === 'citizen' && page === 'drives' ? donationViews
     : (workspace === 'volunteer' || workspace === 'coordinator') && page === 'notices' ? noticeViews
     : workspace === 'volunteer' && page === 'missions' ? missionViews
@@ -1651,6 +1654,7 @@ function writeRoute(workspace: Workspace, page: string, user: Me | null, mode: '
     url.searchParams.delete('sos_id');
     url.searchParams.delete('sos_tab');
     url.searchParams.delete('campaign_tab');
+    url.searchParams.delete('map_layer');
     url.searchParams.delete('mission_id');
     url.searchParams.delete('mission_tab');
     url.searchParams.delete('warehouse_id');

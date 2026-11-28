@@ -9,6 +9,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { label, timeLabel } from '../../i18n/labels';
 import { useUrlView } from '../../app/useUrlView';
 import { auditTypes } from '../../app/routeViews';
+import { fetchAll } from '../../api/fetchAll';
 import './admin-audit.css';
 
 type Row = Record<string, unknown> & {
@@ -45,6 +46,18 @@ function grantScopeLabel(grant: { role_code: string; scope_type: string; campaig
   return grant.role_code === 'COORDINATOR' && grant.scope_type === 'CAMPAIGN' && !grant.campaign_id ? subCoordinatorLabel : label(grant.scope_type);
 }
 const systemOperationsWarning = 'Phạm vi toàn hệ thống cho quản lý vận hành: người này sẽ điều khiển TẤT CẢ chiến dịch (tiếp nhận quyên góp, giao hàng cho đội cứu hộ và đối soát), cùng danh mục và kho. Chỉ chọn khi thật sự cần; nên chọn phạm vi chiến dịch.';
+const roleHints: Record<string, string> = {
+  CITIZEN: 'Gửi SOS, theo dõi tiến độ và đóng góp hàng cứu trợ.',
+  VOLUNTEER: 'Nhận nhiệm vụ cứu hộ; có thể được chọn làm đội trưởng khi tạo đội.',
+  COORDINATOR: 'Xác minh, ưu tiên SOS và giao đội cứu hộ.',
+  OPERATIONS_MANAGER: 'Quản lý kho, đợt quyên góp và giao hàng cho đội.',
+  REVIEWER: 'Duyệt độc lập biên nhận hàng quyên góp.',
+  ADMIN: 'Quản lý người dùng, quyền truy cập và lịch sử thao tác.',
+};
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return ((parts.at(-1)?.[0] ?? '') + (parts.length > 1 ? parts[0]![0] : '')).toUpperCase() || '?';
+}
 const types: Record<string, string> = {
   app_user: 'Người dùng',
   role_grant: 'Quyền truy cập',
@@ -59,7 +72,18 @@ export function Admin({ page }: { page: string }) {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [userAction, setUserAction] = useState<'disable' | 'enable' | 'reset' | 'revoke' | 'grant' | null>(null);
   const [revokeGrantId, setRevokeGrantId] = useState('');
+  const [campaignOptions, setCampaignOptions] = useState<{ value: string; label: string }[]>([]);
   useEffect(() => { setUserAction(null); setRevokeGrantId(''); }, [selected]);
+  // Campaign names for grant scopes: a bounded lookup so admins pick a campaign by name instead of pasting its id.
+  useEffect(() => {
+    if (page !== 'users') return;
+    let live = true;
+    void fetchAll<{ id: string; name?: string }>('response', '/public/campaigns')
+      .then((items) => { if (live) setCampaignOptions(items.filter((item) => item.id && item.name).map((item) => ({ value: item.id, label: item.name! }))); })
+      .catch(() => undefined);
+    return () => { live = false; };
+  }, [page]);
+  const campaignName = (id?: string | null) => (id ? campaignOptions.find((option) => option.value === id)?.label ?? `mã …${id.slice(-8)}` : '');
   useEffect(() => {
     if (!userAction) return;
     const frame = requestAnimationFrame(() => document.querySelector<HTMLElement>('.admin-user-actions')?.scrollIntoView({ block: 'nearest' }));
@@ -267,33 +291,38 @@ export function Admin({ page }: { page: string }) {
         {selected && !detail && <p role="status">Đang tải chi tiết…</p>}
         {detail && (
           <>
-            <p>
-              <strong>{detail.display_name || detail.name}</strong>{' '}
-              {detail.username ? `· ${detail.username}` : ''}
-            </p>
-            <div className="admin-record-meta">
-              <span className="admin-version-badge">V{detail.version}</span>
-              {detail.status && <StatusBadge status={detail.status} />}
+            <div className="admin-profile">
+              <span className="admin-profile__avatar" aria-hidden="true">{initials(String(detail.display_name || detail.name || detail.username || ''))}</span>
+              <div className="admin-profile__body">
+                <strong className="admin-profile__name">{detail.display_name || detail.name}</strong>
+                {detail.username && <span className="muted">@{detail.username}</span>}
+                <div className="admin-record-meta">
+                  {detail.status && <StatusBadge status={detail.status} />}
+                  {detail.must_change_password === true && <span className="admin-flag">Chờ đổi mật khẩu tạm</span>}
+                  <span className="admin-version-badge" title="Phiên bản bản ghi, dùng để tránh ghi đè thay đổi của người khác">Phiên bản {detail.version}</span>
+                </div>
+                {typeof detail.created_at === 'string' && <small className="muted">Tạo lúc {timeLabel(detail.created_at)}</small>}
+              </div>
             </div>
-            <>
+            <section className="admin-grants" aria-labelledby="admin-grants-title">
                 <div className="admin-grants-heading">
-                  <h3>Quyền hiện có</h3>
-                  {page === 'users' && <button type="button" className="button secondary" aria-expanded={userAction === 'grant'} onClick={() => { setUserAction(current => current === 'grant' ? null : 'grant'); setRevokeGrantId(''); }}>{userAction === 'grant' ? 'Đóng biểu mẫu' : 'Cấp quyền'}</button>}
+                  <h3 id="admin-grants-title">Quyền hiện có</h3>
+                  {page === 'users' && <button type="button" className={`button ${userAction === 'grant' ? 'secondary' : 'primary'}`} aria-expanded={userAction === 'grant'} onClick={() => { setUserAction(current => current === 'grant' ? null : 'grant'); setRevokeGrantId(''); }}>{userAction === 'grant' ? 'Hủy cấp quyền' : '＋ Cấp quyền'}</button>}
                 </div>
                 {detail.grants?.length ? (
-                  detail.grants.map((grant) => (
-                    <div className="candidate" key={grant.id}>
-                      <p>
-                        {label(grant.role_code)} · {grantScopeLabel(grant)}{' '}
-                        {grant.campaign_id && <> · Chiến dịch {grant.campaign_id}</>}
-                        {grant.revoked_at ? ' (đã thu hồi)' : ''}
-                      </p>
-                    </div>
-                  ))
+                  <ul className="admin-grant-list">
+                    {detail.grants.map((grant) => (
+                      <li key={grant.id} className={`admin-grant${grant.revoked_at ? ' is-revoked' : ''}`}>
+                        <strong>{label(grant.role_code)}</strong>
+                        <span>{grantScopeLabel(grant)}{grant.campaign_id ? ` · ${campaignName(grant.campaign_id)}` : ''}</span>
+                        {grant.revoked_at ? <small>Đã thu hồi {timeLabel(grant.revoked_at)}</small> : <small className="admin-grant__active">Đang hiệu lực</small>}
+                      </li>
+                    ))}
+                  </ul>
                 ) : (
-                  <p>Chưa có quyền được cấp.</p>
+                  <p className="muted">Chưa có quyền được cấp.</p>
                 )}
-            </>
+            </section>
             <div className="action-grid admin-user-actions">
               {page === 'users' && userAction === 'revoke' && <div className="admin-selected-action"><label>Quyền cần thu hồi<Dropdown value={revokeGrantId} onChange={event => setRevokeGrantId(event.target.value)}><option value="">Chọn quyền</option>{detail.grants?.filter(grant => !grant.revoked_at).map(grant => <option key={grant.id} value={grant.id}>{label(grant.role_code)} · {grantScopeLabel(grant)}{grant.campaign_id ? ` · Chiến dịch ${grant.campaign_id}` : ''}</option>)}</Dropdown></label>{revokeGrantId && <CommandForm key={revokeGrantId} spec={{ title: 'Thu hồi quyền', service: 'identity', path: `/grants/${revokeGrantId}/revoke`, warning: `Thu hồi quyền này của ${detail.username}?`, fields: [{ name: 'reason', label: 'Lý do thu hồi', type: 'textarea', required: true, maxLength: 500 }] }} onSuccess={success} />}</div>}
               {['users', 'grants', 'overview'].includes(page) && userAction === 'disable' && detail.status === 'ACTIVE' && (
@@ -345,14 +374,17 @@ export function Admin({ page }: { page: string }) {
                 />
               )}
               {page === 'users' && userAction === 'grant' && (
+                <div className="admin-grant-form">
+                <p className="admin-grant-form__intro">Chọn vai trò và phạm vi. Người dùng sẽ cần đăng nhập lại để nhận quyền mới.</p>
                 <CommandForm
                   spec={{
                     title: 'Cấp quyền',
                     service: 'identity',
                     path: `/users/${detail.id}/grants`,
+                    hideTitle: true,
                     warningFor: (values) => {
                       const scopeDetails = [
-                        values.campaign_id && `Chiến dịch ${values.campaign_id}`,
+                        values.campaign_id && `Chiến dịch ${campaignName(values.campaign_id)}`,
                       ].filter(Boolean).join(' · ');
                       const scopeName = values.scope_type === SUB_COORDINATOR_SCOPE ? subCoordinatorLabel : label(values.scope_type);
                       return `Cấp quyền ${label(values.role_code)} · ${scopeName}${scopeDetails ? ` · ${scopeDetails}` : ''} cho ${detail.username}? Phiên hiện tại của người này sẽ bị thu hồi.`;
@@ -363,7 +395,10 @@ export function Admin({ page }: { page: string }) {
                         label: 'Vai trò',
                         type: 'select',
                         required: true,
-                        options: roles.map((value) => ({ value, label: label(value) })),
+                        options: roles.filter((value) => !detail.grants?.some((grant) => !grant.revoked_at && grant.role_code === value && grant.scope_type === 'SYSTEM'))
+                          .map((value) => ({ value, label: label(value) })),
+                        emptyLabel: 'Chọn vai trò',
+                        hintFor: (values) => roleHints[values.role_code],
                         resetOnChange: ['scope_type', 'campaign_id'],
                       },
                       {
@@ -384,7 +419,9 @@ export function Admin({ page }: { page: string }) {
                           : values.scope_type === SUB_COORDINATOR_SCOPE ? subCoordinatorHint : undefined,
                         resetOnChange: ['campaign_id'],
                       },
-                      { name: 'campaign_id', label: 'Chiến dịch', type: 'reference', required: true, visibleWhen: { field: 'scope_type', value: 'CAMPAIGN' }, placeholder: 'Dán mã chiến dịch cần cấp quyền' },
+                      campaignOptions.length
+                        ? { name: 'campaign_id', label: 'Chiến dịch', type: 'select', required: true, searchable: true, options: campaignOptions, emptyLabel: 'Chọn chiến dịch', visibleWhen: { field: 'scope_type', value: 'CAMPAIGN' } }
+                        : { name: 'campaign_id', label: 'Chiến dịch', type: 'reference', required: true, visibleWhen: { field: 'scope_type', value: 'CAMPAIGN' }, placeholder: 'Dán mã chiến dịch cần cấp quyền' },
                       { name: 'reason', label: 'Ghi chú (không bắt buộc)', type: 'textarea', maxLength: 500,
                         placeholder: 'Ghi thêm thông tin nếu cần' },
                     ],
@@ -397,6 +434,7 @@ export function Admin({ page }: { page: string }) {
                   }}
                   onSuccess={success}
                 />
+                </div>
               )}
             </div>
           </>

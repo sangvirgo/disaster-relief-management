@@ -348,3 +348,11 @@
 /* Pin placed by clicking the map (OSM engine). */
 .location-pin-icon { background: transparent; border: 0; }
 .location-pin-marker { position: relative; display: block; width: 36px; height: 38px; pointer-events: none; }
+
+/* SOS form validation (2026-11-28). */
+.sos-error-summary { display: grid; gap: 6px; margin: 12px 0; padding: 12px 16px; border: 1px solid #fecaca; border-left: 4px solid #dc2626; border-radius: 10px; background: #fef2f2; color: #7f1d1d; }
+.sos-error-summary ul { margin: 0; padding-left: 18px; display: grid; gap: 2px; }
+.sos-error-summary .text-button { padding: 0; border: 0; background: none; color: #b91c1c; font: inherit; text-align: left; text-decoration: underline; cursor: pointer; }
+.sos-submit-hint { display: block; margin-bottom: 6px; color: var(--color-text-secondary); font-size: 13px; }
+.sos-char-count { display: block; margin-top: 4px; color: var(--color-text-secondary); font-size: 12px; text-align: right; }
+.sos-char-count.is-over { color: #b91c1c; font-weight: 700; }

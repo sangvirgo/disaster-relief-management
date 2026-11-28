@@ -173,6 +173,8 @@ export function SosForm({
     const errors: Record<string, string> = {};
     if (!category) errors.category = 'Loại sự cố là bắt buộc.';
     if (description.trim().length > 2000) errors.description = 'Mô tả tình huống không được vượt quá 2.000 ký tự.';
+    else if (['OTHER', 'UNKNOWN'].includes(category) && description.trim().length < 10)
+      errors.description = 'Với loại sự cố “Khác” hoặc “Chưa rõ”, hãy mô tả tình hình (ít nhất 10 ký tự) để đội cứu hộ hiểu cần làm gì.';
     if (needsRelief && reliefItems.trim().length > 500) errors.reliefItems = 'Vật phẩm cần hỗ trợ không được vượt quá 500 ký tự.';
     if (name.length > 200) errors.name = 'Họ tên người báo không được vượt quá 200 ký tự.';
     for (const [field, value] of [['phone', phone], ['beneficiaryPhone', beneficiaryPhone], ['alternatePhone', alternatePhone]] as const) {
@@ -187,7 +189,8 @@ export function SosForm({
     if (!longitude || !latitude) errors.location = 'Chọn vị trí trên bản đồ rồi bấm “Xác nhận vị trí”.';
     else if (!Number.isFinite(lon) || !Number.isFinite(lat) || Math.abs(lon) > 180 || Math.abs(lat) > 90)
       errors.location = 'Vị trí cần hỗ trợ không hợp lệ.';
-    if (people && (!Number.isInteger(Number(people)) || Number(people) < 1 || Number(people) > 10000))
+    if (people && Number(people) < 0) errors.people = 'Số người không được là số âm.';
+    else if (people && (!Number.isInteger(Number(people)) || Number(people) < 1 || Number(people) > 10000))
       errors.people = 'Số người cần hỗ trợ phải từ 1 đến 10.000.';
     if (children && (!Number.isInteger(Number(children)) || Number(children) < 0 || Number(children) > 10000))
       errors.children = 'Số trẻ em phải từ 0 đến 10.000.';
@@ -213,6 +216,10 @@ export function SosForm({
     return errors;
   }
   const clientErrors = getClientErrors();
+  /** Counts are whole people: keep exponent, sign and decimal keys out of the number inputs. */
+  const blockNonInteger = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (['e', 'E', '+', '-', '.', ','].includes(event.key)) event.preventDefault();
+  };
   function build(): Pending {
     const invalid = (field: string, message: string): never => {
       throw Object.assign(new Error(message), { field });
@@ -377,7 +384,7 @@ export function SosForm({
         <div className="sos-col-map">
           <Card className="sos-location-card" aria-labelledby="sos-location-title">
             <h2 id="sos-location-title" className="visually-hidden">Vị trí cần hỗ trợ</h2>
-            <span id="sos-location" />
+            <span id="sos-location" data-sos-field="location" tabIndex={-1} />
             {fieldMessage('location')}
             <LocationPicker
               initiallyOpen
@@ -505,6 +512,7 @@ export function SosForm({
                 <small id="sos-relief-items-help" className="sos-field-help">
                   Chỉ cần ghi tên vật phẩm, ví dụ: nước uống, mì tôm, thuốc. Không cần ghi số lượng.
                 </small>
+                <small className={`sos-char-count${reliefItems.trim().length > 500 ? ' is-over' : ''}`}>{reliefItems.trim().length}/500 ký tự</small>
                 {fieldMessage('reliefItems')}
               </label>}
               {fieldMessage('needs')}
@@ -518,6 +526,9 @@ export function SosForm({
                 <input
                   data-sos-field="people"
                   aria-invalid={fieldInvalid('people')}
+                  inputMode="numeric"
+                  step="1"
+                  onKeyDown={blockNonInteger}
                   type="number"
                   min="1"
                   max="10000"
@@ -535,6 +546,9 @@ export function SosForm({
                 <input
                   data-sos-field="children"
                   aria-invalid={fieldInvalid('children')}
+                  inputMode="numeric"
+                  step="1"
+                  onKeyDown={blockNonInteger}
                   type="number"
                   min="0"
                   max="10000"
@@ -552,6 +566,9 @@ export function SosForm({
                 <input
                   data-sos-field="elderly"
                   aria-invalid={fieldInvalid('elderly')}
+                  inputMode="numeric"
+                  step="1"
+                  onKeyDown={blockNonInteger}
                   type="number"
                   min="0"
                   max="10000"
@@ -578,6 +595,7 @@ export function SosForm({
                 }}
                 placeholder="Mô tả ngắn tình trạng và điều cần hỗ trợ"
               />
+              <small className={`sos-char-count${description.trim().length > 2000 ? ' is-over' : ''}`} aria-live="polite">{description.trim().length.toLocaleString('vi-VN')}/2.000 ký tự</small>
               {fieldMessage('description')}
             </label>
             <label className="sos-upload-field">
@@ -712,8 +730,22 @@ export function SosForm({
           )}
         </div>
       </div>
+      {attempted && Object.keys(clientErrors).length > 0 && <div className="sos-error-summary" role="alert" aria-labelledby="sos-error-summary-title">
+        <strong id="sos-error-summary-title">Còn {Object.keys(clientErrors).length} mục cần sửa trước khi gửi</strong>
+        <ul>
+          {Object.entries(clientErrors).map(([field, message]) => <li key={field}>
+            <button type="button" className="text-button" onClick={() => {
+              if (['beneficiaryPhone', 'alternateName', 'alternatePhone'].includes(field)) setProxyContactsOpen(true);
+              const target = document.querySelector<HTMLElement>(`[data-sos-field="${field}"]`);
+              target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              target?.focus({ preventScroll: true });
+            }}>{message}</button>
+          </li>)}
+        </ul>
+      </div>}
       <div className={`sos-submit-bar${busy || (Object.keys(clientErrors).length === 0 && !fieldError) ? ' is-ready' : ''}`}>
-      <Button type="submit" variant="emergency" size="lg" disabled={busy || Object.keys(clientErrors).length > 0 || Boolean(fieldError)} loading={busy}>
+      {!attempted && Object.keys(clientErrors).length > 0 && <small className="sos-submit-hint">Cần chọn loại sự cố, nhu cầu và vị trí trên bản đồ. Bấm gửi để xem mục còn thiếu.</small>}
+      <Button type="submit" variant="emergency" size="lg" disabled={busy} loading={busy}>
         {busy ? 'Đang gửi…' : 'Gửi yêu cầu SOS'}
       </Button>
       </div>

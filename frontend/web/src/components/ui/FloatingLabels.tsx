@@ -56,6 +56,8 @@ function syncLabel(label: HTMLLabelElement): void {
   if (!caption) return;
 
   label.classList.add('floating-field');
+  // The caption drops the visual '*', so required fields get it back through CSS.
+  label.classList.toggle('floating-field--required', control.required || Boolean(label.querySelector('.required-mark')));
   label.classList.toggle('floating-field--external', Boolean(group));
   label.dataset.floatingLabel = caption;
   label.classList.toggle('is-filled', Boolean(control.value));

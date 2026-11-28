@@ -924,7 +924,7 @@ const sharedLogisticsResponses = {
   logisticsCatalogDeleteItem: object({ id, deleted: boolean() }, ['id', 'deleted']),
   logisticsCatalogUpdateItemAliases: catalogItemSchema,
   logisticsDrivesList: object({
-    items: item({ ...driveValueSchema.properties, cursor_created_at: text, items: array(object({ drive_id: id, ...driveCommandItemSchema.properties, accepted_total: quantity })) }),
+    items: item({ ...driveValueSchema.properties, cursor_created_at: text, warehouse_name: text, delivery_count: integer(), posted_delivery_count: integer(), items: array(object({ drive_id: id, ...driveCommandItemSchema.properties, accepted_total: quantity })) }),
     more: boolean(), cursor: text,
   }),
   logisticsDrivesPublicList: object({ items: array(publicDriveViewSchema), more: boolean(), cursor: text, generated_at: dateTime }),

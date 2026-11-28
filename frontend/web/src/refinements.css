@@ -1893,3 +1893,88 @@
 }
 
 .drive-detail-dialog .command-form > .command-field > span { line-height: 18px; }
+
+/* Donation drive list: needs, progress and donation counts (2026-11-28). */
+.operations-record-table--drives { min-width: 860px; }
+.operations-record-table--drives tbody td:nth-child(2) { max-width: none; min-width: 240px; }
+.drive-row__meta { display: block; margin-top: 4px; color: var(--color-text-secondary); font-size: 12.5px; font-weight: 400; }
+.drive-row__donations strong { font-size: 16px; }
+.drive-row__donations small { display: block; color: var(--color-text-secondary); font-size: 12.5px; }
+.drive-need { display: grid; gap: 6px; }
+.drive-need__overall { display: flex; align-items: center; gap: 8px; }
+.drive-need__overall strong { font-size: 13px; min-width: 3ch; }
+.drive-need__track { flex: 1 1 auto; height: 6px; border-radius: 999px; background: #e2e8f0; overflow: hidden; }
+.drive-need__fill { display: block; height: 100%; border-radius: inherit; background: var(--color-primary, #2563eb); }
+.drive-need__items { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; font-size: 12.5px; }
+.drive-need__items li { display: flex; justify-content: space-between; gap: 8px; }
+
+/* Warehouse map: details sit in a column beside the map instead of a card covering its corner (2026-11-28). */
+.warehouse-coverage__frame { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-items: start; min-width: 0; }
+.warehouse-coverage__frame--with-side { grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); }
+.warehouse-map-side { position: sticky; top: 12px; box-sizing: border-box; max-height: min(82vh, 920px); overflow-y: auto; padding: 16px;
+  border: 1px solid #dbe3ef; border-radius: 12px; background: #fff; box-shadow: 0 6px 18px #0f172a14; min-width: 0; }
+.warehouse-map-side p { margin: 6px 0 10px; font-size: 13.5px; }
+.warehouse-map-side__empty { display: grid; gap: 6px; color: var(--color-text-secondary); }
+.warehouse-map-side__empty strong { color: var(--color-text-primary, #0f172a); font-size: 15px; }
+.warehouse-map-side .warehouse-map-hover__table { min-width: 0; }
+.warehouse-map-side .warehouse-map-hover__table th, .warehouse-map-side .warehouse-map-hover__table td { white-space: normal; }
+.warehouse-map-side .pager { margin: 10px 0 0; }
+@media (max-width: 1100px) {
+  .warehouse-coverage__frame--with-side { grid-template-columns: minmax(0, 1fr); }
+  .warehouse-map-side { position: static; max-height: none; }
+}
+
+/* Account page for every role (2026-11-28). */
+.account-hero { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+.account-hero__avatar { display: inline-grid; place-items: center; flex: 0 0 auto; width: 72px; height: 72px; border-radius: 50%;
+  background: linear-gradient(135deg, #2563eb, #0ea5e9); color: #fff; font-size: 26px; font-weight: 800; }
+.account-hero__body { display: grid; gap: 4px; min-width: 0; }
+.account-hero__body h2 { margin: 0; }
+.account-hero__body p { margin: 0; }
+.account-hero__roles { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 0; padding: 0; list-style: none; }
+.account-role-chip { padding: 4px 10px; border-radius: 999px; border: 1px solid #cbd5e1; background: #f8fafc; font-size: 12.5px; font-weight: 700; }
+.account-role-chip--volunteer, .account-grant--volunteer { border-color: #bbf7d0; background: #f0fdf4; }
+.account-role-chip--coordinator, .account-grant--coordinator { border-color: #bfdbfe; background: #eff6ff; }
+.account-role-chip--operations, .account-grant--operations { border-color: #fde68a; background: #fffbeb; }
+.account-role-chip--admin, .account-grant--admin { border-color: #ddd6fe; background: #f5f3ff; }
+.account-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 20px; align-items: start; }
+.account-section h3 { margin: 0 0 4px; }
+.account-section > .muted { margin: 0 0 12px; font-size: 13.5px; }
+.account-grants { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.account-grant { display: grid; gap: 2px; padding: 12px 14px; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; }
+.account-grant__scope { font-size: 13px; font-weight: 600; color: var(--color-text-secondary); }
+.account-grant small { color: var(--color-text-secondary); }
+.account-shortcuts { display: grid; gap: 12px; }
+.account-shortcut { display: grid; gap: 6px; padding-bottom: 12px; border-bottom: 1px solid var(--color-surface-border); }
+.account-shortcut:last-child { border-bottom: 0; padding-bottom: 0; }
+.account-shortcut__links { display: flex; flex-wrap: wrap; gap: 6px; }
+.account-shortcut__links a { padding: 5px 10px; border: 1px solid #dbe3ef; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none; }
+.account-shortcut__links a:hover { background: #f1f5f9; }
+
+/* Admin user detail (2026-11-28). */
+.admin-profile { display: flex; align-items: center; gap: 16px; padding: 14px 16px; margin: 8px 0 4px; border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc; }
+.admin-profile__avatar { display: inline-grid; place-items: center; flex: 0 0 auto; width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, #2563eb, #0ea5e9); color: #fff; font-size: 20px; font-weight: 800; }
+.admin-profile__body { display: grid; gap: 2px; min-width: 0; }
+.admin-profile__name { font-size: 18px; }
+.admin-profile .admin-record-meta { margin: 6px 0 2px; }
+.admin-flag { padding: 4px 9px; border-radius: 8px; background: #fffbeb; border: 1px solid #fde68a; color: #92400e; font-size: 12.5px; font-weight: 700; }
+.admin-grant-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.admin-grant { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 14px; border: 1px solid #dbe3ef; border-left: 4px solid #2563eb; border-radius: 10px; background: #fff; }
+.admin-grant span { color: var(--color-text-secondary); font-size: 13.5px; overflow-wrap: anywhere; }
+.admin-grant small { font-size: 12px; color: var(--color-text-secondary); }
+.admin-grant__active { color: #047857 !important; font-weight: 700; }
+.admin-grant.is-revoked { border-left-color: #94a3b8; background: #f8fafc; opacity: 0.75; }
+.admin-grant.is-revoked strong { text-decoration: line-through; }
+.admin-grant-form { margin-top: 14px; padding: 16px; border: 1px solid #bfdbfe; border-radius: 12px; background: #f8fbff; }
+.admin-grant-form__intro { margin: 0 0 10px; color: var(--color-text-secondary); font-size: 13.5px; }
+@media (max-width: 560px) { .admin-grant { grid-template-columns: minmax(0, 1fr); gap: 2px; } }
+
+/* Conflict SOS: compare the campaigns a SOS falls into (2026-11-28). */
+.conflict-bulk { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin: 8px 0 12px; padding: 10px 14px; border: 1px solid #fecaca; border-left: 4px solid #dc2626; border-radius: 10px; background: #fef2f2; }
+.conflict-candidates { display: grid; gap: 6px; width: 100%; margin: 8px 0 0; padding: 0; list-style: none; }
+.conflict-candidates li { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; }
+.conflict-candidates li.is-suggested { border-color: #93c5fd; background: #eff6ff; }
+.conflict-candidates__info { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; min-width: 0; }
+.conflict-candidates__info small { flex-basis: 100%; color: var(--color-text-secondary); }
+.conflict-candidates__warn { color: #b91c1c; }
+.common-queue-suggestions .suggestion-head > .conflict-candidates { order: 3; flex-basis: 100%; }

@@ -160,7 +160,9 @@ export class DriveQueriesService {
     values.push(limit + 1);
     const rows = await this.dataSource.query(
       `SELECT d.id,d.intake_warehouse_id,d.campaign_id,d.campaign_status,d.campaign_status_at,d.status,d.title,d.description,
-              d.opens_at,d.closes_at,d.version,d.created_at,d.location_note,
+              d.opens_at,d.closes_at,d.version,d.created_at,d.location_note,w.name AS warehouse_name,
+              (SELECT count(*)::int FROM donation_delivery dd WHERE dd.drive_id=d.id) AS delivery_count,
+              (SELECT count(*)::int FROM donation_delivery dd WHERE dd.drive_id=d.id AND dd.status='POSTED') AS posted_delivery_count,
               ST_X(d.location::geometry)::float8 AS longitude,ST_Y(d.location::geometry)::float8 AS latitude,
               to_char(d.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_created_at
          FROM donation_drive d JOIN warehouse w ON w.id=d.intake_warehouse_id WHERE ${conditions.join(' AND ')}

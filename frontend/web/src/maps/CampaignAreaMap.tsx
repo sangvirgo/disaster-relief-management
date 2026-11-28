@@ -47,6 +47,8 @@ export type AreaMapCampaign = {
   heat?: number;
   /** Short summary shown in the area tooltip, e.g. open SOS and P1 counts. */
   summary?: string;
+  /** Number drawn on the area badge; defaults to the position in the list. */
+  label?: number;
 };
 
 const heatColor = (heat: number) => (heat >= 0.66 ? '#dc2626' : heat >= 0.33 ? '#f59e0b' : '#10b981');
@@ -108,6 +110,8 @@ export function CampaignAreaMap({
   alert,
   height = 380,
   ariaLabel = 'Bản đồ chiến dịch và SOS cần quyết định',
+  showLegend = true,
+  highlightCampaignIds,
 }: {
   requests: AreaMapRequest[];
   campaigns: AreaMapCampaign[];
@@ -131,6 +135,10 @@ export function CampaignAreaMap({
   alert?: ReactNode;
   height?: number | string;
   ariaLabel?: string;
+  /** The numbered list under the map; hide it when the page already lists the campaigns beside the map. */
+  showLegend?: boolean;
+  /** Campaigns to emphasise (e.g. the areas a conflicting SOS falls into); the others are dimmed. */
+  highlightCampaignIds?: string[] | null;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -180,7 +188,24 @@ export function CampaignAreaMap({
       map.invalidateSize();
       if (boundsRef.current.length && !focusedRef.current) map.fitBounds(boundsRef.current, { padding: [24, 24], maxZoom: 12, animate: false });
     }, 250);
+    // A map laid out in a grid column can start with zero width; any fit made then lands far away (e.g. the North Pacific).
+    // Re-fit to the data whenever the container first gets, or changes, its real size, until the person moves the map.
+    let userMoved = false;
+    map.on('dragstart zoomstart', (event) => { if ((event as L.LeafletEvent & { originalEvent?: Event }).originalEvent) userMoved = true; });
+    map.getContainer().addEventListener('wheel', () => { userMoved = true; }, { passive: true });
+    let lastWidth = 0;
+    const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver((entries) => {
+      const width = Math.round(entries[0]?.contentRect.width ?? 0);
+      if (!width || width === lastWidth) return;
+      lastWidth = width;
+      map.invalidateSize();
+      if (!userMoved && boundsRef.current.length && !focusedRef.current && !editorRef.current) {
+        map.fitBounds(boundsRef.current, { padding: [24, 24], maxZoom: 12, animate: false });
+      }
+    });
+    resize?.observe(containerRef.current);
     return () => {
+      resize?.disconnect();
       window.clearTimeout(timer);
       map.remove();
       setMapInstance(null);
@@ -240,14 +265,16 @@ export function CampaignAreaMap({
       const active = campaign.status === 'ACTIVE';
       const heat = campaign.heat == null ? null : Math.min(1, Math.max(0, campaign.heat));
       const color = heat == null ? areaColor(index) : heatColor(heat);
+      const highlighted = highlightCampaignIds?.length ? highlightCampaignIds.includes(campaign.id) : null;
       const hint = campaignEditRef.current ? ' · nhấp đúp để chỉnh vùng' : campaignSelectRef.current ? ' · bấm để chọn' : '';
       L.circle([campaign.center.lat, campaign.center.lng], {
         radius: campaign.radius_m,
         color,
-        weight: heat == null ? 2 : 2 + Math.round(heat * 2),
+        weight: highlighted ? 4 : heat == null ? 2 : 2 + Math.round(heat * 2),
+        opacity: highlighted === false ? 0.35 : 1,
         dashArray: active ? undefined : '6 4',
         fillColor: color,
-        fillOpacity: heat == null ? 0.07 : 0.08 + heat * 0.3,
+        fillOpacity: highlighted ? 0.16 : highlighted === false ? 0.02 : heat == null ? 0.07 : 0.08 + heat * 0.3,
         className: 'campaign-area-circle',
       }).on('click', () => {
         if (heat != null) campaignSelectRef.current?.(campaign.id);
@@ -261,13 +288,15 @@ export function CampaignAreaMap({
         interactive: true,
         icon: L.divIcon({
           className: 'campaign-area-label',
-          html: `<span style="border-color:${color};color:${color}">${index + 1}</span>`,
+          html: `<span style="border-color:${color};color:${color}">${campaign.label ?? index + 1}</span>`,
           iconSize: [22, 22],
           iconAnchor: [11, 11],
         }),
       }).bindTooltip(campaign.name).on('click', () => campaignSelectRef.current?.(campaign.id))
         .on('dblclick', () => campaignEditRef.current?.(campaign.id)).addTo(layer);
-      bounds.push([campaign.center.lat, campaign.center.lng]);
+      // Fit the whole circle, not only its centre, so a lone campaign is shown at a sensible zoom.
+      const extent = L.latLng(campaign.center.lat, campaign.center.lng).toBounds(campaign.radius_m * 2);
+      bounds.push([extent.getSouth(), extent.getWest()], [extent.getNorth(), extent.getEast()]);
     });
     // SOS dots live in their own pane above the campaign number badges, so a dot is never hidden under a circle label.
     const dotPane = map.getPane('sos-dots') ?? map.createPane('sos-dots');
@@ -301,7 +330,7 @@ export function CampaignAreaMap({
     boundsRef.current = bounds;
     map.invalidateSize();
     if (bounds.length && !focusedRef.current && !editing) map.fitBounds(bounds, { padding: [24, 24], maxZoom: 12, animate: false });
-  }, [requests, campaigns, hideId, expandingId, editing]);
+  }, [requests, campaigns, hideId, expandingId, editing, highlightCampaignIds]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -418,7 +447,7 @@ export function CampaignAreaMap({
             disabled={editActions.busy} onClick={editActions.onCancel}>✕</button>
         </div>}
       </div>
-      {campaigns.length > 0 && (
+      {showLegend && campaigns.length > 0 && (
         <ol className="campaign-area-legend" aria-label="Chú giải vùng chiến dịch">
           {campaigns.map((campaign, index) => (
             <li key={campaign.id}>

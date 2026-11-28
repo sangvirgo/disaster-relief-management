@@ -145,7 +145,7 @@ function ResponseOverviewPanels({ view, compact = false }: { view: 'overview' | 
         order={['AVAILABLE', 'ON_MISSION', 'AWAITING_READINESS', 'UNAVAILABLE']}
         labelFor={(code) => ({ AVAILABLE: 'Sẵn sàng', ON_MISSION: 'Đang làm nhiệm vụ', AWAITING_READINESS: 'Chờ xác nhận sẵn sàng', UNAVAILABLE: 'Không sẵn sàng' }[code] || code)} />
     </div>}
-    {data && <a className="dash-link" href="?workspace=coordinator&page=reports">Xem bản đồ nhiệt SOS ›</a>}
+    {data && <a className="dash-link" href="?workspace=coordinator&page=campaigns&campaign_tab=routing&map_layer=density">Xem bản đồ nhiệt SOS ›</a>}
   </Panel>;
   return <Panel title={compact ? 'Tình hình ứng cứu' : 'Việc cần xử lý'} updated={data?.generated_at} onRefresh={snapshot.refresh} loading={snapshot.loading} error={snapshot.error}>
     {data && <>

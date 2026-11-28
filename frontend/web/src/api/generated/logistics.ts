@@ -2040,6 +2040,9 @@ export interface operations {
                                 accepted_total?: string;
                             }[];
                             cursor_created_at?: string;
+                            warehouse_name?: string;
+                            delivery_count?: number;
+                            posted_delivery_count?: number;
                         }[];
                         more?: boolean;
                         cursor?: string;

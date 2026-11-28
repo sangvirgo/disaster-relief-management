@@ -260,3 +260,82 @@ END $$;
 UPDATE donation_drive d SET location = w.location, location_note = 'Tại kho tiếp nhận'
   FROM warehouse w
  WHERE w.id = d.intake_warehouse_id AND d.location IS NULL AND w.location IS NOT NULL;
+
+-- ---------- donations received by the regional drives (2026-11-28) ----------
+-- Each OPEN regional drive (a6cXX) gets three donations that went through the full intake chain (count by ops_seed, independent
+-- APPROVE and posting by reviewer1) and one donation still DECLARED, so the drive list shows real progress against its targets.
+-- Ids: deliveries 000000a7dNNk, receipts 000000a8dNNk, reviews 000000acdNNk (NN = drive number, k = 1..4). Safe to apply more than once.
+DO $$
+DECLARE
+  d record;
+  it record;
+  k int;
+  n text;
+  del uuid;
+  rec uuid;
+  bal uuid;
+  qty numeric;
+  donors text[] := ARRAY['Nhóm thiện nguyện Ánh Dương (giả lập)', 'Hội phụ nữ phường (giả lập)', 'Công ty Thực phẩm An Phát (giả lập)', 'Nhà hảo tâm ẩn danh (giả lập)'];
+BEGIN
+  FOR d IN
+    SELECT drive.id, drive.intake_warehouse_id, substr(drive.id::text, 35, 2) AS num
+      FROM donation_drive drive
+     WHERE drive.id::text LIKE '00000000-0000-4000-8000-0000000a6c%' AND drive.status = 'OPEN'
+     ORDER BY drive.id
+  LOOP
+    n := d.num;
+    FOR k IN 1..4 LOOP
+      del := ('00000000-0000-4000-8000-000000a7d' || n || k)::uuid;
+      CONTINUE WHEN EXISTS (SELECT 1 FROM donation_delivery WHERE id = del);
+      -- k-th item of the drive (wraps around), donated at roughly 15-35% of the drive target
+      SELECT di.item_id, di.target_quantity INTO it
+        FROM drive_item di WHERE di.drive_id = d.id ORDER BY di.item_id OFFSET ((k - 1) % 4) LIMIT 1;
+      CONTINUE WHEN it.item_id IS NULL;
+      qty := greatest(1, floor(it.target_quantity * (0.15 + 0.05 * k)));
+
+      INSERT INTO donation_delivery (id, public_code, drive_id, donor_name, donor_phone, capability_hash, status, created_at)
+      VALUES (del, 'GDRS' || n || k || 'Q', d.id, donors[k], '09000004' || n, NULL, 'DECLARED', now() - (5 - k) * interval '18 hours');
+      INSERT INTO donation_declaration (delivery_id, revision, created_by_kind, created_at)
+      VALUES (del, 1, 'DONOR', now() - (5 - k) * interval '18 hours');
+      INSERT INTO donation_line (delivery_id, revision, item_id, declared_quantity) VALUES (del, 1, it.item_id, qty);
+      CONTINUE WHEN k = 4;
+
+      rec := ('00000000-0000-4000-8000-000000a8d' || n || k)::uuid;
+      INSERT INTO donation_receipt (id, delivery_id, warehouse_id, created_at)
+      VALUES (rec, del, d.intake_warehouse_id, now() - (5 - k) * interval '18 hours' + interval '2 hours');
+      INSERT INTO receipt_count (receipt_id, revision, counted_by_user_id, counted_at, note)
+      VALUES (rec, 1, '00000000-0000-4000-8000-000000000112', now() - (5 - k) * interval '18 hours' + interval '3 hours', 'Đã đếm đủ theo khai báo');
+      INSERT INTO receipt_count_line (receipt_id, revision, item_id, counted_quantity, accepted_quantity, held_quantity, rejected_quantity, condition_note, expiry_date)
+      VALUES (rec, 1, it.item_id, qty, qty, 0, 0, 'Hàng nguyên vẹn', NULL);
+      INSERT INTO receipt_review (id, receipt_id, delivery_id, count_revision, declaration_revision, reviewer_user_id, decision, reason, reviewed_at)
+      VALUES (('00000000-0000-4000-8000-000000acd' || n || k)::uuid, rec, del, 1, 1, '00000000-0000-4000-8000-000000000108', 'APPROVE', NULL,
+              now() - (5 - k) * interval '18 hours' + interval '4 hours');
+
+      INSERT INTO stock_balance (id, warehouse_id, item_id) VALUES (gen_random_uuid(), d.intake_warehouse_id, it.item_id)
+      ON CONFLICT (warehouse_id, item_id) DO NOTHING;
+      SELECT sb.id INTO bal FROM stock_balance sb WHERE sb.warehouse_id = d.intake_warehouse_id AND sb.item_id = it.item_id;
+      INSERT INTO stock_movement (balance_id, movement_type, delta_on_hand, delta_reserved, receipt_id, operation_ref, actor_user_id, created_at)
+      VALUES (bal, 'RECEIPT', qty, 0, rec, 'RCPT:' || rec || ':' || it.item_id, '00000000-0000-4000-8000-000000000108',
+              now() - (5 - k) * interval '18 hours' + interval '4 hours');
+      UPDATE donation_delivery SET status = 'POSTED' WHERE id = del;
+    END LOOP;
+  END LOOP;
+END $$;
+
+-- ---------- open relief needs for an SOS that asked for goods (2026-11-28) ----------
+-- C48DEM0003 (campaign c1, needs relief supplies) has an OPEN fulfillment cycle: rice, water and blankets nobody has reserved yet.
+-- These needs feed the supply-gap inbox of the campaign's primary warehouse and the team's "cần hàng" view.
+INSERT INTO fulfillment_cycle (id, request_id, work_cycle, campaign_id, state, created_at)
+SELECT '00000000-0000-4000-8000-0000000b7003', '00000000-0000-4000-8000-0000000000f3', 1, '00000000-0000-4000-8000-0000000000c1', 'OPEN', now() - interval '150 minutes'
+ WHERE NOT EXISTS (SELECT 1 FROM fulfillment_cycle WHERE request_id = '00000000-0000-4000-8000-0000000000f3' AND work_cycle = 1);
+
+INSERT INTO relief_need (id, cycle_id, item_id, original_quantity, requested_quantity, cancelled_remaining, status, created_at)
+SELECT fixture.id, '00000000-0000-4000-8000-0000000b7003', fixture.item_id, fixture.quantity, fixture.quantity, NULL, 'OPEN', now() - interval '140 minutes'
+  FROM (VALUES
+    ('00000000-0000-4000-8000-0000000b1031'::uuid, '00000000-0000-4000-8000-0000000a1001'::uuid, 12::numeric),
+    ('00000000-0000-4000-8000-0000000b1032'::uuid, '00000000-0000-4000-8000-0000000a1003'::uuid, 24::numeric),
+    ('00000000-0000-4000-8000-0000000b1033'::uuid, '00000000-0000-4000-8000-0000000a1007'::uuid, 2::numeric)
+  ) AS fixture(id, item_id, quantity)
+  JOIN item ON item.id = fixture.item_id
+ WHERE EXISTS (SELECT 1 FROM fulfillment_cycle WHERE id = '00000000-0000-4000-8000-0000000b7003')
+ON CONFLICT DO NOTHING;

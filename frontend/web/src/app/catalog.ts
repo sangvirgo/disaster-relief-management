@@ -50,10 +50,6 @@ export const pages: Record<Workspace, Page[]> = {
   coordinator: [
     { id: 'campaigns', title: 'Chiến dịch và điều phối', icon: 'campaign', service: 'response', path: '/campaigns/overview' },
     { id: 'dashboard', title: 'Bảng điều khiển', icon: 'home' },
-    {
-      id: 'reports', title: 'Tổng quan và bản đồ', icon: 'report', service: 'response',
-      path: '/reports/summary', note: 'Tình hình SOS, nhiệm vụ và bản đồ nhiệt.',
-    },
     { id: 'teams', title: 'Đội cứu hộ', icon: 'team', service: 'response', path: '/teams' },
     { id: 'notices', title: 'Thông báo', icon: 'notice', service: 'response', path: '/notices' },
   ],
