@@ -1,3 +1,4 @@
+import { itemUnitName } from '../../i18n/units';
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { Badge, type BadgeTone } from '../../components/ui/Badge';
@@ -92,7 +93,7 @@ export function SosNeedEstimatePanel({ requestId, workCycle, status, needsRelief
               <li key={need.id} className="sos-need-estimate__row">
                 <span>{category ? labelFor(normCategoryLabels, category, 'Nhóm khác') : labelFor(needSourceLabels, need.source, 'Khác')}</span>{' '}
                 <strong>{need.item.name}</strong>{': '}
-                <span>{formatQuantity(need.requested)} {need.unit.display_name}</span>{' '}
+                <span>{formatQuantity(need.requested)} {itemUnitName(need.item.id, need.unit.display_name)}</span>{' '}
                 <Badge kind="meta" tone={(needSourceTones[need.source] ?? 'neutral') as BadgeTone}>{labelFor(needSourceLabels, need.source, 'Khác')}</Badge>
                 {reasons.length > 0 && (
                   <ul className="sos-need-estimate__reasons">

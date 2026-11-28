@@ -25,6 +25,27 @@ function fixture(grants: ReporterSession['grants'], managerHandler?: (sql: strin
 }
 
 describe('CampaignCoordinationService triage', () => {
+  it('pages the unassigned SOS queue newest first with a matching descending cursor', async () => {
+    const time = new Date('2026-11-28T03:00:00.123Z');
+    const found = [campaignB, campaignA, userId].map(id => ({ id, tracking_code: 'SYNTHETIC',
+      status: 'SUBMITTED', version: 1, campaign_match_state: 'UNMATCHED', priority: null,
+      received_at: time, latitude: 17, longitude: 106, campaign_candidate_ids: [], needs_relief_supplies: false }));
+    const { service, dataSourceQuery } = fixture([{ role_code: 'COORDINATOR', scope_type: 'SYSTEM' }], (sql, values) => {
+      if (sql.includes('count(*)')) return [{ total: 3 }];
+      if (sql.includes('date_trunc') && sql.includes('SELECT r.id')) return values?.length === 1 ? found : found.slice(2);
+      return [];
+    });
+    const first = await service.commonQueueSuggestions({ limit: 2 }, request) as { cursor: string; requests: Array<{ id: string }>; more: boolean };
+    expect(first.requests.map(row => row.id)).toEqual([campaignB, campaignA]);
+    expect(first.more).toBe(true);
+    const second = await service.commonQueueSuggestions({ limit: 2, cursor: first.cursor }, request) as { requests: Array<{ id: string }> };
+    expect(second.requests.map(row => row.id)).toEqual([userId]);
+    const pageQueries = dataSourceQuery.mock.calls.filter(([sql]) => sql.includes('date_trunc') && sql.includes('SELECT r.id'));
+    expect(pageQueries[0]?.[0]).toContain("ORDER BY date_trunc('milliseconds',r.received_at) DESC,r.id DESC");
+    expect(pageQueries[1]?.[0]).toMatch(/\(date_trunc\('milliseconds',r\.received_at\),r\.id\)</);
+    expect(pageQueries[1]?.[1]).toEqual([time.toISOString(), campaignA, 3]);
+  });
+
   it('sorts deterministically by P1, P2, overdue, wait, fewer coordinators, then id', async () => {
     const rows = [
       { id: campaignB, name: 'B', status: 'ACTIVE', highest_priority: null, highest_priority_unhandled_count: 0,

@@ -213,7 +213,7 @@ function SupplyStrip({ supply }: { supply: NonNullable<OperationsOverview['suppl
       <li><a href={handoverHref()} className={supply.expiring_soon ? 'has-work' : ''}>
         <span className="dash-pipeline__index">!</span><strong>{supply.expiring_soon}</strong><span>Sắp hết hạn nhận (dưới 1 giờ)</span>
       </a></li>
-      <li><a href={handoverHref()}>
+      <li><a href={handoverHref('HANDED_OVER')}>
         <span className="dash-pipeline__index">2</span><strong>{supply.handed_over_last_7d}</strong><span>Đã giao 7 ngày qua</span>
       </a></li>
     </ol>

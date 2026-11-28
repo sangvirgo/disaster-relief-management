@@ -14,6 +14,8 @@ BEGIN;
 -- ---------- catalogs ----------
 INSERT INTO unit (code, display_name, scale) VALUES
   ('CAI',   'cái',   0),
+  ('CHAI',  'chai',  0),
+  ('GOI',   'gói',   0),
   ('KG',    'kg',    3),
   ('LIT',   'lít',   3),
   ('THUNG', 'thùng', 0);
@@ -27,8 +29,8 @@ INSERT INTO item_type (code, display_name) VALUES
 -- returnable=false marks consumables (food, water, medicine and dressings) that cannot come back to stock (proposal 3.6).
 INSERT INTO item (id, item_type_code, unit_code, name, returnable, aliases) VALUES
   ('00000000-0000-4000-8000-0000000a1001', 'LUONG_THUC', 'KG',    'Gạo', false, ARRAY['gạo']::text[]),
-  ('00000000-0000-4000-8000-0000000a1002', 'LUONG_THUC', 'CAI',   'Mì gói', false, ARRAY['mì tôm','mì ăn liền']::text[]),
-  ('00000000-0000-4000-8000-0000000a1003', 'NUOC_UONG',  'CAI',   'Nước đóng chai', false, ARRAY['nước suối','nước lọc','nuoc']::text[]),
+  ('00000000-0000-4000-8000-0000000a1002', 'LUONG_THUC', 'GOI',   'Mì gói', false, ARRAY['mì tôm','mì ăn liền']::text[]),
+  ('00000000-0000-4000-8000-0000000a1003', 'NUOC_UONG',  'CHAI',  'Nước đóng chai', false, ARRAY['nước suối','nước lọc','nuoc']::text[]),
   ('00000000-0000-4000-8000-0000000a1004', 'NUOC_UONG',  'LIT',   'Nước sạch đóng can', false, ARRAY['nước sạch','nước can']::text[]),
   ('00000000-0000-4000-8000-0000000a1005', 'Y_TE',       'CAI',   'Bộ sơ cứu', false, ARRAY['thuốc','thuốc men','sơ cứu']::text[]),
   ('00000000-0000-4000-8000-0000000a1006', 'Y_TE',       'THUNG', 'Băng gạc y tế', false, ARRAY['băng gạc','băng y tế']::text[]),

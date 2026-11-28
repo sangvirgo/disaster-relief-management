@@ -50,14 +50,16 @@
 .dash-link { justify-self: start; color: var(--color-primary-dark); font-weight: 650; font-size: 14px; text-decoration: none; }
 .dash-link:hover { text-decoration: underline; }
 
-/* Distribution slips by step, mirroring the slip's own step tracker. */
+/* Each status is a complete navigation card, including its arrow. */
 .dash-pipeline { display: grid; gap: 10px; }
 .dash-pipeline header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px; }
 .dash-pipeline h3 { margin: 0; font-size: 16px; }
 .dash-pipeline header .muted { font-size: 13px; }
-.dash-pipeline ol { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; counter-reset: none; }
-.dash-pipeline a { position: relative; display: grid; justify-items: start; gap: 2px; padding: 12px 14px; border: 1px solid var(--color-surface-border); border-radius: 12px; background: var(--color-surface-card); color: var(--color-text-primary); text-decoration: none; }
-.dash-pipeline li:not(:last-child) a::after { content: '›'; position: absolute; top: 50%; right: -9px; z-index: 1; transform: translateY(-50%); color: var(--color-text-muted); font-size: 18px; }
+.dash-pipeline ol { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; counter-reset: none; }
+.dash-pipeline li { min-width: 0; }
+.dash-pipeline ol a { position: relative; display: grid; justify-items: start; align-content: start; gap: 5px; height: 100%; box-sizing: border-box; padding: 16px 34px 16px 16px; border: 1px solid var(--color-surface-border); border-radius: 12px; background: var(--color-surface-card); color: var(--color-text-primary); text-decoration: none; }
+.dash-pipeline ol a::after { content: '›'; position: absolute; top: 50%; right: 14px; transform: translateY(-50%); color: var(--color-text-muted); font-size: 24px; }
+.dash-pipeline ol a:focus-visible { outline: 3px solid var(--color-primary-border); outline-offset: 2px; }
 .dash-pipeline a:hover { border-color: var(--color-primary-border); }
 .dash-pipeline a.has-work { border-color: var(--color-primary-border); background: var(--color-primary-bg); }
 .dash-pipeline strong { font-size: 24px; line-height: 1.1; }
@@ -74,7 +76,6 @@
   .dash-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dash-attention { grid-template-columns: 1fr; }
   .dash-grid { grid-template-columns: 1fr; }
-  .dash-pipeline ol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .dash-pipeline li a::after { display: none; }
+  .dash-pipeline ol { grid-template-columns: 1fr; }
   .dash-bars li { grid-template-columns: minmax(90px, 42%) minmax(0, 1fr) 34px; }
 }

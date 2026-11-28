@@ -1,6 +1,22 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { quantityFitsScale, remainingQuantity } from '../src/i18n/quantity.ts';
+import { formatQuantity, quantityInput, quantityFitsScale, remainingQuantity } from '../src/i18n/quantity.ts';
+import { itemUnitName } from '../src/i18n/units.ts';
+
+test('API padding does not turn nineteen pieces into nineteen thousand in display or inputs', () => {
+  assert.equal(formatQuantity('19.000'), '19');
+  assert.equal(quantityInput('19.000'), '19');
+  assert.equal(quantityInput('15.500'), '15.5');
+  assert.equal(quantityInput('9007199254740993.010'), '9007199254740993.01');
+  assert.equal(formatQuantity('15000.000'), '15.000');
+});
+
+test('legacy package labels never convert quantities or override explicit units', () => {
+  assert.equal(itemUnitName('00000000-0000-4000-8000-0000000a1003', 'cái'), 'chai');
+  assert.equal(itemUnitName('00000000-0000-4000-8000-0000000a1002', 'cái'), 'gói');
+  assert.equal(itemUnitName('00000000-0000-4000-8000-0000000a1003', 'thùng'), 'thùng');
+  assert.equal(itemUnitName('other', 'cái'), 'cái');
+});
 
 test('remaining quantity preserves decimal arithmetic and clamps over-target donations', () => {
   assert.equal(remainingQuantity('0.3', '0.1'), '0.2');

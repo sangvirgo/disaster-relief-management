@@ -1,3 +1,4 @@
+import { itemUnitName } from '../../i18n/units';
 import { DriveNearbyMap, type MapDrive } from '../../maps/DriveNearbyMap';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, newCommandKey, upload } from '../../api/client';
@@ -715,7 +716,7 @@ export function Donations({ user }: { user: Me | null }) {
                   {tracking.declaration?.lines.map((line) => (
                     <tr key={line.item_id}>
                       <th scope="row">{line.item_name}</th>
-                      <td>{formatQuantity(line.declared_quantity)} {line.unit_name}</td>
+                      <td>{formatQuantity(line.declared_quantity)} {itemUnitName(line.item_id, line.unit_name)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -735,7 +736,7 @@ export function Donations({ user }: { user: Me | null }) {
                   <tbody>{tracking.receipt.lines.map((line, i) => {
                   const declared = tracking.declaration?.lines.find((item) => item.item_id === line.item_id);
                   const itemName = line.item_name || declared?.item_name || `Vật phẩm ${i + 1}`;
-                  const unitName = line.unit_name || declared?.unit_name || '';
+                  const unitName = itemUnitName(line.item_id, line.unit_name || declared?.unit_name);
                   return (
                     <tr key={`${line.item_id}-${i}`}>
                       <th scope="row">{itemName}</th>
@@ -967,8 +968,8 @@ export function Donations({ user }: { user: Me | null }) {
                           const compatible = quantityFitsScale(item.target_quantity, item.scale) && quantityFitsScale(item.accepted_total, item.scale);
                           return <tr key={item.item_id}>
                             <th scope="row"><strong>{item.item_name}</strong></th>
-                            <td className="numeric" data-label="Mục tiêu">{formatQuantity(item.target_quantity)} {item.unit_name}</td>
-                            <td className="numeric" data-label="Đã tiếp nhận"><span className="available-value">{formatQuantity(item.accepted_total)} {item.unit_name}</span>{!compatible && <small>Cần kiểm tra số liệu</small>}</td>
+                            <td className="numeric" data-label="Mục tiêu">{formatQuantity(item.target_quantity)} {itemUnitName(item.item_id, item.unit_name)}</td>
+                            <td className="numeric" data-label="Đã tiếp nhận"><span className="available-value">{formatQuantity(item.accepted_total)} {itemUnitName(item.item_id, item.unit_name)}</span>{!compatible && <small>Cần kiểm tra số liệu</small>}</td>
                           </tr>;
                         })}
                       </tbody>
@@ -1040,12 +1041,12 @@ export function Donations({ user }: { user: Me | null }) {
                         <strong>{item.item_name}</strong>
                         {compatible && remaining !== null ? (
                           <div className="donation-declaration-stats" id={`declaration-progress-${item.item_id}`}>
-                            <span><span>Mục tiêu</span><strong>{formatQuantity(item.target_quantity)} {item.unit_name}</strong></span>
-                            <span><span>Đã nhập kho</span><strong>{formatQuantity(item.accepted_total)} {item.unit_name}</strong></span>
+                            <span><span>Mục tiêu</span><strong>{formatQuantity(item.target_quantity)} {itemUnitName(item.item_id, item.unit_name)}</strong></span>
+                            <span><span>Đã nhập kho</span><strong>{formatQuantity(item.accepted_total)} {itemUnitName(item.item_id, item.unit_name)}</strong></span>
                             <span>
                               <span>{remaining === '0' ? 'Tiến độ' : 'Còn cần'}</span>
                               <strong className={remaining === '0' ? 'is-complete' : 'is-remaining'}>
-                                {remaining === '0' ? 'Đã đủ' : `${formatQuantity(remaining)} ${item.unit_name}`}
+                                {remaining === '0' ? 'Đã đủ' : `${formatQuantity(remaining)} ${itemUnitName(item.item_id, item.unit_name)}`}
                               </strong>
                             </span>
                           </div>
@@ -1057,7 +1058,7 @@ export function Donations({ user }: { user: Me | null }) {
 
                       </div>
                       <label className="donation-declaration-quantity">
-                        <span>Số lượng mang đến ({item.unit_name})</span>
+                        <span>Số lượng mang đến ({itemUnitName(item.item_id, item.unit_name)})</span>
                         <input
                           type="number"
                           min="0"

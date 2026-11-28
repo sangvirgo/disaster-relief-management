@@ -10,6 +10,7 @@ import { roles, type Me } from '../../auth/session';
 import { CommandForm, type CommandSpec } from '../../components/CommandForm';
 import { dateLabel, label, timeLabel } from '../../i18n/labels';
 import { formatQuantity } from '../../i18n/quantity';
+import { itemUnitName } from '../../i18n/units';
 import { ReceiptCountForm } from './ReceiptCountForm';
 import { operationRecordKey } from './recordKey';
 import { RecoveryIssue } from '../../components/RecoveryIssue';
@@ -70,7 +71,7 @@ const string = (value: unknown) => (typeof value === 'string' ? value : '');
 const number = (value: unknown) => (typeof value === 'number' ? value : undefined);
 const quantity = formatQuantity;
 function quantityWithUnit(item: Row, value: unknown, fallbackUnit = ''): string {
-  const unit = string((item.unit as Row | undefined)?.display_name) || string(item.unit_name) || fallbackUnit || string(item.unit_code);
+  const unit = itemUnitName(item.item_id || (item.item as Row | undefined)?.id, string((item.unit as Row | undefined)?.display_name) || string(item.unit_name) || fallbackUnit || string(item.unit_code));
   return `${quantity(value)}\u00a0${unit || '(chưa rõ đơn vị)'}`;
 }
 function recordTitle(page: string, item: Row): string {
@@ -507,16 +508,15 @@ export function Operations({ page, user }: { page: string; user: Me }) {
         {page === 'stock' || (page === 'reports' && report === 'stock-summary') ? (
           <>
             <p className="table-swipe-hint">Vuốt ngang bảng để xem các cột số lượng.</p>
-            <div className="stock-table-scroll">
-              <table className="stock-table">
+            <div className="stock-table-scroll" role="region" aria-label="Tồn kho và lượng hàng có thể giao" tabIndex={0}>
+              <table className="stock-table stock-table--summary">
                 <thead>
                   <tr>
                     <th>Vật phẩm</th>
-                    <th>Kho</th>
-                    <th>Đơn vị</th>
-                    <th className="numeric">Tồn thực tế</th>
-                    <th className="numeric">Đã giữ</th>
+                    {!warehouse && <th>Kho</th>}
                     <th className="numeric">Khả dụng</th>
+                    <th className="numeric">Đã giữ</th>
+                    <th className="numeric">Tồn thực tế</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -536,22 +536,17 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                             item.name ||
                             'Vật phẩm'}
                         </button>
+                        <small className="stock-unit">{itemUnitName(item.item_id || (item.item as Row | undefined)?.id, string((item.unit as Row | undefined)?.display_name) || string(item.unit) || string(item.unit_name)) || 'Chưa rõ đơn vị'}</small>
                       </th>
-                      <td>
+                      {!warehouse && <td>
                         {string(item.warehouse_name) ||
                           (item.warehouse_id ? warehouseName(item.warehouse_id) : '—')}
-                      </td>
-                      <td>
-                        {string((item.unit as Row | undefined)?.display_name) ||
-                          string(item.unit) ||
-                          string(item.unit_name) ||
-                          '—'}
-                      </td>
-                      <td className="numeric">{quantity(item.on_hand)}</td>
-                      <td className="numeric">{quantity(item.reserved)}</td>
+                      </td>}
                       <td className="numeric">
-                        <strong className="available-value">{quantity(item.available)}</strong>
+                        <strong className={`available-value${Number(item.available) === 0 ? ' available-value--empty' : ''}`}>{quantity(item.available)}</strong>
                       </td>
+                      <td className="numeric">{quantity(item.reserved)}</td>
+                      <td className="numeric">{quantity(item.on_hand)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -563,7 +558,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
         ) : page === 'assets' ? null : (
           <div className="operations-table-scroll" role="region" aria-label={`Bảng ${headings[page] || 'bản ghi'}`} tabIndex={0}>
             <table className={`operations-record-table${page === 'drives' ? ' operations-record-table--drives' : ''}`}>
-              <thead><tr><th scope="col">{page === 'assets' ? 'Kho' : 'Tên bản ghi'}</th>{page !== 'assets' && page !== 'drives' && <th scope="col">Thông tin chính</th>}<th scope="col">Thời gian</th><th scope="col">Trạng thái</th></tr></thead>
+              <thead><tr><th scope="col">{page === 'assets' ? 'Kho' : page === 'intake' ? 'Người đóng góp' : page === 'review' ? 'Mã phiếu' : page === 'drives' ? 'Đợt quyên góp' : 'Vật phẩm'}</th>{page !== 'assets' && page !== 'drives' && <th scope="col">{page === 'intake' || page === 'review' ? 'Đợt quyên góp' : 'Nhu cầu và kết quả'}</th>}<th scope="col">Tiếp nhận lúc</th><th scope="col">Trạng thái</th></tr></thead>
               <tbody>{items.map((item) => <tr key={operationRecordKey(item)}>
                 <th scope="row">{page === 'assets' && asset === 'warehouses' && item.id
                   ? <a className="table-row-link" href={`?workspace=operations&page=assets&view=warehouses&warehouse_id=${encodeURIComponent(item.id)}&warehouse_name=${encodeURIComponent(recordTitle(page, item))}`} aria-label={`Xem tồn kho ${recordTitle(page, item)}`}>{recordTitle(page, item)}</a>
@@ -592,7 +587,6 @@ export function Operations({ page, user }: { page: string; user: Me }) {
           { id: 'details', label: page === 'reports' ? 'Số liệu' : page === 'drives' ? 'Vật phẩm tiếp nhận' : 'Chi tiết' },
           ...(showActionsTab && !inlineActions ? [{ id: 'actions', label: 'Thao tác' }] : []),
         ]} value={detailTab} onChange={setDetailTab} ariaLabel="Nội dung bản ghi" idBase="operations-detail" />}
-        {page === 'drives' && status === 'DRAFT' && id && (rights.has('COORDINATOR') || rights.has('OPERATIONS_MANAGER')) && <a className="button secondary" href={`?workspace=operations&page=assets&view=warehouses&edit_drive=${encodeURIComponent(String(id))}`}>Sửa bản nháp</a>}
         {selected && <div id="operations-detail-tabpanel" style={page === 'review' ? { display: 'flex', flexDirection: 'column' } : undefined}>
         {detail && (
           <>
@@ -646,7 +640,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                   <p>
                     <strong>Đơn vị</strong>
                     <span className="detail-value">
-                      {string(detail.unit) || string((detail.unit as Row | undefined)?.display_name) || string(detail.unit_code) || 'Chưa có'}
+                      {itemUnitName(detail.item_id || (detail.item as Row | undefined)?.id, string(detail.unit) || string((detail.unit as Row | undefined)?.display_name) || string(detail.unit_code)) || 'Chưa có'}
                     </span>
                   </p>
                 </>
@@ -765,6 +759,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             </div>}
             {page === 'drives' && <section aria-label="Vật phẩm cần tiếp nhận">
               <h3>Vật phẩm cần tiếp nhận</h3>
+              {status === 'DRAFT' && id && canCreatePage && <a className="button secondary" href={`?workspace=operations&page=assets&view=warehouses&edit_drive=${encodeURIComponent(id)}`}>Chỉnh sửa bản nháp</a>}
               {driveItems.length > 0 ? <>
                 <div className="operations-table-scroll" role="region" aria-label="Bảng vật phẩm cần tiếp nhận" tabIndex={0}>
                   <table className="drive-items-table">
@@ -802,7 +797,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
             </div>}
             {page === 'reports' && report === 'reconciliation' && <section className="reconciliation-section"><h3>Đối soát {string((detail.item as Row)?.name)}</h3>
               <div className="operations-table-scroll" role="region" aria-label="Bảng đối soát vật phẩm" tabIndex={0}>
-                <table className="reconciliation-table"><thead><tr><th scope="col">Chỉ tiêu</th><th scope="col">Số lượng ({string((detail.unit as Row)?.display_name)})</th></tr></thead><tbody>
+                <table className="reconciliation-table"><thead><tr><th scope="col">Chỉ tiêu</th><th scope="col">Số lượng ({itemUnitName((detail.item as Row)?.id, (detail.unit as Row)?.display_name)})</th></tr></thead><tbody>
                   {reconciliationMetrics.map(([key, title]) => <tr key={key}><th scope="row">{title}</th><td>{quantity(detail[key])}</td></tr>)}
                 </tbody></table>
               </div><p className="reconciliation-result">{reconciliationResult(detail.flags).text}</p>
@@ -965,7 +960,7 @@ export function Operations({ page, user }: { page: string; user: Me }) {
                     existing={null}
                     initialItems={Array.isArray(count.lines) ? (count.lines as Row[]).filter(line => string(line.item_id) && line.has_count_line !== false).map(line => ({
                       id: string(line.item_id), name: string(line.item_name) || string(line.item_id),
-                      unit: { display_name: string(line.unit_name), scale: Number(line.unit_scale ?? 0) },
+                      unit: { display_name: itemUnitName(line.item_id, line.unit_name), scale: Number(line.unit_scale ?? 0) },
                     })) : []}
                     confirm={{ countRevision: Number(count.revision), declarationRevision: Number(count.declaration_revision) }}
                     onSuccess={counted}

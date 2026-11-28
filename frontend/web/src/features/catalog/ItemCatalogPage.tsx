@@ -1,3 +1,4 @@
+import { itemUnitName } from '../../i18n/units';
 import { useState } from 'react';
 import { api, ApiError, newCommandKey } from '../../api/client';
 import { useCursorPages } from '../../api/useCursorPages';
@@ -97,7 +98,7 @@ export function ItemCatalogPage({ user }: { user: Me }) {
           <thead><tr><th scope="col">Vật phẩm</th><th scope="col">Nhóm hàng</th><th scope="col">Đơn vị</th><th scope="col">Từ khóa</th><th scope="col">Trạng thái</th><th scope="col">Ngày tạo</th><th scope="col" aria-label="Tùy chọn"></th></tr></thead>
           <tbody>{pages.items.map((item) => <tr key={item.id}>
             <th scope="row"><button type="button" className="table-row-link" aria-haspopup="dialog" onClick={() => { setSelected(item); setMode('edit'); setActionError(''); }}>{item.name}</button></th>
-            <td>{item.item_type.display_name}</td><td>{item.unit.display_name}</td>
+            <td>{item.item_type.display_name}</td><td>{itemUnitName(item.id, item.unit.display_name)}</td>
             <td>{item.aliases?.length ?? 0} / {ALIAS_MAX_COUNT}</td>
             <td><Badge tone={item.status === 'ACTIVE' ? 'success' : 'neutral'}>{item.status === 'ACTIVE' ? 'Đang dùng' : 'Ngừng dùng'}</Badge></td>
             <td>{timeLabel(item.created_at)}</td>
@@ -123,7 +124,7 @@ export function ItemCatalogPage({ user }: { user: Me }) {
       label={`${mode === 'edit' ? 'Sửa vật phẩm' : 'Sửa từ khóa'} ${selected.name}`}
       heading={`${mode === 'edit' ? 'Sửa vật phẩm' : 'Sửa từ khóa'} ${selected.name}`} className="campaign-management-dialog catalog-item-dialog">
       {mode === 'edit' ? <>
-        <p className="muted">Nhóm hàng: {selected.item_type.display_name} · Đơn vị tính: {selected.unit.display_name}</p>
+        <p className="muted">Nhóm hàng: {selected.item_type.display_name} · Đơn vị tính: {itemUnitName(selected.id, selected.unit.display_name)}</p>
         <CommandForm spec={editSpec(selected)} onSuccess={(result) => { setSelected(null); setNotice(`Đã cập nhật vật phẩm ${String((result as { name?: string } | undefined)?.name ?? selected.name)}.`); pages.reload(); }} onStale={stale} />
       </> : <AliasEditor item={{ ...selected, aliases: selected.aliases ?? [] }}
         onSaved={() => { setSelected(null); setNotice(`Đã lưu từ khóa cho ${selected.name}.`); pages.reload(); }} onStale={stale} />}

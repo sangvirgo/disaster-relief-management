@@ -5,6 +5,7 @@ import { api, newCommandKey } from '../../api/client';
 import { useCursorNav } from '../../api/useCursorNav';
 import { Pager } from '../../components/ui/Pager';
 import { CampaignAreaMap, type AreaAnimation } from '../../maps/CampaignAreaMap';
+import { timeLabel } from '../../i18n/labels';
 
 type LatLng = { latitude: number; longitude: number };
 type NearestCampaign = {
@@ -436,6 +437,7 @@ export function CommonQueueSuggestions({ onChanged }: { onChanged: () => void })
                   {item.priority && <span className="badge">{item.priority}</span>}{' '}
                   <span className={`chip${item.campaign_match_state === 'CONFLICT' ? ' chip--warn' : ''}`}>{STATE_VI[item.campaign_match_state] ?? item.campaign_match_state}</span>{' '}
                   {item.needs_relief_supplies && <span className="chip chip--warn">Cần hàng cứu trợ</span>}
+                  <p className="suggestion-received"><time dateTime={item.received_at}>Tiếp nhận {timeLabel(item.received_at)}</time></p>
                   <p className="muted">
                     {item.campaign_match_state === 'CONFLICT'
                       ? `Nằm trong ${candidates.size || 'nhiều'} vùng; hãy chọn chiến dịch phù hợp.`

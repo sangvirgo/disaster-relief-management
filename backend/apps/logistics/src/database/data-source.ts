@@ -19,6 +19,7 @@ import { RemoveReliefPoints1796256000000 } from './migrations/RemoveReliefPoints
 import { AddDonationDriveLocation1796342400000 } from './migrations/AddDonationDriveLocation1796342400000';
 import { AllowApproverDispatch1796428800000 } from './migrations/AllowApproverDispatch1796428800000';
 import { ReplaceDistributionWithSupplyRequests1796515200000 } from './migrations/ReplaceDistributionWithSupplyRequests1796515200000';
+import { UsePackagedItemUnits1796601600000 } from './migrations/UsePackagedItemUnits1796601600000';
 
 export default new DataSource(postgresOptions([
   InitialLogistics1710000000000,
@@ -39,4 +40,5 @@ export default new DataSource(postgresOptions([
   AddDonationDriveLocation1796342400000,
   AllowApproverDispatch1796428800000,
   ReplaceDistributionWithSupplyRequests1796515200000,
+  UsePackagedItemUnits1796601600000,
 ], 'logistics'));

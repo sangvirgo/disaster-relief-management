@@ -1,5 +1,6 @@
 import type { BadgeTone } from '../../components/ui/Badge';
 import { formatQuantity } from '../../i18n/quantity.ts';
+import { itemUnitName } from '../../i18n/units.ts';
 
 /** Supply requests (2026-11-26): a team asks for goods for its mission; the warehouse hands them over against a code. */
 export type SupplyStatus = 'READY' | 'HANDED_OVER' | 'CANCELLED' | 'EXPIRED';
@@ -93,8 +94,8 @@ export const suggestionBasisLabels: Record<SuggestionBasis, string> = {
   CONFIRMED: 'Nhu cầu đã xác nhận',
 };
 
-export function quantityText(value: string, unit: string): string {
-  return `${formatQuantity(value)} ${unit}`;
+export function quantityText(value: string, unit: string, itemId?: string): string {
+  return `${formatQuantity(value)} ${itemUnitName(itemId, unit)}`;
 }
 
 /** "còn 2 giờ 15 phút" / "quá hạn" — the deadline in words, for both the team and the warehouse. */
@@ -114,11 +115,11 @@ export function isUrgent(expiresAt: string, now = Date.now()): boolean {
   return Number.isFinite(left) && left <= 60 * 60_000;
 }
 
-export function linesSummary(lines: ReadonlyArray<{ item_name: string; quantity?: string; reserved_quantity?: string; unit_name: string }>): string {
+export function linesSummary(lines: ReadonlyArray<{ item_id?: string; item_name: string; quantity?: string; reserved_quantity?: string; unit_name: string }>): string {
   if (!lines.length) return 'Không còn hàng để giao';
   const [first, ...rest] = lines;
   const amount = first.quantity ?? first.reserved_quantity ?? '0';
-  return `${first.item_name} ${quantityText(amount, first.unit_name)}${rest.length ? ` · +${rest.length} mặt hàng` : ''}`;
+  return `${first.item_name} ${quantityText(amount, first.unit_name, first.item_id)}${rest.length ? ` · +${rest.length} mặt hàng` : ''}`;
 }
 
 /** Keeps only digits, at most six, as the staff member types the team's code. */

@@ -1,3 +1,4 @@
+import { itemUnitName } from '../../i18n/units';
 import { Dropdown } from '../../components/ui/Dropdown';
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
@@ -68,7 +69,7 @@ export function SupplyGapInbox({ user }: { user: Me }) {
         campaigns: named(campaigns, (row) => row.name || row.title || ''),
         warehouses: named(warehouses, (row) => row.name || ''),
         unitByItem: itemList.status === 'fulfilled'
-          ? new Map(itemList.value.filter((row) => row.id).map((row) => [row.id!, row.unit?.display_name || '']))
+          ? new Map(itemList.value.filter((row) => row.id).map((row) => [row.id!, itemUnitName(row.id, row.unit?.display_name)]))
           : new Map(),
       });
     });

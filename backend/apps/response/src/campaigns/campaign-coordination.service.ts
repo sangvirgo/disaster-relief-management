@@ -244,7 +244,7 @@ export class CampaignCoordinationService {
   async commonQueueSuggestions(query: CommonQueueQueryDto, request: Request): Promise<Record<string, unknown>> {
     const session = await this.sessions.require(request);
     if (!primaryCoordinator(session.grants)) throw new AppError('FORBIDDEN', { status: 403 });
-    const filters = { route: 'response.campaign-common-queue', match_state: query.match_state ?? null };
+    const filters = { route: 'response.campaign-common-queue', match_state: query.match_state ?? null, order: 'received-desc-v1' };
     const cursor = query.cursor ? decodeKeysetCursor(query.cursor, filters) : null;
     if (cursor) {
       const when = typeof cursor.sort[0] === 'string' ? new Date(cursor.sort[0]) : null;
@@ -291,7 +291,7 @@ export class CampaignCoordinationService {
     ) as Array<{ total: number }>;
     if (cursor) {
       values.push(cursor.sort[0], cursor.id);
-      conditions.push(`(date_trunc('milliseconds',r.received_at),r.id)>($${values.length - 1}::timestamptz,$${values.length}::uuid)`);
+      conditions.push(`(date_trunc('milliseconds',r.received_at),r.id)<($${values.length - 1}::timestamptz,$${values.length}::uuid)`);
     }
     values.push(limit + 1);
     const pageRows = rows(await this.dataSource.query(
@@ -299,7 +299,7 @@ export class CampaignCoordinationService {
               date_trunc('milliseconds',r.received_at) AS received_at,
               ${lat} AS latitude,${lng} AS longitude
          FROM assistance_request r JOIN request_subject s ON s.request_id=r.id
-        WHERE ${conditions.join(' AND ')} ORDER BY date_trunc('milliseconds',r.received_at),r.id LIMIT $${values.length}`, values,
+        WHERE ${conditions.join(' AND ')} ORDER BY date_trunc('milliseconds',r.received_at) DESC,r.id DESC LIMIT $${values.length}`, values,
     ) as SqlRows<Record<string, unknown>>);
     const page = pageRows.slice(0, limit);
     const pageIds = new Set(page.map((item) => String(item.id)));

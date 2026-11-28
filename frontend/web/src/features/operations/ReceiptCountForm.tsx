@@ -1,3 +1,4 @@
+import { itemUnitName } from '../../i18n/units';
 import { Dropdown } from '../../components/ui/Dropdown';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, newCommandKey, upload } from '../../api/client';
@@ -100,7 +101,7 @@ export function ReceiptCountForm({
   }, [dirty, lines, note, advanced, allowUnexpected, touched, evidence, userId, deliveryId, version, confirm?.countRevision, confirm?.declarationRevision]);
   const existingItems: Item[] = [...(initialItems || []), ...(existing?.lines || []).filter(line => line.item_id).map(line => ({
     id: line.item_id!, name: line.item_name || line.item_id!,
-    unit: { display_name: line.unit_name || '', scale: Number(line.unit_scale ?? 0) },
+    unit: { display_name: itemUnitName(line.item_id, line.unit_name), scale: Number(line.unit_scale ?? 0) },
   }))];
   const visibleCatalog = catalogItems.filter(item => allowUnexpected || lines.some(line => line.item_id === item.id));
   const items = [...driveItems, ...existingItems.filter(item => !driveItems.some(driveItem => driveItem.id === item.id)),
@@ -163,7 +164,7 @@ export function ReceiptCountForm({
         }
         setDriveItems(drive.items.map(item => ({
         id: item.item_id, name: item.item_name,
-        unit: { display_name: item.unit_name, scale: Number(item.scale) },
+        unit: { display_name: itemUnitName(item.item_id, item.unit_name), scale: Number(item.scale) },
       }))); })
       .catch(cause => { if (live) setItemsError(cause instanceof Error ? cause.message : 'Không tải được vật phẩm của đợt quyên góp.'); })
       .finally(() => { if (live) setDriveLoading(false); });
@@ -319,7 +320,7 @@ export function ReceiptCountForm({
           return <div key={index} className={`count-form__line${line.outside ? ' count-form__line--outside' : ''}`}>
             <div className="count-form__row" role="row" style={{ gridTemplateColumns }}>
               <span role="cell" className="count-form__item">
-                {fixedItem(line) ? <><strong>{item?.name || 'Vật phẩm'}</strong><small>{item?.unit.display_name}</small></>
+                {fixedItem(line) ? <><strong>{item?.name || 'Vật phẩm'}</strong><small>{itemUnitName(item?.id, item?.unit.display_name)}</small></>
                   : <Dropdown
                     aria-label={`Vật phẩm dòng ${index + 1}`}
                     value={items.some((candidate) => candidate.id === line.item_id) ? line.item_id : ''}
@@ -328,7 +329,7 @@ export function ReceiptCountForm({
                     <option value="">{line.outside ? 'Chọn vật phẩm ngoài đợt' : 'Chọn vật phẩm'}</option>
                     {items.filter(candidate => (candidate.id === line.item_id || !lines.some(other => other.item_id === candidate.id)) && (!line.outside || !driveItems.some(driveItem => driveItem.id === candidate.id))).map((candidate) => (
                       <option value={candidate.id} key={candidate.id}>
-                        {candidate.name} · {candidate.unit.display_name}{!driveItems.some(driveItem => driveItem.id === candidate.id) ? ' · ngoài đợt' : ''}
+                        {candidate.name} · {itemUnitName(candidate.id, candidate.unit.display_name)}{!driveItems.some(driveItem => driveItem.id === candidate.id) ? ' · ngoài đợt' : ''}
                       </option>
                     ))}
                   </Dropdown>}

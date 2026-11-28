@@ -288,3 +288,7 @@
 
 .sos-head__actions .sos-action-entry > .button { border: 1px solid var(--color-surface-divider); background: #fff; border-radius: 8px; color: var(--color-text-secondary); }
 .sos-head__actions .sos-action-entry > .button:hover { border-color: var(--color-primary); color: var(--color-primary); background: var(--color-primary-bg); }
+.sos-next-step { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; margin: 12px 0; background: var(--color-surface-subtle); border: 1px solid var(--color-surface-border); border-radius: 12px; }
+.sos-next-step > div { display: grid; gap: 4px; flex: 1 1 260px; }
+.sos-next-step span { font-size: 13px; color: var(--color-text-secondary); }
+.suggestion-received { margin: 6px 0; font-size: 13px; color: var(--color-text-secondary); }

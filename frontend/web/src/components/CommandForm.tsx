@@ -1,4 +1,5 @@
 import { Dropdown } from './ui/Dropdown';
+import { quantityInput } from '../i18n/quantity';
 import { useId, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, newCommandKey, upload, type Service, type HttpMethod } from '../api/client';
 import { evidenceFileError } from '../i18n/evidence';
@@ -143,7 +144,7 @@ export function CommandForm({
 }) {
   const [values, setValues] = useState<Record<string, string>>(() => withFieldDefaults(spec.fields,
     Object.fromEntries((spec.fields || []).filter((field) => field.initialValue)
-      .map((field) => [field.name, field.initialValue!]))
+      .map((field) => [field.name, field.type === 'number' ? quantityInput(field.initialValue) : field.initialValue!]))
   ));
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');

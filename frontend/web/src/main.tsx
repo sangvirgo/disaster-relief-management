@@ -34,6 +34,7 @@ import { label, requestStatusLabel, timeLabel } from './i18n/labels';
 import { CitizenAccount, CitizenRequests, requestStatusTone } from './features/citizen/CitizenAccount';
 import { clearAllSosDrafts } from './features/citizen/sosDraft';
 import { clearAllCountDrafts } from './features/operations/countDraft';
+import { clearAllMissionDrafts } from './features/volunteer/missionDraft';
 import { clearPendingEvidence, purgeExpiredEvidence } from './features/volunteer/missionEvidenceStorage';
 import type { components as ResponseComponents } from './api/generated/response';
 import './style.css';
@@ -1112,11 +1113,10 @@ function Tracking({
           <p>Tiếp nhận lúc: {timeLabel(data.received_at)}</p>
           {data.current_description && <div className="tracking-situation">
             <h3>Tình huống đang ghi nhận</h3>
-            <p>{data.current_description}</p>
-            {data.first_verified_description && data.first_verified_description !== data.current_description && <details>
-              <summary>Xem mô tả khi xác minh lần đầu</summary>
-              <p>{data.first_verified_description}</p>
-            </details>}
+            {data.current_description.split(/(?=Cập nhật\s*:)/iu).map((part, index) => {
+              const update = part.match(/^(Cập nhật\s*:)([\s\S]*)$/iu);
+              return <p key={index}>{update ? <><strong>Cập nhật:</strong>{update[2]}</> : part}</p>;
+            })}
           </div>}
           {data.status === 'DUPLICATE' && data.duplicate_of_code && (
             <p className="notice">Yêu cầu này trùng với hồ sơ {data.duplicate_of_code}. Nếu hồ sơ gốc thuộc tài khoản của bạn, hãy quay lại danh sách để xem tiến độ hồ sơ đó.</p>
@@ -1745,6 +1745,7 @@ function App() {
   function resetSession(openLogin = false) {
     void clearPendingEvidence();
     clearAllCountDrafts();
+    clearAllMissionDrafts();
     clearAllSosDrafts();
     try {
       for (let index = window.sessionStorage.length - 1; index >= 0; index -= 1) {

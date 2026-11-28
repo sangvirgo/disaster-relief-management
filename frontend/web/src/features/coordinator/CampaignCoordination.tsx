@@ -39,9 +39,8 @@ export function CampaignCoordination({ user, initialRequestId = '' }: { user: Me
 }
 
 function PrimaryCampaignCoordination({ user, initialRequestId = '' }: { user: Me; initialRequestId?: string }) {
-  const opensSos = Boolean(initialRequestId) || Boolean(new URL(window.location.href).searchParams.get('sos_id'));
-  // Tabs: SOS routing (default, map) · campaigns (overview + list) · SOS queue · coordination workspace · history.
-  const [tab, setTab] = useUrlView('campaign_tab', campaignTabs, opensSos ? 'sos' : 'routing');
+  // Start with actionable intake. Map attribution and campaign administration remain one tab away.
+  const [tab, setTab] = useUrlView('campaign_tab', campaignTabs, 'sos');
   const [triage, setTriage] = useState<TriageCampaign[]>([]);
   const [overview, setOverview] = useState<OverviewCampaign[]>([]);
   const [commonQueue, setCommonQueue] = useState({ unmatched: 0, conflict: 0 });
@@ -141,7 +140,7 @@ function PrimaryCampaignCoordination({ user, initialRequestId = '' }: { user: Me
     ...user.grants.filter((grant) => grant.role_code === 'COORDINATOR' && grant.scope_type === 'CAMPAIGN' && grant.campaign_id).map((grant) => grant.campaign_id!),
     ...engagements.map((item) => item.campaign_id),
   ])];
-  const tabs = [['routing', isScopedCoordinator ? 'Bản đồ chiến dịch' : 'Phân vùng SOS'], ['campaigns', 'Chiến dịch'], ['sos', 'Xử lý SOS'], ['workspace', 'Không gian điều phối'], ['history', 'Lịch sử']];
+  const tabs = [['sos', 'Xử lý SOS'], ['routing', isScopedCoordinator ? 'Bản đồ chiến dịch' : 'Phân vùng SOS'], ['campaigns', 'Chiến dịch'], ['workspace', 'Theo dõi chiến dịch'], ['history', 'Lịch sử']];
   const activeTab = (id: string) => tab === id || (id === 'workspace' && tab === 'choose') || (id === 'history' && tab === 'my-history');
   return <section className="campaign-coordination">
     <div className="tabs" role="tablist" aria-label="Điều phối chiến dịch">

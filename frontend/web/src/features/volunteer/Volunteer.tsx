@@ -13,6 +13,8 @@ import { confirmAction } from '../../components/confirmAction';
 import { Tabs } from '../../components/ui/Tabs';
 import { useUrlView } from '../../app/useUrlView';
 import { useUrlRecord } from '../../app/useUrlRecord';
+import { useUnsavedWork } from '../../app/useUnsavedWork';
+import { readMissionDraft, writeMissionDraft, clearMissionDraft } from './missionDraft';
 import { missionViews, noticeViews } from '../../app/routeViews';
 import { TeamMembers } from './TeamMembers';
 import { TeamReadinessForm } from './TeamReadinessForm';
@@ -285,6 +287,9 @@ export function Volunteer({ page, currentUserId, sharingTeamId = '', sharingMess
     : progressNote.length > 2000 ? 'Lý do không được vượt quá 2.000 ký tự.' : '';
   const [showCompleteForm, setShowCompleteForm] = useState(false);
   const [showFailForm, setShowFailForm] = useState(false);
+  const [draftScope, setDraftScope] = useState('');
+  const [draftRestored, setDraftRestored] = useState(false);
+  const [draftSaved, setDraftSaved] = useState(true);
   useEffect(() => {
     setDeclineReason('');
     setMissionFormTouched({});
@@ -338,6 +343,7 @@ export function Volunteer({ page, currentUserId, sharingTeamId = '', sharingMess
 
   const commandKeyRef = useRef<string | null>(null);
   useEffect(() => {
+    setDraftScope('');
     commandKeyRef.current = null;
     setShowDeclineForm(false);
     setShowCompleteForm(false);
@@ -439,6 +445,11 @@ export function Volunteer({ page, currentUserId, sharingTeamId = '', sharingMess
   function refreshAll() {
     setRevision((val) => val + 1);
     commandKeyRef.current = null;
+  }
+
+  function clearMissionForm() {
+    if (missionId) clearMissionDraft(currentUserId, missionId);
+    setDraftRestored(false);
     setShowDeclineForm(false);
     setShowCompleteForm(false);
     setShowFailForm(false);
@@ -508,6 +519,7 @@ export function Volunteer({ page, currentUserId, sharingTeamId = '', sharingMess
         idempotencyKey: commandKeyRef.current,
       });
       setActionMessage('Đã tiếp nhận nhiệm vụ thành công.');
+      clearMissionForm();
       refreshAll();
     } catch (cause) {
       setActionMessage(cause instanceof Error ? cause.message : 'Không thể tiếp nhận nhiệm vụ.');
@@ -530,7 +542,7 @@ export function Volunteer({ page, currentUserId, sharingTeamId = '', sharingMess
         idempotencyKey: commandKeyRef.current,
       });
       setActionMessage('Đã từ chối nhiệm vụ.');
-      setDeclineReason('');
+      clearMissionForm();
       refreshAll();
     } catch (cause) {
       setActionMessage(cause instanceof Error ? cause.message : 'Không thể từ chối nhiệm vụ.');
@@ -563,6 +575,7 @@ export function Volunteer({ page, currentUserId, sharingTeamId = '', sharingMess
         idempotencyKey: commandKeyRef.current,
       });
       setActionMessage(`Đã cập nhật tiến độ: ${label(to)}.`);
+      clearMissionForm();
       refreshAll();
     } catch (cause) {
       if (cause instanceof ApiError && cause.code === 'VERSION_CONFLICT') {
@@ -677,6 +690,31 @@ export function Volunteer({ page, currentUserId, sharingTeamId = '', sharingMess
   }
   const activeMission = !missionId ? null : missionDetail?.id === missionId ? missionDetail : selectedMission?.id === missionId ? selectedMission : null;
   const canManageMission = activeMission?.can_manage_mission === true;
+  const currentDraftScope = activeMission && canManageMission ? JSON.stringify([currentUserId, activeMission.id, activeMission.status]) : '';
+  useEffect(() => {
+    if (!activeMission || !canManageMission || draftScope === currentDraftScope) return;
+    const draft = readMissionDraft(currentUserId, activeMission.id, activeMission.status);
+    setOutcomeNote(draft?.outcome ?? '');
+    setProgressNote(draft?.progress ?? '');
+    setDeclineReason(draft?.decline ?? '');
+    setShowCompleteForm(draft?.action === 'complete');
+    setShowFailForm(draft?.action === 'fail');
+    setShowDeclineForm(draft?.action === 'decline');
+    setDraftRestored(Boolean(draft));
+    setDraftScope(currentDraftScope);
+  }, [currentDraftScope, draftScope, currentUserId, activeMission?.id, activeMission?.status, canManageMission]);
+  const hasMissionDraft = Boolean(outcomeNote.trim() || progressNote.trim() || declineReason.trim());
+  useEffect(() => {
+    if (!activeMission || !canManageMission || draftScope !== currentDraftScope) return;
+    const save = () => setDraftSaved(writeMissionDraft(currentUserId, activeMission.id, {
+      status: activeMission.status, action: showCompleteForm ? 'complete' : showFailForm ? 'fail' : 'decline',
+      outcome: outcomeNote, progress: progressNote, decline: declineReason,
+    }));
+    save();
+    const timer = window.setInterval(save, 60_000);
+    return () => window.clearInterval(timer);
+  }, [draftScope, currentDraftScope, currentUserId, activeMission?.id, activeMission?.status, canManageMission, outcomeNote, progressNote, declineReason, showCompleteForm, showFailForm]);
+  useUnsavedWork(hasMissionDraft && !draftSaved, 'Trình duyệt chưa lưu được ghi chú nhiệm vụ. Rời trang sẽ mất nội dung chưa gửi. Bạn vẫn muốn rời đi?');
   const currentSituation = activeMission?.current_situation;
   // Mission destination remains the approved assignment; a later SOS location needs coordinator review.
   const situationLocation = activeMission?.location;
@@ -998,6 +1036,10 @@ export function Volunteer({ page, currentUserId, sharingTeamId = '', sharingMess
                   <span className={`chip mission-status mission-status-${activeMission.status.toLowerCase()}`}>{label(activeMission.status)}</span>
                 </div>
                 {actionMessage && <p className="notice" role="status">{actionMessage}</p>}
+                {canManageMission && hasMissionDraft && <div className="mission-draft-notice" role="status">
+                  <span>{draftSaved ? draftRestored ? 'Đã khôi phục ghi chú chưa gửi. Hãy kiểm tra trước khi gửi báo cáo.' : 'Đã lưu nháp ghi chú trong phiên này. Nội dung chưa được gửi.' : 'Chưa lưu được bản nháp. Giữ trang này mở cho đến khi gửi xong.'}</span>
+                  <button type="button" className="button secondary small" disabled={busy} onClick={async () => { if (await confirmAction('Bỏ ghi chú nhiệm vụ chưa gửi?')) clearMissionForm(); }}>Bỏ bản nháp</button>
+                </div>}
                 <Tabs
                   items={missionDetailTabs}
                   value={missionDetailTab}

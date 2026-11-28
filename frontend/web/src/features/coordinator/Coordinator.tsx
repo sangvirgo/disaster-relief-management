@@ -1222,6 +1222,11 @@ export function Coordinator({ page, initialRequestId, currentUserId, canSeeUnass
                 <button type="button" className="button secondary" disabled={claimBusy || claimBlockedBy(detail, currentUserId)} onClick={() => void runClaim('claim')}>Nhận xử lý</button>
               )}
             </section>}
+            {!['RESOLVED', 'CLOSED', 'CANCELLED', 'REJECTED', 'DUPLICATE'].includes(detail.status) && <nav className="sos-next-step" aria-label="Bước xử lý SOS">
+              <div><strong>{['SUBMITTED', 'VERIFYING'].includes(detail.status) ? '1. Xác minh thông tin' : detail.status === 'VERIFIED' ? '2. Chọn mức ưu tiên' : '3. Giao đội và theo dõi'}</strong>
+                <span>{['SUBMITTED', 'VERIFYING'].includes(detail.status) ? 'Đối chiếu tình huống người báo và gợi ý trước khi quyết định.' : detail.status === 'VERIFIED' ? 'Mức ưu tiên do điều phối viên quyết định.' : 'Kiểm tra đội, tiến độ và hàng cứu trợ trong mục Điều phối.'}</span></div>
+              <button type="button" className="button secondary" onClick={() => { const target = ['SUBMITTED', 'VERIFYING', 'VERIFIED'].includes(detail.status) ? 'overview' : 'dispatch'; changeTab(target); window.requestAnimationFrame(() => document.getElementById('sos-detail-content')?.scrollIntoView({ behavior: 'smooth', block: 'start' })); }}>{detail.status === 'VERIFIED' ? 'Đến phần chọn ưu tiên' : ['SUBMITTED', 'VERIFYING'].includes(detail.status) ? 'Đến phần xác minh' : 'Mở điều phối đội'}</button>
+            </nav>}
             <div className="sos-detail-tabs" role="tablist" aria-label="Thông tin hồ sơ SOS" onKeyDown={(event) => {
               const tabs = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
               const current = tabs.indexOf(document.activeElement as HTMLButtonElement);

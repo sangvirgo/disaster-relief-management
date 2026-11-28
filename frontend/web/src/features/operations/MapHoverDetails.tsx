@@ -2,12 +2,14 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { api } from '../../api/client';
 import { LIST_PAGE_SIZE, useCursorNav } from '../../api/useCursorNav';
 import { ListNav } from '../../components/ui/Pager';
+import { formatQuantity } from '../../i18n/quantity';
+import { itemUnitName } from '../../i18n/units';
 
-type StockRow = { balance_id: string; item_name: string; on_hand: string; available: string; unit: string };
+type StockRow = { balance_id: string; item_id?: string; item_name: string; on_hand: string; available: string; unit: string };
 type StockPage = { items?: StockRow[]; more?: boolean; cursor?: string | null };
 type DriveItem = { item_id: string; item_name: string; unit_name: string; target_quantity: string; accepted_total?: string };
 
-const amount = (value?: string) => Number(value || 0).toLocaleString('vi-VN', { maximumFractionDigits: 3 });
+const amount = (value?: string) => formatQuantity(value ?? '0');
 
 export function MapHoverDetails({ warehouse, drive, actions, onClose }: {
   warehouse: { id: string; name: string; address_note?: string | null; location?: { coordinates?: [number, number] } | null; service_radius_m?: number | null };
@@ -59,8 +61,8 @@ export function MapHoverDetails({ warehouse, drive, actions, onClose }: {
     {!loading && !error && <div className="warehouse-map-hover__table-wrap" role="region" aria-label={drive ? 'Bảng vật phẩm tiếp nhận' : 'Bảng tồn kho'} tabIndex={0}>
       <table className="warehouse-map-hover__table">
         <thead><tr><th scope="col">Vật phẩm</th><th scope="col">{drive ? 'Mục tiêu' : 'Tồn thực tế'}</th><th scope="col">{drive ? 'Đã tiếp nhận' : 'Khả dụng'}</th></tr></thead>
-        <tbody>{drive ? driveItems.map(item => <tr key={item.item_id}><th scope="row">{item.item_name}</th><td>{amount(item.target_quantity)} {item.unit_name}</td><td>{amount(item.accepted_total)} {item.unit_name}</td></tr>)
-          : stock.map(item => <tr key={item.balance_id}><th scope="row">{item.item_name}</th><td>{amount(item.on_hand)} {item.unit}</td><td>{amount(item.available)} {item.unit}</td></tr>)}
+        <tbody>{drive ? driveItems.map(item => <tr key={item.item_id}><th scope="row">{item.item_name}</th><td>{amount(item.target_quantity)} {itemUnitName(item.item_id, item.unit_name)}</td><td>{amount(item.accepted_total)} {itemUnitName(item.item_id, item.unit_name)}</td></tr>)
+          : stock.map(item => <tr key={item.balance_id}><th scope="row">{item.item_name}</th><td>{amount(item.on_hand)} {itemUnitName(item.item_id, item.unit)}</td><td>{amount(item.available)} {itemUnitName(item.item_id, item.unit)}</td></tr>)}
           {(drive ? !driveItems.length : !stock.length) && <tr><td colSpan={3}>{drive ? 'Chưa có vật phẩm trong đợt.' : 'Kho chưa có vật phẩm tồn.'}</td></tr>}</tbody>
       </table>
     </div>}

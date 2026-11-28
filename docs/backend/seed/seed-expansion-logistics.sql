@@ -1,6 +1,6 @@
 -- Additive synthetic Logistics fixtures. Safe to apply more than once.
 INSERT INTO unit (code, display_name, scale) VALUES
-  ('CAI', 'cái', 0), ('KG', 'kg', 3), ('THUNG', 'thùng', 0)
+  ('CAI', 'cái', 0), ('CHAI', 'chai', 0), ('GOI', 'gói', 0), ('KG', 'kg', 3), ('THUNG', 'thùng', 0)
 ON CONFLICT DO NOTHING;
 INSERT INTO item_type (code, display_name) VALUES
   ('LUONG_THUC', 'Lương thực'), ('NUOC_UONG', 'Nước uống'), ('Y_TE', 'Vật tư y tế'), ('CHAN_MEN', 'Chăn màn, nơi trú ẩn')
@@ -10,7 +10,7 @@ INSERT INTO item (id, item_type_code, unit_code, name, returnable, aliases)
 SELECT fixture.id, fixture.item_type_code, fixture.unit_code, fixture.name, fixture.returnable, fixture.aliases
   FROM (VALUES
     ('00000000-0000-4000-8000-0000000a1010'::uuid, 'LUONG_THUC', 'KG', 'Gạo đóng túi TP. Hồ Chí Minh', 'Lương thực', 'kg', 3, false, ARRAY['gạo đóng túi']::text[]),
-    ('00000000-0000-4000-8000-0000000a1011'::uuid, 'NUOC_UONG', 'CAI', 'Nước uống đóng chai TP. Hồ Chí Minh', 'Nước uống', 'cái', 0, false, ARRAY['nước uống chai','nước suối']::text[]),
+    ('00000000-0000-4000-8000-0000000a1011'::uuid, 'NUOC_UONG', 'CHAI', 'Nước uống đóng chai TP. Hồ Chí Minh', 'Nước uống', 'chai', 0, false, ARRAY['nước uống chai','nước suối']::text[]),
     ('00000000-0000-4000-8000-0000000a1012'::uuid, 'Y_TE', 'CAI', 'Bộ sơ cứu cộng đồng TP. Hồ Chí Minh', 'Vật tư y tế', 'cái', 0, false, ARRAY['sơ cứu cộng đồng','thuốc']::text[]),
     ('00000000-0000-4000-8000-0000000a1013'::uuid, 'CHAN_MEN', 'CAI', 'Chăn giữ nhiệt TP. Hồ Chí Minh', 'Chăn màn, nơi trú ẩn', 'cái', 0, true, ARRAY['chăn giữ nhiệt']::text[])
   ) AS fixture(id, item_type_code, unit_code, name, item_type_name, unit_name, unit_scale, returnable, aliases)

@@ -1,4 +1,10 @@
 /** Format API decimal strings for Vietnamese readers without changing their value. */
+export function quantityInput(value: unknown): string {
+  const raw = value == null ? '' : String(value);
+  if (!/^-?\d+(?:\.\d+)?$/.test(raw)) return raw;
+  return raw.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+}
+
 export function formatQuantity(value: unknown): string {
   if (value == null) return '—';
   const raw = String(value);

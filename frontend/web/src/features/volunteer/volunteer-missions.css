@@ -435,3 +435,4 @@
 .mission-upload-list small { display: block; margin-top: 4px; }
 .mission-upload-list__actions { display: flex; gap: 8px; }
 @media (max-width: 480px) { .mission-upload-control { flex-wrap: wrap; } .mission-upload-control__name { white-space: normal; overflow-wrap: anywhere; } }
+.mission-draft-notice { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; border: 1px solid var(--color-primary-border); border-radius: 10px; background: var(--color-primary-bg); font-size: 14px; }

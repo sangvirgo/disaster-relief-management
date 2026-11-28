@@ -1,3 +1,4 @@
+import { itemUnitName } from '../../i18n/units';
 import { useEffect, useId, useState } from 'react';
 import { api, ApiError } from '../../api/client';
 import { fetchAll } from '../../api/fetchAll';
@@ -7,6 +8,7 @@ import { Button } from '../../components/ui/Button';
 import { Dropdown } from '../../components/ui/Dropdown';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { timeLabel } from '../../i18n/labels';
+import { quantityInput } from '../../i18n/quantity';
 import { prepareSupplyLines, validSupplyQuantity } from './supplyDraft';
 import {
   deadlineText, isUrgent, quantityText, suggestionBasisLabels, supplyStatusLabels, supplyStatusTones,
@@ -105,7 +107,7 @@ export function MissionSupplyPanel({ missionId, missionStatus, onBehalf = false 
                 <li key={item.id}>
                   <Badge tone={supplyStatusTones[item.status]}>{supplyStatusLabels[item.status]}</Badge>
                   <span>{item.warehouse.name} · {timeLabel(item.handed_over_at || item.cancelled_at || item.created_at)}</span>
-                  <span className="muted">{item.lines.map((line) => `${line.item_name} ${quantityText(line.reserved_quantity, line.unit_name)}`).join(', ')}</span>
+                  <span className="muted">{item.lines.map((line) => `${line.item_name} ${quantityText(line.reserved_quantity, line.unit_name, line.item_id)}`).join(', ')}</span>
                   {item.cancel_reason && <span className="muted">Lý do: {item.cancel_reason}</span>}
                 </li>
               ))}
@@ -162,8 +164,8 @@ function OpenRequest({ request, canCancel, onChanged }: { request: SupplyTeamReq
         {request.lines.map((line) => (
           <li key={line.item_id}>
             <span>{line.item_name}</span>
-            <strong>{quantityText(line.reserved_quantity, line.unit_name)}</strong>
-            {Number(line.shortfall_quantity) > 0 && <small className="supply-shortfall">Thiếu {quantityText(line.shortfall_quantity, line.unit_name)}</small>}
+            <strong>{quantityText(line.reserved_quantity, line.unit_name, line.item_id)}</strong>
+            {Number(line.shortfall_quantity) > 0 && <small className="supply-shortfall">Thiếu {quantityText(line.shortfall_quantity, line.unit_name, line.item_id)}</small>}
           </li>
         ))}
       </ul>
@@ -214,13 +216,13 @@ function RequestForm({ missionId, onBehalf, onCancel, onCreated }: {
       if (suggestion.status === 'fulfilled') {
         if (!suggestion.value.lines.length) setSuggestionNotice('Chưa có gợi ý vật phẩm từ dữ liệu đã xử lý. Bạn có thể chọn hàng và số lượng theo nhu cầu thực tế của đội.');
         setLines(current => current.length ? current : suggestion.value.lines.map((line) => ({
-          item_id: line.item_id, item_name: line.item_name, unit_name: line.unit_name, quantity: line.quantity, basis: line.basis,
+          item_id: line.item_id, item_name: line.item_name, unit_name: itemUnitName(line.item_id, line.unit_name), quantity: quantityInput(line.quantity), basis: line.basis,
         })));
       }
       if (suggestion.status === 'rejected') setSuggestionNotice('Chưa tải được gợi ý vật phẩm. Bạn vẫn có thể chọn hàng từ danh mục nếu danh mục đã tải được.');
       if (items.status === 'fulfilled') {
         setCatalog(items.value.filter((item) => item.id && item.status === 'ACTIVE').map((item) => ({
-          id: item.id!, name: item.name || 'Mặt hàng', unit_name: item.unit?.display_name || '', scale: Number(item.unit?.scale ?? 0),
+          id: item.id!, name: item.name || 'Mặt hàng', unit_name: itemUnitName(item.id, item.unit?.display_name), scale: Number(item.unit?.scale ?? 0),
         })));
       }
       else setCatalogFailed(true);

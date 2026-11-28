@@ -1,8 +1,9 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { api } from '../../api/client';
 import { fetchAll } from '../../api/fetchAll';
 import { sendRetryableCommand } from '../../api/retryableCommand';
 import { LIST_PAGE_SIZE, useCursorNav } from '../../api/useCursorNav';
+import { useUrlView } from '../../app/useUrlView';
 import { DetailSurface } from '../../components/DetailSurface';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -24,6 +25,7 @@ const STATUS_TABS: Array<{ id: SupplyStatus; label: string }> = [
   { id: 'EXPIRED', label: 'Hết hạn' },
   { id: 'CANCELLED', label: 'Đã hủy' },
 ];
+const STATUS_VALUES = ['READY', 'HANDED_OVER', 'EXPIRED', 'CANCELLED'] as const;
 
 type Dialog = { mode: 'handover' | 'cancel'; row: SupplyQueueRow } | null;
 
@@ -34,7 +36,8 @@ type Dialog = { mode: 'handover' | 'cancel'; row: SupplyQueueRow } | null;
  */
 export function SupplyQueuePage() {
   const filterId = useId();
-  const [status, setStatus] = useState<SupplyStatus>('READY');
+  const [status, setStatus] = useUrlView('status', STATUS_VALUES, 'READY');
+  const previousStatus = useRef(status);
   const [warehouseId, setWarehouseId] = useState('');
   const [warehouses, setWarehouses] = useState<Array<{ id: string; name: string }>>([]);
   const [rows, setRows] = useState<SupplyQueueRow[]>([]);
@@ -57,6 +60,13 @@ export function SupplyQueuePage() {
   }, []);
 
   useEffect(() => {
+    if (previousStatus.current !== status) {
+      previousStatus.current = status;
+      setCursor('');
+      setRows([]);
+      setNext('');
+      if (cursor) return;
+    }
     let live = true;
     setLoading(true);
     setError('');
@@ -156,7 +166,7 @@ function QueueCard({ row, disabled, onHandOver, onCancel }: { row: SupplyQueueRo
         </div>
       </div>
       <ul className="supply-card__items" aria-label="Hàng cần soạn">
-        {row.lines.map((line) => <li key={line.item_id}><span>{line.item_name}</span><strong>{quantityText(line.quantity, line.unit_name)}</strong></li>)}
+        {row.lines.map((line) => <li key={line.item_id}><span>{line.item_name}</span><strong>{quantityText(line.quantity, line.unit_name, line.item_id)}</strong></li>)}
         {row.lines.length === 0 && <li className="muted">Không còn hàng để giao.</li>}
       </ul>
       {row.status === 'READY' && (
@@ -197,7 +207,7 @@ function HandOverDialog({ row, onClose, onDone, onStale }: { row: SupplyQueueRow
       <form onSubmit={submit} className="supply-dialog__body" aria-busy={busy}>
         <p className="supply-dialog__warehouse">{row.warehouse.name}</p>
         <div className="supply-dialog__goods"><h3>Hàng bàn giao</h3><ul className="supply-card__items">
-          {row.lines.map((line) => <li key={line.item_id}><span>{line.item_name}</span><strong>{quantityText(line.quantity, line.unit_name)}</strong></li>)}
+          {row.lines.map((line) => <li key={line.item_id}><span>{line.item_name}</span><strong>{quantityText(line.quantity, line.unit_name, line.item_id)}</strong></li>)}
         </ul></div>
         <div className="supply-pickup-field" data-static-label>
           <label htmlFor={codeId}>Mã nhận hàng của đội</label>

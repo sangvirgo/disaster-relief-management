@@ -2,6 +2,7 @@ import { Dropdown } from '../../components/ui/Dropdown';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, newCommandKey } from '../../api/client';
 import { LocationPicker, type Point } from '../../maps/LocationPicker';
+import { quantityInput } from '../../i18n/quantity';
 
 type Option = { value: string; label: string };
 type DriveItem = { item_id: string; target_quantity: string; acceptance_note: string };
@@ -42,7 +43,7 @@ export function DriveCreateForm({ warehouses, campaigns, items, itemScales, onSu
   const locationError = !warehouseId ? '' : !area ? 'Kho này chưa có vùng phục vụ. Hãy sửa kho để chọn vị trí và bán kính trước.'
     : !location ? 'Hãy chọn vị trí điểm quyên góp trên bản đồ.'
     : distanceMetres(area, location) > area.radiusM ? `Vị trí phải nằm trong vùng phục vụ của ${area.name} (bán kính ${(area.radiusM / 1000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} km).` : '';
-  const [lines, setLines] = useState<DriveItem[]>(edit?.initial.lines.length ? edit.initial.lines : [emptyItem()]);
+  const [lines, setLines] = useState<DriveItem[]>(edit?.initial.lines.length ? edit.initial.lines.map(line => ({ ...line, target_quantity: quantityInput(line.target_quantity) })) : [emptyItem()]);
   const draftSignature = JSON.stringify({ title, description, warehouseId, campaignId, opensAt, closesAt, location, locationNote, lines });
   const originalDraft = useRef(draftSignature);
   useEffect(() => { onDirtyChange?.(draftSignature !== originalDraft.current); }, [draftSignature, onDirtyChange]);
@@ -126,6 +127,20 @@ export function DriveCreateForm({ warehouses, campaigns, items, itemScales, onSu
       <option value="">Không gắn chiến dịch</option>{campaigns.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
     </Dropdown></label>
     </div>
+    <fieldset className="drive-item-list"><legend>Vật phẩm cần tiếp nhận</legend>
+      {lines.map((line, index) => <div className="drive-item-row" key={index}>
+        <div className="drive-item-head"><strong>Vật phẩm {index + 1}</strong>
+          {lines.length > 1 && <button className="button secondary small" type="button" onClick={() => { setLines(current => current.filter((_, i) => i !== index)); pending.current = null; }}>Xóa</button>}</div>
+        <div className="drive-item-fields">
+        <label><Dropdown required aria-label="Vật phẩm" aria-invalid={Boolean(lineErrors[index].item)} value={line.item_id} onChange={event => updateLine(index, { item_id: event.target.value, target_quantity: '' })}>
+          <option value="">Chọn vật phẩm</option>{items.filter(option => option.value === line.item_id || !lines.some(other => other.item_id === option.value)).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+        </Dropdown>{line.item_id && lineErrors[index].item && <small className="field-error" role="alert">{lineErrors[index].item}</small>}</label>
+        <label><span>Số lượng mục tiêu *</span><input required type="number" min="0" step={10 ** -Number(itemScales.find(item => item.value === line.item_id)?.label ?? 0)} aria-invalid={Boolean(line.target_quantity && lineErrors[index].quantity)} value={line.target_quantity} onChange={event => updateLine(index, { target_quantity: event.target.value })} />{line.target_quantity && lineErrors[index].quantity && <small className="field-error" role="alert">{lineErrors[index].quantity}</small>}</label>
+        <details className="drive-item-instructions"><summary>Hướng dẫn tiếp nhận (không bắt buộc)</summary><label><span>Hướng dẫn tiếp nhận cho người quyên góp</span><input maxLength={501} aria-invalid={Boolean(lineErrors[index].note)} value={line.acceptance_note} onChange={event => updateLine(index, { acceptance_note: event.target.value })} />{lineErrors[index].note && <small className="field-error" role="alert">{lineErrors[index].note}</small>}</label></details>
+        </div>
+      </div>)}
+      <button className="button secondary" type="button" disabled={lines.length >= Math.min(50, items.length)} onClick={() => { setLines(current => [...current, emptyItem()]); pending.current = null; }}>+ Thêm vật phẩm</button>
+    </fieldset>
     <fieldset className="drive-location-field"><legend>Điểm quyên góp trên bản đồ *</legend>
       <small className="muted">Chọn nơi người dân mang hàng đến. Vòng tròn trên bản đồ là vùng phục vụ của kho; điểm phải nằm trong vòng đó. Người quyên góp sẽ được gợi ý đợt gần họ nhất.</small>
       <LocationPicker value={location} initiallyOpen={Boolean(warehouseId) && !location} toggleLabel={location ? 'Đổi điểm quyên góp' : undefined}
@@ -136,24 +151,11 @@ export function DriveCreateForm({ warehouses, campaigns, items, itemScales, onSu
       {warehouseId && locationError && <small className="field-error" role="alert">{locationError}</small>}
       <label><span>Chỉ dẫn tìm điểm (nếu có)</span><input maxLength={501} value={locationNote} onChange={event => { setLocationNote(event.target.value); pending.current = null; }} placeholder="Ví dụ: cổng chính nhà văn hóa, sảnh tầng 1" /></label>
     </fieldset>
-    <div className="form-grid-2">
+    <details className="drive-optional" open={Boolean(opensAt || closesAt)}><summary>Thời gian tiếp nhận (không bắt buộc)</summary><div className="form-grid-2">
     <label><span>Bắt đầu nhận hàng (nếu có)</span><input type="datetime-local" value={opensAt} onChange={event => { setOpensAt(event.target.value); pending.current = null; }} /></label>
     <label><span>Hạn nhận hàng (nếu có)</span><input type="datetime-local" value={closesAt} onChange={event => { setClosesAt(event.target.value); pending.current = null; }} /></label>
-    </div>
-    <fieldset className="drive-item-list"><legend>Vật phẩm cần tiếp nhận</legend>
-      {lines.map((line, index) => <div className="drive-item-row" key={index}>
-        <div className="drive-item-head"><strong>Vật phẩm {index + 1}</strong>
-          {lines.length > 1 && <button className="button secondary small" type="button" onClick={() => { setLines(current => current.filter((_, i) => i !== index)); pending.current = null; }}>Xóa</button>}</div>
-        <div className="drive-item-fields">
-        <label><Dropdown required aria-label="Vật phẩm" aria-invalid={Boolean(lineErrors[index].item)} value={line.item_id} onChange={event => updateLine(index, { item_id: event.target.value, target_quantity: '' })}>
-          <option value="">Chọn vật phẩm</option>{items.filter(option => option.value === line.item_id || !lines.some(other => other.item_id === option.value)).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-        </Dropdown>{line.item_id && lineErrors[index].item && <small className="field-error" role="alert">{lineErrors[index].item}</small>}</label>
-        <label><span>Số lượng mục tiêu *</span><input required type="number" min="0" step={10 ** -Number(itemScales.find(item => item.value === line.item_id)?.label ?? 0)} aria-invalid={Boolean(line.target_quantity && lineErrors[index].quantity)} value={line.target_quantity} onChange={event => updateLine(index, { target_quantity: event.target.value })} />{line.target_quantity && lineErrors[index].quantity && <small className="field-error" role="alert">{lineErrors[index].quantity}</small>}</label>
-        <label><span>Hướng dẫn tiếp nhận cho người quyên góp (nếu có)</span><input maxLength={501} aria-invalid={Boolean(lineErrors[index].note)} value={line.acceptance_note} onChange={event => updateLine(index, { acceptance_note: event.target.value })} />{lineErrors[index].note && <small className="field-error" role="alert">{lineErrors[index].note}</small>}</label>
-        </div>
-      </div>)}
-      <button className="button secondary" type="button" disabled={lines.length >= Math.min(50, items.length)} onClick={() => { setLines(current => [...current, emptyItem()]); pending.current = null; }}>+ Thêm vật phẩm</button>
-    </fieldset>
+    </div></details>
+
     {error && <p className="notice error" role="alert">{error}</p>}
     <div className="form-actions"><button className="button" disabled={busy || hasInvalidFields}>{busy ? (edit ? 'Đang lưu…' : 'Đang tạo…') : (edit ? 'Lưu thay đổi' : 'Tạo đợt quyên góp')}</button>{hasInvalidFields && !busy && <span className="muted">Điền đủ tên, mô tả, kho, vị trí trong vùng phục vụ và vật phẩm.</span>}</div>
   </form>;

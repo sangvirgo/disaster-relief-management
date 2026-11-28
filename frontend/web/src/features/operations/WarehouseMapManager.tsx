@@ -63,10 +63,14 @@ export function WarehouseMapManager({ canManage, canManageDrives, warehouseOptio
   const draftKey = useRef<string | null>(null);
   const [hovered, setHovered] = useState<HoverTarget | null>(null);
   const addMenuRef = useRef<HTMLDetailsElement>(null);
+  const [requestedEditDrive] = useState(() => new URL(window.location.href).searchParams.get('edit_drive'));
   useEffect(() => {
     const url = new URL(window.location.href);
-    const driveId = url.searchParams.get('edit_drive');
+    const driveId = requestedEditDrive;
     if (!canManageDrives || !driveId || !/^[0-9a-f-]{36}$/i.test(driveId)) return;
+    url.searchParams.delete('edit_drive');
+    window.history.replaceState(null, '', url);
+    setActionError('');
     let live = true;
     void loadStaffDrive<Drive>(driveId).then(drive => {
       if (!live) return;
@@ -75,7 +79,7 @@ export function WarehouseMapManager({ canManage, canManageDrives, warehouseOptio
       setDialog({ kind: 'edit-drive', drive });
     }).catch(error => { if (live) setActionError(error instanceof Error ? error.message : 'Chưa mở được bản nháp.'); });
     return () => { live = false; };
-  }, [canManageDrives]);
+  }, [canManageDrives, requestedEditDrive]);
 
   useEffect(() => {
     const url = new URL(window.location.href);

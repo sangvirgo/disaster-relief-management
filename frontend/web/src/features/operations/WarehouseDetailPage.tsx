@@ -1,3 +1,4 @@
+import { itemUnitName } from '../../i18n/units';
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { fetchAll } from '../../api/fetchAll';
@@ -8,6 +9,7 @@ import './warehouse-detail.css';
 
 type Stock = {
   balance_id: string;
+  item_id?: string;
   item_name: string;
   unit: string;
   on_hand: string;
@@ -79,7 +81,7 @@ export function WarehouseDetailPage({ warehouseId, warehouseName }: { warehouseI
       {stock.length > 0 && <div className="stock-table-scroll" role="region" aria-label="Bảng tồn kho" tabIndex={0}>
         <table className="stock-table"><thead><tr><th>Vật phẩm</th><th>Đơn vị</th><th>Tồn thực tế</th><th>Đã giữ</th><th>Có thể xuất</th></tr></thead>
           <tbody>{stock.map((row) => <tr key={row.balance_id}>
-            <th scope="row">{row.item_name}</th><td>{row.unit}</td>
+            <th scope="row">{row.item_name}</th><td>{itemUnitName(row.item_id, row.unit)}</td>
             <td>{formatQuantity(row.on_hand)}</td><td>{formatQuantity(row.reserved)}</td><td><strong>{formatQuantity(row.available)}</strong></td>
           </tr>)}</tbody></table>
       </div>}
