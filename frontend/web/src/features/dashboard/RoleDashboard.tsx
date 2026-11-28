@@ -130,11 +130,34 @@ function DashboardTabs({ children }: { children: (view: (typeof dashboardViews)[
 
 const sosQueue = '?workspace=coordinator&page=campaigns&campaign_tab=sos';
 
+type WeekSummary = { status_counts?: Counts; active_missions?: number; overdue_missions?: number };
+// Fixed once per page load so the snapshot path (and its fetch) stays stable across renders.
+const weekWindow = (() => {
+  const now = new Date();
+  return new URLSearchParams({ from: new Date(now.getTime() - 7 * 86_400_000).toISOString(), to: now.toISOString() }).toString();
+})();
+
+/** Every SOS received in the last 7 days by status, including resolved and closed ones (moved from the old overview page). */
+function WeekSummaryPanel() {
+  const snapshot = useSnapshot<WeekSummary>('response', `/reports/summary?${weekWindow}`);
+  const { data } = snapshot;
+  return <Panel title="SOS trong 7 ngày qua" onRefresh={snapshot.refresh} loading={snapshot.loading} error={snapshot.error}>
+    {data && <>
+      <Kpis items={[
+        { title: 'Tổng SOS nhận', value: sum(data.status_counts) },
+        { title: 'Nhiệm vụ đang hoạt động', value: data.active_missions ?? 0 },
+        { title: 'Nhiệm vụ quá hạn', value: data.overdue_missions ?? 0, hint: 'Cần theo dõi' },
+      ]} />
+      <Bars title="Theo trạng thái (gồm cả đã giải quyết, đã đóng)" counts={data.status_counts} labelFor={requestStatusLabel} />
+    </>}
+  </Panel>;
+}
+
 function ResponseOverviewPanels({ view, compact = false }: { view: 'overview' | 'report'; compact?: boolean }) {
   const snapshot = useSnapshot<ResponseOverview>('response', '/dashboard/overview');
   const { data } = snapshot;
   const missions = sum(data?.missions.active_by_status);
-  if (view === 'report') return <Panel title="Báo cáo ứng cứu" updated={data?.generated_at} onRefresh={snapshot.refresh} loading={snapshot.loading} error={snapshot.error}>
+  if (view === 'report') return <><Panel title="Báo cáo ứng cứu" updated={data?.generated_at} onRefresh={snapshot.refresh} loading={snapshot.loading} error={snapshot.error}>
     {data && <div className="dash-grid">
       <Bars title="SOS đang mở theo trạng thái" counts={data.requests.open_by_status} labelFor={requestStatusLabel} />
       <Bars title="Mức ưu tiên đã quyết định" counts={data.requests.open_by_priority} order={['P1', 'P2', 'P3', 'P4']} />
@@ -146,7 +169,7 @@ function ResponseOverviewPanels({ view, compact = false }: { view: 'overview' | 
         labelFor={(code) => ({ AVAILABLE: 'Sẵn sàng', ON_MISSION: 'Đang làm nhiệm vụ', AWAITING_READINESS: 'Chờ xác nhận sẵn sàng', UNAVAILABLE: 'Không sẵn sàng' }[code] || code)} />
     </div>}
     {data && <a className="dash-link" href="?workspace=coordinator&page=campaigns&campaign_tab=routing&map_layer=density">Xem bản đồ nhiệt SOS ›</a>}
-  </Panel>;
+  </Panel>{!compact && <WeekSummaryPanel />}</>;
   return <Panel title={compact ? 'Tình hình ứng cứu' : 'Việc cần xử lý'} updated={data?.generated_at} onRefresh={snapshot.refresh} loading={snapshot.loading} error={snapshot.error}>
     {data && <>
       {!compact && <AttentionList empty="Không có SOS nguy hiểm, quá hạn hay chờ giao đội." items={[
